@@ -7,6 +7,7 @@ import type {
   UpcomingEvent,
   TodoItem,
   DueItem,
+  CanvasTab,
 } from '../types/canvas'
 
 type IpcResult<T> = { ok: boolean; data?: T; error?: string }
@@ -134,6 +135,19 @@ export function useFileBytes(fileId: string | number | undefined, options?: Part
     },
     enabled: fileId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 60, // 1h caching for file bytes
+    ...options,
+  })
+}
+
+export function useCourseTabs(courseId: string | number | undefined, includeExternal = true, options?: Partial<UseQueryOptions<CanvasTab[], Error, CanvasTab[]>>) {
+  return useQuery<CanvasTab[], Error, CanvasTab[]>({
+    queryKey: ['course-tabs', courseId, includeExternal],
+    queryFn: async () => {
+      if (courseId == null) return []
+      return ensureOk(await window.canvas.listCourseTabs?.(courseId, includeExternal))
+    },
+    enabled: courseId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
     ...options,
   })
 }

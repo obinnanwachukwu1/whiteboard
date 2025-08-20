@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('canvas', {
   listAssignmentsWithSubmission: (courseId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listAssignmentsWithSubmission', courseId, perPage),
   listAssignmentGroups: (courseId: string | number, includeAssignments?: boolean) => ipcRenderer.invoke('canvas:listAssignmentGroups', courseId, includeAssignments),
   listMyEnrollmentsForCourse: (courseId: string | number) => ipcRenderer.invoke('canvas:listMyEnrollmentsForCourse', courseId),
+  listCourseTabs: (courseId: string | number, includeExternal?: boolean) => ipcRenderer.invoke('canvas:listCourseTabs', courseId, includeExternal),
 })
 
 contextBridge.exposeInMainWorld('settings', {

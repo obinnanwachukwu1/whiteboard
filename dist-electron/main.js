@@ -11681,7 +11681,14 @@ var _eval = EvalError;
 var range = RangeError;
 var ref = ReferenceError;
 var syntax = SyntaxError;
-var type = TypeError;
+var type;
+var hasRequiredType;
+function requireType() {
+  if (hasRequiredType) return type;
+  hasRequiredType = 1;
+  type = TypeError;
+  return type;
+}
 var uri = URIError;
 var abs$1 = Math.abs;
 var floor$1 = Math.floor;
@@ -11927,7 +11934,7 @@ function requireCallBindApplyHelpers() {
   if (hasRequiredCallBindApplyHelpers) return callBindApplyHelpers;
   hasRequiredCallBindApplyHelpers = 1;
   var bind3 = functionBind;
-  var $TypeError2 = type;
+  var $TypeError2 = requireType();
   var $call2 = requireFunctionCall();
   var $actualApply = requireActualApply();
   callBindApplyHelpers = function callBindBasic(args) {
@@ -12000,7 +12007,7 @@ var $EvalError = _eval;
 var $RangeError = range;
 var $ReferenceError = ref;
 var $SyntaxError = syntax;
-var $TypeError$1 = type;
+var $TypeError$1 = requireType();
 var $URIError = uri;
 var abs = abs$1;
 var floor = floor$1;
@@ -12331,7 +12338,7 @@ var GetIntrinsic2 = getIntrinsic;
 var $defineProperty = GetIntrinsic2("%Object.defineProperty%", true);
 var hasToStringTag = requireShams()();
 var hasOwn$1 = hasown;
-var $TypeError = type;
+var $TypeError = requireType();
 var toStringTag = hasToStringTag ? Symbol.toStringTag : null;
 var esSetTostringtag = function setToStringTag(object, value) {
   var overrideIfSet = arguments.length > 2 && !!arguments[2] && arguments[2].force;
@@ -16883,6 +16890,11 @@ class CanvasClient {
     p["include[]"] = include;
     return this.paginate(`/courses/${courseId}/assignment_groups`, p);
   }
+  listCourseTabs(courseId, includeExternal = true) {
+    const p = { per_page: 100 };
+    if (includeExternal) p["include[]"] = ["external"];
+    return this.paginate(`/courses/${courseId}/tabs`, p);
+  }
   listMyEnrollmentsForCourse(courseId) {
     const p = { user_id: "self", "type[]": ["StudentEnrollment"] };
     return this.paginate(`/courses/${courseId}/enrollments`, p);
@@ -17252,6 +17264,9 @@ async function listAssignmentGroups(courseId, includeAssignments = false) {
 async function listMyEnrollmentsForCourse(courseId) {
   return ensureClient().listMyEnrollmentsForCourse(courseId);
 }
+async function listCourseTabs(courseId, includeExternal = true) {
+  return ensureClient().listCourseTabs(courseId, includeExternal);
+}
 async function listCourseModulesGql(courseId, first = 20, itemsFirst = 50) {
   return ensureClient().listCourseModulesGql(courseId, first, itemsFirst);
 }
@@ -17522,6 +17537,15 @@ ipcMain.handle("canvas:listAssignmentGroups", async (_evt, courseId, includeAssi
 ipcMain.handle("canvas:listMyEnrollmentsForCourse", async (_evt, courseId) => {
   try {
     const data = await listMyEnrollmentsForCourse(courseId);
+    return { ok: true, data };
+  } catch (e) {
+    const msg = e instanceof CanvasError ? e.message : String((e == null ? void 0 : e.message) || e);
+    return { ok: false, error: msg };
+  }
+});
+ipcMain.handle("canvas:listCourseTabs", async (_evt, courseId, includeExternal = true) => {
+  try {
+    const data = await listCourseTabs(courseId, includeExternal);
     return { ok: true, data };
   } catch (e) {
     const msg = e instanceof CanvasError ? e.message : String((e == null ? void 0 : e.message) || e);

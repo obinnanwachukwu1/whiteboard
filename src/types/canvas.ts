@@ -68,3 +68,12 @@ export type DueItem = {
   htmlUrl?: string
 }
 
+export type CanvasTab = {
+  id?: string
+  label?: string
+  type?: string // 'internal' | 'external'
+  hidden?: boolean
+  visibility?: string
+  position?: number
+  html_url?: string
+}

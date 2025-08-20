@@ -24,6 +24,7 @@ import {
   listAssignmentsWithSubmission as svcListAssignmentsWithSubmission,
   listAssignmentGroups as svcListAssignmentGroups,
   listMyEnrollmentsForCourse as svcListMyEnrollmentsForCourse,
+  listCourseTabs as svcListCourseTabs,
 } from './canvasClient'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -277,6 +278,16 @@ ipcMain.handle('canvas:listAssignmentGroups', async (_evt, courseId: string | nu
 ipcMain.handle('canvas:listMyEnrollmentsForCourse', async (_evt, courseId: string | number) => {
   try {
     const data = await svcListMyEnrollmentsForCourse(courseId)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:listCourseTabs', async (_evt, courseId: string | number, includeExternal = true) => {
+  try {
+    const data = await svcListCourseTabs(courseId, includeExternal)
     return { ok: true, data }
   } catch (e: any) {
     const msg = e instanceof CanvasError ? e.message : String(e?.message || e)

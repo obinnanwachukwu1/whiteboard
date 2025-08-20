@@ -187,6 +187,12 @@ export class CanvasClient {
     return this.paginate<any>(`/courses/${courseId}/assignment_groups`, p)
   }
 
+  listCourseTabs(courseId: string | number, includeExternal = true) {
+    const p: Record<string, any> = { per_page: 100 }
+    if (includeExternal) p['include[]'] = ['external']
+    return this.paginate<any>(`/courses/${courseId}/tabs`, p)
+  }
+
   listMyEnrollmentsForCourse(courseId: string | number) {
     // Useful for comparing to Canvas-computed current/final grades
     const p: Record<string, any> = { user_id: 'self', 'type[]': ['StudentEnrollment'] }
@@ -592,6 +598,10 @@ export async function listAssignmentGroups(courseId: string | number, includeAss
 
 export async function listMyEnrollmentsForCourse(courseId: string | number) {
   return ensureClient().listMyEnrollmentsForCourse(courseId)
+}
+
+export async function listCourseTabs(courseId: string | number, includeExternal = true) {
+  return ensureClient().listCourseTabs(courseId, includeExternal)
 }
 
 export async function listCourseModulesGql(courseId: string | number, first = 20, itemsFirst = 50) {

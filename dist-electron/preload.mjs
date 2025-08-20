@@ -38,7 +38,8 @@ electron.contextBridge.exposeInMainWorld("canvas", {
   getFileBytes: (fileId) => electron.ipcRenderer.invoke("canvas:getFileBytes", fileId),
   listAssignmentsWithSubmission: (courseId, perPage) => electron.ipcRenderer.invoke("canvas:listAssignmentsWithSubmission", courseId, perPage),
   listAssignmentGroups: (courseId, includeAssignments) => electron.ipcRenderer.invoke("canvas:listAssignmentGroups", courseId, includeAssignments),
-  listMyEnrollmentsForCourse: (courseId) => electron.ipcRenderer.invoke("canvas:listMyEnrollmentsForCourse", courseId)
+  listMyEnrollmentsForCourse: (courseId) => electron.ipcRenderer.invoke("canvas:listMyEnrollmentsForCourse", courseId),
+  listCourseTabs: (courseId, includeExternal) => electron.ipcRenderer.invoke("canvas:listCourseTabs", courseId, includeExternal)
 });
 electron.contextBridge.exposeInMainWorld("settings", {
   get: () => electron.ipcRenderer.invoke("config:get"),
