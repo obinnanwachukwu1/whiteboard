@@ -2,6 +2,7 @@ import React from 'react'
 import { Card } from './ui/Card'
 import { TextField } from './ui/TextField'
 import { Button } from './ui/Button'
+import { Pencil, RotateCcw } from 'lucide-react'
 import { useCourseGradebook } from '../hooks/useCourseGradebook'
 import { calculateCourseGrades } from '../utils/gradeCalc'
 
@@ -10,35 +11,67 @@ type Props = {
 }
 
 export const CourseGrades: React.FC<Props> = ({ courseId }) => {
-  // Keep raw string input so users can type decimals naturally
-  const [rawWhatIf, setRawWhatIf] = React.useState<Record<string | number, string>>({})
+  // Keep raw percent input so users can type decimals naturally
+  const [rawWhatIfPct, setRawWhatIfPct] = React.useState<Record<string | number, string>>({})
+  const [editingId, setEditingId] = React.useState<string | number | null>(null)
+  const inputRefs = React.useRef<Record<string, HTMLInputElement | null>>({})
   const { data, isLoading, error, refetch, isFetching } = useCourseGradebook(courseId)
   const groups = data?.groups || []
   const assignments = data?.assignments || []
   const rawAssignments = data?.raw || []
 
-  // Derive numeric overrides for calculator
+  // Derive numeric point overrides for calculator from percent entries
   const whatIf = React.useMemo(() => {
+    const byIdPossible = new Map<string, number>()
+    for (const a of rawAssignments) {
+      byIdPossible.set(String(a?.id), Number(a?.points_possible ?? 0))
+    }
     const out: Record<string | number, number | null> = {}
-    for (const [k, v] of Object.entries(rawWhatIf)) {
+    for (const [k, v] of Object.entries(rawWhatIfPct)) {
       if (v == null || v.trim() === '') { out[k] = null; continue }
-      const n = parseFloat(v)
-      out[k] = Number.isFinite(n) ? n : null
+      const pct = parseFloat(v)
+      if (!Number.isFinite(pct)) { out[k] = null; continue }
+      const possible = byIdPossible.get(String(k)) || 0
+      out[k] = possible > 0 ? (pct / 100) * possible : 0
     }
     return out
-  }, [rawWhatIf])
+  }, [rawWhatIfPct, rawAssignments])
 
   const calc = React.useMemo(() => {
     if (!groups.length) return null as any
     return calculateCourseGrades(groups, assignments, { useWeights: 'auto', treatUngradedAsZero: true, whatIf })
   }, [groups, assignments, whatIf])
 
+  // Global click-away to exit edit mode if clicking outside the active input
+  React.useEffect(() => {
+    if (editingId == null) return
+    const handler = (e: MouseEvent) => {
+      const ref = inputRefs.current[String(editingId)]
+      if (!ref) { setEditingId(null); return }
+      if (e.target instanceof Node) {
+        if (!ref.contains(e.target)) {
+          setEditingId(null)
+        }
+      }
+    }
+    document.addEventListener('mousedown', handler, true)
+    return () => document.removeEventListener('mousedown', handler, true)
+  }, [editingId])
+
   function onChangeWhatIf(id: string | number, v: string) {
-    setRawWhatIf((prev) => ({ ...prev, [id]: v }))
+    // Sanitize: allow only digits and a single decimal point
+    const sanitized = (() => {
+      let s = v.replace(/[^0-9.]/g, '')
+      const dot = s.indexOf('.')
+      if (dot >= 0) s = s.slice(0, dot + 1) + s.slice(dot + 1).replace(/\./g, '')
+      return s
+    })()
+    setRawWhatIfPct((prev) => ({ ...prev, [id]: sanitized }))
   }
 
   function clearOverrides() {
-    setRawWhatIf({})
+    setRawWhatIfPct({})
+    setEditingId(null)
   }
 
   return (
@@ -89,9 +122,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                   <tr className="text-left border-b border-gray-200 dark:border-slate-700">
                     <th className="py-2 pr-3">Assignment</th>
                     <th className="py-2 pr-3 w-24 text-right">Pts</th>
-                    <th className="py-2 pr-3 w-28 text-right">Score</th>
-                    <th className="py-2 pr-3 w-32 text-right">What‑If</th>
-                    <th className="py-2 pr-0 w-16 text-right"></th>
+                    <th className="py-2 pr-0 w-56 text-right">Score</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -112,28 +143,110 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                           const id = a?.id
                           const pts = a?.points_possible ?? null
                           const score = a?.submission?.excused ? 'Excused' : (a?.submission?.score ?? null)
-                          const raw = rawWhatIf[id] ?? ''
+                          const raw = rawWhatIfPct[id] ?? ''
+                          const possible = Number(pts || 0)
+                          const apiPct = possible > 0 && typeof score === 'number' ? (score / possible) * 100 : null
+                          const showPct = (raw?.trim?.() ? parseFloat(raw) : null) ?? apiPct
+                          const display = typeof showPct === 'number' && Number.isFinite(showPct) ? `${Math.round(showPct * 10) / 10}%` : (typeof score === 'string' ? score : '—')
                           return (
                             <tr key={id} className="border-b border-gray-100 dark:border-slate-800">
                               <td className="py-2 pr-3 max-w-0">
-                                <div className="font-medium truncate">{a?.name}</div>
+                                <div className="font-medium truncate" title={a?.name}>{a?.name}</div>
                                 <div className="text-xs text-slate-500 whitespace-nowrap">{a?.due_at ? new Date(a?.due_at).toLocaleString() : 'No due date'}</div>
                               </td>
                               <td className="py-2 pr-3 whitespace-nowrap text-right tabular-nums">{pts ?? '—'}</td>
-                              <td className="py-2 pr-3 whitespace-nowrap text-right tabular-nums">{score ?? '—'}</td>
-                              <td className="py-2 pr-3 w-32 text-right">
-                                <TextField
-                                  placeholder="—"
-                                  value={raw}
-                                  onChange={(e) => onChangeWhatIf(id, e.target.value)}
-                                  inputMode="decimal"
-                                  className="text-right"
-                                />
-                              </td>
-                              <td className="py-2 pr-0 text-right">
-                                {a?.html_url && (
-                                  <a href={a.html_url} className="text-brand hover:underline" target="_blank" rel="noreferrer">Open</a>
-                                )}
+                              <td className="py-2 pr-0 whitespace-nowrap text-right">
+                                <div className="inline-flex items-center gap-2 justify-end w-full">
+                                  {editingId !== id ? (
+                                    <>
+                                      <span className="tabular-nums">{display}</span>
+                                      <button
+                                        aria-label="Edit"
+                                        className="text-brand hover:text-indigo-600"
+                                        onClick={() => {
+                                          // Prefill with API percent if no current override so cursor can move immediately
+                                          setRawWhatIfPct((prev) => {
+                                            const curr = prev[id]
+                                            if ((curr == null || String(curr).trim() === '') && apiPct != null) {
+                                              return { ...prev, [id]: String(Math.round(apiPct * 10) / 10) }
+                                            }
+                                            return prev
+                                          })
+                                          setEditingId(id)
+                                          setTimeout(() => {
+                                            const ref = inputRefs.current[String(id)]
+                                            ref?.focus()
+                                            // place caret at end
+                                            try {
+                                              const val = ref?.value || ''
+                                              ref?.setSelectionRange(val.length, val.length)
+                                            } catch {}
+                                          }, 0)
+                                        }}
+                                      >
+                                        <Pencil className="w-4 h-4" />
+                                      </button>
+                                      {raw?.trim?.() && (
+                                        <button
+                                          aria-label="Revert"
+                                          className="text-slate-500 hover:text-slate-700"
+                                          onClick={() => {
+                                            const { [id]: _, ...rest } = rawWhatIfPct as any
+                                            setRawWhatIfPct(rest)
+                                            if (editingId === id) setEditingId(null)
+                                          }}
+                                        >
+                                          <RotateCcw className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <input
+                                        type="text"
+                                        placeholder={'0'}
+                                        value={raw}
+                                        onChange={(e) => onChangeWhatIf(id, e.target.value)}
+                                        onBlur={() => {
+                                          // If left empty, treat as 0 per user request
+                                          if (!raw || raw.trim() === '') {
+                                            setRawWhatIfPct((prev) => ({ ...prev, [id]: '0' }))
+                                          }
+                                          setEditingId((curr) => (curr === id ? null : curr))
+                                        }}
+                                        inputMode="decimal"
+                                        ref={(el) => { inputRefs.current[String(id)] = el }}
+                                        onPaste={(e) => {
+                                          e.preventDefault()
+                                          const text = (e.clipboardData || (window as any).clipboardData).getData('text') || ''
+                                          onChangeWhatIf(id, text)
+                                          // focus will remain; caret at end next tick
+                                          setTimeout(() => {
+                                            const ref = inputRefs.current[String(id)]
+                                            const val = ref?.value || ''
+                                            try { ref?.setSelectionRange(val.length, val.length) } catch {}
+                                          }, 0)
+                                        }}
+                                        className="mt-0 inline-block w-24 px-3 py-1.5 border border-gray-300 rounded-control text-sm text-right text-slate-900 placeholder-slate-400 bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand outline-none dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 dark:focus:border-brand"
+                                      />
+                                      <span className="text-slate-500">%</span>
+                                      {raw?.trim?.() && (
+                                        <button
+                                          aria-label="Revert"
+                                          className="text-slate-500 hover:text-slate-700"
+                                          onMouseDown={(e) => e.preventDefault()}
+                                          onClick={() => {
+                                            const { [id]: _, ...rest } = rawWhatIfPct as any
+                                            setRawWhatIfPct(rest)
+                                            setEditingId(null)
+                                          }}
+                                        >
+                                          <RotateCcw className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           )
