@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import path$1 from "node:path";
 import require$$1 from "util";
@@ -16895,6 +16895,19 @@ class CanvasClient {
     if (includeExternal) p["include[]"] = ["external"];
     return this.paginate(`/courses/${courseId}/tabs`, p);
   }
+  // Announcements (Discussions API)
+  listCourseAnnouncements(courseId, perPage = 50) {
+    const p = { per_page: Math.min(100, Math.max(1, perPage)), only_announcements: true };
+    return this.paginate(`/courses/${courseId}/discussion_topics`, p);
+  }
+  // Single-page announcements fetch for pagination UI
+  listCourseAnnouncementsPage(courseId, page = 1, perPage = 10) {
+    const p = { per_page: Math.min(100, Math.max(1, perPage)), page: Math.max(1, Number(page) || 1), only_announcements: true };
+    return this.get(`/courses/${courseId}/discussion_topics`, p);
+  }
+  getAnnouncement(courseId, topicId) {
+    return this.get(`/courses/${courseId}/discussion_topics/${topicId}`);
+  }
   listMyEnrollmentsForCourse(courseId) {
     const p = { user_id: "self", "type[]": ["StudentEnrollment"] };
     return this.paginate(`/courses/${courseId}/enrollments`, p);
@@ -17090,6 +17103,13 @@ class CanvasClient {
     }
     return this.get(`/courses/${courseId}/pages/${slug}`);
   }
+  // Course info + front page
+  async getCourseInfo(courseId) {
+    return this.get(`/courses/${courseId}`, { "include[]": ["syllabus_body"] });
+  }
+  async getCourseFrontPage(courseId) {
+    return this.get(`/courses/${courseId}/front_page`);
+  }
   // Assignments (REST detail for description)
   async getAssignmentRest(courseId, assignmentRestId) {
     return this.get(`/courses/${courseId}/assignments/${assignmentRestId}`);
@@ -17112,6 +17132,16 @@ class CanvasClient {
       throw new Error(`Failed to fetch file bytes: ${response.statusText}`);
     }
     return response.arrayBuffer();
+  }
+  async listCourseFolders(courseId, perPage = 100) {
+    return this.paginate(`/courses/${courseId}/folders`, { per_page: Math.min(100, Math.max(1, perPage)) });
+  }
+  async listFolderFiles(folderId, perPage = 100) {
+    return this.paginate(`/folders/${folderId}/files`, { per_page: Math.min(100, Math.max(1, perPage)) });
+  }
+  async listCourseFiles(courseId, perPage = 100, sort = "updated_at", order = "desc") {
+    const p = { per_page: Math.min(100, Math.max(1, perPage)), sort, order };
+    return this.paginate(`/courses/${courseId}/files`, p);
   }
   async listDueAssignmentsGql(params = {}) {
     const days = params.days ?? 7;
@@ -17267,6 +17297,15 @@ async function listMyEnrollmentsForCourse(courseId) {
 async function listCourseTabs(courseId, includeExternal = true) {
   return ensureClient().listCourseTabs(courseId, includeExternal);
 }
+async function listCourseAnnouncements(courseId, perPage = 50) {
+  return ensureClient().listCourseAnnouncements(courseId, perPage);
+}
+async function listCourseAnnouncementsPage(courseId, page = 1, perPage = 10) {
+  return ensureClient().listCourseAnnouncementsPage(courseId, page, perPage);
+}
+async function getAnnouncement(courseId, topicId) {
+  return ensureClient().getAnnouncement(courseId, topicId);
+}
 async function listCourseModulesGql(courseId, first = 20, itemsFirst = 50) {
   return ensureClient().listCourseModulesGql(courseId, first, itemsFirst);
 }
@@ -17285,6 +17324,12 @@ async function listCoursePages(courseId, perPage = 100) {
 async function getCoursePage(courseId, slugOrUrl) {
   return ensureClient().getCoursePage(courseId, slugOrUrl);
 }
+async function getCourseInfo(courseId) {
+  return ensureClient().getCourseInfo(courseId);
+}
+async function getCourseFrontPage(courseId) {
+  return ensureClient().getCourseFrontPage(courseId);
+}
 async function getAssignmentRest(courseId, assignmentRestId) {
   return ensureClient().getAssignmentRest(courseId, assignmentRestId);
 }
@@ -17293,6 +17338,15 @@ async function getFile(fileId) {
 }
 async function getFileBytes(fileId) {
   return ensureClient().getFileBytes(fileId);
+}
+async function listCourseFiles(courseId, perPage = 100, sort = "updated_at", order = "desc") {
+  return ensureClient().listCourseFiles(courseId, perPage, sort, order);
+}
+async function listCourseFolders(courseId, perPage = 100) {
+  return ensureClient().listCourseFolders(courseId, perPage);
+}
+async function listFolderFiles(folderId, perPage = 100) {
+  return ensureClient().listFolderFiles(folderId, perPage);
 }
 const DEFAULT_CONFIG = {
   baseUrl: "https://gatech.instructure.com",
@@ -17552,6 +17606,78 @@ ipcMain.handle("canvas:listCourseTabs", async (_evt, courseId, includeExternal =
     return { ok: false, error: msg };
   }
 });
+ipcMain.handle("canvas:listCourseAnnouncements", async (_evt, courseId, perPage = 50) => {
+  try {
+    const data = await listCourseAnnouncements(courseId, perPage);
+    return { ok: true, data };
+  } catch (e) {
+    const msg = e instanceof CanvasError ? e.message : String((e == null ? void 0 : e.message) || e);
+    return { ok: false, error: msg };
+  }
+});
+ipcMain.handle("canvas:listCourseAnnouncementsPage", async (_evt, courseId, page = 1, perPage = 10) => {
+  try {
+    const data = await listCourseAnnouncementsPage(courseId, page, perPage);
+    return { ok: true, data };
+  } catch (e) {
+    const msg = e instanceof CanvasError ? e.message : String((e == null ? void 0 : e.message) || e);
+    return { ok: false, error: msg };
+  }
+});
+ipcMain.handle("canvas:getCourseInfo", async (_evt, courseId) => {
+  try {
+    const data = await getCourseInfo(courseId);
+    return { ok: true, data };
+  } catch (e) {
+    const msg = e instanceof CanvasError ? e.message : String((e == null ? void 0 : e.message) || e);
+    return { ok: false, error: msg };
+  }
+});
+ipcMain.handle("canvas:getCourseFrontPage", async (_evt, courseId) => {
+  try {
+    const data = await getCourseFrontPage(courseId);
+    return { ok: true, data };
+  } catch (e) {
+    const msg = e instanceof CanvasError ? e.message : String((e == null ? void 0 : e.message) || e);
+    return { ok: false, error: msg };
+  }
+});
+ipcMain.handle("canvas:listCourseFiles", async (_evt, courseId, perPage = 100, sort = "updated_at", order = "desc") => {
+  try {
+    const data = await listCourseFiles(courseId, perPage, sort, order);
+    return { ok: true, data };
+  } catch (e) {
+    const msg = e instanceof CanvasError ? e.message : String((e == null ? void 0 : e.message) || e);
+    return { ok: false, error: msg };
+  }
+});
+ipcMain.handle("canvas:listCourseFolders", async (_evt, courseId, perPage = 100) => {
+  try {
+    const data = await listCourseFolders(courseId, perPage);
+    return { ok: true, data };
+  } catch (e) {
+    const msg = e instanceof CanvasError ? e.message : String((e == null ? void 0 : e.message) || e);
+    return { ok: false, error: msg };
+  }
+});
+ipcMain.handle("canvas:listFolderFiles", async (_evt, folderId, perPage = 100) => {
+  try {
+    const data = await listFolderFiles(folderId, perPage);
+    return { ok: true, data };
+  } catch (e) {
+    const msg = e instanceof CanvasError ? e.message : String((e == null ? void 0 : e.message) || e);
+    return { ok: false, error: msg };
+  }
+});
+ipcMain.handle("canvas:getAnnouncement", async (_evt, courseId, topicId) => {
+  try {
+    const data = await getAnnouncement(courseId, topicId);
+    return { ok: true, data };
+  } catch (e) {
+    const msg = e instanceof CanvasError ? e.message : String((e == null ? void 0 : e.message) || e);
+    return { ok: false, error: msg };
+  }
+});
 ipcMain.handle("canvas:getFileBytes", async (_evt, fileId) => {
   try {
     const data = await getFileBytes(fileId);
@@ -17559,6 +17685,14 @@ ipcMain.handle("canvas:getFileBytes", async (_evt, fileId) => {
   } catch (e) {
     const msg = e instanceof CanvasError ? e.message : String((e == null ? void 0 : e.message) || e);
     return { ok: false, error: msg };
+  }
+});
+ipcMain.handle("app:openExternal", async (_evt, url2) => {
+  try {
+    await shell.openExternal(url2);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String((e == null ? void 0 : e.message) || e) };
   }
 });
 ipcMain.handle("config:get", async () => {

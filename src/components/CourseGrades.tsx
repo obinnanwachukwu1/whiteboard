@@ -1,9 +1,10 @@
 import React from 'react'
-import { Card } from './ui/Card'
+// no Card wrapper; rendered within page container
 import { TextField } from './ui/TextField'
 import { Button } from './ui/Button'
 import { Pencil, RotateCcw } from 'lucide-react'
 import { useCourseGradebook } from '../hooks/useCourseGradebook'
+import { useQueryClient } from '@tanstack/react-query'
 import { calculateCourseGrades } from '../utils/gradeCalc'
 
 type Props = {
@@ -11,6 +12,7 @@ type Props = {
 }
 
 export const CourseGrades: React.FC<Props> = ({ courseId }) => {
+  const queryClient = useQueryClient()
   // Keep raw percent input so users can type decimals naturally
   const [rawWhatIfPct, setRawWhatIfPct] = React.useState<Record<string | number, string>>({})
   const [editingId, setEditingId] = React.useState<string | number | null>(null)
@@ -41,6 +43,9 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
     if (!groups.length) return null as any
     return calculateCourseGrades(groups, assignments, { useWeights: 'auto', treatUngradedAsZero: true, whatIf })
   }, [groups, assignments, whatIf])
+
+  // Toggle: show current vs out-of-total (final) as a single percentage
+  const [outOfTotal, setOutOfTotal] = React.useState(false)
 
   // Global click-away to exit edit mode if clicking outside the active input
   React.useEffect(() => {
@@ -75,32 +80,47 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
   }
 
   return (
-    <Card className="mb-5">
+    <div>
       <div className="flex items-center justify-between mb-3">
         <h3 className="m-0 text-slate-900 dark:text-slate-100 text-base font-semibold">Grades</h3>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="ghost" onClick={() => refetch()}>Refresh</Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={async () => {
+              try {
+                await queryClient.invalidateQueries({ queryKey: ['course-gradebook', courseId] })
+              } catch {}
+              await refetch()
+            }}
+          >
+            Refresh
+          </Button>
           <Button size="sm" variant="ghost" onClick={clearOverrides}>Clear What‑If</Button>
         </div>
       </div>
-      {(isLoading || isFetching) && <div className="text-slate-500 dark:text-slate-400">Loading…</div>}
+      {(isLoading || (isFetching && !data)) && (
+        <div className="text-slate-500 dark:text-slate-400">Loading…</div>
+      )}
       {error && <div className="text-red-600">{String(error.message || error)}</div>}
 
       {calc && (
-        <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="p-3 rounded-md bg-slate-50 dark:bg-slate-800/50">
-            <div className="text-xs text-slate-500">Current</div>
-            <div className="text-lg font-semibold">{calc.current.totals.percent ?? '—'}%</div>
-            <div className="text-xs text-slate-500">{calc.current.totals.pointsEarned} / {calc.current.totals.pointsPossible} pts</div>
-          </div>
-          <div className="p-3 rounded-md bg-slate-50 dark:bg-slate-800/50">
-            <div className="text-xs text-slate-500">Final (ungraded as 0)</div>
-            <div className="text-lg font-semibold">{calc.final.totals.percent ?? '—'}%</div>
-            <div className="text-xs text-slate-500">{calc.final.totals.pointsEarned} / {calc.final.totals.pointsPossible} pts</div>
-          </div>
-          <div className="p-3 rounded-md bg-slate-50 dark:bg-slate-800/50">
-            <div className="text-xs text-slate-500">Weights</div>
-            <div className="text-sm">Auto-detected per group</div>
+        <div className="mb-4 flex justify-end">
+          <div className="text-right">
+            <div className="text-2xl md:text-3xl font-semibold tracking-tight">
+              {(outOfTotal ? calc.final.totals.percent : calc.current.totals.percent) ?? '—'}%
+            </div>
+            <label className="mt-2 inline-flex items-center gap-3 select-none">
+              <input
+                type="checkbox"
+                checked={outOfTotal}
+                onChange={(e) => setOutOfTotal(e.target.checked)}
+                className="align-middle accent-indigo-600 dark:accent-neutral-300"
+              />
+              <span className="text-slate-700 dark:text-neutral-200 text-base md:text-lg font-medium">
+                Show final grade
+              </span>
+            </label>
           </div>
         </div>
       )}
@@ -149,7 +169,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                           const showPct = (raw?.trim?.() ? parseFloat(raw) : null) ?? apiPct
                           const display = typeof showPct === 'number' && Number.isFinite(showPct) ? `${Math.round(showPct * 10) / 10}%` : (typeof score === 'string' ? score : '—')
                           return (
-                            <tr key={id} className="border-b border-gray-100 dark:border-slate-800">
+                            <tr key={id} className="border-b border-gray-100 dark:border-neutral-800 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 transition-colors">
                               <td className="py-2 pr-3 max-w-0">
                                 <div className="font-medium truncate" title={a?.name}>{a?.name}</div>
                                 <div className="text-xs text-slate-500 whitespace-nowrap">{a?.due_at ? new Date(a?.due_at).toLocaleString() : 'No due date'}</div>
@@ -260,6 +280,6 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
           })()}
         </div>
       )}
-    </Card>
+    </div>
   )
 }

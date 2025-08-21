@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import {
@@ -25,6 +25,14 @@ import {
   listAssignmentGroups as svcListAssignmentGroups,
   listMyEnrollmentsForCourse as svcListMyEnrollmentsForCourse,
   listCourseTabs as svcListCourseTabs,
+  listCourseAnnouncements as svcListCourseAnnouncements,
+  listCourseAnnouncementsPage as svcListCourseAnnouncementsPage,
+  getAnnouncement as svcGetAnnouncement,
+  getCourseInfo as svcGetCourseInfo,
+  getCourseFrontPage as svcGetCourseFrontPage,
+  listCourseFiles as svcListCourseFiles,
+  listCourseFolders as svcListCourseFolders,
+  listFolderFiles as svcListFolderFiles,
 } from './canvasClient'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -295,6 +303,86 @@ ipcMain.handle('canvas:listCourseTabs', async (_evt, courseId: string | number, 
   }
 })
 
+ipcMain.handle('canvas:listCourseAnnouncements', async (_evt, courseId: string | number, perPage = 50) => {
+  try {
+    const data = await svcListCourseAnnouncements(courseId, perPage)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:listCourseAnnouncementsPage', async (_evt, courseId: string | number, page = 1, perPage = 10) => {
+  try {
+    const data = await svcListCourseAnnouncementsPage(courseId, page, perPage)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:getCourseInfo', async (_evt, courseId: string | number) => {
+  try {
+    const data = await svcGetCourseInfo(courseId)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:getCourseFrontPage', async (_evt, courseId: string | number) => {
+  try {
+    const data = await svcGetCourseFrontPage(courseId)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:listCourseFiles', async (_evt, courseId: string | number, perPage = 100, sort: 'name' | 'size' | 'created_at' | 'updated_at' = 'updated_at', order: 'asc' | 'desc' = 'desc') => {
+  try {
+    const data = await svcListCourseFiles(courseId, perPage, sort, order)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:listCourseFolders', async (_evt, courseId: string | number, perPage = 100) => {
+  try {
+    const data = await svcListCourseFolders(courseId, perPage)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:listFolderFiles', async (_evt, folderId: string | number, perPage = 100) => {
+  try {
+    const data = await svcListFolderFiles(folderId, perPage)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:getAnnouncement', async (_evt, courseId: string | number, topicId: string | number) => {
+  try {
+    const data = await svcGetAnnouncement(courseId, topicId)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
 ipcMain.handle('canvas:getFileBytes', async (_evt, fileId: string | number) => {
   try {
     const data = await svcGetFileBytes(fileId)
@@ -302,6 +390,16 @@ ipcMain.handle('canvas:getFileBytes', async (_evt, fileId: string | number) => {
   } catch (e: any) {
     const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
     return { ok: false, error: msg }
+  }
+})
+
+// System helpers
+ipcMain.handle('app:openExternal', async (_evt, url: string) => {
+  try {
+    await shell.openExternal(url)
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
   }
 })
 

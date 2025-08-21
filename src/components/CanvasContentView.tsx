@@ -3,9 +3,9 @@ import { Button } from './ui/Button'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { HtmlContent } from './HtmlContent'
 import { PdfViewer } from './PdfViewer'
-import { useAssignmentRest, useCoursePage } from '../hooks/useCanvasQueries'
+import { useAssignmentRest, useCoursePage, useAnnouncement } from '../hooks/useCanvasQueries'
 
-type ContentType = 'page' | 'assignment' | 'file'
+type ContentType = 'page' | 'assignment' | 'file' | 'announcement'
 
 type Props = {
   courseId: string | number
@@ -24,8 +24,9 @@ export const CanvasContentView: React.FC<Props> = ({
 }) => {
   const pageQ = useCoursePage(contentType === 'page' ? courseId : undefined, contentType === 'page' ? contentId : undefined, { enabled: contentType === 'page' })
   const assignQ = useAssignmentRest(contentType === 'assignment' ? courseId : undefined, contentType === 'assignment' ? contentId : undefined, { enabled: contentType === 'assignment' })
-  const loading = pageQ.isLoading || assignQ.isLoading
-  const error = pageQ.error?.message || assignQ.error?.message || null
+  const annQ = useAnnouncement(contentType === 'announcement' ? courseId : undefined, contentType === 'announcement' ? contentId : undefined, { enabled: contentType === 'announcement' })
+  const loading = pageQ.isLoading || assignQ.isLoading || annQ.isLoading
+  const error = pageQ.error?.message || assignQ.error?.message || annQ.error?.message || null
 
   return (
     <div className="flex flex-col h-full">
@@ -40,6 +41,7 @@ export const CanvasContentView: React.FC<Props> = ({
           onClick={() => {
             if (contentType === 'page') pageQ.refetch()
             if (contentType === 'assignment') assignQ.refetch()
+            if (contentType === 'announcement') annQ.refetch()
           }}
         >
           <RefreshCw className="w-4 h-4" />
@@ -60,14 +62,14 @@ export const CanvasContentView: React.FC<Props> = ({
               {!loading && !error && contentType === 'page' && pageQ.data?.body && (
                 <HtmlContent 
                   html={pageQ.data.body} 
-                  className="prose prose-lg max-w-none dark:prose-invert" 
+                  className="rich-html" 
                 />
               )}
               {!loading && !error && contentType === 'assignment' && assignQ.data?.description && (
-                <HtmlContent
-                  html={assignQ.data.description}
-                  className="prose prose-lg max-w-none dark:prose-invert"
-                />
+                <HtmlContent html={assignQ.data.description} className="rich-html" />
+              )}
+              {!loading && !error && contentType === 'announcement' && annQ.data?.message && (
+                <HtmlContent html={annQ.data.message} className="rich-html" />
               )}
               {!loading && !error && ((contentType === 'page' && !pageQ.data?.body) || (contentType === 'assignment' && !assignQ.data?.description)) && (
                 <div className="text-slate-500 dark:text-slate-400 text-sm">No content available</div>

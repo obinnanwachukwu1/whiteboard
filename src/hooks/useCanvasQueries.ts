@@ -1,4 +1,4 @@
-import { useQuery, UseQueryOptions } from '@tanstack/react-query'
+import { useQuery, UseQueryOptions, useInfiniteQuery } from '@tanstack/react-query'
 import type {
   CanvasProfile,
   CanvasCourse,
@@ -147,6 +147,121 @@ export function useCourseTabs(courseId: string | number | undefined, includeExte
       return ensureOk(await window.canvas.listCourseTabs?.(courseId, includeExternal))
     },
     enabled: courseId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
+    ...options,
+  })
+}
+
+export function useCourseAnnouncements(courseId: string | number | undefined, perPage = 50, options?: Partial<UseQueryOptions<any[], Error, any[]>>) {
+  return useQuery<any[], Error, any[]>({
+    queryKey: ['course-announcements', courseId, perPage],
+    queryFn: async () => {
+      if (courseId == null) return []
+      return ensureOk(await window.canvas.listCourseAnnouncements?.(courseId, perPage))
+    },
+    enabled: courseId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
+    ...options,
+  })
+}
+
+export function useAnnouncement(courseId: string | number | undefined, topicId: string | number | undefined, options?: Partial<UseQueryOptions<any, Error, any>>) {
+  return useQuery<any, Error, any>({
+    queryKey: ['announcement', courseId, topicId],
+    queryFn: async () => {
+      if (courseId == null || topicId == null) return null
+      return ensureOk(await window.canvas.getAnnouncement?.(courseId, topicId))
+    },
+    enabled: courseId != null && topicId != null && (options?.enabled ?? true),
+    ...options,
+  })
+}
+
+export function useCourseInfo(courseId: string | number | undefined, options?: Partial<UseQueryOptions<any, Error, any>>) {
+  return useQuery<any, Error, any>({
+    queryKey: ['course-info', courseId],
+    queryFn: async () => {
+      if (courseId == null) return null
+      return ensureOk(await window.canvas.getCourseInfo?.(courseId))
+    },
+    enabled: courseId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
+    ...options,
+  })
+}
+
+export function useCourseFrontPage(courseId: string | number | undefined, options?: Partial<UseQueryOptions<any, Error, any>>) {
+  return useQuery<any, Error, any>({
+    queryKey: ['course-front-page', courseId],
+    queryFn: async () => {
+      if (courseId == null) return null
+      return ensureOk(await window.canvas.getCourseFrontPage?.(courseId))
+    },
+    enabled: courseId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
+    ...options,
+  })
+}
+
+export function useCourseAnnouncementsInfinite(courseId: string | number | undefined, perPage = 10) {
+  return useInfiniteQuery<any[], Error, any[], any, number>({
+    queryKey: ['course-announcements-infinite', courseId, perPage],
+    queryFn: async ({ pageParam = 1 }) => {
+      if (courseId == null) return []
+      const res = await window.canvas.listCourseAnnouncementsPage?.(courseId, pageParam, perPage)
+      if (!res?.ok) throw new Error(res?.error || 'Failed to load announcements')
+      return res.data || []
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _pages, lastPageParam) => {
+      // If we received less than perPage items, assume no more pages
+      if (!Array.isArray(lastPage) || lastPage.length < perPage) return undefined
+      return (lastPageParam || 1) + 1
+    },
+    enabled: courseId != null,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useCourseFiles(courseId: string | number | undefined, perPage = 100, sort: 'name' | 'size' | 'created_at' | 'updated_at' = 'updated_at', order: 'asc' | 'desc' = 'desc', options?: Partial<UseQueryOptions<any[], Error, any[]>>) {
+  return useQuery<any[], Error, any[]>({
+    queryKey: ['course-files', courseId, perPage, sort, order],
+    queryFn: async () => {
+      if (courseId == null) return []
+      const res = await window.canvas.listCourseFiles?.(courseId, perPage, sort, order)
+      if (!res?.ok) throw new Error(res?.error || 'Failed to load files')
+      return res.data || []
+    },
+    enabled: courseId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
+    ...options,
+  })
+}
+export function useCourseFolders(courseId: string | number | undefined, perPage = 100, options?: Partial<UseQueryOptions<any[], Error, any[]>>) {
+  return useQuery<any[], Error, any[]>({
+    queryKey: ['course-folders', courseId, perPage],
+    queryFn: async () => {
+      if (courseId == null) return []
+      const res = await window.canvas.listCourseFolders?.(courseId, perPage)
+      if (!res?.ok) throw new Error(res?.error || 'Failed to load folders')
+      return res.data || []
+    },
+    enabled: courseId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
+    ...options,
+  })
+}
+
+export function useFolderFiles(folderId: string | number | undefined, perPage = 100, options?: Partial<UseQueryOptions<any[], Error, any[]>>) {
+  return useQuery<any[], Error, any[]>({
+    queryKey: ['folder-files', folderId, perPage],
+    queryFn: async () => {
+      if (folderId == null) return []
+      const res = await window.canvas.listFolderFiles?.(folderId, perPage)
+      if (!res?.ok) throw new Error(res?.error || 'Failed to load folder files')
+      return res.data || []
+    },
+    enabled: folderId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 5,
     ...options,
   })

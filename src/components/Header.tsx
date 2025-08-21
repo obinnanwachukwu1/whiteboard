@@ -34,7 +34,8 @@ export const Header: React.FC<Props> = ({ profile }) => {
   useEffect(() => {
     const root = document.documentElement
     if (dark) {
-      root.style.setProperty('--app-accent-bg', 'rgb(15 23 42 / 0.8)')
+      // Neutral black/gray glass instead of blue-ish slate
+      root.style.setProperty('--app-accent-bg', 'rgb(18 18 18 / 0.85)')
     } else {
       root.style.setProperty('--app-accent-bg', 'rgb(255 255 255 / 0.8)')
     }

@@ -44,11 +44,24 @@ contextBridge.exposeInMainWorld('canvas', {
   listAssignmentGroups: (courseId: string | number, includeAssignments?: boolean) => ipcRenderer.invoke('canvas:listAssignmentGroups', courseId, includeAssignments),
   listMyEnrollmentsForCourse: (courseId: string | number) => ipcRenderer.invoke('canvas:listMyEnrollmentsForCourse', courseId),
   listCourseTabs: (courseId: string | number, includeExternal?: boolean) => ipcRenderer.invoke('canvas:listCourseTabs', courseId, includeExternal),
+  listCourseAnnouncements: (courseId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listCourseAnnouncements', courseId, perPage),
+  listCourseAnnouncementsPage: (courseId: string | number, page?: number, perPage?: number) => ipcRenderer.invoke('canvas:listCourseAnnouncementsPage', courseId, page, perPage),
+  getCourseInfo: (courseId: string | number) => ipcRenderer.invoke('canvas:getCourseInfo', courseId),
+  getCourseFrontPage: (courseId: string | number) => ipcRenderer.invoke('canvas:getCourseFrontPage', courseId),
+  getAnnouncement: (courseId: string | number, topicId: string | number) => ipcRenderer.invoke('canvas:getAnnouncement', courseId, topicId),
+  listCourseFiles: (courseId: string | number, perPage?: number, sort?: 'name' | 'size' | 'created_at' | 'updated_at', order?: 'asc' | 'desc') => ipcRenderer.invoke('canvas:listCourseFiles', courseId, perPage, sort, order),
+  listCourseFolders: (courseId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listCourseFolders', courseId, perPage),
+  listFolderFiles: (folderId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listFolderFiles', folderId, perPage),
 })
 
 contextBridge.exposeInMainWorld('settings', {
   get: () => ipcRenderer.invoke('config:get'),
   set: (partial: Partial<{ baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; prefetchEnabled?: boolean; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> } }>) => ipcRenderer.invoke('config:set', partial),
+})
+
+// System helpers
+contextBridge.exposeInMainWorld('system', {
+  openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
 })
 
 // Platform helpers + body class for macOS styling hooks

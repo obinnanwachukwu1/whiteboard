@@ -39,11 +39,22 @@ electron.contextBridge.exposeInMainWorld("canvas", {
   listAssignmentsWithSubmission: (courseId, perPage) => electron.ipcRenderer.invoke("canvas:listAssignmentsWithSubmission", courseId, perPage),
   listAssignmentGroups: (courseId, includeAssignments) => electron.ipcRenderer.invoke("canvas:listAssignmentGroups", courseId, includeAssignments),
   listMyEnrollmentsForCourse: (courseId) => electron.ipcRenderer.invoke("canvas:listMyEnrollmentsForCourse", courseId),
-  listCourseTabs: (courseId, includeExternal) => electron.ipcRenderer.invoke("canvas:listCourseTabs", courseId, includeExternal)
+  listCourseTabs: (courseId, includeExternal) => electron.ipcRenderer.invoke("canvas:listCourseTabs", courseId, includeExternal),
+  listCourseAnnouncements: (courseId, perPage) => electron.ipcRenderer.invoke("canvas:listCourseAnnouncements", courseId, perPage),
+  listCourseAnnouncementsPage: (courseId, page, perPage) => electron.ipcRenderer.invoke("canvas:listCourseAnnouncementsPage", courseId, page, perPage),
+  getCourseInfo: (courseId) => electron.ipcRenderer.invoke("canvas:getCourseInfo", courseId),
+  getCourseFrontPage: (courseId) => electron.ipcRenderer.invoke("canvas:getCourseFrontPage", courseId),
+  getAnnouncement: (courseId, topicId) => electron.ipcRenderer.invoke("canvas:getAnnouncement", courseId, topicId),
+  listCourseFiles: (courseId, perPage, sort, order) => electron.ipcRenderer.invoke("canvas:listCourseFiles", courseId, perPage, sort, order),
+  listCourseFolders: (courseId, perPage) => electron.ipcRenderer.invoke("canvas:listCourseFolders", courseId, perPage),
+  listFolderFiles: (folderId, perPage) => electron.ipcRenderer.invoke("canvas:listFolderFiles", folderId, perPage)
 });
 electron.contextBridge.exposeInMainWorld("settings", {
   get: () => electron.ipcRenderer.invoke("config:get"),
   set: (partial) => electron.ipcRenderer.invoke("config:set", partial)
+});
+electron.contextBridge.exposeInMainWorld("system", {
+  openExternal: (url) => electron.ipcRenderer.invoke("app:openExternal", url)
 });
 electron.contextBridge.exposeInMainWorld("platform", {
   isMac: process.platform === "darwin"

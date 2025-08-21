@@ -193,6 +193,20 @@ export class CanvasClient {
     return this.paginate<any>(`/courses/${courseId}/tabs`, p)
   }
 
+  // Announcements (Discussions API)
+  listCourseAnnouncements(courseId: string | number, perPage = 50) {
+    const p: Record<string, any> = { per_page: Math.min(100, Math.max(1, perPage)), only_announcements: true }
+    return this.paginate<any>(`/courses/${courseId}/discussion_topics`, p)
+  }
+  // Single-page announcements fetch for pagination UI
+  listCourseAnnouncementsPage(courseId: string | number, page = 1, perPage = 10) {
+    const p: Record<string, any> = { per_page: Math.min(100, Math.max(1, perPage)), page: Math.max(1, Number(page) || 1), only_announcements: true }
+    return this.get<any[]>(`/courses/${courseId}/discussion_topics`, p)
+  }
+  getAnnouncement(courseId: string | number, topicId: string | number) {
+    return this.get<any>(`/courses/${courseId}/discussion_topics/${topicId}`)
+  }
+
   listMyEnrollmentsForCourse(courseId: string | number) {
     // Useful for comparing to Canvas-computed current/final grades
     const p: Record<string, any> = { user_id: 'self', 'type[]': ['StudentEnrollment'] }
@@ -395,6 +409,14 @@ export class CanvasClient {
     return this.get(`/courses/${courseId}/pages/${slug}`)
   }
 
+  // Course info + front page
+  async getCourseInfo(courseId: string | number) {
+    return this.get(`/courses/${courseId}`, { 'include[]': ['syllabus_body'] })
+  }
+  async getCourseFrontPage(courseId: string | number) {
+    return this.get(`/courses/${courseId}/front_page`)
+  }
+
   // Assignments (REST detail for description)
   async getAssignmentRest(courseId: string | number, assignmentRestId: string | number) {
     return this.get(`/courses/${courseId}/assignments/${assignmentRestId}`)
@@ -425,6 +447,19 @@ export class CanvasClient {
     }
 
     return response.arrayBuffer()
+  }
+
+  async listCourseFolders(courseId: string | number, perPage = 100) {
+    return this.paginate<any>(`/courses/${courseId}/folders`, { per_page: Math.min(100, Math.max(1, perPage)) })
+  }
+
+  async listFolderFiles(folderId: string | number, perPage = 100) {
+    return this.paginate<any>(`/folders/${folderId}/files`, { per_page: Math.min(100, Math.max(1, perPage)) })
+  }
+
+  async listCourseFiles(courseId: string | number, perPage = 100, sort: 'name' | 'size' | 'created_at' | 'updated_at' = 'updated_at', order: 'asc' | 'desc' = 'desc') {
+    const p: Record<string, any> = { per_page: Math.min(100, Math.max(1, perPage)), sort, order }
+    return this.paginate<any>(`/courses/${courseId}/files`, p)
   }
   async listDueAssignmentsGql(params: { days?: number; onlyPublished?: boolean; includeCourseName?: boolean } = {}) {
     const days = params.days ?? 7
@@ -604,6 +639,18 @@ export async function listCourseTabs(courseId: string | number, includeExternal 
   return ensureClient().listCourseTabs(courseId, includeExternal)
 }
 
+export async function listCourseAnnouncements(courseId: string | number, perPage = 50) {
+  return ensureClient().listCourseAnnouncements(courseId, perPage)
+}
+
+export async function listCourseAnnouncementsPage(courseId: string | number, page = 1, perPage = 10) {
+  return ensureClient().listCourseAnnouncementsPage(courseId, page, perPage)
+}
+
+export async function getAnnouncement(courseId: string | number, topicId: string | number) {
+  return ensureClient().getAnnouncement(courseId, topicId)
+}
+
 export async function listCourseModulesGql(courseId: string | number, first = 20, itemsFirst = 50) {
   return ensureClient().listCourseModulesGql(courseId, first, itemsFirst)
 }
@@ -626,6 +673,12 @@ export async function listCoursePages(courseId: string | number, perPage = 100) 
 export async function getCoursePage(courseId: string | number, slugOrUrl: string) {
   return ensureClient().getCoursePage(courseId, slugOrUrl)
 }
+export async function getCourseInfo(courseId: string | number) {
+  return ensureClient().getCourseInfo(courseId)
+}
+export async function getCourseFrontPage(courseId: string | number) {
+  return ensureClient().getCourseFrontPage(courseId)
+}
 export async function getAssignmentRest(courseId: string | number, assignmentRestId: string | number) {
   return ensureClient().getAssignmentRest(courseId, assignmentRestId)
 }
@@ -635,4 +688,16 @@ export async function getFile(fileId: string | number) {
 
 export async function getFileBytes(fileId: string | number) {
   return ensureClient().getFileBytes(fileId)
+}
+
+export async function listCourseFiles(courseId: string | number, perPage = 100, sort: 'name' | 'size' | 'created_at' | 'updated_at' = 'updated_at', order: 'asc' | 'desc' = 'desc') {
+  return ensureClient().listCourseFiles(courseId, perPage, sort, order)
+}
+
+export async function listCourseFolders(courseId: string | number, perPage = 100) {
+  return ensureClient().listCourseFolders(courseId, perPage)
+}
+
+export async function listFolderFiles(folderId: string | number, perPage = 100) {
+  return ensureClient().listFolderFiles(folderId, perPage)
 }

@@ -21,10 +21,13 @@ type Props = {
   onPrefetchCourse?: (courseId: string | number) => void
   prefetchEnabled?: boolean
   onTogglePrefetch?: (enabled: boolean) => void
+  onReorder?: (nextOrder: Array<string | number>) => void
 }
 
-export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, current = 'dashboard', onSelectDashboard, onSelectCourse, onOpenAllCourses, onHideCourse, onPrefetchCourse, prefetchEnabled = true, onTogglePrefetch }) => {
+export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, current = 'dashboard', onSelectDashboard, onSelectCourse, onOpenAllCourses, onHideCourse, onPrefetchCourse, prefetchEnabled = true, onTogglePrefetch, onReorder }) => {
   const [menuOpenId, setMenuOpenId] = useState<string | number | null>(null)
+  const [dragId, setDragId] = useState<string | number | null>(null)
+  const [overId, setOverId] = useState<string | number | null>(null)
   const hidden = useMemo(() => new Set(sidebar?.hiddenCourseIds || []), [sidebar?.hiddenCourseIds])
 
   const orderedVisibleCourses = useMemo(() => {
@@ -38,6 +41,29 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
   }, [courses, sidebar?.order, hidden])
 
   const labelFor = (c: Course) => sidebar?.customNames?.[String(c.id)] || c.course_code || c.name
+
+  // DnD helpers
+  const onDragStart = (id: string | number) => setDragId(id)
+  const onDragOverItem = (id: string | number, e: React.DragEvent) => { e.preventDefault(); if (overId !== id) setOverId(id) }
+  const onDragEnd = () => { setDragId(null); setOverId(null) }
+  const onDropOn = (targetId: string | number) => {
+    if (!dragId || dragId === targetId) { onDragEnd(); return }
+    const visible = courses.filter((c) => !hidden.has(c.id)).map((c) => String(c.id))
+    const from = visible.indexOf(String(dragId))
+    const to = visible.indexOf(String(targetId))
+    if (from < 0 || to < 0) { onDragEnd(); return }
+    const nextVisible = [...visible]
+    const [moved] = nextVisible.splice(from, 1)
+    nextVisible.splice(to, 0, moved)
+    // Build global order: start with reordered visible, then keep the rest from existing order, then append any remaining course ids
+    const existing = (sidebar?.order || []).map(String)
+    const existingRest = existing.filter((id) => !nextVisible.includes(id))
+    const allIds = courses.map((c) => String(c.id))
+    const remaining = allIds.filter((id) => !nextVisible.includes(id) && !existingRest.includes(id))
+    const finalOrder = [...nextVisible, ...existingRest, ...remaining]
+    onReorder?.(finalOrder)
+    onDragEnd()
+  }
 
   return (
     <aside
@@ -65,7 +91,16 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
         <div className="font-semibold mb-2 text-[11px] uppercase tracking-wide text-brand/70">Courses</div>
         <nav className="flex flex-col gap-1">
           {orderedVisibleCourses.map((c) => (
-            <div key={c.id} className="relative group" onMouseEnter={() => onPrefetchCourse?.(c.id)}>
+            <div
+              key={c.id}
+              className={`relative group transition-colors ${overId === c.id ? 'ring-1 ring-brand/40 rounded-md' : ''}`}
+              onMouseEnter={() => onPrefetchCourse?.(c.id)}
+              draggable
+              onDragStart={() => onDragStart(c.id)}
+              onDragOver={(e) => onDragOverItem(c.id, e)}
+              onDrop={() => onDropOn(c.id)}
+              onDragEnd={onDragEnd}
+            >
               <button
                 className={`w-full text-left py-2 pl-3 pr-8 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
                   activeCourseId === c.id

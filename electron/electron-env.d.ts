@@ -44,9 +44,20 @@ interface Window {
     listAssignmentGroups: (courseId: string | number, includeAssignments?: boolean) => Promise<{ ok: boolean; data?: any; error?: string }>
     listMyEnrollmentsForCourse: (courseId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
     listCourseTabs: (courseId: string | number, includeExternal?: boolean) => Promise<{ ok: boolean; data?: any; error?: string }>
+    listCourseAnnouncements: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
+    listCourseAnnouncementsPage: (courseId: string | number, page?: number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
+    getCourseInfo: (courseId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
+    getCourseFrontPage: (courseId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
+    getAnnouncement: (courseId: string | number, topicId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
+    listCourseFolders: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
+    listFolderFiles: (folderId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
+    listCourseFiles: (courseId: string | number, perPage?: number, sort?: 'name' | 'size' | 'created_at' | 'updated_at', order?: 'asc' | 'desc') => Promise<{ ok: boolean; data?: any; error?: string }>
   }
   settings: {
     get: () => Promise<{ ok: boolean; data?: { baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> } }; error?: string }>
     set: (partial: Partial<{ baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> } }>) => Promise<{ ok: boolean; data?: any; error?: string }>
+  }
+  system: {
+    openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>
   }
 }
