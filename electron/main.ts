@@ -25,6 +25,7 @@ import {
   listAssignmentGroups as svcListAssignmentGroups,
   listMyEnrollmentsForCourse as svcListMyEnrollmentsForCourse,
   listCourseTabs as svcListCourseTabs,
+  listActivityStream as svcListActivityStream,
   listCourseAnnouncements as svcListCourseAnnouncements,
   listCourseAnnouncementsPage as svcListCourseAnnouncementsPage,
   getAnnouncement as svcGetAnnouncement,
@@ -296,6 +297,16 @@ ipcMain.handle('canvas:listMyEnrollmentsForCourse', async (_evt, courseId: strin
 ipcMain.handle('canvas:listCourseTabs', async (_evt, courseId: string | number, includeExternal = true) => {
   try {
     const data = await svcListCourseTabs(courseId, includeExternal)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:listActivityStream', async (_evt, opts?: { onlyActiveCourses?: boolean; perPage?: number }) => {
+  try {
+    const data = await svcListActivityStream(opts)
     return { ok: true, data }
   } catch (e: any) {
     const msg = e instanceof CanvasError ? e.message : String(e?.message || e)

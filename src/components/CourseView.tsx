@@ -16,9 +16,11 @@ import { HtmlContent } from './HtmlContent'
 type Props = {
   courseId: string | number
   courseName?: string
+  initialContent?: { contentType: 'assignment' | 'announcement'; contentId: string; title: string } | null
+  onConsumedInitialContent?: () => void
 }
 
-export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName }) => {
+export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName, initialContent, onConsumedInitialContent }) => {
   const { data: items = [], isLoading, error } = useCourseAssignments(courseId, 200)
   const infoQ = useCourseInfo(courseId)
   const frontQ = useCourseFrontPage(courseId, { enabled: true })
@@ -30,6 +32,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName 
     title: string
   } | null>(null)
   const [activeTab, setActiveTab] = React.useState<CourseTabKey>('announcements')
+  const [tabInitialized, setTabInitialized] = React.useState(false)
 
   // Determine available tabs
   const defaultView = (infoQ.data?.default_view || '').toLowerCase()
@@ -56,7 +59,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName 
 
   // Set initial active tab based on course default view
   React.useEffect(() => {
-    if (!defaultView) return
+    if (!defaultView || tabInitialized || content) return
     const map: Record<string, CourseTabKey> = {
       wiki: 'home',
       modules: 'modules',
@@ -65,10 +68,32 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName 
       feed: 'announcements',
     }
     const next = map[defaultView]
-    if (next) setActiveTab(next)
-  }, [defaultView])
+    if (next) {
+      setActiveTab(next)
+      setTabInitialized(true)
+    }
+  }, [defaultView, tabInitialized, content])
+
+  // Consume initial content deep-link if provided
+  React.useEffect(() => {
+    if (!initialContent) return
+    setContent({ contentType: initialContent.contentType, contentId: initialContent.contentId, title: initialContent.title })
+    if (initialContent.contentType === 'assignment') setActiveTab('assignments')
+    if (initialContent.contentType === 'announcement') setActiveTab('announcements')
+    setTabInitialized(true)
+    onConsumedInitialContent?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialContent?.contentId, initialContent?.contentType, initialContent?.title])
 
   // Keep the floating tabs visible even when viewing content details
+
+  // Ensure the active tab reflects the content being viewed
+  React.useEffect(() => {
+    if (!content) return
+    if (content.contentType === 'assignment') setActiveTab('assignments')
+    if (content.contentType === 'announcement') setActiveTab('announcements')
+    setTabInitialized(true)
+  }, [content?.contentType])
 
   return (
     <Card id="course-content-anchor" className="flex-1 overflow-y-auto relative">
@@ -151,9 +176,16 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName 
                 <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
                   {items.map((a, i) => {
                     const dueStr = a.dueAt ? new Date(a.dueAt).toLocaleString() : null
+                    const restId = String((a as any)?._id ?? '')
                     return (
                       <li className="py-2" key={i}>
-                        <div className="flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 rounded-md px-2 sm:px-3 py-2 transition-colors">
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => restId && setContent({ contentType: 'assignment', contentId: restId, title: a.name })}
+                          onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && restId) { e.preventDefault(); setContent({ contentType: 'assignment', contentId: restId, title: a.name }) } }}
+                          className="cursor-pointer flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 rounded-md px-2 sm:px-3 py-2 transition-colors"
+                        >
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="w-8 h-8 rounded-full bg-neutral-600/15 text-slate-600 dark:text-neutral-200 inline-flex items-center justify-center">
                               <FileText className="w-4 h-4" />
@@ -170,11 +202,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName 
                               </div>
                             </div>
                           </div>
-                              {a.htmlUrl && (
-                                <button onClick={() => window.system?.openExternal?.(a.htmlUrl)} className="inline-flex items-center px-2.5 py-1.5 rounded-control text-sm text-slate-700 hover:bg-slate-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
-                                  Open in Browser
-                                </button>
-                              )}
+                          <div className="shrink-0 text-xs text-slate-500">Open</div>
                         </div>
                       </li>
                     )

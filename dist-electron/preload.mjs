@@ -40,6 +40,7 @@ electron.contextBridge.exposeInMainWorld("canvas", {
   listAssignmentGroups: (courseId, includeAssignments) => electron.ipcRenderer.invoke("canvas:listAssignmentGroups", courseId, includeAssignments),
   listMyEnrollmentsForCourse: (courseId) => electron.ipcRenderer.invoke("canvas:listMyEnrollmentsForCourse", courseId),
   listCourseTabs: (courseId, includeExternal) => electron.ipcRenderer.invoke("canvas:listCourseTabs", courseId, includeExternal),
+  listActivityStream: (opts) => electron.ipcRenderer.invoke("canvas:listActivityStream", opts),
   listCourseAnnouncements: (courseId, perPage) => electron.ipcRenderer.invoke("canvas:listCourseAnnouncements", courseId, perPage),
   listCourseAnnouncementsPage: (courseId, page, perPage) => electron.ipcRenderer.invoke("canvas:listCourseAnnouncementsPage", courseId, page, perPage),
   getCourseInfo: (courseId) => electron.ipcRenderer.invoke("canvas:getCourseInfo", courseId),

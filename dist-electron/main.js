@@ -16895,6 +16895,14 @@ class CanvasClient {
     if (includeExternal) p["include[]"] = ["external"];
     return this.paginate(`/courses/${courseId}/tabs`, p);
   }
+  // Activity stream (cross-course), useful for announcements aggregation
+  listActivityStream(params = {}) {
+    const p = {
+      per_page: Math.min(100, Math.max(1, params.perPage ?? 100)),
+      only_active_courses: params.onlyActiveCourses ?? true
+    };
+    return this.paginate("/users/self/activity_stream", p);
+  }
   // Announcements (Discussions API)
   listCourseAnnouncements(courseId, perPage = 50) {
     const p = { per_page: Math.min(100, Math.max(1, perPage)), only_announcements: true };
@@ -17297,6 +17305,9 @@ async function listMyEnrollmentsForCourse(courseId) {
 async function listCourseTabs(courseId, includeExternal = true) {
   return ensureClient().listCourseTabs(courseId, includeExternal);
 }
+async function listActivityStream(opts) {
+  return ensureClient().listActivityStream(opts);
+}
 async function listCourseAnnouncements(courseId, perPage = 50) {
   return ensureClient().listCourseAnnouncements(courseId, perPage);
 }
@@ -17353,6 +17364,8 @@ const DEFAULT_CONFIG = {
   verbose: false,
   theme: "light",
   prefetchEnabled: true,
+  cachedCourses: [],
+  cachedDue: [],
   sidebar: {
     hiddenCourseIds: [],
     customNames: {},
@@ -17600,6 +17613,15 @@ ipcMain.handle("canvas:listMyEnrollmentsForCourse", async (_evt, courseId) => {
 ipcMain.handle("canvas:listCourseTabs", async (_evt, courseId, includeExternal = true) => {
   try {
     const data = await listCourseTabs(courseId, includeExternal);
+    return { ok: true, data };
+  } catch (e) {
+    const msg = e instanceof CanvasError ? e.message : String((e == null ? void 0 : e.message) || e);
+    return { ok: false, error: msg };
+  }
+});
+ipcMain.handle("canvas:listActivityStream", async (_evt, opts) => {
+  try {
+    const data = await listActivityStream(opts);
     return { ok: true, data };
   } catch (e) {
     const msg = e instanceof CanvasError ? e.message : String((e == null ? void 0 : e.message) || e);

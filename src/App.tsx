@@ -11,6 +11,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from './components/ui/Toaster'
 import { AllCoursesManager } from './components/AllCoursesManager'
 import { toAssignmentInputsFromRest, toAssignmentGroupInputsFromRest } from './utils/gradeCalc'
+import { enqueuePrefetch, requestIdle } from './utils/prefetchQueue'
 
 function App() {
   const queryClient = useQueryClient()
@@ -20,12 +21,15 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState<'dashboard' | 'course' | 'allCourses'>('dashboard')
   const [prefetchEnabled, setPrefetchEnabled] = useState(true)
+  const [cachedCourses, setCachedCourses] = useState<any[] | null>(null)
+  const [cachedDue, setCachedDue] = useState<any[] | null>(null)
   // React Query data
   const profileQ = useProfile({ enabled: hasToken === true })
   const coursesQ = useCourses({ enrollment_state: 'active' }, { enabled: hasToken === true })
   const dueQ = useDueAssignments({ days: 7 }, { enabled: hasToken === true })
   const { add: addToast } = useToast()
   const [activeCourseId, setActiveCourseId] = useState<string | number | null>(null)
+  const [initialCourseContent, setInitialCourseContent] = useState<{ contentType: 'assignment' | 'announcement'; contentId: string; title: string } | null>(null)
   const [sidebarCfg, setSidebarCfg] = useState<SidebarConfig>({ hiddenCourseIds: [], customNames: {}, order: [] })
 
 
@@ -36,6 +40,15 @@ function App() {
       if (cfg.ok && cfg.data?.baseUrl) setBaseUrl(cfg.data.baseUrl)
       if (cfg.ok && cfg.data?.sidebar) setSidebarCfg(cfg.data.sidebar)
       if (cfg.ok && typeof cfg.data?.prefetchEnabled === 'boolean') setPrefetchEnabled(!!cfg.data.prefetchEnabled)
+      if (cfg.ok && Array.isArray(cfg.data?.cachedCourses)) {
+        setCachedCourses(cfg.data.cachedCourses || [])
+        // seed query cache so UI can use cached data immediately
+        queryClient.setQueryData(['courses', { enrollment_state: 'active' }], cfg.data.cachedCourses || [])
+      }
+      if (cfg.ok && Array.isArray(cfg.data?.cachedDue)) {
+        setCachedDue(cfg.data.cachedDue || [])
+        queryClient.setQueryData(['due-assignments', { days: 7 }], cfg.data.cachedDue || [])
+      }
 
       setLoading(true)
       const res = await window.canvas.init({ baseUrl: cfg.data?.baseUrl || baseUrl })
@@ -61,9 +74,23 @@ function App() {
   useEffect(() => {
     if (coursesQ.error) addToast({ title: 'Failed to load courses', description: String(coursesQ.error.message), variant: 'destructive' })
   }, [coursesQ.error, addToast])
+  // Persist latest successful courses to settings for startup cache
+  useEffect(() => {
+    if (Array.isArray(coursesQ.data) && coursesQ.data.length) {
+      setCachedCourses(coursesQ.data)
+      window.settings.set({ cachedCourses: coursesQ.data }).catch(() => {})
+    }
+  }, [coursesQ.data])
   useEffect(() => {
     if (dueQ.error) addToast({ title: 'Failed to load assignments', description: String(dueQ.error.message), variant: 'destructive' })
   }, [dueQ.error, addToast])
+  // Persist latest "Coming Up" to settings for startup cache
+  useEffect(() => {
+    if (Array.isArray(dueQ.data)) {
+      setCachedDue(dueQ.data)
+      window.settings.set({ cachedDue: dueQ.data }).catch(() => {})
+    }
+  }, [dueQ.data])
 
   const init = async () => {
     setLoading(true)
@@ -102,11 +129,11 @@ function App() {
     await window.settings.set({ sidebar: next })
   }
 
-  const prefetchCourseData = async (courseId: string | number) => {
+  const prefetchCourseData = (courseId: string | number) => {
     const id = String(courseId)
-    // Prefetch assignments and modules using the same query keys as hooks
-    await Promise.all([
-      queryClient.prefetchQuery({
+    // High-priority prefetch (do not block navigation)
+    enqueuePrefetch(async () => {
+      await queryClient.prefetchQuery({
         queryKey: ['course-assignments', id, 200],
         queryFn: async () => {
           const res = await window.canvas.listCourseAssignments(id, 200)
@@ -114,8 +141,10 @@ function App() {
           return res.data || []
         },
         staleTime: 1000 * 60 * 5,
-      }),
-      queryClient.prefetchQuery({
+      })
+    })
+    enqueuePrefetch(async () => {
+      await queryClient.prefetchQuery({
         queryKey: ['course-modules', id],
         queryFn: async () => {
           const res = await window.canvas.listCourseModulesGql(id, 20, 50)
@@ -123,82 +152,87 @@ function App() {
           return res.data || []
         },
         staleTime: 1000 * 60 * 5,
-      }),
-      // Gradebook (groups + assignments with submissions)
-      queryClient.prefetchQuery({
-        queryKey: ['course-gradebook', id],
-        queryFn: async () => {
-          const [groupsRes, assignmentsRes] = await Promise.all([
-            window.canvas.listAssignmentGroups(id, false),
-            window.canvas.listAssignmentsWithSubmission(id, 100),
-          ])
-          if (!groupsRes?.ok) throw new Error(groupsRes?.error || 'Failed to load assignment groups')
-          if (!assignmentsRes?.ok) throw new Error(assignmentsRes?.error || 'Failed to load gradebook assignments')
-          const groups = toAssignmentGroupInputsFromRest(groupsRes.data || [])
-          const raw = (assignmentsRes.data || []) as any[]
-          const assignments = toAssignmentInputsFromRest(raw)
-          return { groups, assignments, raw }
-        },
-        staleTime: 1000 * 60 * 5,
-      }),
-      // Course tabs/links
-      queryClient.prefetchQuery({
-        queryKey: ['course-tabs', id, true],
-        queryFn: async () => {
-          const res = await window.canvas.listCourseTabs?.(id, true)
-          if (!res?.ok) throw new Error(res?.error || 'Failed to load course tabs')
-          return res.data || []
-        },
-        staleTime: 1000 * 60 * 5,
-      }),
-      // Announcements (non-blocking; UI loads paged per 10)
-    ])
-    // Prefetch course info and, if wiki, the front page
-    try {
-      await queryClient.prefetchQuery({
-        queryKey: ['course-info', id],
-        queryFn: async () => {
-          const res = await window.canvas.getCourseInfo?.(id)
-          if (!res?.ok) throw new Error(res?.error || 'Failed to load course info')
-          return res.data || null
-        },
-        staleTime: 1000 * 60 * 5,
       })
-      const info = queryClient.getQueryData<any>(['course-info', id]) as any
-      const defaultView = (info?.default_view || '').toLowerCase()
-      if (defaultView === 'wiki') {
+    })
+    // Medium priority after paint
+    requestIdle(() => {
+      enqueuePrefetch(async () => {
         await queryClient.prefetchQuery({
-          queryKey: ['course-front-page', id],
+          queryKey: ['course-gradebook', id],
           queryFn: async () => {
-            const res = await window.canvas.getCourseFrontPage?.(id)
-            if (!res?.ok) throw new Error(res?.error || 'Failed to load front page')
+            const [groupsRes, assignmentsRes] = await Promise.all([
+              window.canvas.listAssignmentGroups(id, false),
+              window.canvas.listAssignmentsWithSubmission(id, 100),
+            ])
+            if (!groupsRes?.ok) throw new Error(groupsRes?.error || 'Failed to load assignment groups')
+            if (!assignmentsRes?.ok) throw new Error(assignmentsRes?.error || 'Failed to load gradebook assignments')
+            const groups = toAssignmentGroupInputsFromRest(groupsRes.data || [])
+            const raw = (assignmentsRes.data || []) as any[]
+            const assignments = toAssignmentInputsFromRest(raw)
+            return { groups, assignments, raw }
+          },
+          staleTime: 1000 * 60 * 5,
+        })
+      })
+      enqueuePrefetch(async () => {
+        await queryClient.prefetchQuery({
+          queryKey: ['course-tabs', id, true],
+          queryFn: async () => {
+            const res = await window.canvas.listCourseTabs?.(id, true)
+            if (!res?.ok) throw new Error(res?.error || 'Failed to load course tabs')
+            return res.data || []
+          },
+          staleTime: 1000 * 60 * 5,
+        })
+      })
+      // Course info / front page and folders after idle
+      enqueuePrefetch(async () => {
+        await queryClient.prefetchQuery({
+          queryKey: ['course-info', id],
+          queryFn: async () => {
+            const res = await window.canvas.getCourseInfo?.(id)
+            if (!res?.ok) throw new Error(res?.error || 'Failed to load course info')
             return res.data || null
           },
           staleTime: 1000 * 60 * 5,
         })
-      }
-      // Conditionally prefetch files if Files tab is visible
-      const tabsRes = await window.canvas.listCourseTabs?.(id, true)
-      if (tabsRes?.ok) {
-        const tabs = tabsRes.data || []
-        const hasFiles = !!(tabs as any[]).find((t: any) => {
-          const idOrType = String(t?.id || t?.type || '').toLowerCase()
-          const label = String(t?.label || '').toLowerCase()
-          return (!t?.hidden) && (idOrType.includes('files') || label.includes('files'))
-        })
-        if (hasFiles) {
+        const info = queryClient.getQueryData<any>(['course-info', id]) as any
+        const defaultView = (info?.default_view || '').toLowerCase()
+        if (defaultView === 'wiki') {
           await queryClient.prefetchQuery({
-            queryKey: ['course-folders', id, 100],
+            queryKey: ['course-front-page', id],
             queryFn: async () => {
-              const res = await window.canvas.listCourseFolders?.(id, 100)
-              if (!res?.ok) throw new Error(res?.error || 'Failed to load folders')
-              return res.data || []
+              const res = await window.canvas.getCourseFrontPage?.(id)
+              if (!res?.ok) throw new Error(res?.error || 'Failed to load front page')
+              return res.data || null
             },
             staleTime: 1000 * 60 * 5,
           })
         }
-      }
-    } catch {}
+      })
+      enqueuePrefetch(async () => {
+        const tabsRes = await window.canvas.listCourseTabs?.(id, true)
+        if (tabsRes?.ok) {
+          const tabs = tabsRes.data || []
+          const hasFiles = !!(tabs as any[]).find((t: any) => {
+            const idOrType = String(t?.id || t?.type || '').toLowerCase()
+            const label = String(t?.label || '').toLowerCase()
+            return (!t?.hidden) && (idOrType.includes('files') || label.includes('files'))
+          })
+          if (hasFiles) {
+            await queryClient.prefetchQuery({
+              queryKey: ['course-folders', id, 100],
+              queryFn: async () => {
+                const res = await window.canvas.listCourseFolders?.(id, 100)
+                if (!res?.ok) throw new Error(res?.error || 'Failed to load folders')
+                return res.data || []
+              },
+              staleTime: 1000 * 60 * 5,
+            })
+          }
+        }
+      })
+    })
   }
 
   // Background prefetch for all visible courses once courses load
@@ -224,16 +258,16 @@ function App() {
       <Header profile={profileQ.data} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
-          courses={coursesQ.data || []}
+          courses={coursesQ.data || cachedCourses || []}
           activeCourseId={view === 'course' ? activeCourseId : null}
           sidebar={sidebarCfg}
           current={view}
-          onSelectDashboard={() => { setView('dashboard'); setActiveCourseId(null) }}
-          onSelectCourse={async (id) => {
-            // Ensure data is ready before navigating to course view
-            await prefetchCourseData(id)
+          onSelectDashboard={() => { setView('dashboard'); setActiveCourseId(null); setInitialCourseContent(null) }}
+          onSelectCourse={(id) => {
+            // Navigate immediately; prefetch runs in background
             setActiveCourseId(id)
             setView('course')
+            prefetchCourseData(id)
           }}
           onOpenAllCourses={() => setView('allCourses')}
           onHideCourse={hideCourse}
@@ -277,7 +311,30 @@ function App() {
 
             <div>
               {view === 'dashboard' && (
-                <Dashboard due={dueQ.data || []} loading={loading || profileQ.isLoading || coursesQ.isLoading || dueQ.isLoading} />
+                <Dashboard
+                  due={(dueQ.data || cachedDue || [])}
+                  loading={
+                    loading ||
+                    profileQ.isLoading ||
+                    (coursesQ.isLoading && !(cachedCourses && cachedCourses.length)) ||
+                    (dueQ.isLoading && !(cachedDue && cachedDue.length))
+                  }
+                  courses={(coursesQ.data || cachedCourses || [])}
+                  sidebar={sidebarCfg}
+                  onOpenCourse={(id) => { setActiveCourseId(id); setInitialCourseContent(null); setView('course'); prefetchCourseData(id) }}
+                  onOpenAssignment={(courseId, assignmentRestId, title) => {
+                    setActiveCourseId(courseId)
+                    setInitialCourseContent({ contentType: 'assignment', contentId: assignmentRestId, title })
+                    setView('course')
+                    prefetchCourseData(courseId)
+                  }}
+                  onOpenAnnouncement={(courseId, topicId, title) => {
+                    setActiveCourseId(courseId)
+                    setInitialCourseContent({ contentType: 'announcement', contentId: topicId, title })
+                    setView('course')
+                    prefetchCourseData(courseId)
+                  }}
+                />
               )}
               {view === 'course' && activeCourseId != null && (
                 <>
@@ -287,6 +344,8 @@ function App() {
                   <CourseView
                     courseId={activeCourseId}
                     courseName={(coursesQ.data || []).find((c) => c.id === activeCourseId)?.name}
+                    initialContent={initialCourseContent}
+                    onConsumedInitialContent={() => setInitialCourseContent(null)}
                   />
                 </>
               )}

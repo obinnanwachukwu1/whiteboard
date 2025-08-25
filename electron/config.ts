@@ -7,6 +7,8 @@ export type AppConfig = {
   verbose?: boolean
   theme?: 'light' | 'dark'
   prefetchEnabled?: boolean
+  cachedCourses?: any[]
+  cachedDue?: any[]
   sidebar?: {
     hiddenCourseIds?: Array<string | number>
     customNames?: Record<string, string>
@@ -19,6 +21,8 @@ const DEFAULT_CONFIG: AppConfig = {
   verbose: false,
   theme: 'light',
   prefetchEnabled: true,
+  cachedCourses: [],
+  cachedDue: [],
   sidebar: {
     hiddenCourseIds: [],
     customNames: {},

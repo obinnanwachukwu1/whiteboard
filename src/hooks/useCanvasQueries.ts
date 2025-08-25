@@ -89,6 +89,22 @@ export function useTodo(options?: Partial<UseQueryOptions<TodoItem[], Error, Tod
   })
 }
 
+// Single-call cross-course announcements via activity_stream
+export function useActivityAnnouncements(n = 20, options?: Partial<UseQueryOptions<any[], Error, any[]>>) {
+  return useQuery<any[], Error, any[]>({
+    queryKey: ['activity-announcements', { n }],
+    queryFn: async () => {
+      const res = await window.canvas.listActivityStream?.({ onlyActiveCourses: true, perPage: 100 })
+      const list = ensureOk(res as any) || []
+      const anns = (Array.isArray(list) ? list : []).filter((x: any) => (x?.type === 'Announcement'))
+      anns.sort((a: any, b: any) => new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime())
+      return anns.slice(0, Math.max(1, n))
+    },
+    staleTime: 1000 * 60, // 1 minute
+    ...options,
+  })
+}
+
 export function useCoursePage(courseId: string | number | undefined, slugOrUrl: string | undefined, options?: Partial<UseQueryOptions<{ body?: string }, Error, { body?: string }>>) {
   return useQuery<{ body?: string }, Error, { body?: string }>({
     queryKey: ['course-page', courseId, slugOrUrl],

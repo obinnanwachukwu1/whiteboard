@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('canvas', {
   listAssignmentGroups: (courseId: string | number, includeAssignments?: boolean) => ipcRenderer.invoke('canvas:listAssignmentGroups', courseId, includeAssignments),
   listMyEnrollmentsForCourse: (courseId: string | number) => ipcRenderer.invoke('canvas:listMyEnrollmentsForCourse', courseId),
   listCourseTabs: (courseId: string | number, includeExternal?: boolean) => ipcRenderer.invoke('canvas:listCourseTabs', courseId, includeExternal),
+  listActivityStream: (opts?: { onlyActiveCourses?: boolean; perPage?: number }) => ipcRenderer.invoke('canvas:listActivityStream', opts),
   listCourseAnnouncements: (courseId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listCourseAnnouncements', courseId, perPage),
   listCourseAnnouncementsPage: (courseId: string | number, page?: number, perPage?: number) => ipcRenderer.invoke('canvas:listCourseAnnouncementsPage', courseId, page, perPage),
   getCourseInfo: (courseId: string | number) => ipcRenderer.invoke('canvas:getCourseInfo', courseId),
@@ -56,7 +57,7 @@ contextBridge.exposeInMainWorld('canvas', {
 
 contextBridge.exposeInMainWorld('settings', {
   get: () => ipcRenderer.invoke('config:get'),
-  set: (partial: Partial<{ baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; prefetchEnabled?: boolean; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> } }>) => ipcRenderer.invoke('config:set', partial),
+  set: (partial: Partial<{ baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; prefetchEnabled?: boolean; cachedCourses?: any[]; cachedDue?: any[]; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> } }>) => ipcRenderer.invoke('config:set', partial),
 })
 
 // System helpers

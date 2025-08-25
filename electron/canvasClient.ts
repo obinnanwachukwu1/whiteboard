@@ -193,6 +193,15 @@ export class CanvasClient {
     return this.paginate<any>(`/courses/${courseId}/tabs`, p)
   }
 
+  // Activity stream (cross-course), useful for announcements aggregation
+  listActivityStream(params: { onlyActiveCourses?: boolean; perPage?: number } = {}) {
+    const p: Record<string, any> = {
+      per_page: Math.min(100, Math.max(1, params.perPage ?? 100)),
+      only_active_courses: params.onlyActiveCourses ?? true,
+    }
+    return this.paginate<any>('/users/self/activity_stream', p)
+  }
+
   // Announcements (Discussions API)
   listCourseAnnouncements(courseId: string | number, perPage = 50) {
     const p: Record<string, any> = { per_page: Math.min(100, Math.max(1, perPage)), only_announcements: true }
@@ -637,6 +646,9 @@ export async function listMyEnrollmentsForCourse(courseId: string | number) {
 
 export async function listCourseTabs(courseId: string | number, includeExternal = true) {
   return ensureClient().listCourseTabs(courseId, includeExternal)
+}
+export async function listActivityStream(opts?: { onlyActiveCourses?: boolean; perPage?: number }) {
+  return ensureClient().listActivityStream(opts)
 }
 
 export async function listCourseAnnouncements(courseId: string | number, perPage = 50) {
