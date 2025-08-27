@@ -8,6 +8,13 @@ import type {
   TodoItem,
   DueItem,
   CanvasTab,
+  CanvasFolder,
+  CanvasFile,
+  ActivityAnnouncement,
+  CourseDiscussion,
+  CourseInfo,
+  AnnouncementDetail,
+  CourseFrontPage,
 } from '../types/canvas'
 
 type IpcResult<T> = { ok: boolean; data?: T; error?: string }
@@ -90,14 +97,14 @@ export function useTodo(options?: Partial<UseQueryOptions<TodoItem[], Error, Tod
 }
 
 // Single-call cross-course announcements via activity_stream
-export function useActivityAnnouncements(n = 20, options?: Partial<UseQueryOptions<any[], Error, any[]>>) {
-  return useQuery<any[], Error, any[]>({
+export function useActivityAnnouncements(n = 20, options?: Partial<UseQueryOptions<ActivityAnnouncement[], Error, ActivityAnnouncement[]>>) {
+  return useQuery<ActivityAnnouncement[], Error, ActivityAnnouncement[]>({
     queryKey: ['activity-announcements', { n }],
     queryFn: async () => {
       const res = await window.canvas.listActivityStream?.({ onlyActiveCourses: true, perPage: 100 })
-      const list = ensureOk(res as any) || []
-      const anns = (Array.isArray(list) ? list : []).filter((x: any) => (x?.type === 'Announcement'))
-      anns.sort((a: any, b: any) => new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime())
+      const list = ensureOk(res as any) as ActivityAnnouncement[] || []
+      const anns = (Array.isArray(list) ? list : []).filter((x) => (x?.type === 'Announcement'))
+      anns.sort((a, b) => new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime())
       return anns.slice(0, Math.max(1, n))
     },
     staleTime: 1000 * 60, // 1 minute
@@ -129,12 +136,12 @@ export function useAssignmentRest(courseId: string | number | undefined, assignm
   })
 }
 
-export function useFileMeta(fileId: string | number | undefined, options?: Partial<UseQueryOptions<any, Error, any>>) {
-  return useQuery<any, Error, any>({
+export function useFileMeta(fileId: string | number | undefined, options?: Partial<UseQueryOptions<CanvasFile | null, Error, CanvasFile | null>>) {
+  return useQuery<CanvasFile | null, Error, CanvasFile | null>({
     queryKey: ['file-meta', fileId],
     queryFn: async () => {
       if (fileId == null) return null
-      return ensureOk(await window.canvas.getFile?.(fileId))
+      return ensureOk(await window.canvas.getFile?.(fileId)) as CanvasFile
     },
     enabled: fileId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 5,
@@ -170,50 +177,12 @@ export function useCourseTabs(courseId: string | number | undefined, includeExte
   })
 }
 
-export function useCourseAnnouncements(courseId: string | number | undefined, perPage = 50, options?: Partial<UseQueryOptions<any[], Error, any[]>>) {
-  return useQuery<any[], Error, any[]>({
+export function useCourseAnnouncements(courseId: string | number | undefined, perPage = 50, options?: Partial<UseQueryOptions<CourseDiscussion[], Error, CourseDiscussion[]>>) {
+  return useQuery<CourseDiscussion[], Error, CourseDiscussion[]>({
     queryKey: ['course-announcements', courseId, perPage],
     queryFn: async () => {
       if (courseId == null) return []
-      return ensureOk(await window.canvas.listCourseAnnouncements?.(courseId, perPage))
-    },
-    enabled: courseId != null && (options?.enabled ?? true),
-    staleTime: 1000 * 60 * 5,
-    ...options,
-  })
-}
-
-export function useAnnouncement(courseId: string | number | undefined, topicId: string | number | undefined, options?: Partial<UseQueryOptions<any, Error, any>>) {
-  return useQuery<any, Error, any>({
-    queryKey: ['announcement', courseId, topicId],
-    queryFn: async () => {
-      if (courseId == null || topicId == null) return null
-      return ensureOk(await window.canvas.getAnnouncement?.(courseId, topicId))
-    },
-    enabled: courseId != null && topicId != null && (options?.enabled ?? true),
-    ...options,
-  })
-}
-
-export function useCourseInfo(courseId: string | number | undefined, options?: Partial<UseQueryOptions<any, Error, any>>) {
-  return useQuery<any, Error, any>({
-    queryKey: ['course-info', courseId],
-    queryFn: async () => {
-      if (courseId == null) return null
-      return ensureOk(await window.canvas.getCourseInfo?.(courseId))
-    },
-    enabled: courseId != null && (options?.enabled ?? true),
-    staleTime: 1000 * 60 * 5,
-    ...options,
-  })
-}
-
-export function useCourseFrontPage(courseId: string | number | undefined, options?: Partial<UseQueryOptions<any, Error, any>>) {
-  return useQuery<any, Error, any>({
-    queryKey: ['course-front-page', courseId],
-    queryFn: async () => {
-      if (courseId == null) return null
-      return ensureOk(await window.canvas.getCourseFrontPage?.(courseId))
+      return ensureOk(await window.canvas.listCourseAnnouncements?.(courseId, perPage)) as CourseDiscussion[]
     },
     enabled: courseId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 5,
@@ -222,17 +191,16 @@ export function useCourseFrontPage(courseId: string | number | undefined, option
 }
 
 export function useCourseAnnouncementsInfinite(courseId: string | number | undefined, perPage = 10) {
-  return useInfiniteQuery<any[], Error, any[], any, number>({
+  return useInfiniteQuery<CourseDiscussion[], Error>({
     queryKey: ['course-announcements-infinite', courseId, perPage],
     queryFn: async ({ pageParam = 1 }) => {
       if (courseId == null) return []
-      const res = await window.canvas.listCourseAnnouncementsPage?.(courseId, pageParam, perPage)
+      const res = await window.canvas.listCourseAnnouncementsPage?.(courseId, pageParam as number, perPage)
       if (!res?.ok) throw new Error(res?.error || 'Failed to load announcements')
-      return res.data || []
+      return (res.data || []) as CourseDiscussion[]
     },
     initialPageParam: 1,
     getNextPageParam: (lastPage, _pages, lastPageParam) => {
-      // If we received less than perPage items, assume no more pages
       if (!Array.isArray(lastPage) || lastPage.length < perPage) return undefined
       return (lastPageParam || 1) + 1
     },
@@ -241,8 +209,46 @@ export function useCourseAnnouncementsInfinite(courseId: string | number | undef
   })
 }
 
-export function useCourseFiles(courseId: string | number | undefined, perPage = 100, sort: 'name' | 'size' | 'created_at' | 'updated_at' = 'updated_at', order: 'asc' | 'desc' = 'desc', options?: Partial<UseQueryOptions<any[], Error, any[]>>) {
-  return useQuery<any[], Error, any[]>({
+export function useAnnouncement(courseId: string | number | undefined, topicId: string | number | undefined, options?: Partial<UseQueryOptions<AnnouncementDetail | null, Error, AnnouncementDetail | null>>) {
+  return useQuery<AnnouncementDetail | null, Error, AnnouncementDetail | null>({
+    queryKey: ['announcement', courseId, topicId],
+    queryFn: async () => {
+      if (courseId == null || topicId == null) return null
+      return ensureOk(await window.canvas.getAnnouncement?.(courseId, topicId)) as AnnouncementDetail
+    },
+    enabled: courseId != null && topicId != null && (options?.enabled ?? true),
+    ...options,
+  })
+}
+
+export function useCourseInfo(courseId: string | number | undefined, options?: Partial<UseQueryOptions<CourseInfo | null, Error, CourseInfo | null>>) {
+  return useQuery<CourseInfo | null, Error, CourseInfo | null>({
+    queryKey: ['course-info', courseId],
+    queryFn: async () => {
+      if (courseId == null) return null
+      return ensureOk(await window.canvas.getCourseInfo?.(courseId)) as CourseInfo
+    },
+    enabled: courseId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
+    ...options,
+  })
+}
+
+export function useCourseFrontPage(courseId: string | number | undefined, options?: Partial<UseQueryOptions<CourseFrontPage, Error, CourseFrontPage>>) {
+  return useQuery<CourseFrontPage, Error, CourseFrontPage>({
+    queryKey: ['course-front-page', courseId],
+    queryFn: async () => {
+      if (courseId == null) return null
+      return ensureOk(await window.canvas.getCourseFrontPage?.(courseId)) as CourseFrontPage
+    },
+    enabled: courseId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
+    ...options,
+  })
+}
+
+export function useCourseFiles(courseId: string | number | undefined, perPage = 100, sort: 'name' | 'size' | 'created_at' | 'updated_at' = 'updated_at', order: 'asc' | 'desc' = 'desc', options?: Partial<UseQueryOptions<CanvasFile[], Error, CanvasFile[]>>) {
+  return useQuery<CanvasFile[], Error, CanvasFile[]>({
     queryKey: ['course-files', courseId, perPage, sort, order],
     queryFn: async () => {
       if (courseId == null) return []
@@ -255,8 +261,8 @@ export function useCourseFiles(courseId: string | number | undefined, perPage = 
     ...options,
   })
 }
-export function useCourseFolders(courseId: string | number | undefined, perPage = 100, options?: Partial<UseQueryOptions<any[], Error, any[]>>) {
-  return useQuery<any[], Error, any[]>({
+export function useCourseFolders(courseId: string | number | undefined, perPage = 100, options?: Partial<UseQueryOptions<CanvasFolder[], Error, CanvasFolder[]>>) {
+  return useQuery<CanvasFolder[], Error, CanvasFolder[]>({
     queryKey: ['course-folders', courseId, perPage],
     queryFn: async () => {
       if (courseId == null) return []
@@ -270,8 +276,8 @@ export function useCourseFolders(courseId: string | number | undefined, perPage 
   })
 }
 
-export function useFolderFiles(folderId: string | number | undefined, perPage = 100, options?: Partial<UseQueryOptions<any[], Error, any[]>>) {
-  return useQuery<any[], Error, any[]>({
+export function useFolderFiles(folderId: string | number | undefined, perPage = 100, options?: Partial<UseQueryOptions<CanvasFile[], Error, CanvasFile[]>>) {
+  return useQuery<CanvasFile[], Error, CanvasFile[]>({
     queryKey: ['folder-files', folderId, perPage],
     queryFn: async () => {
       if (folderId == null) return []

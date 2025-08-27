@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 import * as pdfjsLib from 'pdfjs-dist/build/pdf'
 // Load the worker as a URL for Vite/Electron
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -83,13 +85,6 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '' }) => {
     }
   }, [fileId, fileBytesQ.data, fileMetaQ.data])
 
-  useEffect(() => {
-    if (pdf && numPages > 0) {
-      // Small delay to ensure component is fully mounted, then render all pages
-      setTimeout(() => renderAllPages(), 100)
-    }
-  }, [pdf, numPages, scale])
-
   // Cleanup PDF document on unmount
   useEffect(() => {
     return () => {
@@ -99,96 +94,60 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '' }) => {
     }
   }, [pdf])
 
-  
+  const PageView: React.FC<{ pageNum: number }> = ({ pageNum }) => {
+    const pageRef = React.useRef<HTMLDivElement | null>(null)
+    const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
+    const [visible, setVisible] = React.useState(false)
 
-  const renderAllPages = async () => {
-    if (!pdf) {
-      console.log('No PDF document available')
-      return
-    }
-    
-    if (!containerRef.current) {
-      console.log('Container ref not available, retrying...')
-      setTimeout(() => renderAllPages(), 100)
-      return
-    }
-
-    try {
-      console.log(`Rendering all ${numPages} pages`)
-      
-      // Clear previous content
-      containerRef.current.innerHTML = ''
-      
-      // Create a container for all pages
-      const allPagesContainer = document.createElement('div')
-      allPagesContainer.style.display = 'flex'
-      allPagesContainer.style.flexDirection = 'column'
-      allPagesContainer.style.gap = '20px'
-      allPagesContainer.style.alignItems = 'center'
-      
-      // Render all pages
-      for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum)
-        const viewport = page.getViewport({ scale })
-        
-        // Create page container
-        const pageContainer = document.createElement('div')
-        pageContainer.style.display = 'flex'
-        pageContainer.style.flexDirection = 'column'
-        pageContainer.style.alignItems = 'center'
-        pageContainer.style.marginBottom = '10px'
-        
-        // Add page number label
-        const pageLabel = document.createElement('div')
-        pageLabel.textContent = `Page ${pageNum}`
-        pageLabel.style.fontSize = '12px'
-        pageLabel.style.color = '#64748b'
-        pageLabel.style.marginBottom = '5px'
-        pageLabel.style.fontFamily = 'system-ui, sans-serif'
-        
-        // Create canvas for this page
-        const canvas = document.createElement('canvas')
-        const context = canvas.getContext('2d')
-        
-        if (!context) {
-          console.warn(`Could not get canvas context for page ${pageNum}`)
-          continue
+    useEffect(() => {
+      const el = pageRef.current
+      if (!el) return
+      const io = new IntersectionObserver((entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) setVisible(true)
+          else setVisible(false)
         }
-        
-        canvas.height = viewport.height
-        canvas.width = viewport.width
-        canvas.style.width = '100%'
-        canvas.style.maxWidth = '800px'
-        canvas.style.height = 'auto'
-        canvas.style.display = 'block'
-        canvas.style.border = '1px solid #e2e8f0'
-        canvas.style.borderRadius = '4px'
-        canvas.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
-        
-        // Render the page
-        await (page as any).render({
-          canvasContext: context,
-          viewport: viewport,
-        }).promise
-        
-        // Add to page container
-        pageContainer.appendChild(pageLabel)
-        pageContainer.appendChild(canvas)
-        allPagesContainer.appendChild(pageContainer)
-        
-        console.log(`Page ${pageNum} rendered successfully`)
-      }
-      
-      // Add all pages to the main container
-      if (containerRef.current) {
-        containerRef.current.appendChild(allPagesContainer)
-        console.log(`All ${numPages} pages rendered successfully`)
-      }
-      
-    } catch (e) {
-      console.error('Error rendering pages:', e)
-      setError(`Error rendering pages: ${e}`)
-    }
+      }, { root: containerRef.current, rootMargin: '200px 0px', threshold: 0.01 })
+      io.observe(el)
+      return () => io.disconnect()
+    }, [])
+
+    useEffect(() => {
+      let cancelled = false
+      if (!pdf || !visible) return
+      ;(async () => {
+        try {
+          const page = await pdf.getPage(pageNum)
+          const viewport = page.getViewport({ scale })
+          const canvas = canvasRef.current || document.createElement('canvas')
+          const ctx = canvas.getContext('2d')
+          if (!ctx) return
+          canvas.height = viewport.height
+          canvas.width = viewport.width
+          canvas.style.width = '100%'
+          canvas.style.maxWidth = '800px'
+          canvas.style.height = 'auto'
+          canvas.style.display = 'block'
+          canvas.style.border = '1px solid #e2e8f0'
+          canvas.style.borderRadius = '4px'
+          canvas.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+          await (page as any).render({ canvasContext: ctx, viewport }).promise
+          if (!canvasRef.current) {
+            canvasRef.current = canvas
+            if (pageRef.current) pageRef.current.appendChild(canvas)
+          }
+        } catch (e) {
+          if (!cancelled) setError(String(e))
+        }
+      })()
+      return () => { cancelled = true }
+    }, [pdf, visible, pageNum, scale])
+
+    return (
+      <div ref={pageRef} className="flex flex-col items-center mb-4">
+        <div className="text-xs text-slate-500 mb-1">Page {pageNum}</div>
+      </div>
+    )
   }
 
   const zoomIn = () => setScale(prev => Math.min(prev + 0.2, 3))
@@ -238,8 +197,12 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '' }) => {
       </div>
 
       {/* PDF Content - Fixed Height Container with Scroll */}
-      <div className="h-96 overflow-auto bg-slate-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg" style={{ height: '600px' }}>
-        <div ref={containerRef} className="p-6" />
+      <div ref={containerRef} className="h-96 overflow-auto bg-slate-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg" style={{ height: '600px' }}>
+        <div className="p-6 flex flex-col items-center">
+          {Array.from({ length: numPages }, (_, i) => (
+            <PageView key={i} pageNum={i + 1} />
+          ))}
+        </div>
       </div>
     </div>
   )

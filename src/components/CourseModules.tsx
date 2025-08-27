@@ -1,7 +1,7 @@
 import React from 'react'
-import { Button } from './ui/Button'
 import { FileText, File, MessageSquare, Link as LinkIcon, BookOpen, ExternalLink } from 'lucide-react'
 import { useCourseModules } from '../hooks/useCanvasQueries'
+import type { CanvasModule, CanvasModuleItem, CanvasFile } from '../types/canvas'
 
 type Props = {
   courseId: string | number
@@ -17,7 +17,7 @@ type Props = {
 export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpenContent }) => {
   const { data: modules = null, isLoading, error } = useCourseModules(courseId)
 
-  async function openItem(it: any, title: string) {
+  async function openItem(it: CanvasModuleItem, title: string) {
     if (it.__typename === 'PageModuleItem' || it.pageUrl) {
       onOpenContent?.({ courseId, contentType: 'page', contentId: it.pageUrl || '', title })
       return
@@ -31,9 +31,9 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
         if (it.htmlUrl) onOpenExternal?.(it.htmlUrl)
         return
       }
-      const res: any = await window.canvas.getFile?.(it.contentId)
+      const res = await window.canvas.getFile?.(it.contentId)
       if (res?.ok) {
-        const fileData = res.data
+        const fileData = res.data as CanvasFile
         const fileName = fileData?.display_name || fileData?.filename || title
         const contentType = fileData?.content_type || ''
         const isViewableFile = /\.(pdf|docx?|pptx?|xlsx?|jpe?g|png|gif|webp|bmp|svg|avif|mp3|wav|ogg|m4a|aac|mp4|webm|mov|m4v)$/i.test(fileName)
@@ -41,7 +41,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
         if (isViewableFile) {
           onOpenContent?.({ courseId, contentType: 'file', contentId: it.contentId, title: fileName })
         } else {
-          const url = fileData?.url || fileData?.preview_url || fileData?.display_url
+          const url = fileData?.url as string | undefined
           if (url) window.open(url, '_blank')
         }
       }
@@ -52,7 +52,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
     }
   }
 
-  const iconFor = (n: any) => {
+  const iconFor = (n: CanvasModuleItem) => {
     switch (n?.__typename) {
       case 'AssignmentModuleItem': return <FileText className="w-4 h-4" />
       case 'PageModuleItem': return <BookOpen className="w-4 h-4" />
@@ -64,7 +64,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
     }
   }
 
-  const labelFor = (n: any) => {
+  const labelFor = (n: CanvasModuleItem) => {
     switch (n?.__typename) {
       case 'AssignmentModuleItem': return 'Assignment'
       case 'PageModuleItem': return 'Page'
@@ -86,7 +86,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
       )}
       {!isLoading && modules && modules.length > 0 && (
         <div className="space-y-3">
-          {modules.map((m, i) => (
+          {(modules as CanvasModule[]).map((m, i) => (
             <div key={i} className="rounded-card ring-1 ring-gray-200 dark:ring-slate-700 overflow-hidden">
               <div className="px-4 py-2 font-medium bg-gradient-to-r from-slate-50/70 to-transparent dark:from-neutral-800/40 flex items-center justify-between">
                 <span>{m.name}</span>
@@ -94,8 +94,8 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
               </div>
               {(m.moduleItemsConnection?.nodes?.length ?? 0) > 0 && (
                 <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
-                  {m.moduleItemsConnection?.nodes?.map((it: any, j: number) => {
-                    const title = it.title || it.assignment?.name || it.page?.title || it.file?.displayName || it.discussionTopic?.title || it.quiz?.title || 'Item'
+                  {m.moduleItemsConnection?.nodes?.map((it: CanvasModuleItem, j: number) => {
+                    const title = it.title || 'Item'
                     const kind = labelFor(it)
                     return (
                       <li key={j} className="px-3 sm:px-4 py-2 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 transition-colors">

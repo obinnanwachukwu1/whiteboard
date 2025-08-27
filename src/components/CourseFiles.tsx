@@ -2,6 +2,8 @@ import React from 'react'
 import { FileText, File, Image as ImageIcon, Video, Folder as FolderIcon, ChevronRight, ExternalLink, ArrowUpDown } from 'lucide-react'
 import { Button } from './ui/Button'
 import { useCourseFolders, useFolderFiles } from '../hooks/useCanvasQueries'
+import { VirtualList } from './ui/VirtualList'
+import type { CanvasFolder, CanvasFile } from '../types/canvas'
 
 type Props = {
   courseId: string | number
@@ -49,10 +51,10 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
   const { data: folders = [], isLoading, error } = useCourseFolders(courseId, 100)
   const [current, setCurrent] = React.useState<string | null>(null)
 
-  const byId = React.useMemo(() => new Map((folders as any[]).map((f: any) => [String(f.id), f])), [folders])
+  const byId = React.useMemo(() => new Map((folders as CanvasFolder[]).map((f) => [String(f.id), f])), [folders])
   const children = React.useMemo(() => {
-    const map = new Map<string | null, any[]>()
-    for (const f of (folders as any[])) {
+    const map = new Map<string | null, CanvasFolder[]>()
+    for (const f of (folders as CanvasFolder[])) {
       const pid = f?.parent_folder_id != null ? String(f.parent_folder_id) : null
       if (!map.has(pid)) map.set(pid, [])
       map.get(pid)!.push(f)
@@ -63,7 +65,7 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
   // Find the course root folder ("course files") and treat it as app root
   const courseRootId = React.useMemo(() => {
     let root: string | null = null
-    for (const f of (folders as any[])) {
+    for (const f of (folders as CanvasFolder[])) {
       const name = String(f?.full_name || f?.name || '').toLowerCase()
       const isTop = f?.parent_folder_id == null
       if (isTop && /\bcourse files\b/i.test(name)) {
@@ -73,7 +75,7 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
     }
     if (!root) {
       // Fallback: first top-level folder
-      const top = (folders as any[]).find((f: any) => f?.parent_folder_id == null)
+      const top = (folders as CanvasFolder[]).find((f) => f?.parent_folder_id == null)
       root = top ? String(top.id) : null
     }
     return root
@@ -210,16 +212,20 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
             <div className="text-slate-500 dark:text-slate-400 text-sm">No items in this folder</div>
           )}
           {!filesQ.isLoading && files.length > 0 && (
-            <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
-              {files.map((f: any) => {
-                const updated = f?.updated_at ? new Date(f.updated_at).toLocaleString() : ''
-                const name = f?.display_name || f?.filename || 'File'
-                const viewable = /\.(pdf|docx?|pptx?|xlsx?|jpe?g|png|gif|webp|bmp|svg|avif|mp3|wav|ogg|m4a|aac|mp4|webm|mov|m4v)$/i.test(String(name))
-                  || /^(application\/(pdf|vnd\.openxmlformats-officedocument|vnd\.ms-)|image\/|audio\/|video\/)/i.test(String(f?.content_type || ''))
-                const type = fileTypeLabel(name, f?.content_type)
-                const sizeStr = typeof f?.size === 'number' ? formatBytes(f.size) : null
-                return (
-                  <li key={f.id} className="py-2">
+            <div className="border border-gray-200 dark:border-slate-700 rounded-md">
+              <VirtualList<CanvasFile>
+                items={files as CanvasFile[]}
+                height={480}
+                itemHeight={64}
+                className="bg-transparent"
+                renderItem={(f) => {
+                  const updated = f?.updated_at ? new Date(f.updated_at).toLocaleString() : ''
+                  const name = f?.display_name || f?.filename || 'File'
+                  const viewable = /\.(pdf|docx?|pptx?|xlsx?|jpe?g|png|gif|webp|bmp|svg|avif|mp3|wav|ogg|m4a|aac|mp4|webm|mov|m4v)$/i.test(String(name))
+                    || /^(application\/(pdf|vnd\.openxmlformats-officedocument|vnd\.ms-)|image\/|audio\/|video\/)/i.test(String(f?.content_type || ''))
+                  const type = fileTypeLabel(name, f?.content_type)
+                  const sizeStr = typeof f?.size === 'number' ? formatBytes(f.size) : null
+                  return (
                     <div
                       role="button"
                       tabIndex={0}
@@ -231,7 +237,7 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
                         }
                       }}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (viewable) onOpenContent?.({ courseId, contentType: 'file', contentId: String(f.id), title: name }); else if (f?.url) window.system?.openExternal?.(f.url) } }}
-                      className="group cursor-pointer flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 rounded-md px-2 sm:px-3 py-2 transition-colors"
+                      className="group cursor-pointer flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 px-2 sm:px-3 py-2 transition-colors"
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="w-8 h-8 rounded-full bg-neutral-600/15 text-slate-600 dark:text-neutral-200 inline-flex items-center justify-center shrink-0">
@@ -255,10 +261,10 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
                         </button>
                       )}
                     </div>
-                  </li>
-                )
-              })}
-            </ul>
+                  )
+                }}
+              />
+            </div>
           )}
         </div>
       )}

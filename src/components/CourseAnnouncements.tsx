@@ -1,6 +1,6 @@
 import React from 'react'
 // no Card wrapper; rendered within page container
-import { Button } from './ui/Button'
+// import { Button } from './ui/Button'
 import { Megaphone, ExternalLink } from 'lucide-react'
 import { useCourseAnnouncementsInfinite } from '../hooks/useCanvasQueries'
 

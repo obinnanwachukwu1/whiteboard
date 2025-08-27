@@ -37,7 +37,7 @@ export const FloatingCourseTabs: React.FC<Props> = ({ current, onChange, anchorI
 
   return (
     <div
-      className="fixed top-16 z-50 px-2 py-2 pointer-events-none"
+      className="fixed top-20 z-50 px-2 py-2 pointer-events-none"
       style={{ left: left ?? '50%', transform: 'translateX(-50%)' }}
     >
       <div className="pointer-events-auto inline-flex items-center gap-px rounded-full overflow-hidden ring-1 ring-gray-200/80 dark:ring-neutral-800/80 bg-white/60 dark:bg-neutral-900/70 backdrop-blur-md shadow-lg">

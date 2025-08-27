@@ -57,7 +57,7 @@ contextBridge.exposeInMainWorld('canvas', {
 
 contextBridge.exposeInMainWorld('settings', {
   get: () => ipcRenderer.invoke('config:get'),
-  set: (partial: Partial<{ baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; prefetchEnabled?: boolean; cachedCourses?: any[]; cachedDue?: any[]; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> } }>) => ipcRenderer.invoke('config:set', partial),
+  set: (partial: Partial<{ baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; prefetchEnabled?: boolean; cachedCourses?: any[]; cachedDue?: any[]; queryCache?: any; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> } }>) => ipcRenderer.invoke('config:set', partial),
 })
 
 // System helpers

@@ -9,6 +9,8 @@ export type AppConfig = {
   prefetchEnabled?: boolean
   cachedCourses?: any[]
   cachedDue?: any[]
+  // Optional dehydrated React Query cache snapshot
+  queryCache?: any
   sidebar?: {
     hiddenCourseIds?: Array<string | number>
     customNames?: Record<string, string>
@@ -23,6 +25,7 @@ const DEFAULT_CONFIG: AppConfig = {
   prefetchEnabled: true,
   cachedCourses: [],
   cachedDue: [],
+  queryCache: undefined,
   sidebar: {
     hiddenCourseIds: [],
     customNames: {},

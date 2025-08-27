@@ -159,7 +159,17 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
           <SortableContext items={orderedVisibleCourses.map((c) => String(c.id))} strategy={verticalListSortingStrategy}>
             <nav className="flex flex-col gap-1">
               {orderedVisibleCourses.map((c) => (
-                <SortableCourseRow key={c.id} c={c} active={activeCourseId === c.id} label={labelFor(c)} onSelect={() => onSelectCourse(c.id)} onMore={() => setMenuOpenId(menuOpenId === c.id ? null : c.id)} moreOpen={menuOpenId === c.id} onHide={() => onHideCourse(c.id)} onPrefetch={() => onPrefetchCourse?.(c.id)} />
+                <SortableCourseRow
+                  key={c.id}
+                  c={c}
+                  active={activeCourseId != null && String(activeCourseId) === String(c.id)}
+                  label={labelFor(c)}
+                  onSelect={() => onSelectCourse(c.id)}
+                  onMore={() => setMenuOpenId(menuOpenId === c.id ? null : c.id)}
+                  moreOpen={menuOpenId === c.id}
+                  onHide={() => onHideCourse(c.id)}
+                  onPrefetch={() => onPrefetchCourse?.(c.id)}
+                />
               ))}
             </nav>
           </SortableContext>

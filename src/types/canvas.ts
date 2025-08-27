@@ -77,3 +77,53 @@ export type CanvasTab = {
   position?: number
   html_url?: string
 }
+
+export type ActivityAnnouncement = {
+  type?: string
+  title?: string
+  created_at?: string
+  html_url?: string
+  course_id?: string | number
+}
+
+export type CourseDiscussion = {
+  id: string | number
+  title?: string
+  posted_at?: string
+  html_url?: string
+}
+
+export type CourseInfo = {
+  id?: string | number
+  name?: string
+  default_view?: string
+  syllabus_body?: string
+}
+
+// Minimal file/folder types used in Files view
+export type CanvasFolder = {
+  id: string | number
+  name?: string
+  full_name?: string
+  parent_folder_id?: string | number | null
+}
+
+export type CanvasFile = {
+  id: string | number
+  display_name?: string
+  filename?: string
+  content_type?: string
+  size?: number
+  updated_at?: string
+  url?: string
+}
+
+export type AnnouncementDetail = {
+  id?: string | number
+  title?: string
+  message?: string
+  posted_at?: string
+  html_url?: string
+}
+
+export type CourseFrontPage = { body?: string } | null
