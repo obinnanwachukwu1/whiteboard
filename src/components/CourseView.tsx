@@ -52,14 +52,8 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
   const hasFiles = hasFilesFromTabs || (!!filesProbeQ.data && (filesProbeQ.data as any[]).length > 0)
   const hasLinks = Array.isArray(tabsQ.data) && (tabsQ.data as any[]).length > 0
 
-  // Gate rendering tabs until we know the final list to avoid pop-ins
-  const infoFetched = !!(infoQ.isFetched || infoQ.isSuccess || infoQ.data || infoQ.error)
-  const tabsFetched = !!(tabsQ.isFetched || tabsQ.isSuccess || tabsQ.data || tabsQ.error)
-  // Don't block on files probe; we can add Files tab later
-  const tabsReady = infoFetched || tabsFetched
-
+  // Recompute tabs whenever course info or tabs data change
   React.useEffect(() => {
-    if (!tabsReady) return
     const nextTabs: any[] = [
       ...(hasHome ? [{ key: 'home', label: 'Home', Icon: HomeIcon }] as any[] : []),
       ...(hasSyllabus ? [{ key: 'syllabus', label: 'Syllabus', Icon: ScrollText }] as any[] : []),
@@ -71,19 +65,57 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
       { key: 'grades', label: 'Grades', Icon: Percent },
     ]
     setAvailableTabs(nextTabs)
-    // Cache resolved tabs in query cache to avoid recompute flicker next time
-    queryClient.setQueryData(['course-resolved-tabs', String(courseId)], nextTabs)
-  }, [tabsReady, hasHome, hasSyllabus, hasFiles, hasLinks])
+    // Only cache when actual tabs list has been fetched for this course
+    const fallbackOnly = !hasHome && !hasSyllabus && !hasFiles && !hasLinks
+    if (Array.isArray(tabsQ.data) && !fallbackOnly) {
+      queryClient.setQueryData(['course-resolved-tabs', String(courseId)], nextTabs)
+    }
+  }, [courseId, hasHome, hasSyllabus, hasFiles, hasLinks, tabsQ.data])
 
-  // Seed availableTabs from cache immediately to minimize skeleton time
+  // Reset and seed availableTabs on course change
   React.useEffect(() => {
+    setAvailableTabs(null)
     const cachedTabs = queryClient.getQueryData<any>(['course-resolved-tabs', String(courseId)])
-    if (cachedTabs && !availableTabs) setAvailableTabs(cachedTabs)
+    if (cachedTabs) {
+      try {
+        const iconMap: Record<string, any> = {
+          home: HomeIcon,
+          syllabus: ScrollText,
+          announcements: Megaphone,
+          files: FileText,
+          modules: BookOpen,
+          links: LinkIcon,
+          assignments: ClipboardList,
+          grades: Percent,
+        }
+        const labelMap: Record<string, string> = {
+          home: 'Home',
+          syllabus: 'Syllabus',
+          announcements: 'Announcements',
+          files: 'Files',
+          modules: 'Modules',
+          links: 'Links',
+          assignments: 'Assignments',
+          grades: 'Grades',
+        }
+        const arr = Array.isArray(cachedTabs) ? cachedTabs : []
+        const normalized = arr.map((x: any) => {
+          const key = typeof x === 'string' ? x : x?.key
+          if (!key) return null
+          return { key, label: x?.label || labelMap[key] || key, Icon: iconMap[key] }
+        }).filter(Boolean)
+        if (normalized.length) setAvailableTabs(normalized as any)
+      } catch {
+        // Fall through; CourseView will compute from queries
+      }
+    }
   }, [courseId])
 
   // If no cached tabs yet, seed a fast fallback so skeleton is minimal
   React.useEffect(() => {
     if (availableTabs) return
+    const cachedResolved = queryClient.getQueryData<any>(['course-resolved-tabs', String(courseId)])
+    if (cachedResolved) return
     const cachedInfo = queryClient.getQueryData<any>(['course-info', String(courseId)]) as any
     const dv = String(cachedInfo?.default_view || '').toLowerCase()
     const showHome = dv === 'wiki'

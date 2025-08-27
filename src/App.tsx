@@ -251,7 +251,7 @@ function App() {
         staleTime: 1000 * 60 * 5,
       })
       // Pre-warm course tabs immediately (not idle) so Links/Files visibility resolves fast
-      const tabsPromise = queryClient.prefetchQuery({
+      const tabsPromise = queryClient.fetchQuery({
         queryKey: ['course-tabs', id, true],
         queryFn: async () => {
           const res = await window.canvas.listCourseTabs?.(id, true)
@@ -261,8 +261,40 @@ function App() {
         staleTime: 1000 * 60 * 5,
       })
 
-      const info = await infoPromise
+      const [info, tabs] = await Promise.all([infoPromise, tabsPromise])
       const defaultView = String((info as any)?.default_view || '').toLowerCase()
+      // If user didn't deep-link and we're still viewing this course, adopt API default tab
+      const map: Record<string, any> = { wiki: 'home', modules: 'modules', assignments: 'assignments', syllabus: 'syllabus', feed: 'announcements' }
+      const preferred = (map[defaultView] as any) || 'announcements'
+      if (!courseDetail) {
+        // Only upgrade from null or fallback to the API default
+        if (courseTab == null || (courseTab === 'announcements' && preferred !== 'announcements')) {
+          setCourseTab(preferred)
+        }
+      }
+
+      // Seed resolved tabs cache using available data to avoid fallback on revisit
+      try {
+        const hasSyllabus = typeof (info as any)?.syllabus_body === 'string' && String((info as any)?.syllabus_body).trim() !== ''
+        const hasHome = defaultView === 'wiki'
+        const hasFilesFromTabs = Array.isArray(tabs) && (tabs as any[]).some((t: any) => {
+          const idOrType = String(t?.id || t?.type || '').toLowerCase()
+          const label = String(t?.label || '').toLowerCase()
+          return (!t?.hidden) && (idOrType.includes('files') || label.includes('files'))
+        })
+        const hasLinks = Array.isArray(tabs) && (tabs as any[]).length > 0
+        const nextTabs: any[] = [
+          ...(hasHome ? [{ key: 'home', label: 'Home', Icon: undefined }] as any[] : []),
+          ...(hasSyllabus ? [{ key: 'syllabus', label: 'Syllabus', Icon: undefined }] as any[] : []),
+          { key: 'announcements', label: 'Announcements', Icon: undefined },
+          ...(hasFilesFromTabs ? [{ key: 'files', label: 'Files', Icon: undefined }] as any[] : []),
+          { key: 'modules', label: 'Modules', Icon: undefined },
+          ...(hasLinks ? [{ key: 'links', label: 'Links', Icon: undefined }] as any[] : []),
+          { key: 'assignments', label: 'Assignments', Icon: undefined },
+          { key: 'grades', label: 'Grades', Icon: undefined },
+        ]
+        queryClient.setQueryData(['course-resolved-tabs', id], nextTabs)
+      } catch {}
       if (defaultView === 'wiki') {
         await queryClient.prefetchQuery({
           queryKey: ['course-front-page', id],
@@ -297,7 +329,7 @@ function App() {
         // Announcements default; CourseAnnouncements uses infinite query which is heavier to pre-warm.
         // We skip prefetch here and let the tab load quickly on mount.
       }
-      await tabsPromise.catch(() => {})
+      // tabsPromise already awaited above
     } catch {}
     // Continue warming in background (gradebook, etc.) if desired via prefetchCourseData
   }
