@@ -29,7 +29,8 @@ function App() {
   const dueQ = useDueAssignments({ days: 7 }, { enabled: hasToken === true })
   const { add: addToast } = useToast()
   const [activeCourseId, setActiveCourseId] = useState<string | number | null>(null)
-  const [initialCourseContent, setInitialCourseContent] = useState<{ contentType: 'assignment' | 'announcement'; contentId: string; title: string } | null>(null)
+  const [courseTab, setCourseTab] = useState<'home' | 'wiki' | 'syllabus' | 'announcements' | 'files' | 'modules' | 'links' | 'assignments' | 'grades' | null>(null)
+  const [courseDetail, setCourseDetail] = useState<{ contentType: 'assignment' | 'announcement' | 'page' | 'file'; contentId: string; title: string } | null>(null)
   const [sidebarCfg, setSidebarCfg] = useState<SidebarConfig>({ hiddenCourseIds: [], customNames: {}, order: [] })
 
 
@@ -235,6 +236,81 @@ function App() {
     })
   }
 
+  // Focused prefetch for landing experience: fetch course-info first,
+  // then prefetch only the default tab's data to keep navigation snappy.
+  const prefetchCourseLanding = async (courseId: string | number) => {
+    const id = String(courseId)
+    try {
+      const infoPromise = queryClient.fetchQuery({
+        queryKey: ['course-info', id],
+        queryFn: async () => {
+          const res = await window.canvas.getCourseInfo?.(id)
+          if (!res?.ok) throw new Error(res?.error || 'Failed to load course info')
+          return res.data || null
+        },
+        staleTime: 1000 * 60 * 5,
+      })
+      // Pre-warm course tabs immediately (not idle) so Links/Files visibility resolves fast
+      const tabsPromise = queryClient.prefetchQuery({
+        queryKey: ['course-tabs', id, true],
+        queryFn: async () => {
+          const res = await window.canvas.listCourseTabs?.(id, true)
+          if (!res?.ok) throw new Error(res?.error || 'Failed to load course tabs')
+          return res.data || []
+        },
+        staleTime: 1000 * 60 * 5,
+      })
+
+      const info = await infoPromise
+      const defaultView = String((info as any)?.default_view || '').toLowerCase()
+      if (defaultView === 'wiki') {
+        await queryClient.prefetchQuery({
+          queryKey: ['course-front-page', id],
+          queryFn: async () => {
+            const res = await window.canvas.getCourseFrontPage?.(id)
+            if (!res?.ok) throw new Error(res?.error || 'Failed to load front page')
+            return res.data || null
+          },
+          staleTime: 1000 * 60 * 5,
+        })
+      } else if (defaultView === 'modules') {
+        await queryClient.prefetchQuery({
+          queryKey: ['course-modules', id],
+          queryFn: async () => {
+            const res = await window.canvas.listCourseModulesGql(id, 20, 50)
+            if (!res?.ok) throw new Error(res?.error || 'Failed to load modules')
+            return res.data || []
+          },
+          staleTime: 1000 * 60 * 5,
+        })
+      } else if (defaultView === 'assignments') {
+        await queryClient.prefetchQuery({
+          queryKey: ['course-assignments', id, 200],
+          queryFn: async () => {
+            const res = await window.canvas.listCourseAssignments(id, 200)
+            if (!res?.ok) throw new Error(res?.error || 'Failed to load assignments')
+            return res.data || []
+          },
+          staleTime: 1000 * 60 * 5,
+        })
+      } else if (defaultView === 'feed') {
+        // Announcements default; CourseAnnouncements uses infinite query which is heavier to pre-warm.
+        // We skip prefetch here and let the tab load quickly on mount.
+      }
+      await tabsPromise.catch(() => {})
+    } catch {}
+    // Continue warming in background (gradebook, etc.) if desired via prefetchCourseData
+  }
+
+  // Ensure fresh data on course switch by invalidating cached queries, then prefetch in background
+  const refreshCourseData = (courseId: string | number) => {
+    const id = String(courseId)
+    // Invalidate only course-info so default view and syllabus refresh; per-tab queries load on demand
+    queryClient.invalidateQueries({ queryKey: ['course-info', id] }).catch(() => {})
+    // Warm landing content quickly without over-fetching
+    prefetchCourseLanding(courseId)
+  }
+
   // Background prefetch for all visible courses once courses load
   useEffect(() => {
     const cs = coursesQ.data || []
@@ -262,12 +338,17 @@ function App() {
           activeCourseId={view === 'course' ? activeCourseId : null}
           sidebar={sidebarCfg}
           current={view}
-          onSelectDashboard={() => { setView('dashboard'); setActiveCourseId(null); setInitialCourseContent(null) }}
+          onSelectDashboard={() => { setView('dashboard'); setActiveCourseId(null); setCourseDetail(null); setCourseTab(null) }}
           onSelectCourse={(id) => {
             // Navigate immediately; prefetch runs in background
             setActiveCourseId(id)
+            setCourseDetail(null)
+            const info = queryClient.getQueryData<any>(['course-info', String(id)]) as any
+            const dv = String(info?.default_view || '').toLowerCase()
+            const map: Record<string, any> = { wiki: 'home', modules: 'modules', assignments: 'assignments', syllabus: 'syllabus', feed: 'announcements' }
+            setCourseTab((map[dv] as any) || 'announcements')
             setView('course')
-            prefetchCourseData(id)
+            refreshCourseData(id)
           }}
           onOpenAllCourses={() => setView('allCourses')}
           onHideCourse={hideCourse}
@@ -321,18 +402,20 @@ function App() {
                   }
                   courses={(coursesQ.data || cachedCourses || [])}
                   sidebar={sidebarCfg}
-                  onOpenCourse={(id) => { setActiveCourseId(id); setInitialCourseContent(null); setView('course'); prefetchCourseData(id) }}
+                  onOpenCourse={(id) => { setActiveCourseId(id); setCourseDetail(null); const info = queryClient.getQueryData<any>(['course-info', String(id)]) as any; const dv = String(info?.default_view || '').toLowerCase(); const map: Record<string, any> = { wiki: 'home', modules: 'modules', assignments: 'assignments', syllabus: 'syllabus', feed: 'announcements' }; setCourseTab((map[dv] as any) || 'announcements'); setView('course'); refreshCourseData(id) }}
                   onOpenAssignment={(courseId, assignmentRestId, title) => {
                     setActiveCourseId(courseId)
-                    setInitialCourseContent({ contentType: 'assignment', contentId: assignmentRestId, title })
+                    setCourseDetail({ contentType: 'assignment', contentId: assignmentRestId, title })
+                    setCourseTab('assignments')
                     setView('course')
-                    prefetchCourseData(courseId)
+                    refreshCourseData(courseId)
                   }}
                   onOpenAnnouncement={(courseId, topicId, title) => {
                     setActiveCourseId(courseId)
-                    setInitialCourseContent({ contentType: 'announcement', contentId: topicId, title })
+                    setCourseDetail({ contentType: 'announcement', contentId: topicId, title })
+                    setCourseTab('announcements')
                     setView('course')
-                    prefetchCourseData(courseId)
+                    refreshCourseData(courseId)
                   }}
                 />
               )}
@@ -342,10 +425,29 @@ function App() {
                     {(coursesQ.data || []).find((c) => c.id === activeCourseId)?.name || 'Course'}
                   </h1>
                   <CourseView
+                    key={String(activeCourseId)}
                     courseId={activeCourseId}
                     courseName={(coursesQ.data || []).find((c) => c.id === activeCourseId)?.name}
-                    initialContent={initialCourseContent}
-                    onConsumedInitialContent={() => setInitialCourseContent(null)}
+                    activeTab={(courseTab as any) || 'announcements'}
+                    onChangeTab={(t) => setCourseTab(t)}
+                    content={courseDetail}
+                    onOpenDetail={(d) => { setCourseDetail(d); const tabFor: any = d.contentType === 'assignment' ? 'assignments' : d.contentType === 'announcement' ? 'announcements' : d.contentType === 'page' ? 'home' : 'files'; setCourseTab(tabFor) }}
+                    onClearDetail={() => setCourseDetail(null)}
+                    baseUrl={baseUrl}
+                    onNavigateCourse={(cid, init) => {
+                      if (!cid) return
+                      setActiveCourseId(cid)
+                      if (init) {
+                        if (init.type === 'assignment') { setCourseDetail({ contentType: 'assignment', contentId: init.id, title: init.title || 'Assignment' }); setCourseTab('assignments') }
+                        if (init.type === 'announcement') { setCourseDetail({ contentType: 'announcement', contentId: init.id, title: init.title || 'Announcement' }); setCourseTab('announcements') }
+                        if (init.type === 'page') { setCourseDetail({ contentType: 'page', contentId: init.id, title: init.title || 'Page' }); setCourseTab('home') }
+                        if (init.type === 'file') { setCourseDetail({ contentType: 'file', contentId: init.id, title: init.title || 'File' }); setCourseTab('files') }
+                      } else {
+                        setCourseDetail(null)
+                      }
+                      setView('course')
+                      refreshCourseData(cid)
+                    }}
                   />
                 </>
               )}

@@ -163,7 +163,9 @@ export function useCourseTabs(courseId: string | number | undefined, includeExte
       return ensureOk(await window.canvas.listCourseTabs?.(courseId, includeExternal))
     },
     enabled: courseId != null && (options?.enabled ?? true),
-    staleTime: 1000 * 60 * 5,
+    // Tabs rarely change; keep them warm and cached for a long time
+    staleTime: 1000 * 60 * 60 * 24, // 24h
+    gcTime: 1000 * 60 * 60 * 24, // keep in cache for 24h
     ...options,
   })
 }

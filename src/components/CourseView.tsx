@@ -1,7 +1,8 @@
 import React from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Card } from './ui/Card'
 import { Button } from './ui/Button'
-import { FileText, Calendar, Star, Home as HomeIcon, BookOpen, Megaphone, ClipboardList, ScrollText, Percent } from 'lucide-react'
+import { FileText, Calendar, Star, Home as HomeIcon, BookOpen, Megaphone, ClipboardList, ScrollText, Percent, Link as LinkIcon } from 'lucide-react'
 import { useCourseAssignments, useCourseInfo, useCourseFrontPage, useCourseTabs, useCourseFiles } from '../hooks/useCanvasQueries'
 import { CourseGrades } from './CourseGrades'
 import { CourseModules } from './CourseModules'
@@ -13,26 +14,29 @@ import { FloatingCourseTabs, type CourseTabKey } from './FloatingCourseTabs'
 import { HtmlContent } from './HtmlContent'
 
 
+type Detail = { contentType: 'page' | 'assignment' | 'file' | 'announcement'; contentId: string; title: string }
+
 type Props = {
   courseId: string | number
   courseName?: string
-  initialContent?: { contentType: 'assignment' | 'announcement'; contentId: string; title: string } | null
-  onConsumedInitialContent?: () => void
+  activeTab: CourseTabKey
+  onChangeTab: (tab: CourseTabKey) => void
+  content: Detail | null
+  onOpenDetail: (detail: Detail) => void
+  onClearDetail: () => void
+  baseUrl?: string
+  onNavigateCourse?: (courseId: string | number, init?: { type: 'assignment' | 'announcement' | 'page' | 'file'; id: string; title?: string }) => void
 }
 
-export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName, initialContent, onConsumedInitialContent }) => {
-  const { data: items = [], isLoading, error } = useCourseAssignments(courseId, 200)
+export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName, activeTab, onChangeTab, content, onOpenDetail, onClearDetail, baseUrl, onNavigateCourse }) => {
+  const queryClient = useQueryClient()
+  const [availableTabs, setAvailableTabs] = React.useState<any[] | null>(null)
+
+  const { data: items = [], isLoading, error } = useCourseAssignments(courseId, 200, { enabled: courseId != null && activeTab === 'assignments' })
   const infoQ = useCourseInfo(courseId)
-  const frontQ = useCourseFrontPage(courseId, { enabled: true })
-  const tabsQ = useCourseTabs(courseId, true)
+  const frontQ = useCourseFrontPage(courseId, { enabled: activeTab === 'home' })
+  const tabsQ = useCourseTabs(courseId, true, { staleTime: 1000 * 60 * 60 * 24 })
   const showLoading = (!items || items.length === 0) && isLoading
-  const [content, setContent] = React.useState<{
-    contentType: 'page' | 'assignment' | 'file' | 'announcement'
-    contentId: string
-    title: string
-  } | null>(null)
-  const [activeTab, setActiveTab] = React.useState<CourseTabKey>('announcements')
-  const [tabInitialized, setTabInitialized] = React.useState(false)
 
   // Determine available tabs
   const defaultView = (infoQ.data?.default_view || '').toLowerCase()
@@ -46,58 +50,163 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
   // Fallback probe: if tabs didn’t reveal Files, try a 1-item files fetch; if it works and returns >0, enable Files tab
   const filesProbeQ = useCourseFiles(courseId, 1, 'updated_at', 'desc', { enabled: courseId != null && !!tabsQ.data && !hasFilesFromTabs })
   const hasFiles = hasFilesFromTabs || (!!filesProbeQ.data && (filesProbeQ.data as any[]).length > 0)
+  const hasLinks = Array.isArray(tabsQ.data) && (tabsQ.data as any[]).length > 0
 
-  const tabs = [
-    ...(hasHome ? [{ key: 'home', label: 'Home', Icon: HomeIcon }] as any[] : []),
-    ...(hasSyllabus ? [{ key: 'syllabus', label: 'Syllabus', Icon: ScrollText }] as any[] : []),
-    { key: 'announcements', label: 'Announcements', Icon: Megaphone },
-    ...(hasFiles ? [{ key: 'files', label: 'Files', Icon: FileText }] as any[] : []),
-    { key: 'modules', label: 'Modules', Icon: BookOpen },
-    { key: 'assignments', label: 'Assignments', Icon: ClipboardList },
-    { key: 'grades', label: 'Grades', Icon: Percent },
-  ]
+  // Gate rendering tabs until we know the final list to avoid pop-ins
+  const infoFetched = !!(infoQ.isFetched || infoQ.isSuccess || infoQ.data || infoQ.error)
+  const tabsFetched = !!(tabsQ.isFetched || tabsQ.isSuccess || tabsQ.data || tabsQ.error)
+  // Don't block on files probe; we can add Files tab later
+  const tabsReady = infoFetched || tabsFetched
 
-  // Set initial active tab based on course default view
   React.useEffect(() => {
-    if (!defaultView || tabInitialized || content) return
-    const map: Record<string, CourseTabKey> = {
-      wiki: 'home',
-      modules: 'modules',
-      assignments: 'assignments',
-      syllabus: 'syllabus',
-      feed: 'announcements',
+    if (!tabsReady) return
+    const nextTabs: any[] = [
+      ...(hasHome ? [{ key: 'home', label: 'Home', Icon: HomeIcon }] as any[] : []),
+      ...(hasSyllabus ? [{ key: 'syllabus', label: 'Syllabus', Icon: ScrollText }] as any[] : []),
+      { key: 'announcements', label: 'Announcements', Icon: Megaphone },
+      ...(hasFiles ? [{ key: 'files', label: 'Files', Icon: FileText }] as any[] : []),
+      { key: 'modules', label: 'Modules', Icon: BookOpen },
+      ...(hasLinks ? [{ key: 'links', label: 'Links', Icon: LinkIcon }] as any[] : []),
+      { key: 'assignments', label: 'Assignments', Icon: ClipboardList },
+      { key: 'grades', label: 'Grades', Icon: Percent },
+    ]
+    setAvailableTabs(nextTabs)
+    // Cache resolved tabs in query cache to avoid recompute flicker next time
+    queryClient.setQueryData(['course-resolved-tabs', String(courseId)], nextTabs)
+  }, [tabsReady, hasHome, hasSyllabus, hasFiles, hasLinks])
+
+  // Seed availableTabs from cache immediately to minimize skeleton time
+  React.useEffect(() => {
+    const cachedTabs = queryClient.getQueryData<any>(['course-resolved-tabs', String(courseId)])
+    if (cachedTabs && !availableTabs) setAvailableTabs(cachedTabs)
+  }, [courseId])
+
+  // If no cached tabs yet, seed a fast fallback so skeleton is minimal
+  React.useEffect(() => {
+    if (availableTabs) return
+    const cachedInfo = queryClient.getQueryData<any>(['course-info', String(courseId)]) as any
+    const dv = String(cachedInfo?.default_view || '').toLowerCase()
+    const showHome = dv === 'wiki'
+    const fallback: any[] = [
+      ...(showHome ? [{ key: 'home', label: 'Home', Icon: HomeIcon }] as any[] : []),
+      { key: 'announcements', label: 'Announcements', Icon: Megaphone },
+      { key: 'modules', label: 'Modules', Icon: BookOpen },
+      { key: 'assignments', label: 'Assignments', Icon: ClipboardList },
+      { key: 'grades', label: 'Grades', Icon: Percent },
+    ]
+    setAvailableTabs(fallback)
+  }, [availableTabs, courseId])
+
+  // Keep the skeleton aligned with the main content anchor
+  const [skeletonLeft, setSkeletonLeft] = React.useState<number | null>(null)
+  React.useEffect(() => {
+    function compute() {
+      const el = document.getElementById('course-content-anchor')
+      if (!el) { setSkeletonLeft(null); return }
+      const rect = el.getBoundingClientRect()
+      setSkeletonLeft(rect.left + rect.width / 2)
     }
-    const next = map[defaultView]
-    if (next) {
-      setActiveTab(next)
-      setTabInitialized(true)
+    compute()
+    window.addEventListener('resize', compute)
+    return () => window.removeEventListener('resize', compute)
+  }, [courseId])
+
+  // Controlled: default selection and deep-link behavior handled by parent (App)
+
+  // Central link handler for rich HTML content
+  const handleNavigate = (href: string) => {
+    try {
+      const u = new URL(href)
+      const originMatch = baseUrl ? u.origin === new URL(baseUrl).origin : false
+      const path = u.pathname
+      const parts = path.split('/').filter(Boolean)
+      const idxCourse = parts.indexOf('courses')
+      const cid = idxCourse >= 0 && parts[idxCourse + 1] ? parts[idxCourse + 1] : null
+      const withinCurrent = cid && String(cid) === String(courseId)
+
+      const openAssignment = () => {
+        const idx = parts.indexOf('assignments')
+        const id = idx >= 0 ? parts[idx + 1] : null
+        if (id) {
+          if (withinCurrent) { onChangeTab('assignments'); onOpenDetail({ contentType: 'assignment', contentId: String(id), title: 'Assignment' }) }
+          else if (cid) onNavigateCourse?.(cid, { type: 'assignment', id: String(id) })
+          return true
+        }
+        return false
+      }
+      const openAnnouncement = () => {
+        const idxD = parts.indexOf('discussion_topics')
+        const idxA = parts.indexOf('announcements')
+        const idx = idxD >= 0 ? idxD : idxA
+        const id = idx >= 0 ? parts[idx + 1] : null
+        if (id) {
+          if (withinCurrent) { onChangeTab('announcements'); onOpenDetail({ contentType: 'announcement', contentId: String(id), title: 'Announcement' }) }
+          else if (cid) onNavigateCourse?.(cid, { type: 'announcement', id: String(id) })
+          return true
+        }
+        return false
+      }
+      const openPage = () => {
+        const idxP = parts.indexOf('pages')
+        const slug = idxP >= 0 ? parts[idxP + 1] : null
+        if (slug) {
+          if (withinCurrent) { onChangeTab('home'); onOpenDetail({ contentType: 'page', contentId: String(slug), title: 'Page' }) }
+          else if (cid) onNavigateCourse?.(cid, { type: 'page', id: String(slug) })
+          return true
+        }
+        return false
+      }
+      const openFile = () => {
+        const idxF = parts.indexOf('files')
+        const seg = idxF >= 0 ? parts[idxF + 1] : null
+        // Only treat as file if immediate segment after 'files' is numeric (avoid folder routes)
+        if (seg && /^\d+$/.test(seg)) {
+          const fid = seg
+          if (withinCurrent) { onChangeTab('files'); onOpenDetail({ contentType: 'file', contentId: String(fid), title: 'File' }) }
+          else if (cid) onNavigateCourse?.(cid, { type: 'file', id: String(fid) })
+          return true
+        }
+        return false
+      }
+
+      const isInternal = originMatch || path.startsWith('/courses') || path.startsWith('/files')
+      if (!isInternal) { window.system?.openExternal?.(href); return }
+      if (openAssignment()) return
+      if (openAnnouncement()) return
+      if (openPage()) return
+      if (openFile()) return
+      if (withinCurrent && idxCourse >= 0) { onChangeTab('modules'); return }
+      window.system?.openExternal?.(href)
+    } catch {
+      window.system?.openExternal?.(href)
     }
-  }, [defaultView, tabInitialized, content])
+  }
 
-  // Consume initial content deep-link if provided
-  React.useEffect(() => {
-    if (!initialContent) return
-    setContent({ contentType: initialContent.contentType, contentId: initialContent.contentId, title: initialContent.title })
-    if (initialContent.contentType === 'assignment') setActiveTab('assignments')
-    if (initialContent.contentType === 'announcement') setActiveTab('announcements')
-    setTabInitialized(true)
-    onConsumedInitialContent?.()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialContent?.contentId, initialContent?.contentType, initialContent?.title])
-
-  // Keep the floating tabs visible even when viewing content details
-
-  // Ensure the active tab reflects the content being viewed
-  React.useEffect(() => {
-    if (!content) return
-    if (content.contentType === 'assignment') setActiveTab('assignments')
-    if (content.contentType === 'announcement') setActiveTab('announcements')
-    setTabInitialized(true)
-  }, [content?.contentType])
+  // No detail/content resets here; parent controls tab/content. Keep tabs seeded via cache above.
 
   return (
     <Card id="course-content-anchor" className="flex-1 overflow-y-auto relative">
-      <FloatingCourseTabs current={activeTab} onChange={setActiveTab} anchorId="course-content-anchor" tabs={tabs as any} />
+      {availableTabs && (
+        <FloatingCourseTabs
+          current={activeTab}
+          onChange={(t) => { onClearDetail(); onChangeTab(t) }}
+          anchorId="course-content-anchor"
+          tabs={availableTabs as any}
+        />
+      )}
+      {!availableTabs && (
+        <div
+          className="fixed top-16 z-40 px-2 py-2"
+          style={{ left: skeletonLeft ?? '50%', transform: 'translateX(-50%)' }}
+          aria-hidden
+        >
+          <div className="inline-flex items-center gap-1 rounded-full overflow-hidden ring-1 ring-gray-200/60 dark:ring-neutral-800/60 bg-white/60 dark:bg-neutral-900/70 backdrop-blur-md shadow-lg">
+            {[72, 96, 88, 84].map((w, i) => (
+              <div key={i} className="h-8 mx-[1px] rounded-full bg-slate-200/70 dark:bg-neutral-800/70 animate-pulse" style={{ width: w }} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {content ? (
         <div className="-m-5">
@@ -106,7 +215,8 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
             contentType={content.contentType}
             contentId={content.contentId}
             title={content.title}
-            onBack={() => setContent(null)}
+            onBack={onClearDetail}
+            onNavigate={handleNavigate}
           />
         </div>
       ) : (
@@ -116,7 +226,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
               {frontQ.isLoading && <div className="text-slate-500 dark:text-slate-400">Loading…</div>}
               {frontQ.error && <div className="text-red-600">{String((frontQ.error as any)?.message || frontQ.error)}</div>}
               {frontQ.data?.body && (
-                <HtmlContent html={frontQ.data.body} className="rich-html" />
+                <HtmlContent html={frontQ.data.body} className="rich-html" onNavigate={handleNavigate} />
               )}
             </div>
           )}
@@ -126,7 +236,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
           {activeTab === 'syllabus' && (
             <div className="mt-2">
               {hasSyllabus ? (
-                <HtmlContent html={infoQ.data?.syllabus_body || ''} className="rich-html" />
+                <HtmlContent html={infoQ.data?.syllabus_body || ''} className="rich-html" onNavigate={handleNavigate} />
               ) : (
                 <div className="text-slate-500 dark:text-slate-400">No syllabus</div>
               )}
@@ -137,7 +247,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
             <div className="mt-2">
               <CourseAnnouncements
                 courseId={courseId}
-                onOpen={(topicId, title) => setContent({ contentType: 'announcement', contentId: topicId, title })}
+                onOpen={(topicId, title) => onOpenDetail({ contentType: 'announcement', contentId: topicId, title })}
               />
             </div>
           )}
@@ -147,11 +257,14 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
               <CourseModules
                 courseId={courseId}
                 onOpenExternal={(url) => window.open(url, '_blank', 'noreferrer')}
-                onOpenContent={(c) => setContent({ contentType: c.contentType, contentId: String(c.contentId), title: c.title })}
+                onOpenContent={(c) => onOpenDetail({ contentType: c.contentType, contentId: String(c.contentId), title: c.title })}
               />
-              <div className="mt-6">
-                <CourseLinks courseId={courseId} />
-              </div>
+            </div>
+          )}
+
+          {activeTab === 'links' && (
+            <div className="mt-2">
+              <CourseLinks courseId={courseId} />
             </div>
           )}
 
@@ -159,7 +272,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
             <div className="mt-2">
               <CourseFiles
                 courseId={courseId}
-                onOpenContent={(c) => setContent({ contentType: 'file', contentId: String(c.contentId), title: c.title })}
+                onOpenContent={(c) => onOpenDetail({ contentType: 'file', contentId: String(c.contentId), title: c.title })}
               />
             </div>
           )}
@@ -182,8 +295,8 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
                         <div
                           role="button"
                           tabIndex={0}
-                          onClick={() => restId && setContent({ contentType: 'assignment', contentId: restId, title: a.name })}
-                          onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && restId) { e.preventDefault(); setContent({ contentType: 'assignment', contentId: restId, title: a.name }) } }}
+                          onClick={() => restId && onOpenDetail({ contentType: 'assignment', contentId: restId, title: a.name })}
+                          onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && restId) { e.preventDefault(); onOpenDetail({ contentType: 'assignment', contentId: restId, title: a.name }) } }}
                           className="cursor-pointer flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 rounded-md px-2 sm:px-3 py-2 transition-colors"
                         >
                           <div className="flex items-center gap-3 min-w-0">

@@ -27,7 +27,11 @@
     "postinstall": "^0.11.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "zod": "^4.0.17"
+    "zod": "^4.0.17",
+    "docx-preview": "^0.3.1",
+    "jszip": "^3.10.1",
+    "marked": "^12.0.2",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.12",

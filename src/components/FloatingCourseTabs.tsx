@@ -1,7 +1,7 @@
 import React from 'react'
-import { BookOpen, Megaphone, FileText, Percent } from 'lucide-react'
+import { BookOpen, Megaphone, FileText, Percent, Link as LinkIcon } from 'lucide-react'
 
-export type CourseTabKey = 'home' | 'wiki' | 'syllabus' | 'announcements' | 'files' | 'modules' | 'assignments' | 'grades'
+export type CourseTabKey = 'home' | 'wiki' | 'syllabus' | 'announcements' | 'files' | 'modules' | 'links' | 'assignments' | 'grades'
 
 type TabDesc = { key: CourseTabKey; label: string; Icon: React.ComponentType<any> }
 type Props = {
@@ -14,6 +14,7 @@ type Props = {
 const defaultTabs: TabDesc[] = [
   { key: 'announcements', label: 'Announcements', Icon: Megaphone },
   { key: 'modules', label: 'Modules', Icon: BookOpen },
+  { key: 'links', label: 'Links', Icon: LinkIcon },
   { key: 'assignments', label: 'Assignments', Icon: FileText },
   { key: 'grades', label: 'Grades', Icon: Percent },
 ]

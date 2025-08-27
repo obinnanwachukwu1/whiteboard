@@ -27,10 +27,11 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
       if (!target) return
       const a = target.closest('a') as HTMLAnchorElement | null
       if (!a || !a.href) return
-      const href = a.getAttribute('href') || ''
-      if (href.startsWith('http')) return // let external links pass
+      // Only intercept if consumer provided a handler
+      if (!onNavigate) return
       e.preventDefault()
-      onNavigate?.(href)
+      const href = a.href || a.getAttribute('href') || ''
+      onNavigate(href)
     }
     el.addEventListener('click', handler)
     return () => el.removeEventListener('click', handler)
@@ -38,4 +39,3 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
 
   return <div ref={containerRef} className={className} dangerouslySetInnerHTML={{ __html: sanitized }} />
 }
-

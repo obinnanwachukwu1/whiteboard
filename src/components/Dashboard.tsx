@@ -83,12 +83,24 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
         return undefined
       })()
       const course = orderedVisibleCourses.find((x) => String(x.id) === String(cid))
+      const tid = (() => {
+        try {
+          const u = new URL(a?.html_url || '')
+          const parts = u.pathname.split('/')
+          const idxDT = parts.indexOf('discussion_topics')
+          if (idxDT >= 0 && parts[idxDT + 1]) return String(parts[idxDT + 1])
+          const idxAnn = parts.indexOf('announcements')
+          if (idxAnn >= 0 && parts[idxAnn + 1]) return String(parts[idxAnn + 1])
+        } catch {}
+        return undefined
+      })()
       return {
         courseId: cid,
         courseName: course ? labelFor(course) : String(cid || 'Course'),
         title: a?.title || 'Announcement',
         postedAt: a?.created_at,
         htmlUrl: a?.html_url,
+        topicId: tid,
       }
     }).filter((x) => x.courseId != null)
   }, [annsQ.data, showAllAnns, orderedVisibleCourses])
@@ -160,58 +172,46 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
             {due
               .slice()
               .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
-              .map((d, i) => (
-              <li className="py-3" key={i}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <span className="mt-1 inline-block w-2 h-2 rounded-full bg-brand" />
-                    <div className="min-w-0">
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => {
-                          const rid = String(d.assignment_rest_id || extractAssignmentIdFromUrl(d.htmlUrl) || '')
-                          if (rid) onOpenAssignment?.(d.course_id, rid, d.name)
-                          else onOpenCourse?.(d.course_id)
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            const rid = String(d.assignment_rest_id || extractAssignmentIdFromUrl(d.htmlUrl) || '')
-                            if (rid) onOpenAssignment?.(d.course_id, rid, d.name)
-                            else onOpenCourse?.(d.course_id)
-                          }
-                        }}
-                        className="font-medium leading-snug truncate hover:text-slate-700 transition-colors dark:hover:text-slate-100/90 cursor-pointer"
-                        title={d.name}
-                      >
-                        {d.name}
-                      </div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        {d.course_name && (
-                          <span className="inline-flex items-center gap-1 mr-1.5">
-                            <Badge>{d.course_name}</Badge>
-                            <span>·</span>
-                          </span>
-                        )}
-                        Due {new Date(d.dueAt).toLocaleString()}
-                        {d.pointsPossible ? ` · ${d.pointsPossible} pts` : ''}
+              .map((d, i) => {
+                const open = () => {
+                  const rid = String(d.assignment_rest_id || extractAssignmentIdFromUrl(d.htmlUrl) || '')
+                  if (rid) onOpenAssignment?.(d.course_id, rid, d.name)
+                  else onOpenCourse?.(d.course_id)
+                }
+                return (
+                  <li className="py-1" key={i}>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={open}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
+                      className="cursor-pointer rounded-md px-2 sm:px-3 py-2 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <span className="mt-1 inline-block w-2 h-2 rounded-full bg-brand" />
+                          <div className="min-w-0">
+                            <div className="font-medium leading-snug truncate hover:text-slate-700 dark:hover:text-slate-100/90" title={d.name}>
+                              {d.name}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                              {d.course_name && (
+                                <span className="inline-flex items-center gap-1 mr-1.5">
+                                  <Badge>{d.course_name}</Badge>
+                                  <span>·</span>
+                                </span>
+                              )}
+                              Due {new Date(d.dueAt).toLocaleString()}
+                              {d.pointsPossible ? ` · ${d.pointsPossible} pts` : ''}
+                            </div>
+                          </div>
+                        </div>
+                        <Button size="sm" onClick={(e) => { e.stopPropagation(); open() }}>Open</Button>
                       </div>
                     </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const rid = String(d.assignment_rest_id || extractAssignmentIdFromUrl(d.htmlUrl) || '')
-                      if (rid) onOpenAssignment?.(d.course_id, rid, d.name)
-                      else onOpenCourse?.(d.course_id)
-                    }}
-                  >
-                    Open
-                  </Button>
-                </div>
-              </li>
-            ))}
+                  </li>
+                )
+              })}
           </ul>
         )}
       </Card>
@@ -225,43 +225,37 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
           <div className="text-slate-500 dark:text-slate-400 p-4 text-sm">No announcements</div>
         ) : (
           <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
-            {topAnnouncements.map((a, i) => (
-              <li key={i} className="py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      className="font-medium truncate hover:underline cursor-pointer"
-                      onClick={() => {
-                        const tid = extractAnnouncementIdFromUrl(a.htmlUrl)
-                        const cid = a.courseId ?? extractCourseIdFromUrl(a.htmlUrl)
-                        if (tid && cid != null) onOpenAnnouncement?.(cid, tid, a.title)
-                        else if (cid != null) onOpenCourse?.(cid)
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          const tid = extractAnnouncementIdFromUrl(a.htmlUrl)
-                          const cid = a.courseId ?? extractCourseIdFromUrl(a.htmlUrl)
-                          if (tid && cid != null) onOpenAnnouncement?.(cid, tid, a.title)
-                          else if (cid != null) onOpenCourse?.(cid)
-                        }
-                      }}
-                      title={a.title}
-                    >
-                      {a.title}
-                    </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      <Badge>{a.courseName}</Badge>
-                      <span className="mx-1">·</span>
-                      <span>{a.postedAt ? new Date(a.postedAt).toLocaleString() : '—'}</span>
+            {topAnnouncements.map((a, i) => {
+              const open = () => {
+                const tid = a.topicId ?? extractAnnouncementIdFromUrl(a.htmlUrl)
+                const cid = a.courseId ?? extractCourseIdFromUrl(a.htmlUrl)
+                if (tid && cid != null) onOpenAnnouncement?.(cid, tid, a.title)
+                else if (cid != null) onOpenCourse?.(cid)
+              }
+              return (
+                <li key={i} className="py-1">
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={open}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
+                    className="cursor-pointer rounded-md px-2 sm:px-3 py-2 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate hover:underline" title={a.title}>{a.title}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          <Badge>{a.courseName}</Badge>
+                          <span className="mx-1">·</span>
+                          <span>{a.postedAt ? new Date(a.postedAt).toLocaleString() : '—'}</span>
+                        </div>
+                      </div>
+                      <Button size="sm" onClick={(e) => { e.stopPropagation(); open() }}>Open</Button>
                     </div>
                   </div>
-                  <Button size="sm" onClick={() => { const tid = extractAnnouncementIdFromUrl(a.htmlUrl); const cid = a.courseId ?? extractCourseIdFromUrl(a.htmlUrl); if (tid && cid != null) onOpenAnnouncement?.(cid, tid, a.title); else if (cid != null) onOpenCourse?.(cid) }}>Open</Button>
-                </div>
-              </li>
-            ))}
+                </li>
+              )
+            })}
           </ul>
         )}
         <div className="pt-2 text-right">
@@ -278,7 +272,14 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
             {orderedVisibleCourses.map((c) => {
               const grade = gradeForCourse(c.id)
               return (
-                <Card key={String(c.id)}>
+                <Card
+                  key={String(c.id)}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onOpenCourse?.(c.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCourse?.(c.id) } }}
+                  className="cursor-pointer hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 transition-colors"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="font-semibold truncate">{labelFor(c)}</div>
@@ -290,7 +291,7 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
                     </div>
                   </div>
                   <div className="mt-3 flex items-center justify-end">
-                    <Button size="sm" onClick={() => onOpenCourse?.(c.id)}>Open</Button>
+                    <Button size="sm" onClick={(e) => { e.stopPropagation(); onOpenCourse?.(c.id) }}>Open</Button>
                   </div>
                 </Card>
               )

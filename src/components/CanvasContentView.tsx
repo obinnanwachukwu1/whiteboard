@@ -2,7 +2,7 @@ import React from 'react'
 import { Button } from './ui/Button'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { HtmlContent } from './HtmlContent'
-import { PdfViewer } from './PdfViewer'
+import { FileViewer } from './FileViewer'
 import { useAssignmentRest, useCoursePage, useAnnouncement } from '../hooks/useCanvasQueries'
 
 type ContentType = 'page' | 'assignment' | 'file' | 'announcement'
@@ -13,6 +13,7 @@ type Props = {
   contentId: string
   title: string
   onBack: () => void
+  onNavigate?: (href: string) => void
 }
 
 export const CanvasContentView: React.FC<Props> = ({
@@ -21,6 +22,7 @@ export const CanvasContentView: React.FC<Props> = ({
   contentId,
   title,
   onBack,
+  onNavigate,
 }) => {
   const pageQ = useCoursePage(contentType === 'page' ? courseId : undefined, contentType === 'page' ? contentId : undefined, { enabled: contentType === 'page' })
   const assignQ = useAssignmentRest(contentType === 'assignment' ? courseId : undefined, contentType === 'assignment' ? contentId : undefined, { enabled: contentType === 'assignment' })
@@ -49,7 +51,7 @@ export const CanvasContentView: React.FC<Props> = ({
       </div>
       <div className="flex-1 overflow-hidden">
         {contentType === 'file' ? (
-          <PdfViewer fileId={contentId} className="h-full" />
+          <FileViewer fileId={contentId} className="h-full" />
         ) : (
           <div className="flex-1 overflow-y-auto p-6">
             <div className="max-w-4xl mx-auto">
@@ -60,16 +62,13 @@ export const CanvasContentView: React.FC<Props> = ({
                 <div className="text-red-600 text-sm mb-4">{error}</div>
               )}
               {!loading && !error && contentType === 'page' && pageQ.data?.body && (
-                <HtmlContent 
-                  html={pageQ.data.body} 
-                  className="rich-html" 
-                />
+                <HtmlContent html={pageQ.data.body} className="rich-html" onNavigate={onNavigate} />
               )}
               {!loading && !error && contentType === 'assignment' && assignQ.data?.description && (
-                <HtmlContent html={assignQ.data.description} className="rich-html" />
+                <HtmlContent html={assignQ.data.description} className="rich-html" onNavigate={onNavigate} />
               )}
               {!loading && !error && contentType === 'announcement' && annQ.data?.message && (
-                <HtmlContent html={annQ.data.message} className="rich-html" />
+                <HtmlContent html={annQ.data.message} className="rich-html" onNavigate={onNavigate} />
               )}
               {!loading && !error && ((contentType === 'page' && !pageQ.data?.body) || (contentType === 'assignment' && !assignQ.data?.description)) && (
                 <div className="text-slate-500 dark:text-slate-400 text-sm">No content available</div>

@@ -36,7 +36,8 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
         const fileData = res.data
         const fileName = fileData?.display_name || fileData?.filename || title
         const contentType = fileData?.content_type || ''
-        const isViewableFile = /\.(pdf|docx?|pptx?|xlsx?)$/i.test(fileName) || /^application\/(pdf|vnd\.openxmlformats-officedocument|vnd\.ms-)/i.test(contentType)
+        const isViewableFile = /\.(pdf|docx?|pptx?|xlsx?|jpe?g|png|gif|webp|bmp|svg|avif|mp3|wav|ogg|m4a|aac|mp4|webm|mov|m4v)$/i.test(fileName)
+          || /^(application\/(pdf|vnd\.openxmlformats-officedocument|vnd\.ms-)|image\/|audio\/|video\/)/i.test(contentType)
         if (isViewableFile) {
           onOpenContent?.({ courseId, contentType: 'file', contentId: it.contentId, title: fileName })
         } else {

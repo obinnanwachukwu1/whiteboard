@@ -214,7 +214,8 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
               {files.map((f: any) => {
                 const updated = f?.updated_at ? new Date(f.updated_at).toLocaleString() : ''
                 const name = f?.display_name || f?.filename || 'File'
-                const viewable = /\.(pdf|docx?|pptx?|xlsx?)$/i.test(String(name)) || /^application\/(pdf|vnd\.openxmlformats-officedocument|vnd\.ms-)/i.test(String(f?.content_type || ''))
+                const viewable = /\.(pdf|docx?|pptx?|xlsx?|jpe?g|png|gif|webp|bmp|svg|avif|mp3|wav|ogg|m4a|aac|mp4|webm|mov|m4v)$/i.test(String(name))
+                  || /^(application\/(pdf|vnd\.openxmlformats-officedocument|vnd\.ms-)|image\/|audio\/|video\/)/i.test(String(f?.content_type || ''))
                 const type = fileTypeLabel(name, f?.content_type)
                 const sizeStr = typeof f?.size === 'number' ? formatBytes(f.size) : null
                 return (
