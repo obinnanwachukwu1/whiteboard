@@ -4,6 +4,7 @@ import { Card } from './ui/Card'
 import { Button } from './ui/Button'
 import { FileText, Calendar, Star, Home as HomeIcon, BookOpen, Megaphone, ClipboardList, ScrollText, Percent, Link as LinkIcon } from 'lucide-react'
 import { useCourseAssignments, useCourseInfo, useCourseFrontPage, useCourseTabs, useCourseFiles } from '../hooks/useCanvasQueries'
+import type { CanvasAssignment } from '../types/canvas'
 import { CourseGrades } from './CourseGrades'
 import { CourseModules } from './CourseModules'
 import { CourseFiles } from './CourseFiles'
@@ -12,6 +13,8 @@ import { CourseLinks } from './CourseLinks'
 import { CourseAnnouncements } from './CourseAnnouncements'
 import { FloatingCourseTabs, type CourseTabKey } from './FloatingCourseTabs'
 import { HtmlContent } from './HtmlContent'
+import { computeResolvedTabs, hasFilesFromTabs } from '../utils/courseTabs'
+import type { ResolvedTab } from '../types/ui'
 
 
 type Detail = { contentType: 'page' | 'assignment' | 'file' | 'announcement'; contentId: string; title: string }
@@ -30,85 +33,41 @@ type Props = {
 
 export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName, activeTab, onChangeTab, content, onOpenDetail, onClearDetail, baseUrl, onNavigateCourse }) => {
   const queryClient = useQueryClient()
-  const [availableTabs, setAvailableTabs] = React.useState<any[] | null>(null)
+  const [availableTabs, setAvailableTabs] = React.useState<ResolvedTab[] | null>(null)
 
-  const { data: items = [], isLoading, error } = useCourseAssignments(courseId, 200, { enabled: courseId != null && activeTab === 'assignments' })
+  const assignmentsQ = useCourseAssignments(courseId, 200, { enabled: courseId != null && activeTab === 'assignments' })
   const infoQ = useCourseInfo(courseId)
   const frontQ = useCourseFrontPage(courseId, { enabled: activeTab === 'home' })
   const tabsQ = useCourseTabs(courseId, true, { staleTime: 1000 * 60 * 60 * 24 })
-  const showLoading = (!items || items.length === 0) && isLoading
+  const assignments: CanvasAssignment[] = (assignmentsQ.data || []) as CanvasAssignment[]
+  const showLoading = (!assignments || assignments.length === 0) && assignmentsQ.isLoading
 
   // Determine available tabs
   const defaultView = (infoQ.data?.default_view || '').toLowerCase()
   const hasSyllabus = typeof infoQ.data?.syllabus_body === 'string' && infoQ.data?.syllabus_body.trim() !== ''
   const hasHome = defaultView === 'wiki'
-  const hasFilesFromTabs = Array.isArray(tabsQ.data) && (tabsQ.data as any[]).some((t: any) => {
-    const idOrType = String(t?.id || t?.type || '').toLowerCase()
-    const label = String(t?.label || '').toLowerCase()
-    return (!t?.hidden) && (idOrType.includes('files') || label.includes('files'))
-  })
+  const hasFilesViaTabs = hasFilesFromTabs(tabsQ.data as any)
   // Fallback probe: if tabs didn’t reveal Files, try a 1-item files fetch; if it works and returns >0, enable Files tab
-  const filesProbeQ = useCourseFiles(courseId, 1, 'updated_at', 'desc', { enabled: courseId != null && !!tabsQ.data && !hasFilesFromTabs })
-  const hasFiles = hasFilesFromTabs || (!!filesProbeQ.data && (filesProbeQ.data as any[]).length > 0)
+  const filesProbeQ = useCourseFiles(courseId, 1, 'updated_at', 'desc', { enabled: courseId != null && !!tabsQ.data && !hasFilesViaTabs })
+  const hasFiles = hasFilesViaTabs || (Array.isArray(filesProbeQ.data) && filesProbeQ.data.length > 0)
   const hasLinks = Array.isArray(tabsQ.data) && (tabsQ.data as any[]).length > 0
 
   // Recompute tabs whenever course info or tabs data change
   React.useEffect(() => {
-    const nextTabs: any[] = [
-      ...(hasHome ? [{ key: 'home', label: 'Home', Icon: HomeIcon }] as any[] : []),
-      ...(hasSyllabus ? [{ key: 'syllabus', label: 'Syllabus', Icon: ScrollText }] as any[] : []),
-      { key: 'announcements', label: 'Announcements', Icon: Megaphone },
-      ...(hasFiles ? [{ key: 'files', label: 'Files', Icon: FileText }] as any[] : []),
-      { key: 'modules', label: 'Modules', Icon: BookOpen },
-      ...(hasLinks ? [{ key: 'links', label: 'Links', Icon: LinkIcon }] as any[] : []),
-      { key: 'assignments', label: 'Assignments', Icon: ClipboardList },
-      { key: 'grades', label: 'Grades', Icon: Percent },
-    ]
-    setAvailableTabs(nextTabs)
+    const base = computeResolvedTabs(infoQ.data || null, (tabsQ.data as any[]) || [], hasFiles)
+    setAvailableTabs(base)
     // Only cache when actual tabs list has been fetched for this course
     const fallbackOnly = !hasHome && !hasSyllabus && !hasFiles && !hasLinks
     if (Array.isArray(tabsQ.data) && !fallbackOnly) {
-      queryClient.setQueryData(['course-resolved-tabs', String(courseId)], nextTabs)
+      queryClient.setQueryData(['course-resolved-tabs', String(courseId)], base)
     }
   }, [courseId, hasHome, hasSyllabus, hasFiles, hasLinks, tabsQ.data])
 
   // Reset and seed availableTabs on course change
   React.useEffect(() => {
     setAvailableTabs(null)
-    const cachedTabs = queryClient.getQueryData<any>(['course-resolved-tabs', String(courseId)])
-    if (cachedTabs) {
-      try {
-        const iconMap: Record<string, any> = {
-          home: HomeIcon,
-          syllabus: ScrollText,
-          announcements: Megaphone,
-          files: FileText,
-          modules: BookOpen,
-          links: LinkIcon,
-          assignments: ClipboardList,
-          grades: Percent,
-        }
-        const labelMap: Record<string, string> = {
-          home: 'Home',
-          syllabus: 'Syllabus',
-          announcements: 'Announcements',
-          files: 'Files',
-          modules: 'Modules',
-          links: 'Links',
-          assignments: 'Assignments',
-          grades: 'Grades',
-        }
-        const arr = Array.isArray(cachedTabs) ? cachedTabs : []
-        const normalized = arr.map((x: any) => {
-          const key = typeof x === 'string' ? x : x?.key
-          if (!key) return null
-          return { key, label: x?.label || labelMap[key] || key, Icon: iconMap[key] }
-        }).filter(Boolean)
-        if (normalized.length) setAvailableTabs(normalized as any)
-      } catch {
-        // Fall through; CourseView will compute from queries
-      }
-    }
+    const cachedTabs = queryClient.getQueryData<ResolvedTab[]>(['course-resolved-tabs', String(courseId)])
+    if (cachedTabs && cachedTabs.length) setAvailableTabs(cachedTabs)
   }, [courseId])
 
   // If no cached tabs yet, seed a fast fallback so skeleton is minimal
@@ -119,12 +78,12 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
     const cachedInfo = queryClient.getQueryData<any>(['course-info', String(courseId)]) as any
     const dv = String(cachedInfo?.default_view || '').toLowerCase()
     const showHome = dv === 'wiki'
-    const fallback: any[] = [
-      ...(showHome ? [{ key: 'home', label: 'Home', Icon: HomeIcon }] as any[] : []),
-      { key: 'announcements', label: 'Announcements', Icon: Megaphone },
-      { key: 'modules', label: 'Modules', Icon: BookOpen },
-      { key: 'assignments', label: 'Assignments', Icon: ClipboardList },
-      { key: 'grades', label: 'Grades', Icon: Percent },
+    const fallback: ResolvedTab[] = [
+      ...(showHome ? [{ key: 'home', label: 'Home' }] : []),
+      { key: 'announcements', label: 'Announcements' },
+      { key: 'modules', label: 'Modules' },
+      { key: 'assignments', label: 'Assignments' },
+      { key: 'grades', label: 'Grades' },
     ]
     setAvailableTabs(fallback)
   }, [availableTabs, courseId])
@@ -223,7 +182,16 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
           current={activeTab}
           onChange={(t) => { onClearDetail(); onChangeTab(t) }}
           anchorId="course-content-anchor"
-          tabs={availableTabs as any}
+          tabs={availableTabs.map((t) => ({ key: t.key, label: t.label, Icon: ({
+            home: HomeIcon,
+            syllabus: ScrollText,
+            announcements: Megaphone,
+            files: FileText,
+            modules: BookOpen,
+            links: LinkIcon,
+            assignments: ClipboardList,
+            grades: Percent,
+          } as const)[t.key] })) as any}
         />
       )}
       {!availableTabs && (
@@ -313,15 +281,15 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
             <div className="mt-2">
               <h3 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-base font-semibold">Assignments</h3>
               {showLoading && <div className="text-slate-500 dark:text-slate-400 p-2">Loading…</div>}
-              {error && <div className="text-red-600 p-2">{String(error.message || error)}</div>}
-              {!showLoading && !error && items.length === 0 && (
+              {assignmentsQ.error && <div className="text-red-600 p-2">{String((assignmentsQ.error as any).message || assignmentsQ.error)}</div>}
+              {!showLoading && !assignmentsQ.error && assignments.length === 0 && (
                 <div className="text-slate-500 dark:text-slate-400 p-3 flex items-center gap-2">📭 <span>No assignments found</span></div>
               )}
-              {!showLoading && !error && items.length > 0 && (
+              {!showLoading && !assignmentsQ.error && assignments.length > 0 && (
                 <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
-                  {items.map((a, i) => {
+                  {assignments.map((a, i) => {
                     const dueStr = a.dueAt ? new Date(a.dueAt).toLocaleString() : null
-                    const restId = String((a as any)?._id ?? '')
+                    const restId = String((a._id ?? a.id ?? '') as any)
                     return (
                       <li className="py-2" key={i}>
                         <div
@@ -339,7 +307,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
                               <div className="font-medium leading-snug truncate hover:text-slate-700 transition-colors dark:hover:text-slate-100/90">{a.name}</div>
                               <div className="mt-1 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-neutral-800 dark:text-neutral-300">
-                                  <Star className="w-3 h-3" /> {a.pointsPossible ? `${a.pointsPossible} pts` : '—'}
+                                  <Star className="w-3 h-3" /> {typeof a.pointsPossible === 'number' ? `${a.pointsPossible} pts` : '—'}
                                 </span>
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-neutral-800 dark:text-neutral-300">
                                   <Calendar className="w-3 h-3" /> {dueStr ? `Due ${dueStr}` : 'No due date'}
