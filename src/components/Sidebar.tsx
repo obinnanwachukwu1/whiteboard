@@ -16,7 +16,7 @@ type Props = {
   courses: Course[]
   activeCourseId?: string | number | null
   sidebar?: SidebarConfig
-  current?: 'dashboard' | 'course' | 'allCourses'
+  current?: 'dashboard' | 'course' | 'allCourses' | 'settings'
   onSelectDashboard: () => void
   onSelectCourse: (courseId: string | number) => void
   onOpenAllCourses: () => void
@@ -59,7 +59,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
           className={`w-full text-left py-2 pl-7 pr-8 rounded-md text-sm transition-all outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
             active
               ? 'bg-brand/10 text-slate-900 dark:text-slate-100 font-semibold shadow-sm border-l-2 border-brand'
-              : 'hover:bg-slate-100 dark:hover:bg-slate-900 hover:shadow-sm text-slate-600 dark:text-slate-200 border-l-2 border-transparent'
+              : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-200 border-l-2 border-transparent'
           }`}
           onClick={onSelect}
           title={c.name}
@@ -72,7 +72,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
         </button>
         {moreOpen && (
           <div className="absolute right-2 top-8 z-10 min-w-[140px] rounded-md bg-white dark:bg-slate-900 shadow-lg ring-1 ring-black/10 dark:ring-white/10">
-            <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={(e) => { e.stopPropagation(); onMore(); onHide() }}>Hide from sidebar</button>
+            <button className="block w-full text-left px-3 py-2 text-sm hover:[background-color:var(--app-accent-hover)]" onClick={(e) => { e.stopPropagation(); onMore(); onHide() }}>Hide from sidebar</button>
           </div>
         )}
       </div>
@@ -125,11 +125,11 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
         <div className="font-semibold mb-2 text-[11px] uppercase tracking-wide text-brand/70">Navigation</div>
         <nav className="flex flex-col">
           <button
-            className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
-              current === 'dashboard'
+          className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
+            current === 'dashboard'
                 ? 'bg-brand/10 text-slate-900 dark:text-slate-100 font-semibold shadow-sm border-l-2 border-brand'
-                : 'hover:bg-slate-100 dark:hover:bg-slate-900 hover:shadow-sm text-slate-600 dark:text-slate-200 border-l-2 border-transparent'
-            }`}
+                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-200 border-l-2 border-transparent'
+          }`}
             onClick={onSelectDashboard}
             aria-current={current === 'dashboard' ? 'page' : undefined}
           >
@@ -181,23 +181,13 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
           className={`w-full text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
             current === 'allCourses'
               ? 'bg-brand/10 text-slate-900 dark:text-slate-100 font-semibold shadow-sm border-l-2 border-brand'
-              : 'hover:bg-slate-100 dark:hover:bg-slate-900 hover:shadow-sm text-slate-700 dark:text-slate-200 border-l-2 border-transparent'
+              : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-700 dark:text-slate-200 border-l-2 border-transparent'
           }`}
           onClick={onOpenAllCourses}
           aria-current={current === 'allCourses' ? 'page' : undefined}
         >
           All Courses
         </button>
-        <div className="mt-2 px-1 text-xs text-slate-600 dark:text-slate-300 flex items-center justify-between">
-          <span>Speed up navigation</span>
-          <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={prefetchEnabled}
-              onChange={(e) => onTogglePrefetch?.(e.target.checked)}
-            />
-          </label>
-        </div>
       </div>
     </aside>
   )

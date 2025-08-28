@@ -1,6 +1,6 @@
 import React from 'react'
 import { Dashboard } from '../components/Dashboard'
-import { useAppContext } from './RootLayout'
+import { useAppContext } from '../context/AppContext'
 
 export default function DashboardPage() {
   const ctx = useAppContext()

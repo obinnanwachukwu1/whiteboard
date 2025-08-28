@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, createContext, useContext } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { Header } from '../components/Header'
 import { Sidebar, type SidebarConfig } from '../components/Sidebar'
@@ -7,28 +7,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '../components/ui/Toaster'
 import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
 import { toAssignmentInputsFromRest, toAssignmentGroupInputsFromRest } from '../utils/gradeCalc'
+import { AppProvider, type AppContextValue } from '../context/AppContext'
 
-export type AppOutletContext = {
-  baseUrl: string
-  courses: any[]
-  due: any[]
-  profile: any
-  loading: boolean
-  sidebar: SidebarConfig
-  setSidebar: (next: SidebarConfig) => Promise<void>
-  prefetchEnabled: boolean
-  setPrefetchEnabled: (v: boolean) => Promise<void>
-  onOpenCourse: (id: string | number) => void
-  onOpenAssignment: (courseId: string | number, restId: string | number, title?: string) => void
-  onOpenAnnouncement: (courseId: string | number, topicId: string | number, title?: string) => void
-}
-
-const AppContext = createContext<AppOutletContext | null>(null)
-export function useAppContext(): AppOutletContext {
-  const ctx = useContext(AppContext)
-  if (!ctx) throw new Error('useAppContext must be used within RootLayout')
-  return ctx
-}
+// Context definitions moved to src/context/AppContext.tsx
 
 export function RootLayout() {
   const queryClient = useQueryClient()
@@ -162,10 +143,12 @@ export function RootLayout() {
 
   // Derive current route and active course from pathname
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const currentView: 'dashboard' | 'course' | 'allCourses' = pathname.startsWith('/course/')
+  const currentView: 'dashboard' | 'course' | 'allCourses' | 'settings' = pathname.startsWith('/course/')
     ? 'course'
     : pathname.startsWith('/all-courses')
     ? 'allCourses'
+    : pathname.startsWith('/settings')
+    ? 'settings'
     : 'dashboard'
   const derivedCourseId = React.useMemo(() => {
     if (!pathname.startsWith('/course/')) return null
@@ -175,7 +158,7 @@ export function RootLayout() {
 
   const setActiveCourseId = (id: string | number | null) => setActiveCourseIdState(id)
 
-  const context: AppOutletContext = {
+  const context: AppContextValue = {
     baseUrl,
     courses: (coursesQ.data || cachedCourses || []),
     due: (dueQ.data || cachedDue || []),
@@ -218,51 +201,51 @@ export function RootLayout() {
   }
 
   return (
-    <div className="h-screen flex flex-col">
-      <Header profile={profileQ.data} />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar
-          courses={visibleCourses}
-          activeCourseId={(currentView === 'course' ? (derivedCourseId ?? activeCourseId) : null)}
-          sidebar={sidebarCfg}
-          current={currentView}
-          onSelectDashboard={() => { setActiveCourseId(null); navigate({ to: '/dashboard' }) }}
-          onSelectCourse={(id) => context.onOpenCourse(id)}
-          onOpenAllCourses={() => navigate({ to: '/all-courses' })}
-          onHideCourse={hideCourse}
-          onPrefetchCourse={(id) => { if (prefetchEnabled) prefetchCourseData(id) }}
-          prefetchEnabled={prefetchEnabled}
-          onTogglePrefetch={async (enabled) => { context.setPrefetchEnabled(enabled) }}
-          onReorder={async (nextOrder) => { const next: SidebarConfig = { ...sidebarCfg, order: nextOrder }; setSidebarCfg(next); await window.settings.set({ sidebar: next }) }}
-        />
-        <main className="flex-1 overflow-y-auto flex flex-col bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-tl-lg">
-          <div className={`flex-1 p-6 ${currentView === 'course' ? 'pt-24' : ''}`}>
-            <div className="max-w-6xl w-full mx-auto space-y-4">
-              {hasToken === false && (
-                <div className="rounded-md ring-1 ring-gray-200 dark:ring-neutral-800 p-4">
-                  <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold">Connect to Canvas</h2>
-                  <div className="grid gap-3 max-w-xl">
-                    <label className="text-sm">
-                      <div className="mb-1">Base URL</div>
-                      <input className="w-full rounded border px-2 py-1 bg-white/90 dark:bg-neutral-900" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} onBlur={async () => { await window.settings.set({ baseUrl }) }} placeholder="https://..." />
-                    </label>
-                    <label className="text-sm">
-                      <div className="mb-1">Token</div>
-                      <input className="w-full rounded border px-2 py-1 bg-white/90 dark:bg-neutral-900" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Paste token (stored securely)" />
-                    </label>
-                    <div className="pt-1">
-                      <button className="px-3 py-1.5 rounded bg-slate-900 text-white disabled:opacity-50" onClick={init} disabled={loading || !token.trim()}>{loading ? 'Saving…' : 'Save Token / Init'}</button>
+    <AppProvider value={context}>
+      <div className="h-screen flex flex-col">
+        <Header profile={profileQ.data} />
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar
+            courses={visibleCourses}
+            activeCourseId={(currentView === 'course' ? (derivedCourseId ?? activeCourseId) : null)}
+            sidebar={sidebarCfg}
+            current={currentView}
+            onSelectDashboard={() => { setActiveCourseId(null); navigate({ to: '/dashboard' }) }}
+            onSelectCourse={(id) => context.onOpenCourse(id)}
+            onOpenAllCourses={() => navigate({ to: '/all-courses' })}
+            onHideCourse={hideCourse}
+            onPrefetchCourse={(id) => { if (prefetchEnabled) prefetchCourseData(id) }}
+            prefetchEnabled={prefetchEnabled}
+            onTogglePrefetch={async (enabled) => { context.setPrefetchEnabled(enabled) }}
+            onReorder={async (nextOrder) => { const next: SidebarConfig = { ...sidebarCfg, order: nextOrder }; setSidebarCfg(next); await window.settings.set({ sidebar: next }) }}
+          />
+          <main className="flex-1 overflow-y-auto flex flex-col bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-tl-lg">
+            <div className={`flex-1 p-6 ${currentView === 'course' ? 'pt-24' : ''}`}>
+              <div className="max-w-6xl w-full mx-auto space-y-4">
+                {hasToken === false && (
+                  <div className="rounded-md ring-1 ring-gray-200 dark:ring-neutral-800 p-4">
+                    <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold">Connect to Canvas</h2>
+                    <div className="grid gap-3 max-w-xl">
+                      <label className="text-sm">
+                        <div className="mb-1">Base URL</div>
+                        <input className="w-full rounded border px-2 py-1 bg-white/90 dark:bg-neutral-900" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} onBlur={async () => { await window.settings.set({ baseUrl }) }} placeholder="https://..." />
+                      </label>
+                      <label className="text-sm">
+                        <div className="mb-1">Token</div>
+                        <input className="w-full rounded border px-2 py-1 bg-white/90 dark:bg-neutral-900" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Paste token (stored securely)" />
+                      </label>
+                      <div className="pt-1">
+                        <button className="px-3 py-1.5 rounded bg-slate-900 text-white disabled:opacity-50" onClick={init} disabled={loading || !token.trim()}>{loading ? 'Saving…' : 'Save Token / Init'}</button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-              <AppContext.Provider value={context}>
+                )}
                 <Outlet />
-              </AppContext.Provider>
+              </div>
             </div>
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
-    </div>
+    </AppProvider>
   )
 }

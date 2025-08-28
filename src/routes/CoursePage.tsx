@@ -1,6 +1,6 @@
 import React from 'react'
 import { useParams, useSearch, useNavigate } from '@tanstack/react-router'
-import { useAppContext } from './RootLayout'
+import { useAppContext } from '../context/AppContext'
 import { CourseView } from '../components/CourseView'
 import { useQueryClient } from '@tanstack/react-query'
 import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'

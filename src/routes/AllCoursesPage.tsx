@@ -1,5 +1,5 @@
 import React from 'react'
-import { useAppContext } from './RootLayout'
+import { useAppContext } from '../context/AppContext'
 import { AllCoursesManager } from '../components/AllCoursesManager'
 
 export default function AllCoursesPage() {

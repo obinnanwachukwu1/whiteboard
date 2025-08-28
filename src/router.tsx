@@ -5,6 +5,7 @@ import { RootLayout } from './routes/RootLayout'
 import DashboardPage from './routes/DashboardPage'
 import AllCoursesPage from './routes/AllCoursesPage'
 import CoursePage from './routes/CoursePage'
+import SettingsPage from './routes/SettingsPage'
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -28,6 +29,12 @@ const courseRoute = createRoute({
   component: CoursePage,
 })
 
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/settings',
+  component: SettingsPage,
+})
+
 function RedirectDashboard() { const navigate = useNavigate(); React.useEffect(() => { navigate({ to: '/dashboard', replace: true }) }, [navigate]); return null }
 
 const routeTree = rootRoute.addChildren([
@@ -35,6 +42,7 @@ const routeTree = rootRoute.addChildren([
   dashboardRoute,
   allCoursesRoute,
   courseRoute,
+  settingsRoute,
 ])
 
 export const router = createRouter({

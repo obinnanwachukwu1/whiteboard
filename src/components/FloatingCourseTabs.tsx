@@ -46,12 +46,12 @@ export const FloatingCourseTabs: React.FC<Props> = ({ current, onChange, anchorI
           return (
             <button
               key={key}
-              className={
-                `px-3 sm:px-4 py-1.5 text-sm inline-flex items-center gap-2 transition-colors ` +
-                (active
-                  ? 'bg-neutral-800/90 text-white dark:bg-neutral-800/90'
-                  : 'bg-transparent text-slate-700 hover:bg-slate-100/60 dark:text-neutral-200 dark:hover:bg-neutral-800/60')
-              }
+              className={`px-3 sm:px-4 py-1.5 text-sm inline-flex items-center gap-2 transition-colors ${
+                active
+                  ? 'text-slate-900 dark:text-slate-100'
+                  : 'bg-transparent text-slate-700 dark:text-neutral-200 hover:[background-color:var(--app-accent-hover)]'
+              }`}
+              style={active ? { backgroundColor: 'var(--app-accent-hover)' } as React.CSSProperties : undefined}
               onClick={() => onChange(key)}
               aria-pressed={active}
               aria-label={label}

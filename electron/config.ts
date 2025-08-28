@@ -6,6 +6,7 @@ export type AppConfig = {
   baseUrl: string
   verbose?: boolean
   theme?: 'light' | 'dark'
+  accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'
   prefetchEnabled?: boolean
   cachedCourses?: any[]
   cachedDue?: any[]
@@ -22,6 +23,7 @@ const DEFAULT_CONFIG: AppConfig = {
   baseUrl: 'https://gatech.instructure.com',
   verbose: false,
   theme: 'light',
+  accent: 'default',
   prefetchEnabled: true,
   cachedCourses: [],
   cachedDue: [],

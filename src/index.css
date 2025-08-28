@@ -4,6 +4,7 @@
 
 /* App shell heights only; classes applied in index.html */
 html, body, #root { height: 100%; }
+body { background-color: var(--app-accent-root); }
 
 /* App accent colors - can be changed programmatically */
 /* 
