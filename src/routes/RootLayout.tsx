@@ -33,6 +33,10 @@ export function RootLayout() {
   const profileQ = useProfile({ enabled: hasToken === true })
   const coursesQ = useCourses({ enrollment_state: 'active' }, { enabled: hasToken === true })
   const dueQ = useDueAssignments({ days: 7 }, { enabled: hasToken === true })
+  const userKey = React.useMemo(() => {
+    const uid = (profileQ.data as any)?.id
+    return hasToken && uid ? `${baseUrl}|${uid}` : null
+  }, [hasToken, baseUrl, profileQ.data])
 
   // Load settings + init
   useEffect(() => {
@@ -71,6 +75,46 @@ export function RootLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // After we know the user, load/migrate any per-user sidebar + settings
+  useEffect(() => {
+    ;(async () => {
+      if (!userKey) return
+      try {
+        const cfg = await window.settings.get?.()
+        const data = (cfg?.ok ? (cfg.data as any) : {}) as any
+        // Sidebar: prefer per-user; migrate from global if needed
+        const perSidebar = data?.userSidebars?.[userKey]
+        if (perSidebar) {
+          setSidebarCfg(perSidebar)
+        } else if (data?.sidebar) {
+          const map = { ...(data.userSidebars || {}), [userKey]: data.sidebar }
+          await window.settings.set?.({ userSidebars: map })
+          setSidebarCfg(data.sidebar)
+        }
+
+        // Settings (theme/accent/prefetchEnabled): prefer per-user; migrate globals
+        const perSettings = data?.userSettings?.[userKey]
+        if (perSettings) {
+          if (typeof perSettings.prefetchEnabled === 'boolean') setPrefetchEnabledState(!!perSettings.prefetchEnabled)
+          const theme = perSettings.theme || (document.documentElement.classList.contains('dark') ? 'dark' : 'light')
+          const accent = perSettings.accent || (data?.accent || 'default')
+          try { applyThemeAndAccent(theme as any, accent as any) } catch {}
+        } else {
+          const next: any = {}
+          if (typeof data?.prefetchEnabled === 'boolean') { next.prefetchEnabled = !!data.prefetchEnabled; setPrefetchEnabledState(!!data.prefetchEnabled) }
+          if (data?.theme) next.theme = data.theme
+          if (data?.accent) next.accent = data.accent
+          if (Object.keys(next).length) {
+            const mapS = { ...(data.userSettings || {}) }
+            mapS[userKey] = { ...(mapS[userKey] || {}), ...next }
+            await window.settings.set?.({ userSettings: mapS })
+            try { applyThemeAndAccent((next.theme || (document.documentElement.classList.contains('dark') ? 'dark' : 'light')) as any, (next.accent || 'default') as any) } catch {}
+          }
+        }
+      } catch {}
+    })()
+  }, [userKey])
+
   // Toast errors
   useEffect(() => { if (profileQ.error) addToast({ title: 'Failed to load profile', description: String(profileQ.error.message), variant: 'destructive' }) }, [profileQ.error, addToast])
   useEffect(() => { if (coursesQ.error) addToast({ title: 'Failed to load courses', description: String(coursesQ.error.message), variant: 'destructive' }) }, [coursesQ.error, addToast])
@@ -80,16 +124,39 @@ export function RootLayout() {
   useEffect(() => { if (Array.isArray(coursesQ.data) && coursesQ.data.length) setCachedCourses(coursesQ.data) }, [coursesQ.data])
   useEffect(() => { if (Array.isArray(dueQ.data)) setCachedDue(dueQ.data) }, [dueQ.data])
 
+  const saveUserSidebar = async (next: SidebarConfig) => {
+    try {
+      const cfg = await window.settings.get?.()
+      const map = (cfg?.ok ? (cfg.data as any)?.userSidebars : undefined) || {}
+      if (userKey) map[userKey] = next
+      await window.settings.set?.(userKey ? { userSidebars: map } : { sidebar: next })
+    } catch {}
+  }
+
+  const saveUserSettings = async (partial: Record<string, any>) => {
+    try {
+      const cfg = await window.settings.get?.()
+      const map = (cfg?.ok ? (cfg.data as any)?.userSettings : undefined) || {}
+      if (userKey) {
+        const cur = map[userKey] || {}
+        map[userKey] = { ...cur, ...partial }
+        await window.settings.set?.({ userSettings: map })
+      } else {
+        await window.settings.set?.(partial as any)
+      }
+    } catch {}
+  }
+
   const hideCourse = async (courseId: string | number) => {
     const hidden = new Set(sidebarCfg.hiddenCourseIds || [])
     hidden.add(courseId)
     const next = { ...sidebarCfg, hiddenCourseIds: Array.from(hidden) }
     setSidebarCfg(next)
-    await window.settings.set({ sidebar: next })
+    await saveUserSidebar(next)
   }
   const onSidebarConfigChange = async (next: SidebarConfig) => {
     setSidebarCfg(next)
-    await window.settings.set({ sidebar: next })
+    await saveUserSidebar(next)
   }
 
   const prefetchCourseData = (courseId: string | number) => {
@@ -185,7 +252,7 @@ export function RootLayout() {
     sidebar: sidebarCfg,
     setSidebar: onSidebarConfigChange,
     prefetchEnabled,
-    setPrefetchEnabled: async (v: boolean) => { setPrefetchEnabledState(v); await window.settings.set({ prefetchEnabled: v }) },
+    setPrefetchEnabled: async (v: boolean) => { setPrefetchEnabledState(v); await saveUserSettings({ prefetchEnabled: v }) },
     onOpenCourse: (id) => { setActiveCourseId(id); navigate({ to: '/course/$courseId', params: { courseId: String(id) } }) },
     onOpenAssignment: (courseId, restId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'assignments', type: 'assignment', contentId: String(restId), title } }) },
     onOpenAnnouncement: (courseId, topicId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'announcements', type: 'announcement', contentId: String(topicId), title } }) },
@@ -309,7 +376,7 @@ export function RootLayout() {
             onPrefetchCourse={(id) => { if (prefetchEnabled) prefetchCourseData(id) }}
             prefetchEnabled={prefetchEnabled}
             onTogglePrefetch={async (enabled) => { context.setPrefetchEnabled(enabled) }}
-            onReorder={async (nextOrder) => { const next: SidebarConfig = { ...sidebarCfg, order: nextOrder }; setSidebarCfg(next); await window.settings.set({ sidebar: next }) }}
+            onReorder={async (nextOrder) => { const next: SidebarConfig = { ...sidebarCfg, order: nextOrder }; setSidebarCfg(next); await saveUserSidebar(next) }}
           />
           <main className="flex-1 overflow-y-auto flex flex-col bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-tl-lg">
             <div className={`flex-1 p-6 ${currentView === 'course' ? 'pt-24' : ''}`}>

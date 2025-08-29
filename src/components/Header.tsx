@@ -24,25 +24,44 @@ export const Header: React.FC<Props> = ({ profile }) => {
   useEffect(() => {
     ;(async () => {
       const cfg = await window.settings.get?.()
-      const isDark = cfg?.ok && cfg.data?.theme === 'dark'
+      const userKey = app?.profile?.id ? `${app.baseUrl}|${app.profile.id}` : null
+      const us = (cfg?.ok && userKey) ? (cfg.data as any)?.userSettings?.[userKey] : undefined
+      const isDark = (us?.theme || cfg?.data?.theme) === 'dark'
       const hasSystemDarkPreference = window.matchMedia('(prefers-color-scheme: dark)').matches
-      const shouldBeDark = isDark || (!cfg?.ok && hasSystemDarkPreference)
-      const acc = (cfg?.ok ? (cfg.data as any)?.accent : undefined) as Accent | undefined
+      const shouldBeDark = (us?.theme || cfg?.data?.theme) ? isDark : hasSystemDarkPreference
+      const acc = (us?.accent ?? (cfg?.ok ? (cfg.data as any)?.accent : undefined)) as Accent | undefined
       if (acc) setAccent(acc)
       applyThemeAndAccent(shouldBeDark ? 'dark' : 'light', acc || 'default')
       setDark(shouldBeDark)
     })()
-  }, [])
+  }, [app?.profile?.id, app?.baseUrl])
 
   const toggleTheme = async () => {
     const next = !dark
     setDark(next)
     // pull latest accent from settings in case it changed in Settings page
     let acc: Accent = accent
-    try { const cfg = await window.settings.get?.(); if (cfg?.ok && (cfg.data as any)?.accent) acc = (cfg.data as any).accent as Accent } catch {}
+    try {
+      const cfg = await window.settings.get?.();
+      const userKey = app?.profile?.id ? `${app.baseUrl}|${app.profile.id}` : null
+      const us = (cfg?.ok && userKey) ? (cfg.data as any)?.userSettings?.[userKey] : undefined
+      if (us?.accent) acc = us.accent as Accent
+      else if (cfg?.ok && (cfg.data as any)?.accent) acc = (cfg.data as any).accent as Accent
+    } catch {}
     setAccent(acc)
     applyThemeAndAccent(next ? 'dark' : 'light', acc)
-    await window.settings.set?.({ theme: next ? 'dark' : 'light' })
+    try {
+      const cfg = await window.settings.get?.();
+      const userKey = app?.profile?.id ? `${app.baseUrl}|${app.profile.id}` : null
+      if (userKey) {
+        const map = (cfg?.ok ? (cfg.data as any)?.userSettings : undefined) || {}
+        const cur = map[userKey] || {}
+        map[userKey] = { ...cur, theme: next ? 'dark' : 'light', accent: acc }
+        await window.settings.set?.({ userSettings: map })
+      } else {
+        await window.settings.set?.({ theme: next ? 'dark' : 'light', accent: acc })
+      }
+    } catch {}
   }
   // Keep CSS var in sync if accent state changes elsewhere
   useEffect(() => {
@@ -66,7 +85,12 @@ export const Header: React.FC<Props> = ({ profile }) => {
     return () => { cancelAnimationFrame(raf); setMenuVisible(false); document.removeEventListener('mousedown', onDocClick); document.removeEventListener('keydown', onKey) }
   }, [menuOpen])
 
-  const onSignOut = async () => { setMenuOpen(false); await app.onSignOut() }
+  const onSignOut = async () => {
+    const ok = window.confirm('Sign out of Canvas? You can reconnect later. Your local layout and preferences remain saved.')
+    if (!ok) return
+    setMenuOpen(false)
+    await app.onSignOut()
+  }
 
   const onCopyEmail = async () => {
     const email = profile?.primary_email

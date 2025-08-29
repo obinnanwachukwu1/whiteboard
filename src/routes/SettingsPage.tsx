@@ -32,7 +32,18 @@ export default function SettingsPage() {
   const saveTheme = async (t: 'light' | 'dark') => {
     setTheme(t)
     applyThemeAndAccent(t, accent)
-    await window.settings.set?.({ theme: t })
+    try {
+      const cfg = await window.settings.get?.()
+      const userKey = ctx?.profile?.id ? `${ctx.baseUrl}|${ctx.profile.id}` : null
+      if (userKey) {
+        const map = (cfg?.ok ? (cfg.data as any)?.userSettings : undefined) || {}
+        const cur = map[userKey] || {}
+        map[userKey] = { ...cur, theme: t }
+        await window.settings.set?.({ userSettings: map })
+      } else {
+        await window.settings.set?.({ theme: t })
+      }
+    } catch {}
     setSaved('Theme updated')
     setTimeout(() => setSaved(null), 1200)
   }
@@ -40,7 +51,18 @@ export default function SettingsPage() {
   const saveAccent = async (a: Accent) => {
     setAccent(a)
     applyThemeAndAccent(theme, a)
-    await window.settings.set?.({ accent: a })
+    try {
+      const cfg = await window.settings.get?.()
+      const userKey = ctx?.profile?.id ? `${ctx.baseUrl}|${ctx.profile.id}` : null
+      if (userKey) {
+        const map = (cfg?.ok ? (cfg.data as any)?.userSettings : undefined) || {}
+        const cur = map[userKey] || {}
+        map[userKey] = { ...cur, accent: a }
+        await window.settings.set?.({ userSettings: map })
+      } else {
+        await window.settings.set?.({ accent: a })
+      }
+    } catch {}
     setSaved('Accent updated')
     setTimeout(() => setSaved(null), 1200)
   }
