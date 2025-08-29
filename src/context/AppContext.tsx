@@ -14,6 +14,7 @@ export type AppContextValue = {
   onOpenCourse: (id: string | number) => void
   onOpenAssignment: (courseId: string | number, restId: string | number, title?: string) => void
   onOpenAnnouncement: (courseId: string | number, topicId: string | number, title?: string) => void
+  onSignOut: () => Promise<void>
 }
 
 export const AppContext = React.createContext<AppContextValue | null>(null)
@@ -27,4 +28,3 @@ export function useAppContext(): AppContextValue {
 export function AppProvider({ value, children }: { value: AppContextValue; children: React.ReactNode }) {
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
-

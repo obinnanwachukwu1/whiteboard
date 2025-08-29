@@ -45,17 +45,14 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(null), 1200)
   }
 
-  const onSignOut = async () => {
-    try { await window.canvas.clearToken?.() } catch {}
-    try { window.location.reload() } catch {}
-  }
+  const onSignOut = async () => { await ctx.onSignOut() }
 
   return (
     <div className="space-y-6">
       <h1 className="mt-0 mb-2 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Settings</h1>
 
       {/* General */}
-      <section className="rounded-md ring-1 ring-gray-200 dark:ring-neutral-800 p-4 bg-white/60 dark:bg-neutral-900/60 backdrop-blur">
+      <section className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 p-4 bg-white/60 dark:bg-neutral-900/60 backdrop-blur shadow-card">
         <h2 className="mt-0 mb-3 text-lg font-semibold">General</h2>
         <div className="grid gap-4 w-full max-w-3xl">
           <label className="text-sm">
@@ -128,7 +125,7 @@ export default function SettingsPage() {
       </section>
 
       {/* Performance */}
-      <section className="rounded-md ring-1 ring-gray-200 dark:ring-neutral-800 p-4 bg-white/60 dark:bg-neutral-900/60 backdrop-blur">
+      <section className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 p-4 bg-white/60 dark:bg-neutral-900/60 backdrop-blur shadow-card">
         <h2 className="mt-0 mb-3 text-lg font-semibold">Performance</h2>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 w-full max-w-3xl">
           <div className="text-sm">
@@ -140,7 +137,7 @@ export default function SettingsPage() {
       </section>
 
       {/* Account */}
-      <section className="rounded-md ring-1 ring-gray-200 dark:ring-neutral-800 p-4 bg-white/60 dark:bg-neutral-900/60 backdrop-blur">
+      <section className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 p-4 bg-white/60 dark:bg-neutral-900/60 backdrop-blur shadow-card">
         <h2 className="mt-0 mb-3 text-lg font-semibold">Account</h2>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 w-full max-w-3xl">
           <div className="text-sm">

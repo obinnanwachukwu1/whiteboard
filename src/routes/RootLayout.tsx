@@ -8,6 +8,8 @@ import { useToast } from '../components/ui/Toaster'
 import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
 import { toAssignmentInputsFromRest, toAssignmentGroupInputsFromRest } from '../utils/gradeCalc'
 import { AppProvider, type AppContextValue } from '../context/AppContext'
+import { applyThemeAndAccent } from '../utils/theme'
+import { Eye, EyeOff, ExternalLink } from 'lucide-react'
 
 // Context definitions moved to src/context/AppContext.tsx
 
@@ -20,6 +22,7 @@ export function RootLayout() {
   const [baseUrl, setBaseUrl] = useState('https://gatech.instructure.com')
   const [hasToken, setHasToken] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showToken, setShowToken] = useState(false)
   const [prefetchEnabled, setPrefetchEnabledState] = useState(true)
   const [cachedCourses, setCachedCourses] = useState<any[] | null>(null)
   const [cachedDue, setCachedDue] = useState<any[] | null>(null)
@@ -36,6 +39,11 @@ export function RootLayout() {
     (async () => {
       const cfg = await window.settings.get()
       if (cfg.ok && cfg.data?.baseUrl) setBaseUrl(cfg.data.baseUrl)
+      try {
+        const theme = (cfg.ok && cfg.data?.theme) ? cfg.data.theme : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        const accent = (cfg.ok ? (cfg.data as any)?.accent : undefined) || 'default'
+        applyThemeAndAccent(theme as 'light' | 'dark', accent as any)
+      } catch {}
       if (cfg.ok && cfg.data?.sidebar) setSidebarCfg(cfg.data.sidebar)
       if (cfg.ok && typeof cfg.data?.prefetchEnabled === 'boolean') setPrefetchEnabledState(!!cfg.data.prefetchEnabled)
       if (cfg.ok && Array.isArray(cfg.data?.cachedCourses)) {
@@ -158,6 +166,16 @@ export function RootLayout() {
 
   const setActiveCourseId = (id: string | number | null) => setActiveCourseIdState(id)
 
+  const onSignOut = async () => {
+    try { await window.canvas.clearToken?.(baseUrl) } catch {}
+    try { await window.settings.set?.({ cachedCourses: [], cachedDue: [], queryCache: undefined }) } catch {}
+    try { queryClient.clear() } catch {}
+    setCachedCourses([])
+    setCachedDue([])
+    setHasToken(false)
+    navigate({ to: '/dashboard' })
+  }
+
   const context: AppContextValue = {
     baseUrl,
     courses: (coursesQ.data || cachedCourses || []),
@@ -171,6 +189,7 @@ export function RootLayout() {
     onOpenCourse: (id) => { setActiveCourseId(id); navigate({ to: '/course/$courseId', params: { courseId: String(id) } }) },
     onOpenAssignment: (courseId, restId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'assignments', type: 'assignment', contentId: String(restId), title } }) },
     onOpenAnnouncement: (courseId, topicId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'announcements', type: 'announcement', contentId: String(topicId), title } }) },
+    onSignOut,
   }
 
   const visibleCourses = useMemo(() => {
@@ -200,6 +219,79 @@ export function RootLayout() {
     setLoading(false)
   }
 
+  // Initial app loading screen while auth initializes
+  if (hasToken === null) {
+    return (
+      <div className="h-screen w-screen relative flex items-center justify-center bg-gray-50 dark:bg-neutral-950">
+        {/* Transparent draggable bar on startup */}
+        <div className="absolute inset-x-0 top-0 h-14 app-drag titlebar-left-inset z-50 bg-transparent" aria-hidden />
+        <div className="text-slate-600 dark:text-slate-300 text-sm animate-pulse">Loading…</div>
+      </div>
+    )
+  }
+
+  // Full-screen Sign In page when not authenticated
+  if (hasToken === false) {
+    const toggleShow = () => setShowToken((v) => !v)
+    const openTokenHelp = () => { try { if (baseUrl) window.system?.openExternal?.(`${baseUrl.replace(/\/?$/, '')}/profile/settings`) } catch {} }
+    return (
+      <div className="h-screen w-screen relative overflow-hidden flex flex-col">
+        {/* Transparent draggable bar (doesn't affect layout) */}
+        <div className="absolute inset-x-0 top-0 h-14 app-drag titlebar-left-inset z-50 bg-transparent" aria-hidden />
+        {/* Animated gradient ribbon overlay */}
+        <div className="absolute inset-x-0 -top-1/3 h-1/2 -z-10 bg-gradient-to-r from-sky-400 via-violet-500 to-rose-400 opacity-40 blur-3xl animate-gradient" />
+        {/* Ambient orbs */}
+        <div className="absolute -z-10 -top-24 -left-24 w-[520px] h-[520px] rounded-full blur-3xl opacity-25 animate-float" style={{ background: 'radial-gradient(closest-side, rgba(255,255,255,0.85), transparent)' }} />
+        <div className="absolute -z-10 -bottom-24 -right-24 w-[520px] h-[520px] rounded-full blur-3xl opacity-20 animate-float-delayed" style={{ background: 'radial-gradient(closest-side, rgba(0,0,0,0.5), transparent)' }} />
+
+        <div className="flex-1 w-full flex flex-col items-center justify-center p-6">
+          <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            {/* Left: Brand + Copy */}
+            <div className="text-center lg:text-left">
+              <div className="inline-flex items-center gap-3 px-3 py-1 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-white/40 dark:bg-neutral-900/40 backdrop-blur text-xs tracking-wide uppercase text-slate-700 dark:text-slate-200">Welcome</div>
+              <h1 className="mt-3 mb-3 text-5xl md:text-6xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-sky-500 via-violet-500 to-rose-500 animate-gradient">Whiteboard</h1>
+              <p className="text-slate-700 dark:text-slate-300 text-base md:text-lg max-w-prose">Your fast, focused companion for Canvas. Stay on top of assignments, files, and announcements without the noise.</p>
+              <div className="mt-5 flex flex-wrap gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-card ring-1 ring-black/10 dark:ring-white/10 bg-white/50 dark:bg-neutral-900/40 backdrop-blur">⚡ Fast navigation</span>
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-card ring-1 ring-black/10 dark:ring-white/10 bg-white/50 dark:bg-neutral-900/40 backdrop-blur">📂 Clean file browsing</span>
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-card ring-1 ring-black/10 dark:ring-white/10 bg-white/50 dark:bg-neutral-900/40 backdrop-blur">🔔 Upcoming at a glance</span>
+              </div>
+            </div>
+
+            {/* Right: Connect form (no gradient on box) */}
+            <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 p-6 shadow-card bg-white/85 dark:bg-neutral-900/85 backdrop-blur">
+              <h2 className="mt-0 mb-4 text-slate-900 dark:text-slate-100 text-lg font-semibold">Connect to Canvas</h2>
+              <div className="grid gap-4">
+                <label className="text-sm">
+                  <div className="mb-1">Base URL</div>
+                  <input className="w-full rounded-control border px-3 py-2 bg-white/90 dark:bg-neutral-900" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} onBlur={async () => { await window.settings.set({ baseUrl }) }} placeholder="https://your.school.instructure.com" />
+                </label>
+                <label className="text-sm">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span>Token</span>
+                    <button type="button" className="text-xs text-slate-600 dark:text-slate-300 hover:underline inline-flex items-center gap-1" onClick={openTokenHelp} title="Open Canvas token settings">
+                      <ExternalLink className="w-3 h-3" /> How to get a token
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input className="w-full rounded-control border pl-3 pr-9 py-2 bg-white/90 dark:bg-neutral-900" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Paste token (stored securely)" type={showToken ? 'text' : 'password'} />
+                    <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100" onClick={toggleShow} aria-label={showToken ? 'Hide token' : 'Show token'}>
+                      {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </label>
+                <div className="text-xs text-slate-600 dark:text-slate-300">We store your token securely with the system keychain when available.</div>
+                <div className="pt-1 flex items-center justify-end">
+                  <button className="px-4 py-2 rounded-control bg-slate-900 text-white disabled:opacity-50 hover:opacity-95" onClick={init} disabled={loading || !token.trim()}>{loading ? 'Connecting…' : 'Connect'}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <AppProvider value={context}>
       <div className="h-screen flex flex-col">
@@ -222,24 +314,6 @@ export function RootLayout() {
           <main className="flex-1 overflow-y-auto flex flex-col bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-tl-lg">
             <div className={`flex-1 p-6 ${currentView === 'course' ? 'pt-24' : ''}`}>
               <div className="max-w-6xl w-full mx-auto space-y-4">
-                {hasToken === false && (
-                  <div className="rounded-md ring-1 ring-gray-200 dark:ring-neutral-800 p-4">
-                    <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold">Connect to Canvas</h2>
-                    <div className="grid gap-3 max-w-xl">
-                      <label className="text-sm">
-                        <div className="mb-1">Base URL</div>
-                        <input className="w-full rounded border px-2 py-1 bg-white/90 dark:bg-neutral-900" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} onBlur={async () => { await window.settings.set({ baseUrl }) }} placeholder="https://..." />
-                      </label>
-                      <label className="text-sm">
-                        <div className="mb-1">Token</div>
-                        <input className="w-full rounded border px-2 py-1 bg-white/90 dark:bg-neutral-900" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Paste token (stored securely)" />
-                      </label>
-                      <div className="pt-1">
-                        <button className="px-3 py-1.5 rounded bg-slate-900 text-white disabled:opacity-50" onClick={init} disabled={loading || !token.trim()}>{loading ? 'Saving…' : 'Save Token / Init'}</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
                 <Outlet />
               </div>
             </div>

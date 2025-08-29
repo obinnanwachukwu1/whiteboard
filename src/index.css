@@ -37,6 +37,28 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 /* Adjust if you tweak overlay height or want a different inset. */
 .mac .titlebar-left-inset { padding-left: 120px; }
 
+/* Design tokens: consistent radii & card shadow */
+.rounded-card { border-radius: 0.5rem; } /* ~rounded-lg to match course page */
+.rounded-control { border-radius: 0.375rem; } /* ~rounded-md for inputs/buttons */
+.shadow-card { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+
+/* Playful, subtle animations for the sign-in experience */
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.animate-gradient { background-size: 200% 200%; animation: gradientShift 8s ease-in-out infinite; }
+
+@keyframes floatY {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0); }
+}
+.animate-float-slow { animation: floatY 10s ease-in-out infinite; }
+.animate-float { animation: floatY 6s ease-in-out infinite; }
+.animate-float-delayed { animation: floatY 8s ease-in-out infinite; animation-delay: 1.5s; }
+
 /* Lightweight rich HTML defaults (no typography plugin) */
 .rich-html { color: inherit; }
 .rich-html h1 { font-size: 1.875rem; line-height: 2.25rem; font-weight: 700; margin: 1.25rem 0 0.75rem; }

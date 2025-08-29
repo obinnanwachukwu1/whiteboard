@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { Button } from './ui/Button'
 import { Sun, Moon } from 'lucide-react'
 import { applyThemeAndAccent, type Accent } from '../utils/theme'
+import { useAppContext } from '../context/AppContext'
 
 type Props = {
   profile?: any | null
@@ -10,7 +11,8 @@ type Props = {
 
 export const Header: React.FC<Props> = ({ profile }) => {
   const navigate = useNavigate()
-  const name = profile?.short_name || profile?.name || 'Canvas Desk'
+  const app = useAppContext()
+  const name = profile?.short_name || profile?.name || 'Whiteboard'
   const avatar = profile?.avatar_url
   const [dark, setDark] = useState<boolean>(false)
   const [accent, setAccent] = useState<Accent>('default')
@@ -64,11 +66,7 @@ export const Header: React.FC<Props> = ({ profile }) => {
     return () => { cancelAnimationFrame(raf); setMenuVisible(false); document.removeEventListener('mousedown', onDocClick); document.removeEventListener('keydown', onKey) }
   }, [menuOpen])
 
-  const onSignOut = async () => {
-    try { await window.canvas.clearToken?.() } catch {}
-    // Soft app reset: reload to re-init queries and show connect screen
-    try { window.location.reload() } catch {}
-  }
+  const onSignOut = async () => { setMenuOpen(false); await app.onSignOut() }
 
   const onCopyEmail = async () => {
     const email = profile?.primary_email
@@ -85,8 +83,8 @@ export const Header: React.FC<Props> = ({ profile }) => {
       }}
     >
       <div className="flex items-center gap-3">
-        {/* <div className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-brand/10 text-brand">CD</div>
-        <div className="font-semibold tracking-tight">Canvas Desk</div> */}
+        {/* <div className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-brand/10 text-brand">WB</div>
+        <div className="font-semibold tracking-tight">Whiteboard</div> */}
       </div>
       <div className="flex items-center gap-3 app-no-drag relative">
         <Button variant="ghost" size="sm" onClick={toggleTheme} aria-pressed={dark} title="Toggle theme">

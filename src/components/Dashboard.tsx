@@ -151,23 +151,22 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
   }
 
 
+  // Prefer a precise loading flag for the Coming Up card
+  const dueState = queryClient.getQueryState(['due-assignments', { days: 7 }]) as any
+  const hasDue = Array.isArray(due) && due.length > 0
+  const dueLoading = !hasDue && Boolean(loading || (dueState?.status === 'pending') || (dueState?.fetchStatus === 'fetching'))
+
   return (
     <div className="space-y-4">
       <Card>
         <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold">Coming Up</h2>
-        {loading && (
-          <div className="text-slate-500 dark:text-slate-400 p-4 text-sm flex items-center gap-2">
-            <span>⏳</span>
-            <span>Loading assignments...</span>
-          </div>
+        {dueLoading && (
+          <div className="text-slate-500 dark:text-slate-400 p-4 text-sm">Loading assignments…</div>
         )}
-        {!loading && due.length === 0 && (
-          <div className="text-slate-500 dark:text-slate-400 p-4 text-sm flex items-center gap-2">
-            <span>🎉</span>
-            <span>No upcoming assignments</span>
-          </div>
+        {!dueLoading && due.length === 0 && (
+          <div className="text-slate-500 dark:text-slate-400 p-4 text-sm">No upcoming assignments</div>
         )}
-        {!loading && due.length > 0 && (
+        {!dueLoading && due.length > 0 && (
           <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
             {due
               .slice()
@@ -187,23 +186,20 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
                       className="cursor-pointer rounded-md px-2 sm:px-3 py-2 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 transition-colors"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 min-w-0">
-                          <span className="mt-1 inline-block w-2 h-2 rounded-full bg-brand" />
-                          <div className="min-w-0">
-                            <div className="font-medium leading-snug truncate hover:text-slate-700 dark:hover:text-slate-100/90" title={d.name}>
-                              {d.name}
-                            </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                              {d.course_name && (
-                                <span className="inline-flex items-center gap-1 mr-1.5">
-                                  <Badge>{d.course_name}</Badge>
-                                  <span>·</span>
-                                </span>
-                              )}
-                              Due {new Date(d.dueAt).toLocaleString()}
-                              {d.pointsPossible ? ` · ${d.pointsPossible} pts` : ''}
-                            </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-medium truncate hover:underline" title={d.name}>
+                            {d.name}
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            {d.course_name && (
+                              <span className="inline-flex items-center gap-1 mr-1.5">
+                                <Badge>{d.course_name}</Badge>
+                                <span>·</span>
+                              </span>
+                            )}
+                            Due {new Date(d.dueAt).toLocaleString()}
+                            {d.pointsPossible ? ` · ${d.pointsPossible} pts` : ''}
                           </div>
                         </div>
                         <Button size="sm" onClick={(e) => { e.stopPropagation(); open() }}>Open</Button>

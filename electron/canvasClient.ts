@@ -480,31 +480,47 @@ export class CanvasClient {
     const end = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
     const out: any[] = []
 
-    for (const c of courses) {
+    // Fetch per-course assignments concurrently with a small pool to reduce total time
+    const concurrency = 6
+    const tasks = (courses || []).map((c: any) => async () => {
       const cid = c?.id
       const cname = c?.name ?? ''
-      if (!cid) continue
-      const nodes = await this.listCourseAssignmentsGql(cid, 200)
-      for (const n of nodes) {
-        if (onlyPublished && n?.state !== 'published') continue
-        const dt = parseIso(n?.dueAt)
-        if (!dt) continue
-        if (dt >= now && dt <= end) {
-          const item: any = {
-            course_id: cid,
-            assignment_rest_id: n?._id ? Number(n._id) : null,
-            assignment_graphql_id: n?.id,
-            name: n?.name,
-            dueAt: dt.toISOString(),
-            state: n?.state,
-            pointsPossible: n?.pointsPossible,
-            htmlUrl: n?.htmlUrl,
+      if (!cid) return
+      try {
+        const nodes = await this.listCourseAssignmentsGql(cid, 200)
+        for (const n of nodes) {
+          if (onlyPublished && n?.state !== 'published') continue
+          const dt = parseIso(n?.dueAt)
+          if (!dt) continue
+          if (dt >= now && dt <= end) {
+            const item: any = {
+              course_id: cid,
+              assignment_rest_id: n?._id ? Number(n._id) : null,
+              assignment_graphql_id: n?.id,
+              name: n?.name,
+              dueAt: dt.toISOString(),
+              state: n?.state,
+              pointsPossible: n?.pointsPossible,
+              htmlUrl: n?.htmlUrl,
+            }
+            if (includeCourseName) item.course_name = cname
+            out.push(item)
           }
-          if (includeCourseName) item.course_name = cname
-          out.push(item)
         }
+      } catch (_e) {
+        // ignore course-level errors to avoid blocking whole dashboard
       }
-    }
+    })
+
+    let i = 0
+    const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, () => (async () => {
+      while (i < tasks.length) {
+        const cur = i++
+        await tasks[cur]()
+      }
+    })())
+    await Promise.all(workers)
+
     out.sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt)))
     return out
   }

@@ -24,7 +24,8 @@ export default function CoursePage() {
 
   const onChangeTab = (t: any) => {
     setCourseTab(t)
-    navigate({ to: '/course/$courseId', params: { courseId }, search: { ...search, tab: t } })
+    // Clear any subpage detail in the URL when switching tabs
+    navigate({ to: '/course/$courseId', params: { courseId }, search: { tab: t } })
   }
 
   const onOpenDetail = (d: { contentType: 'assignment'|'announcement'|'page'|'file'; contentId: string; title: string }) => {
