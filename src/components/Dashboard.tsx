@@ -158,27 +158,80 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
 
   return (
     <div className="space-y-4">
-      <Card>
-        <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold">Coming Up</h2>
-        {dueLoading && (
-          <div className="text-slate-500 dark:text-slate-400 p-4 text-sm">Loading assignments…</div>
-        )}
-        {!dueLoading && due.length === 0 && (
-          <div className="text-slate-500 dark:text-slate-400 p-4 text-sm">No upcoming assignments</div>
-        )}
-        {!dueLoading && due.length > 0 && (
-          <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
-            {due
-              .slice()
-              .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
-              .map((d, i) => {
+      <h1 className="mt-0 mb-2 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Dashboard</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold">Coming Up</h2>
+          {dueLoading && (
+            <div className="text-slate-500 dark:text-slate-400 p-4 text-sm">Loading assignments…</div>
+          )}
+          {!dueLoading && due.length === 0 && (
+            <div className="text-slate-500 dark:text-slate-400 p-4 text-sm">No upcoming assignments</div>
+          )}
+          {!dueLoading && due.length > 0 && (
+            <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
+              {due
+                .slice()
+                .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
+                .map((d, i) => {
+                  const open = () => {
+                    const rid = String(d.assignment_rest_id || extractAssignmentIdFromUrl(d.htmlUrl) || '')
+                    if (rid) onOpenAssignment?.(d.course_id, rid, d.name)
+                    else onOpenCourse?.(d.course_id)
+                  }
+                  return (
+                    <li className="py-1" key={i}>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={open}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
+                        className="cursor-pointer rounded-md px-2 sm:px-3 py-2 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 transition-colors"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate hover:underline" title={d.name}>
+                              {d.name}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                              {d.course_name && (
+                                <span className="inline-flex items-center gap-1 mr-1.5">
+                                  <Badge>{d.course_name}</Badge>
+                                  <span>·</span>
+                                </span>
+                              )}
+                              Due {new Date(d.dueAt).toLocaleString()}
+                              {d.pointsPossible ? ` · ${d.pointsPossible} pts` : ''}
+                            </div>
+                          </div>
+                          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); open() }}>Open</Button>
+                        </div>
+                      </div>
+                    </li>
+                  )
+                })}
+            </ul>
+          )}
+        </Card>
+
+        <Card>
+          <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold">Announcements</h2>
+          {annsQ.isLoading && (
+            <div className="text-slate-500 dark:text-slate-400 p-4 text-sm">Loading…</div>
+          )}
+          {!annsQ.isLoading && topAnnouncements.length === 0 ? (
+            <div className="text-slate-500 dark:text-slate-400 p-4 text-sm">No announcements</div>
+          ) : (
+            <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
+              {topAnnouncements.map((a, i) => {
                 const open = () => {
-                  const rid = String(d.assignment_rest_id || extractAssignmentIdFromUrl(d.htmlUrl) || '')
-                  if (rid) onOpenAssignment?.(d.course_id, rid, d.name)
-                  else onOpenCourse?.(d.course_id)
+                  const tid = a.topicId ?? extractAnnouncementIdFromUrl(a.htmlUrl)
+                  const cid = a.courseId ?? extractCourseIdFromUrl(a.htmlUrl)
+                  if (tid && cid != null) onOpenAnnouncement?.(cid, tid, a.title)
+                  else if (cid != null) onOpenCourse?.(cid)
                 }
                 return (
-                  <li className="py-1" key={i}>
+                  <li key={i} className="py-1">
                     <div
                       role="button"
                       tabIndex={0}
@@ -188,78 +241,28 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="font-medium truncate hover:underline" title={d.name}>
-                            {d.name}
-                          </div>
+                          <div className="font-medium truncate hover:underline" title={a.title}>{a.title}</div>
                           <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                            {d.course_name && (
-                              <span className="inline-flex items-center gap-1 mr-1.5">
-                                <Badge>{d.course_name}</Badge>
-                                <span>·</span>
-                              </span>
-                            )}
-                            Due {new Date(d.dueAt).toLocaleString()}
-                            {d.pointsPossible ? ` · ${d.pointsPossible} pts` : ''}
+                            <Badge>{a.courseName}</Badge>
+                            <span className="mx-1">·</span>
+                            <span>{a.postedAt ? new Date(a.postedAt).toLocaleString() : '—'}</span>
                           </div>
                         </div>
-                        <Button size="sm" onClick={(e) => { e.stopPropagation(); open() }}>Open</Button>
+                        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); open() }}>Open</Button>
                       </div>
                     </div>
                   </li>
                 )
               })}
-          </ul>
-        )}
-      </Card>
-
-      <Card>
-        <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold">Announcements</h2>
-        {annsQ.isLoading && (
-          <div className="text-slate-500 dark:text-slate-400 p-4 text-sm">Loading…</div>
-        )}
-        {!annsQ.isLoading && topAnnouncements.length === 0 ? (
-          <div className="text-slate-500 dark:text-slate-400 p-4 text-sm">No announcements</div>
-        ) : (
-          <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
-            {topAnnouncements.map((a, i) => {
-              const open = () => {
-                const tid = a.topicId ?? extractAnnouncementIdFromUrl(a.htmlUrl)
-                const cid = a.courseId ?? extractCourseIdFromUrl(a.htmlUrl)
-                if (tid && cid != null) onOpenAnnouncement?.(cid, tid, a.title)
-                else if (cid != null) onOpenCourse?.(cid)
-              }
-              return (
-                <li key={i} className="py-1">
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={open}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
-                    className="cursor-pointer rounded-md px-2 sm:px-3 py-2 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 transition-colors"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="font-medium truncate hover:underline" title={a.title}>{a.title}</div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                          <Badge>{a.courseName}</Badge>
-                          <span className="mx-1">·</span>
-                          <span>{a.postedAt ? new Date(a.postedAt).toLocaleString() : '—'}</span>
-                        </div>
-                      </div>
-                      <Button size="sm" onClick={(e) => { e.stopPropagation(); open() }}>Open</Button>
-                    </div>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-        <div className="pt-2 text-right">
-          <Button size="sm" variant="ghost" onClick={() => setShowAllAnns((v) => !v)}>
-            {showAllAnns ? 'Show less' : 'View all'}
-          </Button>
-        </div>
-      </Card>
+            </ul>
+          )}
+          <div className="pt-2 text-right">
+            <Button size="sm" variant="ghost" onClick={() => setShowAllAnns((v) => !v)}>
+              {showAllAnns ? 'Show less' : 'View all'}
+            </Button>
+          </div>
+        </Card>
+      </div>
 
       {orderedVisibleCourses.length > 0 && (
         <div>
@@ -287,7 +290,7 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
                     </div>
                   </div>
                   <div className="mt-3 flex items-center justify-end">
-                    <Button size="sm" onClick={(e) => { e.stopPropagation(); onOpenCourse?.(c.id) }}>Open</Button>
+                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onOpenCourse?.(c.id) }}>Open</Button>
                   </div>
                 </Card>
               )

@@ -59,6 +59,13 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 .animate-float { animation: floatY 6s ease-in-out infinite; }
 .animate-float-delayed { animation: floatY 8s ease-in-out infinite; animation-delay: 1.5s; }
 
+/* Dropdown pop-in animation (for menus like sidebar/profile) */
+@keyframes popIn {
+  0% { opacity: 0; transform: translateY(0.25rem) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-pop { animation: popIn 0.2s ease-out; }
+
 /* Lightweight rich HTML defaults (no typography plugin) */
 .rich-html { color: inherit; }
 .rich-html h1 { font-size: 1.875rem; line-height: 2.25rem; font-weight: 700; margin: 1.25rem 0 0.75rem; }
