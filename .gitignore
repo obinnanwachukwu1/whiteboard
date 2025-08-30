@@ -12,6 +12,20 @@ dist
 dist-ssr
 *.local
 
+# Electron build outputs and installers
+release/
+dist-electron/
+*.dmg
+*.app
+*.exe
+*.msi
+*.zip
+*.blockmap
+*.snap
+*.deb
+*.rpm
+*.asar
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
