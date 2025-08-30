@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Button } from './ui/Button'
-import { Sun, Moon } from 'lucide-react'
+// removed theme toggle button
 import { applyThemeAndAccent, type Accent } from '../utils/theme'
 import { useAppContext } from '../context/AppContext'
 
@@ -36,33 +35,6 @@ export const Header: React.FC<Props> = ({ profile }) => {
     })()
   }, [app?.profile?.id, app?.baseUrl])
 
-  const toggleTheme = async () => {
-    const next = !dark
-    setDark(next)
-    // pull latest accent from settings in case it changed in Settings page
-    let acc: Accent = accent
-    try {
-      const cfg = await window.settings.get?.();
-      const userKey = app?.profile?.id ? `${app.baseUrl}|${app.profile.id}` : null
-      const us = (cfg?.ok && userKey) ? (cfg.data as any)?.userSettings?.[userKey] : undefined
-      if (us?.accent) acc = us.accent as Accent
-      else if (cfg?.ok && (cfg.data as any)?.accent) acc = (cfg.data as any).accent as Accent
-    } catch {}
-    setAccent(acc)
-    applyThemeAndAccent(next ? 'dark' : 'light', acc)
-    try {
-      const cfg = await window.settings.get?.();
-      const userKey = app?.profile?.id ? `${app.baseUrl}|${app.profile.id}` : null
-      if (userKey) {
-        const map = (cfg?.ok ? (cfg.data as any)?.userSettings : undefined) || {}
-        const cur = map[userKey] || {}
-        map[userKey] = { ...cur, theme: next ? 'dark' : 'light', accent: acc }
-        await window.settings.set?.({ userSettings: map })
-      } else {
-        await window.settings.set?.({ theme: next ? 'dark' : 'light', accent: acc })
-      }
-    } catch {}
-  }
   // Keep CSS var in sync if accent state changes elsewhere
   useEffect(() => {
     applyThemeAndAccent(dark ? 'dark' : 'light', accent)
@@ -111,9 +83,6 @@ export const Header: React.FC<Props> = ({ profile }) => {
         <div className="font-semibold tracking-tight">Whiteboard</div> */}
       </div>
       <div className="flex items-center gap-3 app-no-drag relative">
-        <Button variant="ghost" size="sm" onClick={toggleTheme} aria-pressed={dark} title="Toggle theme">
-          {dark ? <Sun size={16} aria-hidden /> : <Moon size={16} aria-hidden />}
-        </Button>
         <button
           ref={nameBtnRef}
           className="group inline-flex items-center gap-2 rounded-md px-2 py-1 -mr-1 hover:[background-color:var(--app-accent-hover)] ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10 transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
