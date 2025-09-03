@@ -35,36 +35,38 @@ export const CanvasContentView: React.FC<Props> = ({
 
   if (contentType === 'file') {
     return (
-      <FullscreenContainer>
-        {({ isFullscreen, toggle }) => (
-          <div className="flex flex-col h-full">
-            <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-slate-700 bg-white/60 dark:bg-slate-900/60 backdrop-blur">
-              <Button variant="ghost" size="sm" onClick={onBack}>
-                <ArrowLeft className="w-4 h-4 mr-1" /> Back
-              </Button>
-              <div className="text-sm font-medium truncate flex-1">{title}</div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  // Trigger refresh for file by invalidating related queries
-                  qc.invalidateQueries({ queryKey: ['file-meta', contentId] })
-                  qc.invalidateQueries({ queryKey: ['file-bytes', contentId] })
-                }}
-                title="Refresh"
-              >
-                <RefreshCw className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={toggle} title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-              </Button>
+      <div className="flex flex-col h-full min-h-0">
+        <FullscreenContainer>
+          {({ isFullscreen, toggle }) => (
+            <div className="flex flex-col h-full min-h-0">
+              <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-slate-700 bg-white/60 dark:bg-slate-900/60 backdrop-blur">
+                <Button variant="ghost" size="sm" onClick={onBack}>
+                  <ArrowLeft className="w-4 h-4 mr-1" /> Back
+                </Button>
+                <div className="text-sm font-medium truncate flex-1">{title}</div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    // Trigger refresh for file by invalidating related queries
+                    qc.invalidateQueries({ queryKey: ['file-meta', contentId] })
+                    qc.invalidateQueries({ queryKey: ['file-bytes', contentId] })
+                  }}
+                  title="Refresh"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={toggle} title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>
+                  {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </Button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <FileViewer fileId={contentId} className="h-full" isFullscreen={isFullscreen} />
+              </div>
             </div>
-            <div className="flex-1 overflow-hidden">
-              <FileViewer fileId={contentId} className="h-full" isFullscreen={isFullscreen} />
-            </div>
-          </div>
-        )}
-      </FullscreenContainer>
+          )}
+        </FullscreenContainer>
+      </div>
     )
   }
 

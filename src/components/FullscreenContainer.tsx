@@ -26,7 +26,7 @@ export const FullscreenContainer: React.FC<Props> = ({ className = '', children 
   }
 
   return (
-    <div ref={rootRef} className={`relative w-full h-full ${className}`} style={{ contain: 'size' }}>
+    <div ref={rootRef} className={`relative w-full h-full ${className}`}>
       <div className={isFullscreen ? 'w-screen h-screen' : 'w-full h-full'}>
         {children({ isFullscreen, enter: () => rootRef.current?.requestFullscreen?.() as any, exit: () => document.exitFullscreen(), toggle, containerRef: rootRef })}
       </div>

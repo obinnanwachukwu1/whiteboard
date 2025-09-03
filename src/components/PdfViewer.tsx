@@ -238,7 +238,7 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
       <div
         ref={containerRef}
         className="overflow-auto bg-slate-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg h-full"
-        style={{ height: fullscreen ? '100%' : '600px' }}
+        style={{ height: '100%' }}
       >
         <div className="p-6 flex flex-col items-center">
           {Array.from({ length: numPages }, (_, i) => (
