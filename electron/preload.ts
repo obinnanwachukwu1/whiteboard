@@ -39,7 +39,17 @@ contextBridge.exposeInMainWorld('canvas', {
   getCoursePage: (courseId: string | number, slugOrUrl: string) => ipcRenderer.invoke('canvas:getCoursePage', courseId, slugOrUrl),
   getAssignmentRest: (courseId: string | number, assignmentRestId: string | number) => ipcRenderer.invoke('canvas:getAssignmentRest', courseId, assignmentRestId),
   getFile: (fileId: string | number) => ipcRenderer.invoke('canvas:getFile', fileId),
-  getFileBytes: (fileId: string | number) => ipcRenderer.invoke('canvas:getFileBytes', fileId),
+  getFileBytes: async (fileId: string | number) => {
+    const res = await ipcRenderer.invoke('canvas:getFileBytes', fileId)
+    // Clone the ArrayBuffer to avoid issues when downstream libraries
+    // transfer the buffer to workers (detaching the original).
+    try {
+      if (res?.ok && res?.data && res.data instanceof ArrayBuffer) {
+        res.data = res.data.slice(0)
+      }
+    } catch {}
+    return res
+  },
   listAssignmentsWithSubmission: (courseId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listAssignmentsWithSubmission', courseId, perPage),
   listAssignmentGroups: (courseId: string | number, includeAssignments?: boolean) => ipcRenderer.invoke('canvas:listAssignmentGroups', courseId, includeAssignments),
   listMyEnrollmentsForCourse: (courseId: string | number) => ipcRenderer.invoke('canvas:listMyEnrollmentsForCourse', courseId),

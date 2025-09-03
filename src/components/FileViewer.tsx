@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useFileMeta, useFileBytes } from '../hooks/useCanvasQueries'
 import { PdfViewer } from './PdfViewer'
+import { FullscreenContainer } from './FullscreenContainer'
 import { marked } from 'marked'
 import * as XLSX from 'xlsx'
 import JSZip from 'jszip'
@@ -137,22 +138,22 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '' }) => {
     } catch { return null }
   })()
   React.useEffect(() => { return () => { if (__blobUrl) URL.revokeObjectURL(__blobUrl) } }, [__blobUrl])
-  let body: React.ReactNode = null
+  let renderBody: (isFs: boolean) => React.ReactNode = () => null
   if (metaQ.isLoading || bytesQ.isLoading) {
-    body = <div className={`p-8 text-slate-500 dark:text-slate-400 ${className}`}>Loading file…</div>
+    renderBody = () => <div className={`p-8 text-slate-500 dark:text-slate-400 ${className}`}>Loading file…</div>
   } else if (!metaQ.data) {
-    body = <div className={`p-8 text-slate-500 dark:text-slate-400 ${className}`}>Unable to load file metadata.</div>
+    renderBody = () => <div className={`p-8 text-slate-500 dark:text-slate-400 ${className}`}>Unable to load file metadata.</div>
   } else if (isPdf) {
-    body = <PdfViewer fileId={fileId} className={className} />
+    renderBody = (isFs) => <PdfViewer fileId={fileId} className={className} fullscreen={isFs} />
   } else if (isImage) {
     if (__blobUrl) {
-      body = (
+      renderBody = (isFs) => (
         <div className={`p-4 ${className}`}>
-          <img src={__blobUrl} alt={name || 'Image'} style={{ maxWidth: '100%', height: 'auto' }} />
+          <img src={__blobUrl} alt={name || 'Image'} style={{ maxWidth: '100%', height: isFs ? 'calc(100vh - 64px)' : 'auto', objectFit: 'contain' }} />
         </div>
       )
     } else {
-      body = (
+      renderBody = () => (
         <div className={`p-4 ${className}`}>
           <div className="text-slate-500 dark:text-slate-400 mb-2">Unable to preview image inline.</div>
           {url && (
@@ -165,13 +166,13 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '' }) => {
     }
   } else if (isAudio) {
     if (__blobUrl) {
-      body = (
+      renderBody = () => (
         <div className={`p-4 ${className}`}>
           <audio src={__blobUrl} controls style={{ width: '100%' }} />
         </div>
       )
     } else {
-      body = (
+      renderBody = () => (
         <div className={`p-4 ${className}`}>
           <div className="text-slate-500 dark:text-slate-400 mb-2">Unable to preview audio inline.</div>
           {url && (
@@ -184,13 +185,13 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '' }) => {
     }
   } else if (isVideo) {
     if (__blobUrl) {
-      body = (
+      renderBody = (isFs) => (
         <div className={`p-4 ${className}`}>
-          <video src={__blobUrl} controls style={{ width: '100%', maxHeight: 600 }} />
+          <video src={__blobUrl} controls style={{ width: '100%', maxHeight: isFs ? 'calc(100vh - 64px)' : 600 }} />
         </div>
       )
     } else {
-      body = (
+      renderBody = () => (
         <div className={`p-4 ${className}`}>
           <div className="text-slate-500 dark:text-slate-400 mb-2">Unable to preview video inline.</div>
           {url && (
@@ -203,9 +204,9 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '' }) => {
     }
   } else if ((isDocx || isXlsx || isPptx || isDoc) && url) {
     const viewer = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
-    body = (
+    renderBody = (isFs) => (
       <div className={className}>
-        <div className="h-96 overflow-hidden border border-gray-200 dark:border-slate-700 rounded-lg" style={{ height: '600px' }}>
+        <div className="overflow-hidden border border-gray-200 dark:border-slate-700 rounded-lg" style={{ height: isFs ? 'calc(100vh - 64px)' : '600px' }}>
           <iframe
             src={viewer}
             className="w-full h-full"
@@ -220,20 +221,22 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '' }) => {
       </div>
     )
   } else if (isDocx) {
-    body = (
+    renderBody = (isFs) => (
       <div className={`p-4 ${className}`}>
-        <div ref={containerRef} className="prose prose-slate dark:prose-invert max-w-none" />
-        {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
+        <div style={{ minHeight: isFs ? 'calc(100vh - 64px)' : undefined }}>
+          <div ref={containerRef} className="prose prose-slate dark:prose-invert max-w-none" />
+          {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
+        </div>
       </div>
     )
   } else if (isXlsx && xlsxTable) {
-    body = (
+    renderBody = () => (
       <div className={`p-4 ${className}`}>
         <div dangerouslySetInnerHTML={{ __html: xlsxTable }} />
       </div>
     )
   } else if (isPptx && pptxSlides.length) {
-    body = (
+    renderBody = () => (
       <div className={`p-4 space-y-4 ${className}`}>
         {pptxSlides.map((s, idx) => (
           <div key={idx} className="border border-gray-200 dark:border-slate-700 rounded p-3">
@@ -248,20 +251,20 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '' }) => {
       const text = new TextDecoder('utf-8').decode(bytesQ.data as ArrayBuffer)
       if (ext === 'md') {
         const html = marked.parse(text)
-        body = <div className={`p-4 ${className}`} dangerouslySetInnerHTML={{ __html: String(html) }} />
+        renderBody = () => <div className={`p-4 ${className}`} dangerouslySetInnerHTML={{ __html: String(html) }} />
       } else if (ext === 'json') {
         const pretty = JSON.stringify(JSON.parse(text), null, 2)
-        body = <pre className={`p-4 overflow-auto ${className}`}>{pretty}</pre>
+        renderBody = () => <pre className={`p-4 overflow-auto ${className}`} style={{ maxHeight: 'calc(100vh - 64px)' }}>{pretty}</pre>
       } else {
-        body = <pre className={`p-4 overflow-auto ${className}`}>{text}</pre>
+        renderBody = () => <pre className={`p-4 overflow-auto ${className}`} style={{ maxHeight: 'calc(100vh - 64px)' }}>{text}</pre>
       }
     } catch {
-      body = <div className={`p-4 ${className}`}>Unable to preview text.</div>
+      renderBody = () => <div className={`p-4 ${className}`}>Unable to preview text.</div>
     }
   } else if (url) {
-    body = (
+    renderBody = (isFs) => (
       <div className={className}>
-        <div className="h-96 overflow-hidden border border-gray-200 dark:border-slate-700 rounded-lg" style={{ height: '600px' }}>
+        <div className="overflow-hidden border border-gray-200 dark:border-slate-700 rounded-lg" style={{ height: isFs ? 'calc(100vh - 64px)' : '600px' }}>
           <iframe src={url} className="w-full h-full" style={{ border: 'none' }} title={name || 'File'} />
         </div>
         <div className="p-2 text-right">
@@ -275,10 +278,16 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '' }) => {
       </div>
     )
   } else {
-    body = <div className={`p-8 text-slate-500 dark:text-slate-400 ${className}`}>No preview available.</div>
+    renderBody = () => <div className={`p-8 text-slate-500 dark:text-slate-400 ${className}`}>No preview available.</div>
   }
 
-  return <>{body}</>
+  return (
+    <FullscreenContainer>
+      {(isFs: boolean) => (
+        <>{renderBody(isFs)}</>
+      )}
+    </FullscreenContainer>
+  )
 
   if (isAudio) {
     if (bytesQ.isLoading) {

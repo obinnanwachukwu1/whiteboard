@@ -35,7 +35,16 @@ electron.contextBridge.exposeInMainWorld("canvas", {
   getCoursePage: (courseId, slugOrUrl) => electron.ipcRenderer.invoke("canvas:getCoursePage", courseId, slugOrUrl),
   getAssignmentRest: (courseId, assignmentRestId) => electron.ipcRenderer.invoke("canvas:getAssignmentRest", courseId, assignmentRestId),
   getFile: (fileId) => electron.ipcRenderer.invoke("canvas:getFile", fileId),
-  getFileBytes: (fileId) => electron.ipcRenderer.invoke("canvas:getFileBytes", fileId),
+  getFileBytes: async (fileId) => {
+    const res = await electron.ipcRenderer.invoke("canvas:getFileBytes", fileId);
+    try {
+      if ((res == null ? void 0 : res.ok) && (res == null ? void 0 : res.data) && res.data instanceof ArrayBuffer) {
+        res.data = res.data.slice(0);
+      }
+    } catch {
+    }
+    return res;
+  },
   listAssignmentsWithSubmission: (courseId, perPage) => electron.ipcRenderer.invoke("canvas:listAssignmentsWithSubmission", courseId, perPage),
   listAssignmentGroups: (courseId, includeAssignments) => electron.ipcRenderer.invoke("canvas:listAssignmentGroups", courseId, includeAssignments),
   listMyEnrollmentsForCourse: (courseId) => electron.ipcRenderer.invoke("canvas:listMyEnrollmentsForCourse", courseId),
