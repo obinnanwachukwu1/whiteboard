@@ -2,7 +2,7 @@ import React from 'react'
 
 type Props = {
   className?: string
-  children: React.ReactNode | ((isFullscreen: boolean) => React.ReactNode)
+  children: (ctx: { isFullscreen: boolean; enter: () => Promise<void>; exit: () => Promise<void>; toggle: () => Promise<void>; containerRef: React.RefObject<HTMLDivElement> }) => React.ReactNode
 }
 
 export const FullscreenContainer: React.FC<Props> = ({ className = '', children }) => {
@@ -26,20 +26,10 @@ export const FullscreenContainer: React.FC<Props> = ({ className = '', children 
   }
 
   return (
-    <div ref={rootRef} className={`relative ${className}`}>
-      <div className="absolute top-2 right-2 z-10 flex gap-2">
-        <button
-          onClick={toggle}
-          className="px-2 py-1 text-xs bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur rounded shadow hover:bg-slate-200 dark:hover:bg-slate-700"
-          title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-        >
-          {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-        </button>
-      </div>
-      <div className={isFullscreen ? 'w-screen h-screen' : ''}>
-        {typeof children === 'function' ? (children as any)(isFullscreen) : children}
+    <div ref={rootRef} className={`relative w-full h-full ${className}`} style={{ contain: 'size' }}>
+      <div className={isFullscreen ? 'w-screen h-screen' : 'w-full h-full'}>
+        {children({ isFullscreen, enter: () => rootRef.current?.requestFullscreen?.() as any, exit: () => document.exitFullscreen(), toggle, containerRef: rootRef })}
       </div>
     </div>
   )
 }
-

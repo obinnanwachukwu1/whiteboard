@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { ZoomIn, ZoomOut } from 'lucide-react'
+import { Button } from './ui/Button'
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import * as pdfjsLib from 'pdfjs-dist/build/pdf'
@@ -222,27 +224,21 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
         </div>
         
         <div className="flex items-center gap-2">
-          <button
-            onClick={zoomOut}
-            className="px-3 py-1 text-sm bg-slate-100 dark:bg-slate-700 rounded hover:bg-slate-200 dark:hover:bg-slate-600"
-          >
-            Zoom Out
-          </button>
-          <span className="text-sm font-mono">{Math.round(scale * 100)}%</span>
-          <button
-            onClick={zoomIn}
-            className="px-3 py-1 text-sm bg-slate-100 dark:bg-slate-700 rounded hover:bg-slate-200 dark:hover:bg-slate-600"
-          >
-            Zoom In
-          </button>
+          <Button variant="ghost" size="sm" onClick={zoomOut} title="Zoom out">
+            <ZoomOut className="w-4 h-4" />
+          </Button>
+          <span className="text-sm font-mono w-12 text-center">{Math.round(scale * 100)}%</span>
+          <Button variant="ghost" size="sm" onClick={zoomIn} title="Zoom in">
+            <ZoomIn className="w-4 h-4" />
+          </Button>
         </div>
       </div>
 
       {/* PDF Content - Container with Scroll */}
       <div
         ref={containerRef}
-        className="overflow-auto bg-slate-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg"
-        style={{ height: fullscreen ? 'calc(100vh - 120px)' : '600px' }}
+        className="overflow-auto bg-slate-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg h-full"
+        style={{ height: fullscreen ? '100%' : '600px' }}
       >
         <div className="p-6 flex flex-col items-center">
           {Array.from({ length: numPages }, (_, i) => (
