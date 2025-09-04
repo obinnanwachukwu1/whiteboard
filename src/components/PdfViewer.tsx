@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { ZoomIn, ZoomOut, RefreshCw } from 'lucide-react'
+import { ZoomIn, ZoomOut, Focus } from 'lucide-react'
 import { Button } from './ui/Button'
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
@@ -235,7 +235,7 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
             nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height)
             nextCtx.drawImage(off, 0, 0)
           }
-          // Cross-fade swap to eliminate flicker entirely
+          // Zoom swap: animate scale from previous to new to avoid disappearing
           const container = pageRef.current
           if (!container) return
           container.style.position = container.style.position || 'relative'
@@ -245,25 +245,29 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
             c.style.position = 'absolute'
             c.style.left = '50%'
             c.style.top = '0'
-            c.style.transform = 'translateX(-50%)'
+            c.style.transformOrigin = 'top center'
           }
           applyCenter(nextCanvas)
-          nextCanvas.style.opacity = '0'
-          nextCanvas.style.transition = 'opacity 120ms ease-out'
+          const ratio = (lastScaleRef.current && lastScaleRef.current > 0) ? (lastScaleRef.current / scale) : 1
+          nextCanvas.style.transform = `translateX(-50%) scale(${ratio})`
+          nextCanvas.style.transition = 'transform 150ms ease-out'
+          nextCanvas.style.willChange = 'transform'
           container.appendChild(nextCanvas)
-          // Fade in the new canvas
+          // After insertion, animate to scale(1)
           requestAnimationFrame(() => {
-            nextCanvas.style.opacity = '1'
+            nextCanvas.style.transform = 'translateX(-50%) scale(1)'
           })
-          if (prev) {
-            applyCenter(prev)
-            // Remove previous after the fade completes
-            setTimeout(() => {
-              if (cancelled) return
-              if (prev && prev.parentNode === container) {
-                try { container.removeChild(prev) } catch {}
-              }
-            }, 140)
+          // Remove previous after animation ends
+          const onDone = () => {
+            nextCanvas.removeEventListener('transitionend', onDone)
+            if (prev && prev.parentNode === container) {
+              try { container.removeChild(prev) } catch {}
+            }
+          }
+          nextCanvas.addEventListener('transitionend', onDone)
+          if (Math.abs(ratio - 1) < 0.01) {
+            // No visible size change; clean up previous immediately
+            setTimeout(onDone, 0)
           }
           canvasRef.current = nextCanvas
           lastScaleRef.current = scale
@@ -323,7 +327,7 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
             <ZoomIn className="w-4 h-4" />
           </Button>
           <Button variant="ghost" size="sm" onClick={resetZoom} title="Reset to 100%">
-            <RefreshCw className="w-4 h-4" />
+            <Focus className="w-4 h-4" />
           </Button>
           <Button variant="ghost" size="sm" onClick={toggleFit} title="Fit width">
             {fitWidth ? 'Fit: On' : 'Fit width'}
