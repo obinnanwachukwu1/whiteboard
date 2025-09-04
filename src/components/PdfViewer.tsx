@@ -209,7 +209,7 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
           const viewport = page.getViewport({ scale })
           // Stabilize container height immediately to avoid collapse during rerender
           if (pageRef.current) pageRef.current.style.minHeight = `${Math.round(viewport.height)}px`
-          // Render offscreen to avoid flicker then swap into the DOM
+          // Render offscreen to avoid flicker while reusing the same canvas node
           const dpr = window.devicePixelRatio || 1
           const off = document.createElement('canvas')
           const offCtx = off.getContext('2d')
@@ -218,60 +218,60 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
           off.height = Math.floor(viewport.height * dpr)
           offCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
           const renderTask = (page as any).render({ canvasContext: offCtx, viewport })
-          await renderTask.promise
-          // Prepare onscreen canvas element
-          const nextCanvas = document.createElement('canvas')
-          nextCanvas.width = off.width
-          nextCanvas.height = off.height
-          nextCanvas.style.width = `${viewport.width}px`
-          nextCanvas.style.height = `${viewport.height}px`
-          nextCanvas.style.display = 'block'
-          nextCanvas.style.border = '1px solid #e2e8f0'
-          nextCanvas.style.borderRadius = '4px'
-          nextCanvas.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
-          const nextCtx = nextCanvas.getContext('2d')
-          if (nextCtx) {
-            nextCtx.setTransform(1, 0, 0, 1, 0, 0)
-            nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height)
-            nextCtx.drawImage(off, 0, 0)
+
+          // Ensure an onscreen canvas exists and is mounted once
+          let canvas = canvasRef.current
+          if (!canvas) {
+            canvas = document.createElement('canvas')
+            canvasRef.current = canvas
+            canvas.style.display = 'block'
+            canvas.style.border = '1px solid #e2e8f0'
+            canvas.style.borderRadius = '4px'
+            canvas.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+            canvas.style.transformOrigin = 'top center'
+            if (pageRef.current) pageRef.current.appendChild(canvas)
           }
-          // Zoom swap: animate scale from previous to new to avoid disappearing
-          const container = pageRef.current
-          if (!container) return
-          container.style.position = container.style.position || 'relative'
-          const prev = canvasRef.current
-          // Position canvases centered
-          const applyCenter = (c: HTMLCanvasElement) => {
-            c.style.position = 'absolute'
-            c.style.left = '50%'
-            c.style.top = '0'
-            c.style.transformOrigin = 'top center'
-            c.style.transform = 'translateX(-50%)'
-            c.style.zIndex = '1'
-          }
-          applyCenter(nextCanvas)
+
+          // Animate zoom on the existing canvas while new pixels render offscreen
           const ratio = (lastScaleRef.current && lastScaleRef.current > 0) ? (lastScaleRef.current / scale) : 1
-          nextCanvas.style.transform = `translateX(-50%) scale(${ratio})`
-          nextCanvas.style.transition = 'transform 150ms ease-out'
-          nextCanvas.style.willChange = 'transform'
-          container.appendChild(nextCanvas)
-          // After insertion, animate to scale(1)
-          requestAnimationFrame(() => {
-            nextCanvas.style.transform = 'translateX(-50%) scale(1)'
-          })
-          // Remove previous after animation ends
-          const onDone = () => {
-            nextCanvas.removeEventListener('transitionend', onDone)
-            if (prev && prev.parentNode === container) {
-              try { container.removeChild(prev) } catch {}
+          const animate = Math.abs(ratio - 1) > 0.01
+          const targetCssW = `${viewport.width}px`
+          const targetCssH = `${viewport.height}px`
+          canvas.style.width = targetCssW
+          canvas.style.height = targetCssH
+          if (animate) {
+            canvas.style.transition = 'transform 150ms ease-out'
+            canvas.style.transform = `scale(${ratio})`
+            // Kick the transition to scale(1)
+            requestAnimationFrame(() => { canvas && (canvas.style.transform = 'scale(1)') })
+          } else {
+            canvas.style.transition = ''
+            canvas.style.transform = 'scale(1)'
+          }
+
+          const waitForTransition = animate
+            ? new Promise<void>((resolve) => {
+                const onEnd = () => { canvas?.removeEventListener('transitionend', onEnd); resolve() }
+                canvas.addEventListener('transitionend', onEnd)
+              })
+            : Promise.resolve()
+
+          await Promise.all([renderTask.promise, waitForTransition])
+          if (cancelled) return
+
+          // Update backing resolution and draw new pixels immediately
+          const nextW = off.width
+          const nextH = off.height
+          if (canvas) {
+            canvas.width = nextW
+            canvas.height = nextH
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+              ctx.setTransform(1, 0, 0, 1, 0, 0)
+              ctx.clearRect(0, 0, nextW, nextH)
+              ctx.drawImage(off, 0, 0)
             }
           }
-          nextCanvas.addEventListener('transitionend', onDone)
-          if (Math.abs(ratio - 1) < 0.01) {
-            // No visible size change; clean up previous immediately
-            setTimeout(onDone, 0)
-          }
-          canvasRef.current = nextCanvas
           lastScaleRef.current = scale
         } catch (e) {
           if (!cancelled) setError(String(e))
