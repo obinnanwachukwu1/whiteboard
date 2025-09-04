@@ -246,6 +246,8 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
             c.style.left = '50%'
             c.style.top = '0'
             c.style.transformOrigin = 'top center'
+            c.style.transform = 'translateX(-50%)'
+            c.style.zIndex = '1'
           }
           applyCenter(nextCanvas)
           const ratio = (lastScaleRef.current && lastScaleRef.current > 0) ? (lastScaleRef.current / scale) : 1
