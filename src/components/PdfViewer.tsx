@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { ZoomIn, ZoomOut } from 'lucide-react'
+import { ZoomIn, ZoomOut, RefreshCw } from 'lucide-react'
 import { Button } from './ui/Button'
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
@@ -30,6 +30,8 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
   const [numPages, setNumPages] = useState(0)
   const [scale, setScale] = useState(1.2)
+  const [fitWidth, setFitWidth] = useState(false)
+  const [basePageWidth, setBasePageWidth] = useState<number | null>(null)
   // Track scale and page count only; rendering is done eagerly
   const loadingTaskRef = useRef<any | null>(null)
   const fileBytesQ = useFileBytes(fileId)
@@ -138,10 +140,52 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
     return () => { cancelled = true }
   }, [pdf, scale])
 
+  // Determine base page width at scale 1 for fit-width calculations
+  useEffect(() => {
+    let cancelled = false
+    async function run() {
+      try {
+        if (!pdf) { setBasePageWidth(null); return }
+        const page = await pdf.getPage(1)
+        const v = page.getViewport({ scale: 1 })
+        if (!cancelled) setBasePageWidth(v.width)
+      } catch {
+        if (!cancelled) setBasePageWidth(null)
+      }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [pdf])
+
+  const recomputeFitWidth = React.useCallback(() => {
+    if (!fitWidth) return
+    const el = containerRef.current
+    if (!el || !basePageWidth) return
+    const paddingX = 48 // inner container has p-6 (24px each side)
+    const available = Math.max(0, el.clientWidth - paddingX)
+    const next = available / basePageWidth
+    const clamped = Math.max(0.5, Math.min(3, next))
+    setScale((s) => (Math.abs(s - clamped) > 0.005 ? clamped : s))
+  }, [fitWidth, basePageWidth])
+
+  // Keep scale fitted to width on container resize when fit mode is on
+  useEffect(() => {
+    if (!fitWidth) return
+    recomputeFitWidth()
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => recomputeFitWidth())
+    ro.observe(el)
+    const onWin = () => recomputeFitWidth()
+    window.addEventListener('resize', onWin)
+    return () => { ro.disconnect(); window.removeEventListener('resize', onWin) }
+  }, [fitWidth, recomputeFitWidth])
+
   const PageView: React.FC<{ pageNum: number }> = ({ pageNum }) => {
     const pageRef = React.useRef<HTMLDivElement | null>(null)
     const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
     const [visible, setVisible] = React.useState(false)
+    const lastScaleRef = React.useRef<number>(scale)
 
     useEffect(() => {
       const el = pageRef.current
@@ -163,27 +207,66 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
         try {
           const page = await pdf.getPage(pageNum)
           const viewport = page.getViewport({ scale })
-          const canvas = canvasRef.current || document.createElement('canvas')
-          const ctx = canvas.getContext('2d')
-          if (!ctx) return
-          // Size canvas to match the viewport so zoom changes are visible
+          // Stabilize container height immediately to avoid collapse during rerender
+          if (pageRef.current) pageRef.current.style.minHeight = `${Math.round(viewport.height)}px`
+          // Render offscreen to avoid flicker then swap into the DOM
           const dpr = window.devicePixelRatio || 1
-          canvas.width = Math.floor(viewport.width * dpr)
-          canvas.height = Math.floor(viewport.height * dpr)
-          canvas.style.width = `${viewport.width}px`
-          canvas.style.height = `${viewport.height}px`
-          canvas.style.display = 'block'
-          canvas.style.border = '1px solid #e2e8f0'
-          canvas.style.borderRadius = '4px'
-          canvas.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
-          // Scale drawing for device pixel ratio to keep it crisp
-          ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-          const renderTask = (page as any).render({ canvasContext: ctx, viewport })
+          const off = document.createElement('canvas')
+          const offCtx = off.getContext('2d')
+          if (!offCtx) return
+          off.width = Math.floor(viewport.width * dpr)
+          off.height = Math.floor(viewport.height * dpr)
+          offCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
+          const renderTask = (page as any).render({ canvasContext: offCtx, viewport })
           await renderTask.promise
-          if (!canvasRef.current) {
-            canvasRef.current = canvas
-            if (pageRef.current) pageRef.current.appendChild(canvas)
+          // Prepare onscreen canvas element
+          const nextCanvas = document.createElement('canvas')
+          nextCanvas.width = off.width
+          nextCanvas.height = off.height
+          nextCanvas.style.width = `${viewport.width}px`
+          nextCanvas.style.height = `${viewport.height}px`
+          nextCanvas.style.display = 'block'
+          nextCanvas.style.border = '1px solid #e2e8f0'
+          nextCanvas.style.borderRadius = '4px'
+          nextCanvas.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+          const nextCtx = nextCanvas.getContext('2d')
+          if (nextCtx) {
+            nextCtx.setTransform(1, 0, 0, 1, 0, 0)
+            nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height)
+            nextCtx.drawImage(off, 0, 0)
           }
+          // Cross-fade swap to eliminate flicker entirely
+          const container = pageRef.current
+          if (!container) return
+          container.style.position = container.style.position || 'relative'
+          const prev = canvasRef.current
+          // Position canvases centered
+          const applyCenter = (c: HTMLCanvasElement) => {
+            c.style.position = 'absolute'
+            c.style.left = '50%'
+            c.style.top = '0'
+            c.style.transform = 'translateX(-50%)'
+          }
+          applyCenter(nextCanvas)
+          nextCanvas.style.opacity = '0'
+          nextCanvas.style.transition = 'opacity 120ms ease-out'
+          container.appendChild(nextCanvas)
+          // Fade in the new canvas
+          requestAnimationFrame(() => {
+            nextCanvas.style.opacity = '1'
+          })
+          if (prev) {
+            applyCenter(prev)
+            // Remove previous after the fade completes
+            setTimeout(() => {
+              if (cancelled) return
+              if (prev && prev.parentNode === container) {
+                try { container.removeChild(prev) } catch {}
+              }
+            }, 140)
+          }
+          canvasRef.current = nextCanvas
+          lastScaleRef.current = scale
         } catch (e) {
           if (!cancelled) setError(String(e))
         }
@@ -197,8 +280,13 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
     )
   }
 
-  const zoomIn = () => setScale(prev => Math.min(prev + 0.2, 3))
-  const zoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.5))
+  const zoomIn = () => { setFitWidth(false); setScale(prev => Math.min(prev + 0.2, 3)) }
+  const zoomOut = () => { setFitWidth(false); setScale(prev => Math.max(prev - 0.2, 0.5)) }
+  const toggleFit = () => setFitWidth((v) => !v)
+  const resetZoom = () => { setFitWidth(false); setScale(1) }
+
+  // Recompute fit after toggling on
+  useEffect(() => { if (fitWidth) recomputeFitWidth() }, [fitWidth, recomputeFitWidth])
 
   if (fileBytesQ.isLoading || fileMetaQ.isLoading) {
     return (
@@ -233,6 +321,12 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
           <span className="text-sm font-mono w-12 text-center">{Math.round(scale * 100)}%</span>
           <Button variant="ghost" size="sm" onClick={zoomIn} title="Zoom in">
             <ZoomIn className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={resetZoom} title="Reset to 100%">
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={toggleFit} title="Fit width">
+            {fitWidth ? 'Fit: On' : 'Fit width'}
           </Button>
         </div>
       </div>
