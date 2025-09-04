@@ -183,7 +183,9 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
 
   const PageView: React.FC<{ pageNum: number }> = ({ pageNum }) => {
     const pageRef = React.useRef<HTMLDivElement | null>(null)
-    const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
+    const canvasARef = React.useRef<HTMLCanvasElement | null>(null)
+    const canvasBRef = React.useRef<HTMLCanvasElement | null>(null)
+    const frontIndexRef = React.useRef<0 | 1>(0)
     const [visible, setVisible] = React.useState(false)
     const lastScaleRef = React.useRef<number>(scale)
 
@@ -209,99 +211,76 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
           const viewport = page.getViewport({ scale })
           // Stabilize container height immediately to avoid collapse during rerender
           if (pageRef.current) pageRef.current.style.minHeight = `${Math.round(viewport.height)}px`
-          // Render offscreen to avoid flicker while reusing the same canvas node
-          const dpr = window.devicePixelRatio || 1
-          const off = document.createElement('canvas')
-          const offCtx = off.getContext('2d')
-          if (!offCtx) return
-          off.width = Math.floor(viewport.width * dpr)
-          off.height = Math.floor(viewport.height * dpr)
-          offCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
-          const renderTask = (page as any).render({ canvasContext: offCtx, viewport })
-
-          // Ensure an onscreen canvas exists and is mounted once
-          let canvas = canvasRef.current
-          if (!canvas) {
-            canvas = document.createElement('canvas')
-            canvasRef.current = canvas
-            canvas.style.display = 'block'
-            canvas.style.border = '1px solid #e2e8f0'
-            canvas.style.borderRadius = '4px'
-            canvas.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
-            canvas.style.transformOrigin = 'top center'
-            if (pageRef.current) pageRef.current.appendChild(canvas)
+          // Ensure two canvases are mounted (double buffer)
+          const ensureCanvas = (ref: React.MutableRefObject<HTMLCanvasElement | null>) => {
+            if (ref.current) return ref.current
+            const c = document.createElement('canvas')
+            ref.current = c
+            c.style.position = 'absolute'
+            c.style.left = '50%'
+            c.style.top = '0'
+            c.style.transform = 'translateX(-50%)'
+            c.style.transformOrigin = 'top center'
+            c.style.display = 'block'
+            c.style.border = '1px solid #e2e8f0'
+            c.style.borderRadius = '4px'
+            c.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+            c.style.pointerEvents = 'none'
+            if (pageRef.current) {
+              pageRef.current.style.position = pageRef.current.style.position || 'relative'
+              pageRef.current.appendChild(c)
+            }
+            return c
           }
+
+          const front = frontIndexRef.current === 0 ? ensureCanvas(canvasARef) : ensureCanvas(canvasBRef)
+          const back = frontIndexRef.current === 0 ? ensureCanvas(canvasBRef) : ensureCanvas(canvasARef)
 
           // Decide if we animate this change
           const ratio = (lastScaleRef.current && lastScaleRef.current > 0) ? (lastScaleRef.current / scale) : 1
           const animate = Math.abs(ratio - 1) > 0.01
-          const targetCssW = `${viewport.width}px`
-          const targetCssH = `${viewport.height}px`
-          canvas.style.width = targetCssW
-          canvas.style.height = targetCssH
-          // Prepare snapshot overlay before any canvas clearing happens
-          let snapshotEl: HTMLImageElement | null = null
-          const containerEl = pageRef.current
-          if (animate && containerEl && canvas) {
-            try {
-              const dataUrl = canvas.toDataURL('image/png')
-              const img = new Image()
-              img.src = dataUrl
-              img.style.position = 'absolute'
-              img.style.left = '50%'
-              img.style.top = '0'
-              img.style.transform = `translateX(-50%) scale(${ratio})`
-              img.style.transformOrigin = 'top center'
-              img.style.width = targetCssW
-              img.style.height = targetCssH
-              img.style.zIndex = '2'
-              img.style.pointerEvents = 'none'
-              containerEl.style.position = containerEl.style.position || 'relative'
-              containerEl.appendChild(img)
-              snapshotEl = img
-              // Hide underlying canvas during animation
-              canvas.style.opacity = '0'
-              // Animate overlay to scale(1)
-              img.style.transition = 'transform 150ms ease-out'
-              requestAnimationFrame(() => { img.style.transform = 'translateX(-50%) scale(1)' })
-            } catch {}
-          } else {
-            // No animation, keep canvas visible
-            canvas.style.opacity = '1'
-            canvas.style.transition = ''
-            canvas.style.transform = 'scale(1)'
-          }
+          const dpr = window.devicePixelRatio || 1
 
-          const waitForTransition = animate && snapshotEl
-            ? new Promise<void>((resolve) => {
-                const onEnd = () => { snapshotEl?.removeEventListener('transitionend', onEnd); resolve() }
-                snapshotEl!.addEventListener('transitionend', onEnd)
-              })
-            : Promise.resolve()
+          // Prepare back buffer size and appearance (hidden)
+          back.width = Math.floor(viewport.width * dpr)
+          back.height = Math.floor(viewport.height * dpr)
+          back.style.width = `${viewport.width}px`
+          back.style.height = `${viewport.height}px`
+          back.style.opacity = '0'
+          back.style.zIndex = '2' // overlay on top during swap
+          ;(back.getContext('2d') as CanvasRenderingContext2D).setTransform(dpr, 0, 0, dpr, 0, 0)
 
-          await Promise.all([renderTask.promise, waitForTransition])
+          // Start rendering new pixels to back buffer
+          const renderTask = (page as any).render({ canvasContext: back.getContext('2d'), viewport })
+
+          // Front remains visible below
+          front.style.opacity = '1'
+          front.style.zIndex = '1'
+
+          // When render completes, animate back into view
+          await renderTask.promise
           if (cancelled) return
 
-          // Update backing resolution and draw new pixels immediately
-          const nextW = off.width
-          const nextH = off.height
-          if (canvas) {
-            canvas.width = nextW
-            canvas.height = nextH
-            const ctx = canvas.getContext('2d')
-            if (ctx) {
-              ctx.setTransform(1, 0, 0, 1, 0, 0)
-              ctx.clearRect(0, 0, nextW, nextH)
-              ctx.drawImage(off, 0, 0)
-            }
-          }
-          // Show canvas and remove snapshot after drawing completes
-          if (canvas) canvas.style.opacity = '1'
-          if (snapshotEl && containerEl) {
+          if (animate) {
+            back.style.transition = 'transform 150ms ease-out, opacity 120ms ease-out'
+            back.style.transform = `translateX(-50%) scale(${ratio})`
+            // Trigger animation into place
             requestAnimationFrame(() => {
-              try { if (snapshotEl && snapshotEl.parentNode === containerEl) containerEl.removeChild(snapshotEl) } catch {}
+              back.style.opacity = '1'
+              back.style.transform = 'translateX(-50%) scale(1)'
             })
+            await new Promise<void>((resolve) => {
+              const onEnd = () => { back.removeEventListener('transitionend', onEnd); resolve() }
+              back.addEventListener('transitionend', onEnd)
+            })
+          } else {
+            back.style.opacity = '1'
+            back.style.transform = 'translateX(-50%) scale(1)'
           }
+
+          // Swap buffers: back becomes front
+          front.style.opacity = '0'
+          frontIndexRef.current = frontIndexRef.current === 0 ? 1 : 0
           lastScaleRef.current = scale
         } catch (e) {
           if (!cancelled) setError(String(e))
