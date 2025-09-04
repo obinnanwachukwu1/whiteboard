@@ -35,8 +35,10 @@ export const CanvasContentView: React.FC<Props> = ({
 
   if (contentType === 'file') {
     return (
-      <div className="flex flex-col h-full min-h-0">
-        <FullscreenContainer>
+      <div className="flex flex-col min-h-0">
+        {/* Constrain viewer to viewport height so inner content scrolls */}
+        <div className="h-[80vh] min-h-0 overflow-hidden">
+          <FullscreenContainer className="h-full">
           {({ isFullscreen, toggle }) => (
             <div className="flex flex-col h-full min-h-0">
               <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-slate-700 bg-white/60 dark:bg-slate-900/60 backdrop-blur">
@@ -60,12 +62,13 @@ export const CanvasContentView: React.FC<Props> = ({
                   {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                 </Button>
               </div>
-              <div className="flex-1 min-h-0 overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-auto">
                 <FileViewer fileId={contentId} className="h-full" isFullscreen={isFullscreen} />
               </div>
             </div>
           )}
-        </FullscreenContainer>
+          </FullscreenContainer>
+        </div>
       </div>
     )
   }

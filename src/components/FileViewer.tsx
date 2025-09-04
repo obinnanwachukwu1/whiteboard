@@ -149,7 +149,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
     if (__blobUrl) {
       body = (
         <div className={`p-4 ${className}`} style={{ height: '100%' }}>
-          <img src={__blobUrl} alt={name || 'Image'} style={{ width: '100%', height: isFullscreen ? '100%' : 'auto', objectFit: 'contain' }} />
+          <img src={__blobUrl} alt={name || 'Image'} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
       )
     } else {
@@ -206,7 +206,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
     const viewer = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
     body = (
       <div className={className} style={{ height: '100%' }}>
-        <div className="overflow-hidden border border-gray-200 dark:border-slate-700 rounded-lg" style={{ height: isFullscreen ? '100%' : '600px' }}>
+        <div className="overflow-hidden border border-gray-200 dark:border-slate-700 rounded-lg" style={{ height: '100%' }}>
           <iframe
             src={viewer}
             className="w-full h-full"
@@ -222,20 +222,20 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
     )
   } else if (isDocx) {
     body = (
-      <div className={`p-4 ${className}`} style={{ height: '100%' }}>
+      <div className={`p-4 overflow-auto ${className}`} style={{ height: '100%' }}>
         <div ref={containerRef} className="prose prose-slate dark:prose-invert max-w-none" style={{ minHeight: isFullscreen ? '100%' : undefined }} />
         {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
       </div>
     )
   } else if (isXlsx && xlsxTable) {
     body = (
-      <div className={`p-4 ${className}`} style={{ height: '100%' }}>
+      <div className={`p-4 overflow-auto ${className}`} style={{ height: '100%' }}>
         <div dangerouslySetInnerHTML={{ __html: xlsxTable }} />
       </div>
     )
   } else if (isPptx && Array.isArray(pptxSlides)) {
     body = (
-      <div className={`p-4 space-y-4 ${className}`} style={{ height: '100%' }}>
+      <div className={`p-4 space-y-4 overflow-auto ${className}`} style={{ height: '100%' }}>
         {pptxSlides.map((s: any, idx: number) => (
           <div key={idx} className="border border-gray-200 dark:border-slate-700 rounded p-3">
             <div className="text-xs text-slate-500">Slide {s.index}</div>
@@ -249,7 +249,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
       const text = new TextDecoder('utf-8').decode(bytesQ.data as ArrayBuffer)
       if (ext === 'md') {
         const html = marked.parse(text)
-        body = <div className={`p-4 ${className}`} style={{ height: '100%' }} dangerouslySetInnerHTML={{ __html: String(html) }} />
+        body = <div className={`p-4 overflow-auto ${className}`} style={{ height: '100%' }} dangerouslySetInnerHTML={{ __html: String(html) }} />
       } else if (ext === 'json') {
         const pretty = JSON.stringify(JSON.parse(text), null, 2)
         body = <pre className={`p-4 overflow-auto ${className}`} style={{ maxHeight: isFullscreen ? '100%' : 600 }}>{pretty}</pre>
@@ -262,7 +262,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
   } else if (url) {
     body = (
       <div className={className} style={{ height: '100%' }}>
-        <div className="overflow-hidden border border-gray-200 dark:border-slate-700 rounded-lg" style={{ height: isFullscreen ? '100%' : '600px' }}>
+        <div className="overflow-hidden border border-gray-200 dark:border-slate-700 rounded-lg" style={{ height: '100%' }}>
           <iframe src={url} className="w-full h-full" style={{ border: 'none' }} title={name || 'File'} />
         </div>
         <div className="p-2 text-right">

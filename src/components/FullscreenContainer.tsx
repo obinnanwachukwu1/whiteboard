@@ -27,7 +27,8 @@ export const FullscreenContainer: React.FC<Props> = ({ className = '', children 
 
   return (
     <div ref={rootRef} className={`relative w-full h-full ${className}`}>
-      <div className={isFullscreen ? 'w-screen h-screen' : 'w-full h-full'}>
+      {/* In fullscreen, give the container a solid card-like background so translucent headers look identical */}
+      <div className={isFullscreen ? 'w-screen h-screen bg-white dark:bg-neutral-900' : 'w-full h-full'}>
         {children({ isFullscreen, enter: () => rootRef.current?.requestFullscreen?.() as any, exit: () => document.exitFullscreen(), toggle, containerRef: rootRef })}
       </div>
     </div>

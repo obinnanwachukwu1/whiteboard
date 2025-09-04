@@ -166,15 +166,18 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
           const canvas = canvasRef.current || document.createElement('canvas')
           const ctx = canvas.getContext('2d')
           if (!ctx) return
-          canvas.height = viewport.height
-          canvas.width = viewport.width
-          canvas.style.width = '100%'
-          canvas.style.maxWidth = '800px'
-          canvas.style.height = 'auto'
+          // Size canvas to match the viewport so zoom changes are visible
+          const dpr = window.devicePixelRatio || 1
+          canvas.width = Math.floor(viewport.width * dpr)
+          canvas.height = Math.floor(viewport.height * dpr)
+          canvas.style.width = `${viewport.width}px`
+          canvas.style.height = `${viewport.height}px`
           canvas.style.display = 'block'
           canvas.style.border = '1px solid #e2e8f0'
           canvas.style.borderRadius = '4px'
           canvas.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+          // Scale drawing for device pixel ratio to keep it crisp
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
           const renderTask = (page as any).render({ canvasContext: ctx, viewport })
           await renderTask.promise
           if (!canvasRef.current) {
