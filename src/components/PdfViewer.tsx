@@ -183,6 +183,7 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
 
   const PageView: React.FC<{ pageNum: number }> = ({ pageNum }) => {
     const pageRef = React.useRef<HTMLDivElement | null>(null)
+    const wrapperRef = React.useRef<HTMLDivElement | null>(null)
     const canvasARef = React.useRef<HTMLCanvasElement | null>(null)
     const canvasBRef = React.useRef<HTMLCanvasElement | null>(null)
     const frontIndexRef = React.useRef<0 | 1>(0)
@@ -211,6 +212,10 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
           const viewport = page.getViewport({ scale })
           // Stabilize container height immediately to avoid collapse during rerender
           if (pageRef.current) pageRef.current.style.minHeight = `${Math.round(viewport.height)}px`
+          if (wrapperRef.current) {
+            wrapperRef.current.style.width = `${viewport.width}px`
+            wrapperRef.current.style.height = `${viewport.height}px`
+          }
           // Ensure two canvases are mounted (double buffer)
           const ensureCanvas = (ref: React.MutableRefObject<HTMLCanvasElement | null>) => {
             if (ref.current) return ref.current
@@ -222,13 +227,11 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
             c.style.transform = 'translateX(-50%)'
             c.style.transformOrigin = 'top center'
             c.style.display = 'block'
-            c.style.border = '1px solid #e2e8f0'
-            c.style.borderRadius = '4px'
-            c.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+            // Remove border/shadow from canvases; apply to wrapper to avoid compositor artifacts
             c.style.pointerEvents = 'none'
-            if (pageRef.current) {
-              pageRef.current.style.position = pageRef.current.style.position || 'relative'
-              pageRef.current.appendChild(c)
+            if (wrapperRef.current) {
+              wrapperRef.current.style.position = 'relative'
+              wrapperRef.current.appendChild(c)
             }
             return c
           }
@@ -246,7 +249,6 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
           back.height = Math.floor(viewport.height * dpr)
           back.style.width = `${viewport.width}px`
           back.style.height = `${viewport.height}px`
-          back.style.opacity = '0'
           back.style.zIndex = '2' // overlay on top during swap
           ;(back.getContext('2d') as CanvasRenderingContext2D).setTransform(dpr, 0, 0, dpr, 0, 0)
 
@@ -262,24 +264,25 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
           if (cancelled) return
 
           if (animate) {
-            back.style.transition = 'transform 150ms ease-out, opacity 120ms ease-out'
+            back.style.willChange = 'transform'
+            back.style.transition = 'transform 150ms ease-out'
             back.style.transform = `translateX(-50%) scale(${ratio})`
             // Trigger animation into place
             requestAnimationFrame(() => {
-              back.style.opacity = '1'
               back.style.transform = 'translateX(-50%) scale(1)'
             })
+            // Wait specifically for transform to finish (not opacity)
             await new Promise<void>((resolve) => {
-              const onEnd = () => { back.removeEventListener('transitionend', onEnd); resolve() }
+              const onEnd = (e: TransitionEvent) => {
+                if (e.propertyName === 'transform') { back.removeEventListener('transitionend', onEnd); resolve() }
+              }
               back.addEventListener('transitionend', onEnd)
             })
           } else {
-            back.style.opacity = '1'
             back.style.transform = 'translateX(-50%) scale(1)'
           }
 
-          // Swap buffers: back becomes front
-          front.style.opacity = '0'
+          // Swap buffers: back becomes front (keep previous canvas present underneath)
           frontIndexRef.current = frontIndexRef.current === 0 ? 1 : 0
           lastScaleRef.current = scale
         } catch (e) {
@@ -291,7 +294,13 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
 
     const minH = pageHeights[pageNum - 1] ?? defaultPageHeight
     return (
-      <div ref={pageRef} className="flex flex-col items-center mb-4" style={{ minHeight: `${minH}px` }}></div>
+      <div ref={pageRef} className="flex flex-col items-center mb-4" style={{ minHeight: `${minH}px` }}>
+        <div
+          ref={wrapperRef}
+          className="relative overflow-hidden bg-white dark:bg-neutral-900 border border-gray-200 dark:border-slate-700 rounded-md shadow"
+          style={{ width: 'auto', height: 'auto' }}
+        />
+      </div>
     )
   }
 
