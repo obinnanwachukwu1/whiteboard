@@ -259,6 +259,29 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
           await Promise.all([renderTask.promise, waitForTransition])
           if (cancelled) return
 
+          // Snapshot overlay to bridge the brief moment when resizing clears the canvas
+          let snapshotEl: HTMLImageElement | null = null
+          const containerEl = pageRef.current
+          if (containerEl && canvas) {
+            try {
+              const dataUrl = canvas.toDataURL('image/png')
+              const img = new Image()
+              img.src = dataUrl
+              img.style.position = 'absolute'
+              img.style.left = '50%'
+              img.style.top = '0'
+              img.style.transform = 'translateX(-50%)'
+              img.style.transformOrigin = 'top center'
+              img.style.width = targetCssW
+              img.style.height = targetCssH
+              img.style.zIndex = '2'
+              img.style.pointerEvents = 'none'
+              containerEl.style.position = containerEl.style.position || 'relative'
+              containerEl.appendChild(img)
+              snapshotEl = img
+            } catch {}
+          }
+
           // Update backing resolution and draw new pixels immediately
           const nextW = off.width
           const nextH = off.height
@@ -271,6 +294,12 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
               ctx.clearRect(0, 0, nextW, nextH)
               ctx.drawImage(off, 0, 0)
             }
+          }
+          // Remove snapshot on next frame after draw completes
+          if (snapshotEl && containerEl) {
+            requestAnimationFrame(() => {
+              try { if (snapshotEl && snapshotEl.parentNode === containerEl) containerEl.removeChild(snapshotEl) } catch {}
+            })
           }
           lastScaleRef.current = scale
         } catch (e) {
