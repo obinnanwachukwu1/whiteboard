@@ -232,37 +232,17 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
             if (pageRef.current) pageRef.current.appendChild(canvas)
           }
 
-          // Animate zoom on the existing canvas while new pixels render offscreen
+          // Decide if we animate this change
           const ratio = (lastScaleRef.current && lastScaleRef.current > 0) ? (lastScaleRef.current / scale) : 1
           const animate = Math.abs(ratio - 1) > 0.01
           const targetCssW = `${viewport.width}px`
           const targetCssH = `${viewport.height}px`
           canvas.style.width = targetCssW
           canvas.style.height = targetCssH
-          if (animate) {
-            canvas.style.transition = 'transform 150ms ease-out'
-            canvas.style.transform = `scale(${ratio})`
-            // Kick the transition to scale(1)
-            requestAnimationFrame(() => { canvas && (canvas.style.transform = 'scale(1)') })
-          } else {
-            canvas.style.transition = ''
-            canvas.style.transform = 'scale(1)'
-          }
-
-          const waitForTransition = animate
-            ? new Promise<void>((resolve) => {
-                const onEnd = () => { canvas?.removeEventListener('transitionend', onEnd); resolve() }
-                canvas.addEventListener('transitionend', onEnd)
-              })
-            : Promise.resolve()
-
-          await Promise.all([renderTask.promise, waitForTransition])
-          if (cancelled) return
-
-          // Snapshot overlay to bridge the brief moment when resizing clears the canvas
+          // Prepare snapshot overlay before any canvas clearing happens
           let snapshotEl: HTMLImageElement | null = null
           const containerEl = pageRef.current
-          if (containerEl && canvas) {
+          if (animate && containerEl && canvas) {
             try {
               const dataUrl = canvas.toDataURL('image/png')
               const img = new Image()
@@ -270,7 +250,7 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
               img.style.position = 'absolute'
               img.style.left = '50%'
               img.style.top = '0'
-              img.style.transform = 'translateX(-50%)'
+              img.style.transform = `translateX(-50%) scale(${ratio})`
               img.style.transformOrigin = 'top center'
               img.style.width = targetCssW
               img.style.height = targetCssH
@@ -279,8 +259,28 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
               containerEl.style.position = containerEl.style.position || 'relative'
               containerEl.appendChild(img)
               snapshotEl = img
+              // Hide underlying canvas during animation
+              canvas.style.opacity = '0'
+              // Animate overlay to scale(1)
+              img.style.transition = 'transform 150ms ease-out'
+              requestAnimationFrame(() => { img.style.transform = 'translateX(-50%) scale(1)' })
             } catch {}
+          } else {
+            // No animation, keep canvas visible
+            canvas.style.opacity = '1'
+            canvas.style.transition = ''
+            canvas.style.transform = 'scale(1)'
           }
+
+          const waitForTransition = animate && snapshotEl
+            ? new Promise<void>((resolve) => {
+                const onEnd = () => { snapshotEl?.removeEventListener('transitionend', onEnd); resolve() }
+                snapshotEl!.addEventListener('transitionend', onEnd)
+              })
+            : Promise.resolve()
+
+          await Promise.all([renderTask.promise, waitForTransition])
+          if (cancelled) return
 
           // Update backing resolution and draw new pixels immediately
           const nextW = off.width
@@ -295,7 +295,8 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
               ctx.drawImage(off, 0, 0)
             }
           }
-          // Remove snapshot on next frame after draw completes
+          // Show canvas and remove snapshot after drawing completes
+          if (canvas) canvas.style.opacity = '1'
           if (snapshotEl && containerEl) {
             requestAnimationFrame(() => {
               try { if (snapshotEl && snapshotEl.parentNode === containerEl) containerEl.removeChild(snapshotEl) } catch {}
