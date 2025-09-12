@@ -1,6 +1,5 @@
 import React from 'react'
 // no Card wrapper; rendered within page container
-import { TextField } from './ui/TextField'
 import { Button } from './ui/Button'
 import { Pencil, RotateCcw } from 'lucide-react'
 import { useCourseGradebook } from '../hooks/useCourseGradebook'

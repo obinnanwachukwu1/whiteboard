@@ -5,9 +5,12 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   size?: 'sm' | 'md'
 }
 
-export function Button({ variant = 'primary', size = 'md', className = '', ...props }: ButtonProps) {
-  const base = 'inline-flex items-center font-medium rounded-control transition-colors shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/30'
-  const sizes = size === 'sm' ? 'px-2.5 py-1.5 text-sm' : 'px-4 py-2 text-sm'
-  const look = 'bg-transparent text-slate-700 hover:[background-color:var(--app-accent-hover)] dark:text-neutral-200'
-  return <button className={`${base} ${sizes} ${look} ${className}`} {...props} />
-}
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ variant = 'primary', size = 'md', className = '', ...props }, ref) => {
+    const base = 'inline-flex items-center font-medium rounded-control transition-colors shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/30'
+    const sizes = size === 'sm' ? 'px-2.5 py-1.5 text-sm' : 'px-4 py-2 text-sm'
+    const look = 'bg-transparent text-slate-700 hover:[background-color:var(--app-accent-hover)] dark:text-neutral-200'
+    return <button ref={ref} className={`${base} ${sizes} ${look} ${className}`} {...props} />
+  }
+)
+Button.displayName = 'Button'

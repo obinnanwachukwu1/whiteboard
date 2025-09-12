@@ -25,7 +25,7 @@ declare namespace NodeJS {
 interface Window {
   ipcRenderer: import('electron').IpcRenderer
   canvas: {
-    init: (cfg: { token?: string; baseUrl?: string; verbose?: boolean }) => Promise<{ ok: boolean; error?: string }>
+    init: (cfg: { token?: string; baseUrl?: string; verbose?: boolean }) => Promise<{ ok: boolean; insecure?: boolean; error?: string }>
     clearToken: (baseUrl?: string) => Promise<{ ok: boolean; error?: string }>
     getProfile: () => Promise<{ ok: boolean; data?: any; error?: string }>
     listCourses: (opts?: { enrollment_state?: string }) => Promise<{ ok: boolean; data?: any; error?: string }>
@@ -44,6 +44,7 @@ interface Window {
     listAssignmentGroups: (courseId: string | number, includeAssignments?: boolean) => Promise<{ ok: boolean; data?: any; error?: string }>
     listMyEnrollmentsForCourse: (courseId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
     listCourseTabs: (courseId: string | number, includeExternal?: boolean) => Promise<{ ok: boolean; data?: any; error?: string }>
+    listActivityStream: (opts?: { onlyActiveCourses?: boolean; perPage?: number }) => Promise<{ ok: boolean; data?: any; error?: string }>
     listCourseAnnouncements: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
     listCourseAnnouncementsPage: (courseId: string | number, page?: number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
     getCourseInfo: (courseId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
@@ -54,8 +55,8 @@ interface Window {
     listCourseFiles: (courseId: string | number, perPage?: number, sort?: 'name' | 'size' | 'created_at' | 'updated_at', order?: 'asc' | 'desc') => Promise<{ ok: boolean; data?: any; error?: string }>
   }
   settings: {
-    get: () => Promise<{ ok: boolean; data?: { baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> } }; error?: string }>
-    set: (partial: Partial<{ baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> } }>) => Promise<{ ok: boolean; data?: any; error?: string }>
+    get: () => Promise<{ ok: boolean; data?: { baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'; prefetchEnabled?: boolean; cachedCourses?: any[]; cachedDue?: any[]; queryCache?: any; userSettings?: Record<string, any>; userSidebars?: Record<string, any>; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> } }; error?: string }>
+    set: (partial: Partial<{ baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'; prefetchEnabled?: boolean; cachedCourses?: any[]; cachedDue?: any[]; queryCache?: any; userSettings?: Record<string, any>; userSidebars?: Record<string, any>; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> } }>) => Promise<{ ok: boolean; data?: any; error?: string }>
   }
   system: {
     openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>

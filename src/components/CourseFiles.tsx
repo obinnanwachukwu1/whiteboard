@@ -94,6 +94,7 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
     while (fid && byId.has(fid)) {
       const f = byId.get(fid)
       // Do not include the course root itself in the breadcrumb trail
+      if (!f) break
       if (courseRootId && String(f.id) === courseRootId) break
       out.unshift(f)
       const parent = f?.parent_folder_id != null ? String(f.parent_folder_id) : null
@@ -169,7 +170,7 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
       {/* Breadcrumb */}
       <div className="text-sm text-slate-600 dark:text-slate-300 mb-2 flex items-center gap-1">
         <button className="hover:underline" onClick={() => setCurrent(courseRootId || null)}>{courseRootId ? 'Course Files' : 'Root'}</button>
-        {breadcrumb.map((f: any, idx: number) => (
+        {breadcrumb.map((f: any) => (
           <React.Fragment key={f.id}>
             <ChevronRight className="w-4 h-4 opacity-60" />
             <button className="hover:underline" onClick={() => setCurrent(String(f.id))}>{f.name || f.full_name || 'Folder'}</button>
@@ -254,7 +255,7 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
                       </div>
                       {f?.url && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); window.system?.openExternal?.(f.url) }}
+                          onClick={(e) => { e.stopPropagation(); window.system?.openExternal?.(f.url!) }}
                           className="inline-flex items-center px-2.5 py-1.5 rounded-control text-sm text-slate-700 hover:bg-slate-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
                         >
                           <ExternalLink className="w-4 h-4 mr-1" /> Open in Browser

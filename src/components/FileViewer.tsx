@@ -130,12 +130,12 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
     }
   }
   const __blobUrl = (() => {
-    if (!bytesQ.data) return null as string | null
+    if (!bytesQ.data) return undefined as string | undefined
     try {
       const mime = _mimeFromExt(ext)
       const blob = new Blob([bytesQ.data as ArrayBuffer], { type: mime })
       return URL.createObjectURL(blob)
-    } catch { return null }
+    } catch { return undefined }
   })()
   React.useEffect(() => { return () => { if (__blobUrl) URL.revokeObjectURL(__blobUrl) } }, [__blobUrl])
   let body: React.ReactNode = null
@@ -280,122 +280,4 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
   }
 
   return <>{body}</>
-
-  if (isAudio) {
-    if (bytesQ.isLoading) {
-      return <div className={`p-4 ${className} text-slate-500 dark:text-slate-400`}>Loading audio…</div>
-    }
-    if (__blobUrl) {
-      return (
-        <div className={`p-4 ${className}`}>
-          <audio src={__blobUrl} controls style={{ width: '100%' }} />
-        </div>
-      )
-    }
-    return (
-      <div className={`p-4 ${className}`}>
-        <div className="text-slate-500 dark:text-slate-400 mb-2">Unable to preview audio inline.</div>
-        {url && (
-          <button className="px-3 py-1 text-sm bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700" onClick={() => window.system?.openExternal?.(url)}>
-            Open in Browser
-          </button>
-        )}
-      </div>
-    )
-  }
-
-  if (isVideo) {
-    if (bytesQ.isLoading) {
-      return <div className={`p-4 ${className} text-slate-500 dark:text-slate-400`}>Loading video…</div>
-    }
-    if (__blobUrl) {
-      return (
-        <div className={`p-4 ${className}`}>
-          <video src={__blobUrl} controls style={{ width: '100%', maxHeight: 600 }} />
-        </div>
-      )
-    }
-    return (
-      <div className={`p-4 ${className}`}>
-        <div className="text-slate-500 dark:text-slate-400 mb-2">Unable to preview video inline.</div>
-        {url && (
-          <button className="px-3 py-1 text-sm bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700" onClick={() => window.system?.openExternal?.(url)}>
-            Open in Browser
-          </button>
-        )}
-      </div>
-    )
-  }
-
-  // Office Online primary path
-  if ((isDocx || isXlsx || isPptx || isDoc) && url) {
-    const viewer = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
-    return (
-      <div className={className}>
-        <div className="h-96 overflow-hidden border border-gray-200 dark:border-slate-700 rounded-lg" style={{ height: '600px' }}>
-          <iframe
-            src={viewer}
-            className="w-full h-full"
-            style={{ border: 'none' }}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-            title={name || 'Document viewer'}
-          />
-        </div>
-        {/* Local fallback below if online viewer fails (user can switch by toggling network off) */}
-        {(isDocx || isXlsx || isPptx) && (
-          <div className="p-3 text-xs text-slate-500">If the embedded viewer fails to load, the app can render a simplified local preview when network is unavailable.</div>
-        )}
-      </div>
-    )
-  }
-
-  // Local fallbacks when Office viewer isn't possible
-  if (isDocx) {
-    return (
-      <div className={`p-4 ${className}`}>
-        <div ref={containerRef} className="prose prose-slate dark:prose-invert max-w-none" />
-        {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
-      </div>
-    )
-  }
-
-  if (isXlsx && xlsxTable) {
-    return (
-      <div className={`p-4 ${className}`}>
-        <div dangerouslySetInnerHTML={{ __html: xlsxTable }} />
-      </div>
-    )
-  }
-
-  if (isPptx && Array.isArray(pptxSlides)) {
-    return (
-      <div className={`p-4 space-y-4 ${className}`}>
-        {pptxSlides.map((s: any, idx: number) => (
-          <div key={idx} className="border border-gray-200 dark:border-slate-700 rounded p-3">
-            <div className="text-xs text-slate-500">Slide {s.index}</div>
-            <div className="mt-1 whitespace-pre-wrap">{s.text || '—'}</div>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  if (isTextLike && bytesQ.data) {
-    try {
-      const text = new TextDecoder('utf-8').decode(bytesQ.data as ArrayBuffer)
-      if (ext === 'md') {
-        const html = marked.parse(text)
-        return <div className={`p-4 ${className}`} dangerouslySetInnerHTML={{ __html: String(html) }} />
-      }
-      if (ext === 'json') {
-        const pretty = JSON.stringify(JSON.parse(text), null, 2)
-        return <pre className={`p-4 overflow-auto ${className}`}>{pretty}</pre>
-      }
-      return <pre className={`p-4 overflow-auto ${className}`}>{text}</pre>
-    } catch {
-      // ignore
-    }
-  }
-
-  // Note: dead code below retained from previous implementation was removed for clarity.
 }

@@ -1,7 +1,6 @@
 import React from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Card } from './ui/Card'
-import { Button } from './ui/Button'
 import { FileText, Calendar, Star, Home as HomeIcon, BookOpen, Megaphone, ClipboardList, ScrollText, Percent, Link as LinkIcon } from 'lucide-react'
 import { useCourseAssignments, useCourseInfo, useCourseFrontPage, useCourseTabs, useCourseFiles } from '../hooks/useCanvasQueries'
 import type { CanvasAssignment } from '../types/canvas'
@@ -78,13 +77,14 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
     const cachedInfo = queryClient.getQueryData<any>(['course-info', String(courseId)]) as any
     const dv = String(cachedInfo?.default_view || '').toLowerCase()
     const showHome = dv === 'wiki'
-    const fallback: ResolvedTab[] = [
-      ...(showHome ? [{ key: 'home', label: 'Home' }] : []),
+    const fallback: ResolvedTab[] = []
+    if (showHome) fallback.push({ key: 'home', label: 'Home' })
+    fallback.push(
       { key: 'announcements', label: 'Announcements' },
       { key: 'modules', label: 'Modules' },
       { key: 'assignments', label: 'Assignments' },
       { key: 'grades', label: 'Grades' },
-    ]
+    )
     setAvailableTabs(fallback)
   }, [availableTabs, courseId])
 
@@ -184,6 +184,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
           anchorId="course-content-anchor"
           tabs={availableTabs.map((t) => ({ key: t.key, label: t.label, Icon: ({
             home: HomeIcon,
+            wiki: HomeIcon,
             syllabus: ScrollText,
             announcements: Megaphone,
             files: FileText,

@@ -27,11 +27,9 @@ type Props = {
   onReorder?: (nextOrder: Array<string | number>) => void
 }
 
-export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, current = 'dashboard', onSelectDashboard, onSelectCourse, onOpenAllCourses, onHideCourse, onPrefetchCourse, prefetchEnabled = true, onTogglePrefetch, onReorder }) => {
+export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, current = 'dashboard', onSelectDashboard, onSelectCourse, onOpenAllCourses, onHideCourse, onPrefetchCourse, prefetchEnabled: _prefetchEnabled = true, onTogglePrefetch: _onTogglePrefetch, onReorder }) => {
   const [menuOpenId, setMenuOpenId] = useState<string | number | null>(null)
-  const [dragId, setDragId] = useState<string | number | null>(null)
-  const [overId, setOverId] = useState<string | number | null>(null)
-  const [insertIdx, setInsertIdx] = useState<number | null>(null)
+  const [, setDragId] = useState<string | number | null>(null)
   const hidden = useMemo(() => new Set(sidebar?.hiddenCourseIds || []), [sidebar?.hiddenCourseIds])
 
   const orderedVisibleCourses = useMemo(() => {
@@ -114,42 +112,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
     return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onDocClick) }
   }, [menuOpenId])
 
-  // DnD helpers
-  const onDragStart = (id: string | number, e?: React.DragEvent) => {
-    setDragId(id)
-    setOverId(null)
-    const uiOrder = orderedVisibleCourses.map((c) => String(c.id))
-    setInsertIdx(uiOrder.indexOf(String(id)))
-    try { e?.dataTransfer?.setData('text/plain', String(id)); if (e?.dataTransfer) e.dataTransfer.effectAllowed = 'move' } catch {}
-  }
-  const onDragOverItem = (id: string | number, e: React.DragEvent) => {
-    e.preventDefault()
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const mid = rect.top + rect.height / 2
-    setOverId(id)
-    const idx = orderedVisibleCourses.findIndex((c) => String(c.id) === String(id))
-    const targetIdx = e.clientY < mid ? idx : idx + 1
-    setInsertIdx(targetIdx)
-  }
-  const onDragLeaveItem = (id: string | number) => {
-    if (overId === id) { setOverId(null) }
-  }
-  const onDragEnd = () => { setDragId(null); setOverId(null); setInsertIdx(null) }
-  const onDropOn = (targetId: string | number) => {
-    if (!dragId) { onDragEnd(); return }
-    const uiOrder = orderedVisibleCourses.map((c) => String(c.id))
-    const movedId = String(dragId)
-    const base = uiOrder.filter((id) => id !== movedId)
-    const idx = insertIdx == null ? base.length : Math.max(0, Math.min(insertIdx, base.length))
-    base.splice(idx, 0, movedId)
-    const existing = (sidebar?.order || []).map(String)
-    const existingRest = existing.filter((id) => !base.includes(id))
-    const allIds = courses.map((c) => String(c.id))
-    const remaining = allIds.filter((id) => !base.includes(id) && !existingRest.includes(id))
-    const finalOrder = [...base, ...existingRest, ...remaining]
-    onReorder?.(finalOrder)
-    onDragEnd()
-  }
+  // DnD helpers — handled inline in DndContext callbacks above
 
   return (
     <aside

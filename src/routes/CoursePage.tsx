@@ -55,7 +55,7 @@ export default function CoursePage() {
     const timer = setTimeout(async () => {
       try {
         // Ensure basic metadata is ready (tabs + info)
-        const [tabs] = await Promise.all([
+        await Promise.all([
           queryClient.fetchQuery({
             queryKey: ['course-tabs', id, true],
             queryFn: async () => {

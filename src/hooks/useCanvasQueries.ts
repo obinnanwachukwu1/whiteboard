@@ -208,7 +208,8 @@ export function useCourseAnnouncementsInfinite(courseId: string | number | undef
     initialPageParam: 1,
     getNextPageParam: (lastPage, _pages, lastPageParam) => {
       if (!Array.isArray(lastPage) || lastPage.length < perPage) return undefined
-      return (lastPageParam || 1) + 1
+      const curr = typeof lastPageParam === 'number' ? lastPageParam : 1
+      return curr + 1
     },
     enabled: courseId != null,
     staleTime: 1000 * 60 * 5,

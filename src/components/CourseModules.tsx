@@ -23,7 +23,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
       return
     }
     if (it.__typename === 'AssignmentModuleItem' && it.contentId) {
-      onOpenContent?.({ courseId, contentType: 'assignment', contentId: it.contentId, title })
+      onOpenContent?.({ courseId, contentType: 'assignment', contentId: String(it.contentId), title })
       return
     }
     if (it.__typename === 'FileModuleItem' || (it.__typename === 'ModuleItem' && it.contentId && it.title?.match(/\.(pdf|docx?|pptx?|xlsx?|jpe?g|png|gif|mp4|mov|avi)$/i))) {
@@ -39,7 +39,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
         const isViewableFile = /\.(pdf|docx?|pptx?|xlsx?|jpe?g|png|gif|webp|bmp|svg|avif|mp3|wav|ogg|m4a|aac|mp4|webm|mov|m4v)$/i.test(fileName)
           || /^(application\/(pdf|vnd\.openxmlformats-officedocument|vnd\.ms-)|image\/|audio\/|video\/)/i.test(contentType)
         if (isViewableFile) {
-          onOpenContent?.({ courseId, contentType: 'file', contentId: it.contentId, title: fileName })
+          onOpenContent?.({ courseId, contentType: 'file', contentId: String(it.contentId), title: fileName })
         } else {
           const url = fileData?.url as string | undefined
           if (url) window.open(url, '_blank')
@@ -120,7 +120,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
                           <div className="shrink-0 flex items-center gap-1 sm:gap-2">
                             {it.htmlUrl && (
                               <button
-                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.system?.openExternal?.(it.htmlUrl) }}
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.system?.openExternal?.(it.htmlUrl!) }}
                                 className="inline-flex items-center px-2.5 py-1.5 rounded-control text-sm text-slate-700 hover:bg-slate-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
                               >
                                 <ExternalLink className="w-4 h-4 mr-1" /> Open in Browser
