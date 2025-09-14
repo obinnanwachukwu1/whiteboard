@@ -71,7 +71,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
         <button ref={btnRef} data-sb-more className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100" aria-label="Course options" onClick={(e) => { e.stopPropagation(); onMore() }} title="More options">
           <MoreVertical className="w-4 h-4" />
         </button>
-        <Dropdown open={moreOpen} onOpenChange={(o) => { if (!o) onMore() }} align="right" offsetY={32} anchorEl={btnRef.current}>
+        <Dropdown open={moreOpen} onOpenChange={(o) => { if (!o) onMore() }} align="right" offsetY={32} anchorRef={btnRef}>
           <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={(e) => { e.stopPropagation(); onMore(); onHide() }}>
             Hide from sidebar
           </button>

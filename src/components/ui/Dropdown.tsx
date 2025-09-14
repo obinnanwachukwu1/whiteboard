@@ -10,24 +10,26 @@ type Props = {
   className?: string
   style?: React.CSSProperties
   anchorEl?: HTMLElement | null
+  anchorRef?: React.RefObject<HTMLElement>
 }
 
-export const Dropdown: React.FC<Props> = ({ open, onOpenChange, children, align = 'right', offsetY = 32, className = '', style, anchorEl }) => {
+export const Dropdown: React.FC<Props> = ({ open, onOpenChange, children, align = 'right', offsetY = 32, className = '', style, anchorEl, anchorRef }) => {
   const [visible, setVisible] = React.useState(false)
   const [mounted, setMounted] = React.useState(false)
   const ANIM_MS = 180
   const [coords, setCoords] = React.useState<{ top: number; left?: number; right?: number } | null>(null)
 
   const compute = React.useCallback(() => {
-    if (anchorEl) {
-      const rect = anchorEl.getBoundingClientRect()
+    const el = anchorRef?.current ?? anchorEl
+    if (el) {
+      const rect = el.getBoundingClientRect()
       const top = rect.bottom + (offsetY - 32)
       if (align === 'right') setCoords({ top, right: Math.max(0, window.innerWidth - rect.right) })
       else setCoords({ top, left: Math.max(0, rect.left) })
     } else {
       setCoords(null)
     }
-  }, [anchorEl, align, offsetY])
+  }, [anchorRef, anchorEl, align, offsetY])
 
   React.useEffect(() => {
     if (open) {
