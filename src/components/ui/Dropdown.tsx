@@ -18,28 +18,38 @@ export const Dropdown: React.FC<Props> = ({ open, onOpenChange, children, align 
   const ANIM_MS = 180
   const [coords, setCoords] = React.useState<{ top: number; left?: number; right?: number } | null>(null)
 
+  const compute = React.useCallback(() => {
+    if (anchorEl) {
+      const rect = anchorEl.getBoundingClientRect()
+      const top = rect.bottom + (offsetY - 32)
+      if (align === 'right') setCoords({ top, right: Math.max(0, window.innerWidth - rect.right) })
+      else setCoords({ top, left: Math.max(0, rect.left) })
+    } else {
+      setCoords(null)
+    }
+  }, [anchorEl, align, offsetY])
+
   React.useEffect(() => {
     if (open) {
       setMounted(true)
-      if (anchorEl) {
-        const rect = anchorEl.getBoundingClientRect()
-        const top = rect.bottom + (offsetY - 32)
-        if (align === 'right') setCoords({ top, right: Math.max(0, window.innerWidth - rect.right) })
-        else setCoords({ top, left: Math.max(0, rect.left) })
-      } else {
-        setCoords(null)
-      }
+      compute()
       const raf = requestAnimationFrame(() => setVisible(true))
       const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onOpenChange(false) }
+      const onScroll = () => compute()
+      const onResize = () => compute()
       document.addEventListener('keydown', onKey)
-      return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', onKey) }
+      window.addEventListener('scroll', onScroll, true)
+      window.addEventListener('resize', onResize)
+      // Recompute after paint in case ref settles late
+      const t = setTimeout(compute, 0)
+      return () => { cancelAnimationFrame(raf); clearTimeout(t); document.removeEventListener('keydown', onKey); window.removeEventListener('scroll', onScroll, true); window.removeEventListener('resize', onResize) }
     } else {
       // start exit animation
       setVisible(false)
       const t = setTimeout(() => setMounted(false), ANIM_MS)
       return () => clearTimeout(t)
     }
-  }, [open, onOpenChange, anchorEl, align, offsetY])
+  }, [open, onOpenChange, compute])
 
   if (!mounted) return null
 
