@@ -224,7 +224,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
         <>
           {activeTab === 'home' && (
             <div className="mt-2">
-              {frontQ.isLoading && <div className="text-slate-500 dark:text-slate-400">Loading…</div>}
+              {frontQ.isLoading && <div className="text-slate-500 dark:text-neutral-400">Loading…</div>}
               {frontQ.error && <div className="text-red-600">{String((frontQ.error as any)?.message || frontQ.error)}</div>}
               {frontQ.data?.body && (
                 <HtmlContent html={frontQ.data.body} className="rich-html" onNavigate={handleNavigate} />
@@ -239,7 +239,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
               {hasSyllabus ? (
                 <HtmlContent html={infoQ.data?.syllabus_body || ''} className="rich-html" onNavigate={handleNavigate} />
               ) : (
-                <div className="text-slate-500 dark:text-slate-400">No syllabus</div>
+                <div className="text-slate-500 dark:text-neutral-400">No syllabus</div>
               )}
             </div>
           )}
@@ -281,13 +281,13 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
           {activeTab === 'assignments' && (
             <div className="mt-2">
               <h3 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-base font-semibold">Assignments</h3>
-              {showLoading && <div className="text-slate-500 dark:text-slate-400 p-2">Loading…</div>}
+              {showLoading && <div className="text-slate-500 dark:text-neutral-400 p-2">Loading…</div>}
               {assignmentsQ.error && <div className="text-red-600 p-2">{String((assignmentsQ.error as any).message || assignmentsQ.error)}</div>}
               {!showLoading && !assignmentsQ.error && assignments.length === 0 && (
-                <div className="text-slate-500 dark:text-slate-400 p-3 flex items-center gap-2">📭 <span>No assignments found</span></div>
+                <div className="text-slate-500 dark:text-neutral-400 p-3 flex items-center gap-2">📭 <span>No assignments found</span></div>
               )}
               {!showLoading && !assignmentsQ.error && assignments.length > 0 && (
-                <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
+                <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-neutral-700">
                   {assignments.map((a, i) => {
                     const dueStr = a.dueAt ? new Date(a.dueAt).toLocaleString() : null
                     const restId = String((a._id ?? a.id ?? '') as any)
@@ -306,7 +306,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
                             </div>
                             <div className="min-w-0">
                               <div className="font-medium leading-snug truncate hover:text-slate-700 transition-colors dark:hover:text-slate-100/90">{a.name}</div>
-                              <div className="mt-1 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                              <div className="mt-1 flex items-center gap-2 text-xs text-slate-600 dark:text-neutral-300">
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-neutral-800 dark:text-neutral-300">
                                   <Star className="w-3 h-3" /> {typeof a.pointsPossible === 'number' ? `${a.pointsPossible} pts` : '—'}
                                 </span>

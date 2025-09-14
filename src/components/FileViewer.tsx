@@ -155,7 +155,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
     } else {
       body = (
         <div className={`p-4 ${className}`}>
-          <div className="text-slate-500 dark:text-slate-400 mb-2">Unable to preview image inline.</div>
+          <div className="text-slate-500 dark:text-neutral-400 mb-2">Unable to preview image inline.</div>
           {url && (
             <button className="px-3 py-1 text-sm bg-slate-100 dark:bg-neutral-800 rounded hover:bg-slate-200 dark:hover:bg-neutral-700" onClick={async () => { (await import('../utils/openExternal')).openExternal(url) }}>
               Open in Browser
@@ -174,7 +174,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
     } else {
       body = (
         <div className={`p-4 ${className}`}>
-          <div className="text-slate-500 dark:text-slate-400 mb-2">Unable to preview audio inline.</div>
+          <div className="text-slate-500 dark:text-neutral-400 mb-2">Unable to preview audio inline.</div>
           {url && (
             <button className="px-3 py-1 text-sm bg-slate-100 dark:bg-neutral-800 rounded hover:bg-slate-200 dark:hover:bg-neutral-700" onClick={async () => { (await import('../utils/openExternal')).openExternal(url) }}>
               Open in Browser
@@ -193,7 +193,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
     } else {
       body = (
         <div className={`p-4 ${className}`}>
-          <div className="text-slate-500 dark:text-slate-400 mb-2">Unable to preview video inline.</div>
+          <div className="text-slate-500 dark:text-neutral-400 mb-2">Unable to preview video inline.</div>
           {url && (
             <button className="px-3 py-1 text-sm bg-slate-100 dark:bg-neutral-800 rounded hover:bg-slate-200 dark:hover:bg-neutral-700" onClick={async () => { (await import('../utils/openExternal')).openExternal(url) }}>
               Open in Browser
@@ -216,7 +216,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
           />
         </div>
         {(isDocx || isXlsx || isPptx) && (
-          <div className="p-3 text-xs text-slate-500">If the embedded viewer fails to load, a simplified local preview may be shown.</div>
+          <div className="p-3 text-xs text-slate-500 dark:text-neutral-400">If the embedded viewer fails to load, a simplified local preview may be shown.</div>
         )}
       </div>
     )
@@ -238,7 +238,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
       <div className={`p-4 space-y-4 overflow-auto ${className}`} style={{ height: '100%' }}>
         {pptxSlides.map((s: any, idx: number) => (
           <div key={idx} className="border border-gray-200 dark:border-neutral-700 rounded p-3">
-            <div className="text-xs text-slate-500">Slide {s.index}</div>
+            <div className="text-xs text-slate-500 dark:text-neutral-400">Slide {s.index}</div>
             <div className="mt-1 whitespace-pre-wrap">{s.text || '—'}</div>
           </div>
         ))}
@@ -280,7 +280,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
       </div>
     )
   } else {
-    body = <div className={`p-8 text-slate-500 dark:text-slate-400 ${className}`}>No preview available.</div>
+      body = <div className={`p-8 text-slate-500 dark:text-neutral-400 ${className}`}>No preview available.</div>
   }
 
   return <>{body}</>

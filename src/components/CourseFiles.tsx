@@ -184,13 +184,13 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
         </div>
       </div>
       {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
-      {isLoading && <div className="text-slate-500 dark:text-slate-400 text-sm">Loading…</div>}
+      {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
       {!isLoading && (folders as any[]).length === 0 && (
-        <div className="text-slate-500 dark:text-slate-400 text-sm">No files</div>
+        <div className="text-slate-500 dark:text-neutral-400 text-sm">No files</div>
       )}
 
       {/* Breadcrumb */}
-      <div className="text-sm text-slate-600 dark:text-slate-300 mb-2 flex items-center gap-1">
+      <div className="text-sm text-slate-600 dark:text-neutral-300 mb-2 flex items-center gap-1">
         <button className="hover:underline" onClick={() => setCurrent(courseRootId || null)}>{courseRootId ? 'Course Files' : 'Root'}</button>
         {breadcrumb.map((f: any) => (
           <React.Fragment key={f.id}>
@@ -202,7 +202,7 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
 
       {/* Folders */}
       {listFolders.length > 0 && (
-        <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700 mb-2">
+        <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-neutral-700 mb-2">
           {listFolders.map((f: any) => (
             <li key={f.id} className="py-2">
               <div
@@ -230,9 +230,9 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
       {/* Files in current folder */}
       {current != null && (
         <div>
-          {filesQ.isLoading && <div className="text-slate-500 dark:text-slate-400 text-sm">Loading files…</div>}
+          {filesQ.isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading files…</div>}
           {!filesQ.isLoading && files.length === 0 && listFolders.length === 0 && (
-            <div className="text-slate-500 dark:text-slate-400 text-sm">No items in this folder</div>
+            <div className="text-slate-500 dark:text-neutral-400 text-sm">No items in this folder</div>
           )}
           {!filesQ.isLoading && files.length > 0 && (
             <div>

@@ -93,7 +93,7 @@ export default function SettingsPage() {
               >
                 {saving ? 'Saving…' : 'Save'}
               </button>
-              {saved && <span className="text-xs text-slate-500 dark:text-slate-400">{saved}</span>}
+              {saved && <span className="text-xs text-slate-500 dark:text-neutral-400">{saved}</span>}
             </div>
           </label>
 
@@ -101,13 +101,13 @@ export default function SettingsPage() {
             <div className="mb-1">Theme</div>
             <div className="inline-flex rounded-md overflow-hidden ring-1 ring-gray-200 dark:ring-neutral-800">
               <button
-                className={`px-3 py-1 ${theme === 'light' ? 'bg-slate-900 text-white' : 'bg-white dark:bg-neutral-900 text-slate-700 dark:text-slate-200'}`}
+                className={`px-3 py-1 ${theme === 'light' ? 'bg-slate-900 text-white' : 'bg-white dark:bg-neutral-900 text-slate-700 dark:text-neutral-200'}`}
                 onClick={() => saveTheme('light')}
               >
                 Light
               </button>
               <button
-                className={`px-3 py-1 ${theme === 'dark' ? 'bg-slate-900 text-white' : 'bg-white dark:bg-neutral-900 text-slate-700 dark:text-slate-200'}`}
+                className={`px-3 py-1 ${theme === 'dark' ? 'bg-slate-900 text-white' : 'bg-white dark:bg-neutral-900 text-slate-700 dark:text-neutral-200'}`}
                 onClick={() => saveTheme('dark')}
               >
                 Dark
@@ -152,7 +152,7 @@ export default function SettingsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 w-full max-w-3xl">
           <div className="text-sm">
             <div className="mb-0.5">Speed up navigation</div>
-            <div className="text-xs text-slate-600 dark:text-slate-400">Prefetch course data while browsing</div>
+            <div className="text-xs text-slate-600 dark:text-neutral-400">Prefetch course data while browsing</div>
           </div>
           <input className="self-start sm:self-auto" type="checkbox" checked={ctx.prefetchEnabled} onChange={(e) => ctx.setPrefetchEnabled(e.target.checked)} />
         </div>
@@ -165,7 +165,7 @@ export default function SettingsPage() {
           <div className="text-sm">
             <div className="font-medium">{ctx.profile?.name || 'Signed in'}</div>
             {ctx.profile?.primary_email && (
-              <div className="text-xs text-slate-600 dark:text-slate-400">{ctx.profile.primary_email}</div>
+              <div className="text-xs text-slate-600 dark:text-neutral-400">{ctx.profile.primary_email}</div>
             )}
           </div>
           <button className="self-start sm:self-auto px-3 py-1.5 rounded text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={onSignOut}>Sign out</button>

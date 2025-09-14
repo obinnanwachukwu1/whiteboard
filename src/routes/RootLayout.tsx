@@ -315,10 +315,10 @@ export function RootLayout() {
           <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             {/* Left: Brand + Copy */}
             <div className="text-center lg:text-left">
-              <div className="inline-flex items-center gap-3 px-3 py-1 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-white/40 dark:bg-neutral-900/40 backdrop-blur text-xs tracking-wide uppercase text-slate-700 dark:text-slate-200">Welcome</div>
+              <div className="inline-flex items-center gap-3 px-3 py-1 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-white/40 dark:bg-neutral-900/40 backdrop-blur text-xs tracking-wide uppercase text-slate-700 dark:text-neutral-200">Welcome</div>
               <h1 className="mt-3 mb-3 text-5xl md:text-6xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-sky-500 via-violet-500 to-rose-500 animate-gradient">Whiteboard</h1>
-              <p className="text-slate-700 dark:text-slate-300 text-base md:text-lg max-w-prose">Your fast, focused companion for Canvas. Stay on top of assignments, files, and announcements without the noise.</p>
-              <div className="mt-5 flex flex-wrap gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <p className="text-slate-700 dark:text-neutral-300 text-base md:text-lg max-w-prose">Your fast, focused companion for Canvas. Stay on top of assignments, files, and announcements without the noise.</p>
+              <div className="mt-5 flex flex-wrap gap-2 text-sm text-slate-700 dark:text-neutral-300">
                 <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-card ring-1 ring-black/10 dark:ring-white/10 bg-white/50 dark:bg-neutral-900/40 backdrop-blur">⚡ Fast navigation</span>
                 <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-card ring-1 ring-black/10 dark:ring-white/10 bg-white/50 dark:bg-neutral-900/40 backdrop-blur">📂 Clean file browsing</span>
                 <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-card ring-1 ring-black/10 dark:ring-white/10 bg-white/50 dark:bg-neutral-900/40 backdrop-blur">🔔 Upcoming at a glance</span>
@@ -336,7 +336,7 @@ export function RootLayout() {
                 <label className="text-sm">
                   <div className="mb-1 flex items-center justify-between">
                     <span>Token</span>
-                    <button type="button" className="text-xs text-slate-600 dark:text-slate-300 hover:underline inline-flex items-center gap-1" onClick={openTokenHelp} title="Open Canvas token settings">
+                    <button type="button" className="text-xs text-slate-600 dark:text-neutral-300 hover:underline inline-flex items-center gap-1" onClick={openTokenHelp} title="Open Canvas token settings">
                       <ExternalLink className="w-3 h-3" /> How to get a token
                     </button>
                   </div>
@@ -347,7 +347,7 @@ export function RootLayout() {
                     </button>
                   </div>
                 </label>
-                <div className="text-xs text-slate-600 dark:text-slate-300">We store your token securely with the system keychain when available.</div>
+                <div className="text-xs text-slate-600 dark:text-neutral-300">We store your token securely with the system keychain when available.</div>
                 <div className="pt-1 flex items-center justify-end">
                   <button className="px-4 py-2 rounded-control bg-slate-900 text-white disabled:opacity-50 hover:opacity-95" onClick={init} disabled={loading || !token.trim()}>{loading ? 'Connecting…' : 'Connect'}</button>
                 </div>

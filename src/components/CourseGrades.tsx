@@ -99,7 +99,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
         </div>
       </div>
       {(isLoading || (isFetching && !data)) && (
-        <div className="text-slate-500 dark:text-slate-400">Loading…</div>
+        <div className="text-slate-500 dark:text-neutral-400">Loading…</div>
       )}
       {error && <div className="text-red-600">{String(error.message || error)}</div>}
 
@@ -154,7 +154,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                     return (
                       <React.Fragment key={gid}>
                         <tr>
-                          <td className="pt-4 pb-2 text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide" colSpan={5}>
+                          <td className="pt-4 pb-2 text-xs font-semibold text-slate-600 dark:text-neutral-300 uppercase tracking-wide" colSpan={5}>
                             <div className="border-b border-gray-200 dark:border-neutral-700 pb-1">{label}</div>
                           </td>
                         </tr>

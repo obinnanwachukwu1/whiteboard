@@ -24,7 +24,7 @@ export const ExternalBrowser: React.FC<Props> = ({ initialUrl, onBackToApp }) =>
         <Button variant="ghost" size="sm" onClick={onBackToApp}>
           <ArrowLeft className="w-4 h-4 mr-1" /> Back
         </Button>
-        <div className="text-xs text-slate-600 dark:text-slate-300 truncate flex-1">{url}</div>
+        <div className="text-xs text-slate-600 dark:text-neutral-300 truncate flex-1">{url}</div>
         <Button variant="ghost" size="sm" onClick={() => ref.current?.reload?.()}>
           <RefreshCw className="w-4 h-4" />
         </Button>

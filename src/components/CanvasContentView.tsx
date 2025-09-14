@@ -96,8 +96,8 @@ export const CanvasContentView: React.FC<Props> = ({
       <div className="flex-1 overflow-hidden">
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-4xl mx-auto">
-            {loading && (
-              <div className="text-slate-500 dark:text-slate-400 text-sm">Loading content...</div>
+              {loading && (
+              <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading content...</div>
             )}
             {error && (
               <div className="text-red-600 text-sm mb-4">{error}</div>
@@ -112,7 +112,7 @@ export const CanvasContentView: React.FC<Props> = ({
               <HtmlContent html={annQ.data.message} className="rich-html" onNavigate={onNavigate} />
             )}
             {!loading && !error && ((contentType === 'page' && !pageQ.data?.body) || (contentType === 'assignment' && !assignQ.data?.description)) && (
-              <div className="text-slate-500 dark:text-slate-400 text-sm">No content available</div>
+              <div className="text-slate-500 dark:text-neutral-400 text-sm">No content available</div>
             )}
           </div>
         </div>

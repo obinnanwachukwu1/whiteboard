@@ -86,9 +86,9 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
     <div>
       <h3 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-base font-semibold">Modules</h3>
       {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
-      {isLoading && <div className="text-slate-500 dark:text-slate-400 text-sm">Loading…</div>}
+      {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
       {!isLoading && modules && modules.length === 0 && (
-        <div className="text-slate-500 dark:text-slate-400 text-sm">No modules</div>
+        <div className="text-slate-500 dark:text-neutral-400 text-sm">No modules</div>
       )}
       {!isLoading && modules && modules.length > 0 && (
         <div className="space-y-3">
@@ -99,7 +99,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
                 <span className="text-xs text-slate-500">{m?.moduleItemsConnection?.nodes?.length ?? 0} items</span>
               </div>
               {(m.moduleItemsConnection?.nodes?.length ?? 0) > 0 && (
-                <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
+                <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-neutral-700">
                   {m.moduleItemsConnection?.nodes?.map((it: CanvasModuleItem, j: number) => {
                     const title = it.title || 'Item'
                     const kind = labelFor(it)

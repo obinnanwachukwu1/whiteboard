@@ -17,12 +17,12 @@ export const CourseLinks: React.FC<Props> = ({ courseId }) => {
     <div>
       <h3 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-base font-semibold">Course Links</h3>
       {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
-      {isLoading && <div className="text-slate-500 dark:text-slate-400 text-sm">Loading…</div>}
+      {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
       {!isLoading && tabs && tabs.length === 0 && (
-        <div className="text-slate-500 dark:text-slate-400 text-sm">No links</div>
+        <div className="text-slate-500 dark:text-neutral-400 text-sm">No links</div>
       )}
       {!isLoading && tabs && tabs.length > 0 && (
-        <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
+        <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-neutral-700">
           {tabs
             .slice()
             .sort((a: any, b: any) => (Number(a.position || 0) - Number(b.position || 0)))

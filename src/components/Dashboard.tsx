@@ -163,13 +163,13 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
         <Card>
           <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold">Coming Up</h2>
           {dueLoading && (
-            <div className="text-slate-500 dark:text-slate-400 p-4 text-sm">Loading assignments…</div>
+            <div className="text-slate-500 dark:text-neutral-400 p-4 text-sm">Loading assignments…</div>
           )}
           {!dueLoading && due.length === 0 && (
-            <div className="text-slate-500 dark:text-slate-400 p-4 text-sm">No upcoming assignments</div>
+            <div className="text-slate-500 dark:text-neutral-400 p-4 text-sm">No upcoming assignments</div>
           )}
           {!dueLoading && due.length > 0 && (
-            <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
+            <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-neutral-700">
               {due
                 .slice()
                 .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
@@ -193,7 +193,7 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
                             <div className="font-medium truncate hover:underline" title={d.name}>
                               {d.name}
                             </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            <div className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
                               {d.course_name && (
                                 <span className="inline-flex items-center gap-1 mr-1.5">
                                   <Badge>{d.course_name}</Badge>
@@ -217,12 +217,12 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
         <Card>
           <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold">Announcements</h2>
           {annsQ.isLoading && (
-            <div className="text-slate-500 dark:text-slate-400 p-4 text-sm">Loading…</div>
+            <div className="text-slate-500 dark:text-neutral-400 p-4 text-sm">Loading…</div>
           )}
           {!annsQ.isLoading && topAnnouncements.length === 0 ? (
-            <div className="text-slate-500 dark:text-slate-400 p-4 text-sm">No announcements</div>
+            <div className="text-slate-500 dark:text-neutral-400 p-4 text-sm">No announcements</div>
           ) : (
-            <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
+            <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-neutral-700">
               {topAnnouncements.map((a, i) => {
                 const open = () => {
                   const tid = a.topicId ?? extractAnnouncementIdFromUrl(a.htmlUrl)

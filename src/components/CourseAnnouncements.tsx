@@ -36,12 +36,12 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
     <div>
       <h3 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-base font-semibold">Announcements</h3>
       {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
-      {isLoading && <div className="text-slate-500 dark:text-slate-400 text-sm">Loading…</div>}
+      {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
       {!isLoading && list && list.length === 0 && (
-        <div className="text-slate-500 dark:text-slate-400 text-sm">No announcements</div>
+        <div className="text-slate-500 dark:text-neutral-400 text-sm">No announcements</div>
       )}
       {!isLoading && list && list.length > 0 && (
-        <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-slate-700">
+        <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-neutral-700">
           {list.map((a: any, i: number) => {
             const posted = a?.posted_at ? new Date(a.posted_at).toLocaleString() : ''
             return (

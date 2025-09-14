@@ -103,13 +103,13 @@ export const Header: React.FC<Props> = ({ profile }) => {
           <div className="flex flex-col leading-tight items-end text-right">
             <div className="font-medium text-sm">{name}</div>
             {profile?.primary_email && (
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">{profile.primary_email}</div>
+              <div className="text-[11px] text-slate-500 dark:text-neutral-400">{profile.primary_email}</div>
             )}
           </div>
         </button>
 
         <Dropdown open={menuOpen} onOpenChange={setMenuOpen} align="right" offsetY={48} anchorEl={nameBtnRef.current}>
-          <div className="px-3 py-2 text-[11px] text-slate-600 dark:text-slate-400 border-b border-black/5 dark:border-white/10">
+          <div className="px-3 py-2 text-[11px] text-slate-600 dark:text-neutral-400 border-b border-black/5 dark:border-white/10">
             Signed in as
             <div className="truncate text-slate-800 dark:text-slate-200 text-[11px]">{profile?.primary_email || name}</div>
           </div>

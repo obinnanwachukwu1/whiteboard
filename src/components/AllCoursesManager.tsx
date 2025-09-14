@@ -58,7 +58,7 @@ export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange 
   return (
     <div className="space-y-4">
       <h1 className="mt-0 mb-2 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">All Courses</h1>
-      <div className="text-slate-500 dark:text-slate-400 text-sm">Show/hide and rename courses. Drag to reorder directly in the sidebar.</div>
+      <div className="text-slate-500 dark:text-neutral-400 text-sm">Show/hide and rename courses. Drag to reorder directly in the sidebar.</div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {courses.map((c) => {
@@ -77,7 +77,7 @@ export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange 
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  <div className="text-xs text-slate-500 dark:text-neutral-400 mb-1">
                     <Badge tone="brand">{c.course_code || 'COURSE'}</Badge>
                   </div>
                   {editingId === idKey ? (
@@ -106,8 +106,8 @@ export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange 
                   ) : (
                     <>
                       <div className="font-semibold whitespace-normal break-words leading-snug" title={c.name}>{custom || c.name}</div>
-                      {custom && (
-                        <div className="text-xs text-slate-500 dark:text-slate-400 whitespace-normal break-words" title={c.name}>Original: {c.name}</div>
+                        {custom && (
+                        <div className="text-xs text-slate-500 dark:text-neutral-400 whitespace-normal break-words" title={c.name}>Original: {c.name}</div>
                       )}
                     </>
                   )}
