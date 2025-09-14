@@ -63,6 +63,8 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>(({ fileId, cla
     }
   }
   const anchorRef = useRef<{ page: number; rel: number } | null>(null)
+  // Suppress transient page publishes during anchored reposition (zoom/resize)
+  const suppressPagePublishRef = useRef(0)
   // Track scale and page count only; rendering is done eagerly
   const loadingTaskRef = useRef<any | null>(null)
   const fileBytesQ = useFileBytes(fileId)
@@ -565,15 +567,10 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>(({ fileId, cla
   // Controls rendered as independent subscriber so page changes don't rerender PdfViewer
   const PageControls: React.FC = React.memo(() => {
     const page = useSyncExternalStore(pageStoreRef.current!.subscribe, pageStoreRef.current!.get, pageStoreRef.current!.get)
-    const inputRef = React.useRef<HTMLInputElement | null>(null)
-    // Keep the textbox in sync with current page without making it controlled
-    useEffect(() => {
-      const el = inputRef.current
-      if (!el) return
-      // Don't overwrite while user is actively editing
-      if (document.activeElement === el) return
-      el.value = String(page)
-    }, [page])
+    const [editing, setEditing] = React.useState(false)
+    const [localVal, setLocalVal] = React.useState<string>(String(page))
+    // When page changes due to scroll/zoom, update input if not editing
+    useEffect(() => { if (!editing) setLocalVal(String(page)) }, [page, editing])
     return (
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60">
         <div className="flex items-center gap-3">
@@ -583,10 +580,11 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>(({ fileId, cla
             </Button>
             <input
               className="w-14 px-2 py-1 text-sm rounded-control bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 text-center"
-              ref={inputRef}
-              defaultValue={String(page)}
-              onBlur={async (e) => { const n = clampPage(parseInt((e.target as HTMLInputElement).value || '1', 10) || 1); await scrollToPage(n) }}
-              onKeyDown={async (e) => { if (e.key === 'Enter') { const n = clampPage(parseInt((e.target as HTMLInputElement).value || '1', 10) || 1); await scrollToPage(n) } }}
+              value={localVal}
+              onFocus={() => setEditing(true)}
+              onChange={(e) => setLocalVal(e.target.value.replace(/[^0-9]/g, ''))}
+              onBlur={async (e) => { setEditing(false); const n = clampPage(parseInt((e.target as HTMLInputElement).value || '1', 10) || 1); await scrollToPage(n) }}
+              onKeyDown={async (e) => { if (e.key === 'Enter') { setEditing(false); const n = clampPage(parseInt((e.target as HTMLInputElement).value || '1', 10) || 1); await scrollToPage(n) } }}
               aria-label="Current page"
             />
             <span className="text-sm">/ {numPages || 1}</span>
