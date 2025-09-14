@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { MoreVertical, GripVertical } from 'lucide-react'
+import { Dropdown } from './ui/Dropdown'
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -48,19 +49,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
   function SortableCourseRow({ c, active, label, onSelect, onMore, moreOpen, onHide, onPrefetch }: { c: Course; active: boolean; label: string; onSelect: () => void; onMore: () => void; moreOpen: boolean; onHide: () => void; onPrefetch: () => void }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: String(c.id) })
     const style: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.7 : 1 }
-    const [menuVisible, setMenuVisible] = useState(false)
-    const [renderMenu, setRenderMenu] = useState(false)
-    useEffect(() => {
-      if (moreOpen) {
-        setRenderMenu(true)
-        const raf = requestAnimationFrame(() => setMenuVisible(true))
-        return () => cancelAnimationFrame(raf)
-      } else {
-        setMenuVisible(false)
-        const t = setTimeout(() => setRenderMenu(false), 200)
-        return () => clearTimeout(t)
-      }
-    }, [moreOpen])
+    // Dropdown handles its own mount/animation
     return (
       <div ref={setNodeRef} style={style} className={`relative group rounded-md ${isDragging ? 'scale-[0.99]' : ''}`} onMouseEnter={onPrefetch}>
         <div className="absolute left-1 top-1/2 -translate-y-1/2 p-1 cursor-grab text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100" {...attributes} {...listeners} aria-label="Drag course">
@@ -81,36 +70,16 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
         <button data-sb-more className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100" aria-label="Course options" onClick={(e) => { e.stopPropagation(); onMore() }} title="More options">
           <MoreVertical className="w-4 h-4" />
         </button>
-        {renderMenu && (
-          <>
-            <div className="fixed inset-0 z-[105]" aria-hidden onClick={() => onMore()} />
-            <div data-sb-menu
-              role="menu"
-              className={`absolute right-0 top-8 z-[110] min-w-[200px] rounded-md shadow-xl ring-1 ring-black/10 dark:ring-white/10 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md overflow-hidden origin-top-right transition-all duration-200 ease-out ${menuVisible ? 'opacity-100 translate-y-0 scale-100 animate-pop' : 'opacity-0 translate-y-1 scale-95'}`}
-            >
-              <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={(e) => { e.stopPropagation(); onMore(); onHide() }}>
-                Hide from sidebar
-              </button>
-            </div>
-          </>
-        )}
+        <Dropdown open={moreOpen} onOpenChange={(o) => { if (!o) onMore() }} align="right" offsetY={32}>
+          <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={(e) => { e.stopPropagation(); onMore(); onHide() }}>
+            Hide from sidebar
+          </button>
+        </Dropdown>
       </div>
     )
   }
 
-  // Global handlers to close any open menu
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpenId(null) }
-    const onDocClick = (e: MouseEvent) => {
-      if (!menuOpenId) return
-      const target = e.target as HTMLElement
-      if (target.closest('[data-sb-menu]') || target.closest('[data-sb-more]')) return
-      setMenuOpenId(null)
-    }
-    document.addEventListener('keydown', onKey)
-    document.addEventListener('mousedown', onDocClick)
-    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onDocClick) }
-  }, [menuOpenId])
+  // Dropdown handles outside click/Escape
 
   // DnD helpers — handled inline in DndContext callbacks above
 

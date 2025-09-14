@@ -2,6 +2,7 @@ import React from 'react'
 // no Card wrapper; rendered within page container
 // import { Button } from './ui/Button'
 import { Megaphone, MoreVertical } from 'lucide-react'
+import { Dropdown } from './ui/Dropdown'
 import { useCourseAnnouncementsInfinite } from '../hooks/useCanvasQueries'
 
 type Props = {
@@ -14,7 +15,6 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
   const list = (data?.pages || []).flat()
   const sentinelRef = React.useRef<HTMLDivElement | null>(null)
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
-  const [menuVisible, setMenuVisible] = React.useState(false)
 
   React.useEffect(() => {
     const el = sentinelRef.current
@@ -29,23 +29,7 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
     return () => obs.disconnect()
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  React.useEffect(() => {
-    if (menuOpenId) {
-      const raf = requestAnimationFrame(() => setMenuVisible(true))
-      const onDocKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpenId(null) }
-      const onDocClick = (e: MouseEvent) => {
-        const t = e.target as HTMLElement
-        if (t.closest('[data-ann-menu]') || t.closest('[data-ann-more]')) return
-        setMenuOpenId(null)
-      }
-      document.addEventListener('keydown', onDocKey)
-      document.addEventListener('mousedown', onDocClick)
-      return () => { cancelAnimationFrame(raf); setMenuVisible(false); document.removeEventListener('keydown', onDocKey); document.removeEventListener('mousedown', onDocClick) }
-    } else {
-      const t = setTimeout(() => setMenuVisible(false), 150)
-      return () => clearTimeout(t)
-    }
-  }, [menuOpenId])
+  // No global listeners; handled by Dropdown
 
   return (
     <div>
@@ -83,27 +67,17 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
                     {a?.html_url && (
                       <div>
                         <button
-                          data-ann-more
                           onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === String(a.id) ? null : String(a.id)) }}
                           className="inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
                           aria-label="More options"
                         >
                           <MoreVertical className="w-4 h-4" />
                         </button>
-                        {menuOpenId === String(a.id) && (
-                          <>
-                            <div className="fixed inset-0 z-[105]" aria-hidden onClick={() => setMenuOpenId(null)} />
-                            <div
-                              data-ann-menu
-                              role="menu"
-                              className={`absolute right-2 top-10 z-[110] min-w-[180px] rounded-md shadow-xl ring-1 ring-black/10 dark:ring-white/10 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md overflow-hidden origin-top-right transition-all duration-150 ease-out ${menuVisible ? 'opacity-100 translate-y-0 scale-100 animate-pop' : 'opacity-0 translate-y-1 scale-95'}`}
-                            >
-                              <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(a.html_url!) }}>
-                                Open in Browser
-                              </button>
-                            </div>
-                          </>
-                        )}
+                        <Dropdown open={menuOpenId === String(a.id)} onOpenChange={(o) => setMenuOpenId(o ? String(a.id) : null)} align="right" offsetY={40} style={{ right: 8 }}>
+                          <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(a.html_url!) }}>
+                            Open in Browser
+                          </button>
+                        </Dropdown>
                       </div>
                     )}
                   </div>

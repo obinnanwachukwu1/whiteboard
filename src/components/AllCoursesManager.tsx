@@ -1,7 +1,8 @@
-import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react'
+import React, { useCallback, useMemo, useState, useRef } from 'react'
 import { Button } from './ui/Button'
 import { Badge } from './ui/Badge'
 import { Eye, EyeOff, RotateCcw, MoreVertical } from 'lucide-react'
+import { Dropdown } from './ui/Dropdown'
 import { Card } from './ui/Card'
 import { useAppContext } from '../context/AppContext'
 
@@ -23,8 +24,6 @@ export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange 
   const ctx = useAppContext()
   const hiddenSet = useMemo(() => new Set(sidebar.hiddenCourseIds || []), [sidebar.hiddenCourseIds])
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
-  const [menuVisible, setMenuVisible] = useState(false)
-  const menuRef = useRef<HTMLDivElement | null>(null)
   const btnRef = useRef<HTMLButtonElement | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
 
@@ -46,21 +45,7 @@ export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange 
     await window.settings.set?.({ sidebar: next })
   }, [sidebar, onChange])
 
-  // Lightweight dropdown lifecycle
-  useEffect(() => {
-    if (!menuOpenId) return
-    const raf = requestAnimationFrame(() => setMenuVisible(true))
-    const onDocClick = (e: MouseEvent) => {
-      const target = e.target as Node
-      if (menuRef.current && !menuRef.current.contains(target) && btnRef.current && !btnRef.current.contains(target)) {
-        setMenuOpenId(null)
-      }
-    }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpenId(null) }
-    document.addEventListener('mousedown', onDocClick)
-    document.addEventListener('keydown', onKey)
-    return () => { cancelAnimationFrame(raf); setMenuVisible(false); document.removeEventListener('mousedown', onDocClick); document.removeEventListener('keydown', onKey) }
-  }, [menuOpenId])
+  // Dropdown handles outside click/Escape
 
   const resetName = useCallback(async (courseId: string | number) => {
     const custom = { ...(sidebar.customNames || {}) }
@@ -131,31 +116,21 @@ export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange 
                   <Button ref={open ? (btnRef as any) : undefined} size="sm" variant="ghost" onClick={() => setMenuOpenId(open ? null : idKey)} aria-expanded={open} aria-haspopup="menu" title="Options">
                     <MoreVertical className="w-4 h-4" />
                   </Button>
-                  {open && (
-                    <>
-                      {/* click-catcher overlay to mimic header dropdown behavior */}
-                      <div className="fixed inset-0 z-[105]" aria-hidden onClick={() => setMenuOpenId(null)} />
-                      <div
-                        ref={menuRef}
-                        role="menu"
-                        className={`absolute right-0 top-8 z-[110] min-w-[220px] rounded-md shadow-xl ring-1 ring-black/10 dark:ring-white/10 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md overflow-hidden transition-all duration-150 ease-out ${menuVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-1 scale-95'}`}
-                      >
-                        <button
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
-                          onClick={() => { setEditingId(idKey); setMenuOpenId(null) }}
-                        >
-                          Edit display name
-                        </button>
-                        <button
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2"
-                          onClick={() => { toggleVisibility(c.id, hidden); setMenuOpenId(null) }}
-                        >
-                          {hidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                          <span>{hidden ? 'Show in sidebar' : 'Hide from sidebar'}</span>
-                        </button>
-                      </div>
-                    </>
-                  )}
+                  <Dropdown open={open} onOpenChange={(o) => setMenuOpenId(o ? idKey : null)} align="right" offsetY={32} className="min-w-[220px]">
+                    <button
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                      onClick={() => { setEditingId(idKey); setMenuOpenId(null) }}
+                    >
+                      Edit display name
+                    </button>
+                    <button
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2"
+                      onClick={() => { toggleVisibility(c.id, hidden); setMenuOpenId(null) }}
+                    >
+                      {hidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                      <span>{hidden ? 'Show in sidebar' : 'Hide from sidebar'}</span>
+                    </button>
+                  </Dropdown>
                 </div>
               </div>
             </Card>

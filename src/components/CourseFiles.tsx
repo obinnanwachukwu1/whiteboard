@@ -4,6 +4,7 @@ import { Button } from './ui/Button'
 import { useCourseFolders, useFolderFiles } from '../hooks/useCanvasQueries'
 import { VirtualList } from './ui/VirtualList'
 import type { CanvasFolder, CanvasFile } from '../types/canvas'
+import { Dropdown } from './ui/Dropdown'
 
 type Props = {
   courseId: string | number
@@ -68,7 +69,6 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
   const { data: folders = [], isLoading, error } = useCourseFolders(courseId, 100)
   const [current, setCurrent] = React.useState<string | null>(null)
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
-  const [menuVisible, setMenuVisible] = React.useState(false)
 
   const byId = React.useMemo(() => new Map((folders as CanvasFolder[]).map((f) => [String(f.id), f])), [folders])
   const children = React.useMemo(() => {
@@ -128,24 +128,7 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
   const [sortKey, setSortKey] = React.useState<'name' | 'updated'>('updated')
   const [sortOrder, setSortOrder] = React.useState<'asc' | 'desc'>('desc')
 
-  // Dropdown visibility helpers for file row menus
-  React.useEffect(() => {
-    if (menuOpenId) {
-      const raf = requestAnimationFrame(() => setMenuVisible(true))
-      const onDocKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpenId(null) }
-      const onDocClick = (e: MouseEvent) => {
-        const t = e.target as HTMLElement
-        if (t.closest('[data-file-menu]') || t.closest('[data-file-more]')) return
-        setMenuOpenId(null)
-      }
-      document.addEventListener('keydown', onDocKey)
-      document.addEventListener('mousedown', onDocClick)
-      return () => { cancelAnimationFrame(raf); setMenuVisible(false); document.removeEventListener('keydown', onDocKey); document.removeEventListener('mousedown', onDocClick) }
-    } else {
-      const t = setTimeout(() => setMenuVisible(false), 150)
-      return () => clearTimeout(t)
-    }
-  }, [menuOpenId])
+  // No global listeners; handled by Dropdown
 
   function compare(a: any, b: any) {
     let va: string | number = ''
@@ -294,27 +277,17 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
                       {f?.url && (
                         <div className="shrink-0">
                           <button
-                            data-file-more
                             onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === String(f.id) ? null : String(f.id)) }}
                             className="inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
                             aria-label="More options"
                           >
                             <MoreVertical className="w-4 h-4" />
                           </button>
-                          {menuOpenId === String(f.id) && (
-                            <>
-                              <div className="fixed inset-0 z-[105]" aria-hidden onClick={() => setMenuOpenId(null)} />
-                              <div
-                                data-file-menu
-                                role="menu"
-                                className={`absolute right-2 top-10 z-[110] min-w-[180px] rounded-md shadow-xl ring-1 ring-black/10 dark:ring-white/10 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md overflow-hidden origin-top-right transition-all duration-150 ease-out ${menuVisible ? 'opacity-100 translate-y-0 scale-100 animate-pop' : 'opacity-0 translate-y-1 scale-95'}`}
-                              >
-                                <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(f.url!) }}>
-                                  Open in Browser
-                                </button>
-                              </div>
-                            </>
-                          )}
+                          <Dropdown open={menuOpenId === String(f.id)} onOpenChange={(o) => setMenuOpenId(o ? String(f.id) : null)} align="right" offsetY={40} style={{ right: 8 }}>
+                            <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(f.url!) }}>
+                              Open in Browser
+                            </button>
+                          </Dropdown>
                         </div>
                       )}
                     </div>
