@@ -116,7 +116,7 @@ export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange 
                   <Button ref={open ? (btnRef as any) : undefined} size="sm" variant="ghost" onClick={() => setMenuOpenId(open ? null : idKey)} aria-expanded={open} aria-haspopup="menu" title="Options">
                     <MoreVertical className="w-4 h-4" />
                   </Button>
-                  <Dropdown open={open} onOpenChange={(o) => setMenuOpenId(o ? idKey : null)} align="right" offsetY={32} className="min-w-[220px]">
+                  <Dropdown open={open} onOpenChange={(o) => setMenuOpenId(o ? idKey : null)} align="right" offsetY={32} className="min-w-[220px]" anchorEl={btnRef.current}>
                     <button
                       className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
                       onClick={() => { setEditingId(idKey); setMenuOpenId(null) }}

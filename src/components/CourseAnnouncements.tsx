@@ -15,6 +15,7 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
   const list = (data?.pages || []).flat()
   const sentinelRef = React.useRef<HTMLDivElement | null>(null)
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
+  const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
 
   React.useEffect(() => {
     const el = sentinelRef.current
@@ -70,10 +71,11 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
                           onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === String(a.id) ? null : String(a.id)) }}
                           className="inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
                           aria-label="More options"
+                          ref={(el) => { anchorEls.current.set(String(a.id), el) }}
                         >
                           <MoreVertical className="w-4 h-4" />
                         </button>
-                        <Dropdown open={menuOpenId === String(a.id)} onOpenChange={(o) => setMenuOpenId(o ? String(a.id) : null)} align="right" offsetY={40} style={{ right: 8 }}>
+                        <Dropdown open={menuOpenId === String(a.id)} onOpenChange={(o) => setMenuOpenId(o ? String(a.id) : null)} align="right" offsetY={40} anchorEl={anchorEls.current.get(String(a.id))}>
                           <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(a.html_url!) }}>
                             Open in Browser
                           </button>

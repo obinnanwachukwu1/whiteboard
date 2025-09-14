@@ -108,7 +108,7 @@ export const Header: React.FC<Props> = ({ profile }) => {
           </div>
         </button>
 
-        <Dropdown open={menuOpen} onOpenChange={setMenuOpen} align="right" offsetY={48}>
+        <Dropdown open={menuOpen} onOpenChange={setMenuOpen} align="right" offsetY={48} anchorEl={nameBtnRef.current}>
           <div className="px-3 py-2 text-[11px] text-slate-600 dark:text-slate-400 border-b border-black/5 dark:border-white/10">
             Signed in as
             <div className="truncate text-slate-800 dark:text-slate-200 text-[11px]">{profile?.primary_email || name}</div>

@@ -19,6 +19,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
   const { data: modules = null, isLoading, error } = useCourseModules(courseId)
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
   // menu animation handled by Dropdown
+  const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
 
   async function openItem(it: CanvasModuleItem, title: string) {
     if (it.__typename === 'PageModuleItem' || it.pageUrl) {
@@ -129,10 +130,11 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
                                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpenId(menuOpenId === String(it.id || `${i}-${j}`) ? null : String(it.id || `${i}-${j}`)) }}
                                   className="inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
                                   aria-label="More options"
+                                  ref={(el) => { anchorEls.current.set(String(it.id || `${i}-${j}`), el) }}
                                 >
                                   <MoreVertical className="w-4 h-4" />
                                 </button>
-                                <Dropdown open={menuOpenId === String(it.id || `${i}-${j}`)} onOpenChange={(o) => setMenuOpenId(o ? String(it.id || `${i}-${j}`) : null)} align="right" offsetY={32}>
+                                <Dropdown open={menuOpenId === String(it.id || `${i}-${j}`)} onOpenChange={(o) => setMenuOpenId(o ? String(it.id || `${i}-${j}`) : null)} align="right" offsetY={32} anchorEl={anchorEls.current.get(String(it.id || `${i}-${j}`))}>
                                   <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(it.htmlUrl!) }}>
                                     Open in Browser
                                   </button>
