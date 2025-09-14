@@ -41,7 +41,7 @@ export const CanvasContentView: React.FC<Props> = ({
           <FullscreenContainer className="h-full">
           {({ isFullscreen, toggle }) => (
             <div className="flex flex-col h-full min-h-0">
-              <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/60 dark:bg-slate-900/60 backdrop-blur">
+              <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60 backdrop-blur">
                 <Button variant="ghost" size="sm" onClick={onBack}>
                   <ArrowLeft className="w-4 h-4 mr-1" /> Back
                 </Button>
@@ -75,7 +75,7 @@ export const CanvasContentView: React.FC<Props> = ({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/60 dark:bg-slate-900/60 backdrop-blur">
+      <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60 backdrop-blur">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="w-4 h-4 mr-1" /> Back
         </Button>

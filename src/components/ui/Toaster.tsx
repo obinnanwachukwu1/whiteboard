@@ -43,7 +43,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`rounded-md shadow-md ring-1 px-4 py-3 text-sm max-w-sm bg-white/90 dark:bg-slate-900/90 ring-gray-200 dark:ring-slate-700 ${
+            className={`rounded-md shadow-md ring-1 px-4 py-3 text-sm max-w-sm bg-white/90 dark:bg-neutral-900/90 ring-gray-200 dark:ring-neutral-700 ${
               t.variant === 'destructive' ? 'text-red-700 dark:text-red-300' : t.variant === 'success' ? 'text-green-700 dark:text-green-300' : 'text-slate-800 dark:text-slate-100'
             }`}
           >
@@ -61,4 +61,3 @@ export function useToast() {
   if (!ctx) throw new Error('useToast must be used within ToastProvider')
   return ctx
 }
-

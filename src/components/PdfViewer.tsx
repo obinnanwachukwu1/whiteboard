@@ -331,7 +331,7 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
   return (
     <div className={`flex flex-col ${className}`}>
       {/* PDF Controls */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/60 dark:bg-slate-900/60">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60">
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium">
             {numPages} {numPages === 1 ? 'page' : 'pages'}
@@ -358,7 +358,7 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
       {/* PDF Content - Container with Scroll */}
       <div
         ref={containerRef}
-        className="overflow-auto bg-slate-100 dark:bg-slate-800 border border-gray-200 dark:border-neutral-700 rounded-lg h-full"
+        className="overflow-auto bg-slate-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg h-full"
         style={{ height: '100%', minHeight: fullscreen ? '100%' : undefined }}
       >
         <div className="p-6 flex flex-col items-center">

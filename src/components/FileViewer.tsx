@@ -157,7 +157,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
         <div className={`p-4 ${className}`}>
           <div className="text-slate-500 dark:text-slate-400 mb-2">Unable to preview image inline.</div>
           {url && (
-            <button className="px-3 py-1 text-sm bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700" onClick={async () => { (await import('../utils/openExternal')).openExternal(url) }}>
+            <button className="px-3 py-1 text-sm bg-slate-100 dark:bg-neutral-800 rounded hover:bg-slate-200 dark:hover:bg-neutral-700" onClick={async () => { (await import('../utils/openExternal')).openExternal(url) }}>
               Open in Browser
             </button>
           )}
@@ -176,7 +176,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
         <div className={`p-4 ${className}`}>
           <div className="text-slate-500 dark:text-slate-400 mb-2">Unable to preview audio inline.</div>
           {url && (
-            <button className="px-3 py-1 text-sm bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700" onClick={async () => { (await import('../utils/openExternal')).openExternal(url) }}>
+            <button className="px-3 py-1 text-sm bg-slate-100 dark:bg-neutral-800 rounded hover:bg-slate-200 dark:hover:bg-neutral-700" onClick={async () => { (await import('../utils/openExternal')).openExternal(url) }}>
               Open in Browser
             </button>
           )}
@@ -195,7 +195,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
         <div className={`p-4 ${className}`}>
           <div className="text-slate-500 dark:text-slate-400 mb-2">Unable to preview video inline.</div>
           {url && (
-            <button className="px-3 py-1 text-sm bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700" onClick={async () => { (await import('../utils/openExternal')).openExternal(url) }}>
+            <button className="px-3 py-1 text-sm bg-slate-100 dark:bg-neutral-800 rounded hover:bg-slate-200 dark:hover:bg-neutral-700" onClick={async () => { (await import('../utils/openExternal')).openExternal(url) }}>
               Open in Browser
             </button>
           )}
@@ -271,7 +271,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
         </div>
         <div className="p-2 text-right">
           <button
-            className="px-3 py-1 text-sm bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+            className="px-3 py-1 text-sm bg-slate-100 dark:bg-neutral-800 rounded hover:bg-slate-200 dark:hover:bg-neutral-700"
             onClick={async () => { (await import('../utils/openExternal')).openExternal(url) }}
           >
             Open in Browser

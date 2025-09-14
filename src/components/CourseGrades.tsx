@@ -246,7 +246,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                                             try { ref?.setSelectionRange(val.length, val.length) } catch {}
                                           }, 0)
                                         }}
-                                        className="mt-0 inline-block w-24 px-3 py-1.5 border border-gray-300 rounded-control text-sm text-right text-slate-900 placeholder-slate-400 bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand outline-none dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 dark:focus:border-brand"
+                                        className="mt-0 inline-block w-24 px-3 py-1.5 border border-gray-300 rounded-control text-sm text-right text-slate-900 placeholder-slate-400 bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand outline-none dark:bg-neutral-900 dark:text-slate-100 dark:border-neutral-600 dark:focus:border-brand"
                                       />
                                       <span className="text-slate-500">%</span>
                                       {raw?.trim?.() && (

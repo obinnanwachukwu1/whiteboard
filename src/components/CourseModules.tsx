@@ -93,7 +93,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
       {!isLoading && modules && modules.length > 0 && (
         <div className="space-y-3">
           {(modules as CanvasModule[]).map((m, i) => (
-            <div key={i} className="rounded-card ring-1 ring-gray-200 dark:ring-slate-700 overflow-hidden">
+            <div key={i} className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-700 overflow-hidden">
               <div className="px-4 py-2 font-medium bg-gradient-to-r from-slate-50/70 to-transparent dark:from-neutral-800/40 flex items-center justify-between">
                 <span>{m.name}</span>
                 <span className="text-xs text-slate-500">{m?.moduleItemsConnection?.nodes?.length ?? 0} items</span>
