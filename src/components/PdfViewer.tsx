@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useSyncExternalStore, useCallback, useImperativeHandle } from 'react'
 import { ZoomIn, ZoomOut, Focus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from './ui/Button'
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -18,13 +18,19 @@ import { useFileBytes, useFileMeta } from '../hooks/useCanvasQueries'
 
 // Worker is configured by importing 'pdfjs-dist/webpack.mjs' above for bundlers
 
+export type PdfViewerHandle = {
+  getCurrentPage: () => number
+  subscribePage: (fn: () => void) => () => void
+}
+
 type Props = { 
   fileId: string | number
   className?: string
   fullscreen?: boolean
+  onPageChange?: (page: number) => void
 }
 
-export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen = false }) => {
+export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>(({ fileId, className = '', fullscreen = false, onPageChange }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
@@ -32,17 +38,30 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
   const [scale, setScale] = useState(1.2)
   const [fitWidth, setFitWidth] = useState(false)
   const [basePageWidth, setBasePageWidth] = useState<number | null>(null)
+  // Multi-page continuous scroll refs
   const pageElsRef = useRef<Map<number, HTMLDivElement | null>>(new Map())
-  type PageNodes = {
-    wrapper: HTMLDivElement | null
-    canvasA: HTMLCanvasElement | null
-    canvasB: HTMLCanvasElement | null
+  type PageRenderRefs = {
+    wrapperRef: React.MutableRefObject<HTMLDivElement | null>
+    canvasARef: React.MutableRefObject<HTMLCanvasElement | null>
+    canvasBRef: React.MutableRefObject<HTMLCanvasElement | null>
     frontIndexRef: React.MutableRefObject<0 | 1>
     lastScaleRef: React.MutableRefObject<number>
+    renderTaskARef: React.MutableRefObject<any | null>
+    renderTaskBRef: React.MutableRefObject<any | null>
+    tokenRef: React.MutableRefObject<number>
   }
-  const pagesRef = useRef<Map<number, PageNodes>>(new Map())
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageInput, setPageInput] = useState('1')
+  const pageRenderMap = useRef<Map<number, PageRenderRefs>>(new Map())
+  // Lightweight store to publish current page without rerendering PdfViewer
+  const pageStoreRef = useRef<{ get: () => number; set: (n: number) => void; subscribe: (fn: () => void) => () => void } | null>(null)
+  if (!pageStoreRef.current) {
+    let v = 1
+    const subs = new Set<() => void>()
+    pageStoreRef.current = {
+      get: () => v,
+      set: (n: number) => { if (n !== v) { v = n; subs.forEach((f) => f()) } },
+      subscribe: (fn: () => void) => { subs.add(fn); return () => subs.delete(fn) },
+    }
+  }
   const anchorRef = useRef<{ page: number; rel: number } | null>(null)
   // Track scale and page count only; rendering is done eagerly
   const loadingTaskRef = useRef<any | null>(null)
@@ -122,7 +141,7 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
     }
   }, [pdf])
 
-  // Pre-compute page heights to stabilize scroll container
+  // Pre-compute page heights to stabilize container sizing
   useEffect(() => {
     let cancelled = false
     setPageHeights([])
@@ -193,35 +212,32 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
     return () => { ro.disconnect(); window.removeEventListener('resize', onWin) }
   }, [fitWidth, recomputeFitWidth])
 
-  const PageView: React.FC<{ pageNum: number }> = ({ pageNum }) => {
+  // Single page renderer with double-buffer swap (no scroll page switching)
+  // Page component: visible-range render with double buffer and per-page cancellation
+  type PageViewProps = { pageNum: number; scale: number }
+  const PageViewInner: React.FC<PageViewProps> = ({ pageNum, scale }) => {
     const pageRef = React.useRef<HTMLDivElement | null>(null)
     const wrapperRef = React.useRef<HTMLDivElement | null>(null)
     const canvasARef = React.useRef<HTMLCanvasElement | null>(null)
     const canvasBRef = React.useRef<HTMLCanvasElement | null>(null)
     const frontIndexRef = React.useRef<0 | 1>(0)
-    const [visible, setVisible] = React.useState(false)
     const lastScaleRef = React.useRef<number>(scale)
+    const renderTaskARef = React.useRef<any | null>(null)
+    const renderTaskBRef = React.useRef<any | null>(null)
+    const tokenRef = React.useRef(0)
+    const [visible, setVisible] = useState(false)
 
+    // Register page DOM
     useEffect(() => {
       const el = pageRef.current
       if (!el) return
-      // Register page element and nodes with parent for scrolling/position
       pageElsRef.current.set(pageNum, el)
-      pagesRef.current.set(pageNum, {
-        wrapper: wrapperRef.current,
-        canvasA: canvasARef.current,
-        canvasB: canvasBRef.current,
-        frontIndexRef,
-        lastScaleRef,
-      })
+      pageRenderMap.current.set(pageNum, { wrapperRef, canvasARef, canvasBRef, frontIndexRef, lastScaleRef, renderTaskARef, renderTaskBRef, tokenRef })
       const io = new IntersectionObserver((entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) setVisible(true)
-          else setVisible(false)
-        }
+        for (const e of entries) setVisible(e.isIntersecting)
       }, { root: containerRef.current, rootMargin: '1200px 0px', threshold: 0.01 })
       io.observe(el)
-      return () => { io.disconnect(); pageElsRef.current.delete(pageNum); pagesRef.current.delete(pageNum) }
+      return () => { io.disconnect(); pageElsRef.current.delete(pageNum); pageRenderMap.current.delete(pageNum) }
     }, [])
 
     useEffect(() => {
@@ -229,15 +245,14 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
       if (!pdf || !visible) return
       ;(async () => {
         try {
+          const myToken = ++tokenRef.current
           const page = await pdf.getPage(pageNum)
           const viewport = page.getViewport({ scale })
-          // Stabilize container height immediately to avoid collapse during rerender
           if (pageRef.current) pageRef.current.style.minHeight = `${Math.round(viewport.height)}px`
           if (wrapperRef.current) {
             wrapperRef.current.style.width = `${viewport.width}px`
             wrapperRef.current.style.height = `${viewport.height}px`
           }
-          // Ensure two canvases are mounted (double buffer)
           const ensureCanvas = (ref: React.MutableRefObject<HTMLCanvasElement | null>) => {
             if (ref.current) return ref.current
             const c = document.createElement('canvas')
@@ -248,67 +263,44 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
             c.style.transform = 'translateX(-50%)'
             c.style.transformOrigin = 'top center'
             c.style.display = 'block'
-            // Remove border/shadow from canvases; apply to wrapper to avoid compositor artifacts
             c.style.pointerEvents = 'none'
-            if (wrapperRef.current) {
-              wrapperRef.current.style.position = 'relative'
-              wrapperRef.current.appendChild(c)
-            }
+            if (wrapperRef.current) { wrapperRef.current.style.position = 'relative'; wrapperRef.current.appendChild(c) }
             return c
           }
-
           const front = frontIndexRef.current === 0 ? ensureCanvas(canvasARef) : ensureCanvas(canvasBRef)
           const back = frontIndexRef.current === 0 ? ensureCanvas(canvasBRef) : ensureCanvas(canvasARef)
-
-          // Decide if we animate this change
-          const ratio = (lastScaleRef.current && lastScaleRef.current > 0) ? (lastScaleRef.current / scale) : 1
-          const animate = Math.abs(ratio - 1) > 0.01
+          // cancel back render if running
+          if (back === canvasARef.current && renderTaskARef.current?.cancel) { try { renderTaskARef.current.cancel() } catch {} }
+          if (back === canvasBRef.current && renderTaskBRef.current?.cancel) { try { renderTaskBRef.current.cancel() } catch {} }
           const dpr = window.devicePixelRatio || 1
-
-          // Prepare back buffer size and appearance (hidden)
           back.width = Math.floor(viewport.width * dpr)
           back.height = Math.floor(viewport.height * dpr)
           back.style.width = `${viewport.width}px`
           back.style.height = `${viewport.height}px`
-          back.style.zIndex = '2' // overlay on top during swap
+          back.style.zIndex = '2'
           ;(back.getContext('2d') as CanvasRenderingContext2D).setTransform(dpr, 0, 0, dpr, 0, 0)
-
-          // Start rendering new pixels to back buffer
           const renderTask = (page as any).render({ canvasContext: back.getContext('2d'), viewport })
-
-          // Front remains visible below
-          front.style.opacity = '1'
-          front.style.zIndex = '1'
-
-          // When render completes, animate back into view
-          await renderTask.promise
-          if (cancelled) return
-
+          if (back === canvasARef.current) renderTaskARef.current = renderTask
+          if (back === canvasBRef.current) renderTaskBRef.current = renderTask
+          front.style.opacity = '1'; front.style.zIndex = '1'
+          try { await renderTask.promise } catch (e) { const msg = String(e||''); if (!/Rendering cancelled/i.test(msg)) throw e }
+          if (cancelled || myToken !== tokenRef.current) return
+          // animate only on scale change
+          const ratio = (lastScaleRef.current && lastScaleRef.current > 0) ? (lastScaleRef.current / scale) : 1
+          const animate = Math.abs(ratio - 1) > 0.01
           if (animate) {
             back.style.willChange = 'transform'
-            back.style.transition = 'transform 150ms ease-out'
+            back.style.transition = 'transform 120ms ease-out'
             back.style.transform = `translateX(-50%) scale(${ratio})`
-            // Trigger animation into place
-            requestAnimationFrame(() => {
-              back.style.transform = 'translateX(-50%) scale(1)'
-            })
-            // Wait specifically for transform to finish (not opacity)
+            requestAnimationFrame(() => { back.style.transform = 'translateX(-50%) scale(1)' })
             await new Promise<void>((resolve) => {
-              const onEnd = (e: TransitionEvent) => {
-                if (e.propertyName === 'transform') { back.removeEventListener('transitionend', onEnd); resolve() }
-              }
+              const onEnd = (e: TransitionEvent) => { if (e.propertyName === 'transform') { back.removeEventListener('transitionend', onEnd); resolve() } }
               back.addEventListener('transitionend', onEnd)
             })
-          } else {
-            back.style.transform = 'translateX(-50%) scale(1)'
-          }
-
-          // Swap buffers: back becomes front (keep previous canvas present underneath)
+          } else { back.style.transform = 'translateX(-50%) scale(1)' }
           frontIndexRef.current = frontIndexRef.current === 0 ? 1 : 0
           lastScaleRef.current = scale
-        } catch (e) {
-          if (!cancelled) setError(String(e))
-        }
+        } catch (e) { if (!cancelled) setError(String(e)) }
       })()
       return () => { cancelled = true }
     }, [pdf, visible, pageNum, scale])
@@ -325,22 +317,19 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
     )
   }
 
-  // Imperative render to avoid first-time flicker when jumping to an unrendered page
-  const ensureRendered = React.useCallback(async (p: number) => {
+  const PageView = React.memo(PageViewInner, (prev, next) => prev.pageNum === next.pageNum && prev.scale === next.scale)
+
+  // Imperatively render a specific page into its own refs (used on page jumps)
+  const ensurePageRendered = React.useCallback(async (p: number, animate = false) => {
     try {
       if (!pdf) return
-      const nodes = pagesRef.current.get(p)
-      const el = pageElsRef.current.get(p)
-      if (!nodes || !el) return
-      const wrapperRef = { current: nodes.wrapper }
-      const canvasARef = { current: nodes.canvasA } as React.MutableRefObject<HTMLCanvasElement | null>
-      const canvasBRef = { current: nodes.canvasB } as React.MutableRefObject<HTMLCanvasElement | null>
-      const frontIndexRef = nodes.frontIndexRef
-      const lastScaleRef = nodes.lastScaleRef
-
+      const refs = pageRenderMap.current.get(p)
+      const host = pageElsRef.current.get(p)
+      if (!refs || !host) return
+      const { wrapperRef, canvasARef, canvasBRef, frontIndexRef, lastScaleRef, renderTaskARef, renderTaskBRef, tokenRef } = refs
+      const myToken = ++tokenRef.current
       const page = await pdf.getPage(p)
       const viewport = page.getViewport({ scale })
-      if (el) el.style.minHeight = `${Math.round(viewport.height)}px`
       if (wrapperRef.current) {
         wrapperRef.current.style.width = `${viewport.width}px`
         wrapperRef.current.style.height = `${viewport.height}px`
@@ -356,14 +345,13 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
         c.style.transformOrigin = 'top center'
         c.style.display = 'block'
         c.style.pointerEvents = 'none'
-        if (wrapperRef.current) {
-          wrapperRef.current.style.position = 'relative'
-          wrapperRef.current.appendChild(c)
-        }
+        if (wrapperRef.current) { wrapperRef.current.style.position = 'relative'; wrapperRef.current.appendChild(c) }
         return c
       }
       const front = frontIndexRef.current === 0 ? ensureCanvas(canvasARef) : ensureCanvas(canvasBRef)
       const back = frontIndexRef.current === 0 ? ensureCanvas(canvasBRef) : ensureCanvas(canvasARef)
+      if (back === canvasARef.current && renderTaskARef.current?.cancel) { try { renderTaskARef.current.cancel() } catch {} }
+      if (back === canvasBRef.current && renderTaskBRef.current?.cancel) { try { renderTaskBRef.current.cancel() } catch {} }
       const dpr = window.devicePixelRatio || 1
       back.width = Math.floor(viewport.width * dpr)
       back.height = Math.floor(viewport.height * dpr)
@@ -372,30 +360,40 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
       back.style.zIndex = '2'
       ;(back.getContext('2d') as CanvasRenderingContext2D).setTransform(dpr, 0, 0, dpr, 0, 0)
       const renderTask = (page as any).render({ canvasContext: back.getContext('2d'), viewport })
-      front.style.opacity = '1'
-      front.style.zIndex = '1'
-      await renderTask.promise
-      back.style.transform = 'translateX(-50%) scale(1)'
+      if (back === canvasARef.current) renderTaskARef.current = renderTask
+      if (back === canvasBRef.current) renderTaskBRef.current = renderTask
+      front.style.opacity = '1'; front.style.zIndex = '1'
+      try { await renderTask.promise } catch (e) { const msg = String(e||''); if (!/Rendering cancelled/i.test(msg)) throw e }
+      if (myToken !== tokenRef.current) return
+      // animate only when requested (e.g., zoom); page jumps are non-animated
+      if (animate) {
+        const ratio = (lastScaleRef.current && lastScaleRef.current > 0) ? (lastScaleRef.current / scale) : 1
+        if (Math.abs(ratio - 1) > 0.01) {
+          back.style.willChange = 'transform'
+          back.style.transition = 'transform 120ms ease-out'
+          back.style.transform = `translateX(-50%) scale(${ratio})`
+          requestAnimationFrame(() => { back.style.transform = 'translateX(-50%) scale(1)' })
+          await new Promise<void>((resolve) => {
+            const onEnd = (e: TransitionEvent) => { if (e.propertyName === 'transform') { back.removeEventListener('transitionend', onEnd); resolve() } }
+            back.addEventListener('transitionend', onEnd)
+          })
+        }
+      } else {
+        back.style.transform = 'translateX(-50%) scale(1)'
+      }
       frontIndexRef.current = frontIndexRef.current === 0 ? 1 : 0
       lastScaleRef.current = scale
-      // Persist nodes in registry
-      pagesRef.current.set(p, {
-        wrapper: wrapperRef.current,
-        canvasA: canvasARef.current,
-        canvasB: canvasBRef.current,
-        frontIndexRef,
-        lastScaleRef,
-      })
     } catch {}
   }, [pdf, scale])
+
+  // (continuous scroll) rendering is handled by each PageView when visible
 
   // Anchor the center during zoom by capturing relative position within current page
   const captureAnchor = () => {
     const c = containerRef.current
     if (!c) return null
     const centerY = c.scrollTop + c.clientHeight / 2
-    // Pick nearest page by center distance
-    let best = 1
+    let best = pageStoreRef.current!.get()
     let bestDist = Infinity
     for (let i = 1; i <= numPages; i++) {
       const el = pageElsRef.current.get(i)
@@ -429,25 +427,43 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
   // Recompute fit after toggling on
   useEffect(() => { if (fitWidth) recomputeFitWidth() }, [fitWidth, recomputeFitWidth])
 
-  // After scale changes, restore anchored position
+  // After scale changes, restore anchored position (continuous scroll)
   useEffect(() => {
     if (!anchorRef.current) return
     const info = anchorRef.current
     const c = containerRef.current
-    if (!c) { anchorRef.current = null; return }
+    const el = pageElsRef.current.get(info.page)
+    if (!c || !el) { anchorRef.current = null; return }
     const adjust = () => {
-      const el = pageElsRef.current.get(info.page)
-      if (!el) { anchorRef.current = null; return }
       const ph = pageHeights[info.page - 1] ?? el.getBoundingClientRect().height
       const target = el.offsetTop + (ph * info.rel) - c.clientHeight / 2
-      c.scrollTo({ top: Math.max(0, target) })
+      // Suppress transient page publish during this repositioning
+      suppressPagePublishRef.current++
+      c.scrollTop = Math.max(0, target)
       anchorRef.current = null
+      // After scroll settles, publish the final page value and release suppression
+      const finalize = () => {
+        const centerY = c.scrollTop + c.clientHeight / 2
+        let best = pageStoreRef.current!.get()
+        let bestDist = Infinity
+        for (let i = 1; i <= numPages; i++) {
+          const el2 = pageElsRef.current.get(i)
+          if (!el2) continue
+          const pageTop2 = el2.offsetTop
+          const ph2 = pageHeights[i - 1] ?? el2.getBoundingClientRect().height
+          const mid2 = pageTop2 + ph2 / 2
+          const d2 = Math.abs(centerY - mid2)
+          if (d2 < bestDist) { best = i; bestDist = d2 }
+        }
+        pageStoreRef.current!.set(best)
+        suppressPagePublishRef.current = Math.max(0, suppressPagePublishRef.current - 1)
+      }
+      requestAnimationFrame(() => requestAnimationFrame(finalize))
     }
-    // Defer to allow canvases to reflow
     requestAnimationFrame(() => requestAnimationFrame(adjust))
   }, [scale, pageHeights])
 
-  // Track current page based on scroll position (center of viewport)
+  // Track current page based on scroll center; publish to store only
   useEffect(() => {
     const c = containerRef.current
     if (!c) return
@@ -455,8 +471,9 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
     const onScroll = () => {
       if (raf) cancelAnimationFrame(raf)
       raf = requestAnimationFrame(() => {
+        if (suppressPagePublishRef.current > 0) return
         const centerY = c.scrollTop + c.clientHeight / 2
-        let best = currentPage
+        let best = pageStoreRef.current!.get()
         let bestDist = Infinity
         for (let i = 1; i <= numPages; i++) {
           const el = pageElsRef.current.get(i)
@@ -467,28 +484,45 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
           const d = Math.abs(centerY - mid)
           if (d < bestDist) { best = i; bestDist = d }
         }
-        if (best !== currentPage) setCurrentPage(best)
+        pageStoreRef.current!.set(best)
       })
     }
     c.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', onScroll)
     onScroll()
     return () => { c.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onScroll); if (raf) cancelAnimationFrame(raf) }
-  }, [numPages, pageHeights, currentPage])
+  }, [numPages, pageHeights])
 
-  // Keep input in sync with current page
-  useEffect(() => { setPageInput(String(currentPage)) }, [currentPage])
+  // Expose page getters/subscription via ref, no re-renders
+  useImperativeHandle(ref, () => ({
+    getCurrentPage: () => pageStoreRef.current!.get(),
+    subscribePage: (fn: () => void) => pageStoreRef.current!.subscribe(fn),
+  }), [])
+
+  // Optional callback when page changes (no re-render)
+  useEffect(() => {
+    if (!onPageChange) return
+    const unsub = pageStoreRef.current!.subscribe(() => {
+      try { onPageChange(pageStoreRef.current!.get()) } catch {}
+    })
+    // fire once immediately with current value
+    try { onPageChange(pageStoreRef.current!.get()) } catch {}
+    return unsub
+  }, [onPageChange])
 
   const clampPage = (p: number) => Math.max(1, Math.min(numPages || 1, p))
-  const scrollToPage = (p: number) => {
+  const scrollToPage = async (p: number) => {
+    // Ensure target is rendered to avoid flash
+    await ensurePageRendered(p, false)
     const c = containerRef.current
     const el = pageElsRef.current.get(p)
-    if (!c || !el) return
+    if (!c || !el) { pageStoreRef.current!.set(p); return }
     c.scrollTop = el.offsetTop
+    pageStoreRef.current!.set(p)
   }
 
-  const goPrev = async () => { const p = clampPage(currentPage - 1); await ensureRendered(p); scrollToPage(p) }
-  const goNext = async () => { const p = clampPage(currentPage + 1); await ensureRendered(p); scrollToPage(p) }
+  const goPrev = useCallback(() => { const cur = pageStoreRef.current!.get(); const p = clampPage(cur - 1); scrollToPage(p) }, [numPages])
+  const goNext = useCallback(() => { const cur = pageStoreRef.current!.get(); const p = clampPage(cur + 1); scrollToPage(p) }, [numPages])
 
   // Keyboard shortcuts: prev/next, zoom in/out/reset
   useEffect(() => {
@@ -507,17 +541,10 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
     return () => window.removeEventListener('keydown', onKey)
   }, [zoomIn, zoomOut, resetZoom, goPrev, goNext])
 
-  // Pre-render neighbors when page changes
+  // Re-render visible pages on scale change; invisible pages render when they become visible
   useEffect(() => {
-    const a = async () => {
-      await ensureRendered(currentPage)
-      const n1 = clampPage(currentPage + 1)
-      const p1 = clampPage(currentPage - 1)
-      if (n1 !== currentPage) ensureRendered(n1)
-      if (p1 !== currentPage) ensureRendered(p1)
-    }
-    a()
-  }, [currentPage, ensureRendered])
+    // trigger rerender in PageView via scale dependency
+  }, [scale])
 
   if (fileBytesQ.isLoading || fileMetaQ.isLoading) {
     return (
@@ -535,30 +562,39 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
     )
   }
 
-  return (
-    <div className={`flex flex-col ${className}`}>
-      {/* PDF Controls */}
+  // Controls rendered as independent subscriber so page changes don't rerender PdfViewer
+  const PageControls: React.FC = React.memo(() => {
+    const page = useSyncExternalStore(pageStoreRef.current!.subscribe, pageStoreRef.current!.get, pageStoreRef.current!.get)
+    const inputRef = React.useRef<HTMLInputElement | null>(null)
+    // Keep the textbox in sync with current page without making it controlled
+    useEffect(() => {
+      const el = inputRef.current
+      if (!el) return
+      // Don't overwrite while user is actively editing
+      if (document.activeElement === el) return
+      el.value = String(page)
+    }, [page])
+    return (
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60">
         <div className="flex items-center gap-3">
           <div className="inline-flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={goPrev} title="Previous page" disabled={currentPage <= 1}>
+            <Button variant="ghost" size="sm" onClick={goPrev} title="Previous page" disabled={page <= 1}>
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <input
               className="w-14 px-2 py-1 text-sm rounded-control bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 text-center"
-              value={pageInput}
-              onChange={(e) => setPageInput(e.target.value.replace(/[^0-9]/g, ''))}
-              onBlur={() => { const n = clampPage(parseInt(pageInput || '1', 10) || 1); setPageInput(String(n)); scrollToPage(n) }}
-              onKeyDown={(e) => { if (e.key === 'Enter') { const n = clampPage(parseInt(pageInput || '1', 10) || 1); setPageInput(String(n)); scrollToPage(n) } }}
+              ref={inputRef}
+              defaultValue={String(page)}
+              onBlur={async (e) => { const n = clampPage(parseInt((e.target as HTMLInputElement).value || '1', 10) || 1); await scrollToPage(n) }}
+              onKeyDown={async (e) => { if (e.key === 'Enter') { const n = clampPage(parseInt((e.target as HTMLInputElement).value || '1', 10) || 1); await scrollToPage(n) } }}
               aria-label="Current page"
             />
             <span className="text-sm">/ {numPages || 1}</span>
-            <Button variant="ghost" size="sm" onClick={goNext} title="Next page" disabled={currentPage >= numPages}>
+            <Button variant="ghost" size="sm" onClick={goNext} title="Next page" disabled={page >= numPages}>
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         </div>
-        
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={zoomOut} title="Zoom out">
             <ZoomOut className="w-4 h-4" />
@@ -575,8 +611,14 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
           </Button>
         </div>
       </div>
+    )
+  })
 
-      {/* PDF Content - Container with Scroll */}
+  return (
+    <div className={`flex flex-col ${className}`}>
+      <PageControls />
+
+      {/* PDF Content - Continuous scroll of pages */}
       <div
         ref={containerRef}
         className="overflow-auto bg-slate-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg h-full"
@@ -584,10 +626,12 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
       >
         <div className="p-6 flex flex-col items-center">
           {Array.from({ length: numPages }, (_, i) => (
-            <PageView key={i} pageNum={i + 1} />
+            <PageView key={i} pageNum={i + 1} scale={scale} />
           ))}
         </div>
       </div>
     </div>
   )
-}
+})
+
+PdfViewer.displayName = 'PdfViewer'
