@@ -12,14 +12,22 @@ type Props = {
 
 export const Dropdown: React.FC<Props> = ({ open, onOpenChange, children, align = 'right', offsetY = 32, className = '', style }) => {
   const [visible, setVisible] = React.useState(false)
-  const mounted = open
+  const [mounted, setMounted] = React.useState(false)
+  const ANIM_MS = 180
 
   React.useEffect(() => {
-    if (!open) return
-    const raf = requestAnimationFrame(() => setVisible(true))
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onOpenChange(false) }
-    document.addEventListener('keydown', onKey)
-    return () => { cancelAnimationFrame(raf); setVisible(false); document.removeEventListener('keydown', onKey) }
+    if (open) {
+      setMounted(true)
+      const raf = requestAnimationFrame(() => setVisible(true))
+      const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onOpenChange(false) }
+      document.addEventListener('keydown', onKey)
+      return () => { cancelAnimationFrame(raf); document.removeEventListener('keydown', onKey) }
+    } else {
+      // start exit animation
+      setVisible(false)
+      const t = setTimeout(() => setMounted(false), ANIM_MS)
+      return () => clearTimeout(t)
+    }
   }, [open, onOpenChange])
 
   if (!mounted) return null
@@ -39,4 +47,3 @@ export const Dropdown: React.FC<Props> = ({ open, onOpenChange, children, align 
     </>
   )
 }
-

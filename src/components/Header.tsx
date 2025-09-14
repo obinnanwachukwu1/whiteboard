@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { Dropdown } from './ui/Dropdown'
 import { useNavigate } from '@tanstack/react-router'
 // removed theme toggle button
 import { applyThemeAndAccent, type Accent } from '../utils/theme'
@@ -16,9 +17,10 @@ export const Header: React.FC<Props> = ({ profile }) => {
   const [dark, setDark] = useState<boolean>(false)
   const [accent, setAccent] = useState<Accent>('default')
   const [menuOpen, setMenuOpen] = useState(false)
-  const [menuVisible, setMenuVisible] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const nameBtnRef = useRef<HTMLButtonElement | null>(null)
+  // Legacy visibility handler is a no-op now that Dropdown controls animation
+  const setMenuVisible = (_visible?: boolean) => {}
 
   useEffect(() => {
     ;(async () => {
@@ -106,35 +108,21 @@ export const Header: React.FC<Props> = ({ profile }) => {
           </div>
         </button>
 
-        {menuOpen && (
-          <>
-            {/* click-catcher to ensure layering and easy outside-close */}
-            <div className="fixed inset-0 z-[105]" aria-hidden onClick={() => setMenuOpen(false)} />
-          </>
-        )}
-        {menuOpen && (
-          <div
-            ref={menuRef}
-            role="menu"
-            aria-label="Account menu"
-            className={`absolute right-0 top-12 z-[110] min-w-[200px] rounded-md shadow-xl ring-1 ring-black/10 dark:ring-white/10 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md overflow-hidden
-              transition-all duration-150 ease-out ${menuVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-1 scale-95'}`}
-          >
-            <div className="px-3 py-2 text-[11px] text-slate-600 dark:text-slate-400 border-b border-black/5 dark:border-white/10">
-              Signed in as
-              <div className="truncate text-slate-800 dark:text-slate-200 text-[11px]">{profile?.primary_email || name}</div>
-            </div>
-            <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" onClick={() => { setMenuOpen(false); navigate({ to: '/settings' }) }}>
-              Settings
-            </button>
-            <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50" onClick={onCopyEmail} disabled={!profile?.primary_email}>
-              Copy email
-            </button>
-            <button className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors" onClick={onSignOut}>
-              Sign out
-            </button>
+        <Dropdown open={menuOpen} onOpenChange={setMenuOpen} align="right" offsetY={48}>
+          <div className="px-3 py-2 text-[11px] text-slate-600 dark:text-slate-400 border-b border-black/5 dark:border-white/10">
+            Signed in as
+            <div className="truncate text-slate-800 dark:text-slate-200 text-[11px]">{profile?.primary_email || name}</div>
           </div>
-        )}
+          <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" onClick={() => { setMenuOpen(false); navigate({ to: '/settings' }) }}>
+            Settings
+          </button>
+          <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50" onClick={onCopyEmail} disabled={!profile?.primary_email}>
+            Copy email
+          </button>
+          <button className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors" onClick={onSignOut}>
+            Sign out
+          </button>
+        </Dropdown>
       </div>
     </header>
   )
