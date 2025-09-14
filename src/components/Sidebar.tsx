@@ -120,7 +120,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
       style={{ backgroundColor: 'var(--app-accent-bg)' }}
     >
       <div className="mb-4">
-        <div className="font-semibold mb-2 text-[11px] uppercase tracking-wide text-brand/70">Navigation</div>
+        <div className="font-semibold mb-2 text-[11px] uppercase tracking-wide text-brand/70">At A Glance</div>
         <nav className="flex flex-col">
           <button
           className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${

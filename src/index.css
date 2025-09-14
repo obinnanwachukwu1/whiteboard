@@ -73,6 +73,10 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 .rich-html h3 { font-size: 1.25rem; line-height: 1.75rem; font-weight: 600; margin: 0.875rem 0 0.5rem; }
 .rich-html p { margin: 0.75rem 0; line-height: 1.7; }
 .rich-html ul, .rich-html ol { padding-left: 1.25rem; margin: 0.75rem 0; }
+.rich-html ul { list-style: disc; }
+.rich-html ol { list-style: decimal; }
+.rich-html ul ul { list-style: circle; }
+.rich-html ol ol { list-style: lower-roman; }
 .rich-html li { margin: 0.25rem 0; }
 .rich-html a { color: #2563eb; text-decoration: underline; }
 .dark .rich-html a { color: #93c5fd; }

@@ -1,5 +1,5 @@
 import React from 'react'
-import { FileText, File, Image as ImageIcon, Video, Folder as FolderIcon, ChevronRight, ExternalLink, ArrowUpDown } from 'lucide-react'
+import { FileText, File, Image as ImageIcon, Video, Folder as FolderIcon, ChevronRight, ArrowUpDown, FileArchive, FileSpreadsheet, FileAudio, FileCode2, Presentation, MoreVertical } from 'lucide-react'
 import { Button } from './ui/Button'
 import { useCourseFolders, useFolderFiles } from '../hooks/useCanvasQueries'
 import { VirtualList } from './ui/VirtualList'
@@ -10,12 +10,29 @@ type Props = {
   onOpenContent?: (content: { courseId: string | number; contentType: 'file'; contentId: string; title: string }) => void
 }
 
-function iconForContentType(ct: string | undefined) {
-  if (!ct) return <File className="w-4 h-4" />
-  if (ct.startsWith('image/')) return <ImageIcon className="w-4 h-4" />
-  if (ct.startsWith('video/')) return <Video className="w-4 h-4" />
-  if (ct === 'application/pdf') return <FileText className="w-4 h-4" />
-  return <File className="w-4 h-4" />
+function iconForFile(name?: string, contentType?: string) {
+  const n = String(name || '')
+  const ext = n.includes('.') ? n.split('.').pop()!.toLowerCase() : ''
+  const ct = String(contentType || '').toLowerCase()
+  const icon = (el: React.ReactElement) => React.cloneElement(el, { className: 'w-4 h-4' })
+  if (ext) {
+    if (['png','jpg','jpeg','gif','webp','bmp','svg','avif'].includes(ext)) return icon(<ImageIcon />)
+    if (['mp4','webm','ogg','mov','m4v'].includes(ext)) return icon(<Video />)
+    if (['mp3','wav','ogg','m4a','aac'].includes(ext)) return icon(<FileAudio />)
+    if (['xls','xlsx','csv'].includes(ext)) return icon(<FileSpreadsheet />)
+    if (['ppt','pptx','key'].includes(ext)) return icon(<Presentation />)
+    if (['zip','rar','7z','tar','gz','tgz'].includes(ext)) return icon(<FileArchive />)
+    if (['pdf'].includes(ext)) return icon(<FileText />)
+    if (['js','ts','tsx','jsx','json','html','css','md','xml','yml','yaml'].includes(ext)) return icon(<FileCode2 />)
+    if (['doc','docx','rtf','txt'].includes(ext)) return icon(<FileText />)
+  }
+  if (ct.startsWith('image/')) return icon(<ImageIcon />)
+  if (ct.startsWith('video/')) return icon(<Video />)
+  if (ct.startsWith('audio/')) return icon(<FileAudio />)
+  if (ct === 'application/pdf') return icon(<FileText />)
+  if (ct.includes('spreadsheet') || ct.includes('excel') || ct.includes('csv')) return icon(<FileSpreadsheet />)
+  if (ct.includes('zip') || ct.includes('tar') || ct.includes('archive')) return icon(<FileArchive />)
+  return icon(<File />)
 }
 
 function formatBytes(bytes?: number | null) {
@@ -50,6 +67,8 @@ function fileTypeLabel(name?: string, contentType?: string) {
 export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
   const { data: folders = [], isLoading, error } = useCourseFolders(courseId, 100)
   const [current, setCurrent] = React.useState<string | null>(null)
+  const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
+  const [menuVisible, setMenuVisible] = React.useState(false)
 
   const byId = React.useMemo(() => new Map((folders as CanvasFolder[]).map((f) => [String(f.id), f])), [folders])
   const children = React.useMemo(() => {
@@ -108,6 +127,25 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
   const effectiveCurrent = current || courseRootId || null
   const [sortKey, setSortKey] = React.useState<'name' | 'updated'>('updated')
   const [sortOrder, setSortOrder] = React.useState<'asc' | 'desc'>('desc')
+
+  // Dropdown visibility helpers for file row menus
+  React.useEffect(() => {
+    if (menuOpenId) {
+      const raf = requestAnimationFrame(() => setMenuVisible(true))
+      const onDocKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpenId(null) }
+      const onDocClick = (e: MouseEvent) => {
+        const t = e.target as HTMLElement
+        if (t.closest('[data-file-menu]') || t.closest('[data-file-more]')) return
+        setMenuOpenId(null)
+      }
+      document.addEventListener('keydown', onDocKey)
+      document.addEventListener('mousedown', onDocClick)
+      return () => { cancelAnimationFrame(raf); setMenuVisible(false); document.removeEventListener('keydown', onDocKey); document.removeEventListener('mousedown', onDocClick) }
+    } else {
+      const t = setTimeout(() => setMenuVisible(false), 150)
+      return () => clearTimeout(t)
+    }
+  }, [menuOpenId])
 
   function compare(a: any, b: any) {
     let va: string | number = ''
@@ -213,10 +251,10 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
             <div className="text-slate-500 dark:text-slate-400 text-sm">No items in this folder</div>
           )}
           {!filesQ.isLoading && files.length > 0 && (
-            <div className="border border-gray-200 dark:border-slate-700 rounded-md">
+            <div>
               <VirtualList<CanvasFile>
                 items={files as CanvasFile[]}
-                height={480}
+                height={listFolders.length === 0 ? 560 : 480}
                 itemHeight={64}
                 className="bg-transparent"
                 renderItem={(f) => {
@@ -234,15 +272,15 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
                         if (viewable) {
                           onOpenContent?.({ courseId, contentType: 'file', contentId: String(f.id), title: name })
                         } else if (f?.url) {
-                          window.system?.openExternal?.(f.url)
+                          (await import('../utils/openExternal')).openExternal(f.url)
                         }
                       }}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (viewable) onOpenContent?.({ courseId, contentType: 'file', contentId: String(f.id), title: name }); else if (f?.url) window.system?.openExternal?.(f.url) } }}
-                      className="group cursor-pointer flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 px-2 sm:px-3 py-2 transition-colors"
+                      className="group cursor-pointer flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 px-2 sm:px-3 py-2 transition-colors relative"
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="w-8 h-8 rounded-full bg-neutral-600/15 text-slate-600 dark:text-neutral-200 inline-flex items-center justify-center shrink-0">
-                          {iconForContentType(f?.content_type)}
+                          {iconForFile(name, f?.content_type)}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="font-medium truncate group-hover:underline decoration-slate-300 dark:decoration-neutral-700">{name}</div>
@@ -254,12 +292,30 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
                         </div>
                       </div>
                       {f?.url && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); window.system?.openExternal?.(f.url!) }}
-                          className="inline-flex items-center px-2.5 py-1.5 rounded-control text-sm text-slate-700 hover:bg-slate-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
-                        >
-                          <ExternalLink className="w-4 h-4 mr-1" /> Open in Browser
-                        </button>
+                        <div className="shrink-0">
+                          <button
+                            data-file-more
+                            onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === String(f.id) ? null : String(f.id)) }}
+                            className="inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                            aria-label="More options"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                          {menuOpenId === String(f.id) && (
+                            <>
+                              <div className="fixed inset-0 z-[105]" aria-hidden onClick={() => setMenuOpenId(null)} />
+                              <div
+                                data-file-menu
+                                role="menu"
+                                className={`absolute right-2 top-10 z-[110] min-w-[180px] rounded-md shadow-xl ring-1 ring-black/10 dark:ring-white/10 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md overflow-hidden origin-top-right transition-all duration-150 ease-out ${menuVisible ? 'opacity-100 translate-y-0 scale-100 animate-pop' : 'opacity-0 translate-y-1 scale-95'}`}
+                              >
+                                <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(f.url!) }}>
+                                  Open in Browser
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       )}
                     </div>
                   )

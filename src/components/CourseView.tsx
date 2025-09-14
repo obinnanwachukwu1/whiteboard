@@ -105,7 +105,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
   // Controlled: default selection and deep-link behavior handled by parent (App)
 
   // Central link handler for rich HTML content
-  const handleNavigate = (href: string) => {
+  const handleNavigate = async (href: string) => {
     try {
       const u = new URL(href)
       const originMatch = baseUrl ? u.origin === new URL(baseUrl).origin : false
@@ -161,15 +161,15 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
       }
 
       const isInternal = originMatch || path.startsWith('/courses') || path.startsWith('/files')
-      if (!isInternal) { window.system?.openExternal?.(href); return }
+      if (!isInternal) { (await import('../utils/openExternal')).openExternal(href); return }
       if (openAssignment()) return
       if (openAnnouncement()) return
       if (openPage()) return
       if (openFile()) return
       if (withinCurrent && idxCourse >= 0) { onChangeTab('modules'); return }
-      window.system?.openExternal?.(href)
+      ;(await import('../utils/openExternal')).openExternal(href)
     } catch {
-      window.system?.openExternal?.(href)
+      ;(await import('../utils/openExternal')).openExternal(href)
     }
   }
 
@@ -257,7 +257,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
             <div className="mt-2">
               <CourseModules
                 courseId={courseId}
-                onOpenExternal={(url) => window.open(url, '_blank', 'noreferrer')}
+                onOpenExternal={async (url) => { (await import('../utils/openExternal')).openExternal(url) }}
                 onOpenContent={(c) => onOpenDetail({ contentType: c.contentType, contentId: String(c.contentId), title: c.title })}
               />
             </div>
