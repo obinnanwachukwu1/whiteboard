@@ -490,9 +490,40 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>(({ fileId, cla
       })
     }
     c.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', onScroll)
     onScroll()
-    return () => { c.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onScroll); if (raf) cancelAnimationFrame(raf) }
+    return () => { c.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf) }
+  }, [numPages, pageHeights])
+
+  // Debounced window resize: hold current page steady, then publish once after resize settles
+  useEffect(() => {
+    let t: number | null = null
+    const onResize = () => {
+      suppressPagePublishRef.current++
+      if (t) window.clearTimeout(t)
+      t = window.setTimeout(() => {
+        const c = containerRef.current
+        const best = (() => {
+          if (!c) return pageStoreRef.current!.get()
+          const centerY = c.scrollTop + c.clientHeight / 2
+          let best = pageStoreRef.current!.get()
+          let bestDist = Infinity
+          for (let i = 1; i <= numPages; i++) {
+            const el = pageElsRef.current.get(i)
+            if (!el) continue
+            const pageTop = el.offsetTop
+            const ph = pageHeights[i - 1] ?? el.getBoundingClientRect().height
+            const mid = pageTop + ph / 2
+            const d = Math.abs(centerY - mid)
+            if (d < bestDist) { best = i; bestDist = d }
+          }
+          return best
+        })()
+        pageStoreRef.current!.set(best)
+        suppressPagePublishRef.current = Math.max(0, suppressPagePublishRef.current - 1)
+      }, 200)
+    }
+    window.addEventListener('resize', onResize)
+    return () => { if (t) window.clearTimeout(t); window.removeEventListener('resize', onResize) }
   }, [numPages, pageHeights])
 
   // Expose page getters/subscription via ref, no re-renders
