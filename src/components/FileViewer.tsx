@@ -206,7 +206,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
     const viewer = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
     body = (
       <div className={className} style={{ height: '100%' }}>
-        <div className="overflow-hidden border border-gray-200 dark:border-slate-700 rounded-lg" style={{ height: '100%' }}>
+        <div className="overflow-hidden border border-gray-200 dark:border-neutral-700 rounded-lg" style={{ height: '100%' }}>
           <iframe
             src={viewer}
             className="w-full h-full"
@@ -237,7 +237,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
     body = (
       <div className={`p-4 space-y-4 overflow-auto ${className}`} style={{ height: '100%' }}>
         {pptxSlides.map((s: any, idx: number) => (
-          <div key={idx} className="border border-gray-200 dark:border-slate-700 rounded p-3">
+          <div key={idx} className="border border-gray-200 dark:border-neutral-700 rounded p-3">
             <div className="text-xs text-slate-500">Slide {s.index}</div>
             <div className="mt-1 whitespace-pre-wrap">{s.text || '—'}</div>
           </div>
@@ -266,7 +266,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
   } else if (url) {
     body = (
       <div className={className} style={{ height: '100%' }}>
-        <div className="overflow-hidden border border-gray-200 dark:border-slate-700 rounded-lg" style={{ height: '100%' }}>
+        <div className="overflow-hidden border border-gray-200 dark:border-neutral-700 rounded-lg" style={{ height: '100%' }}>
           <iframe src={url} className="w-full h-full" style={{ border: 'none' }} title={name || 'File'} />
         </div>
         <div className="p-2 text-right">

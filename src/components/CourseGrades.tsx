@@ -138,7 +138,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
             return (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left border-b border-gray-200 dark:border-slate-700">
+                  <tr className="text-left border-b border-gray-200 dark:border-neutral-700">
                     <th className="py-2 pr-3">Assignment</th>
                     <th className="py-2 pr-3 w-24 text-right">Pts</th>
                     <th className="py-2 pr-0 w-56 text-right">Score</th>
@@ -155,7 +155,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                       <React.Fragment key={gid}>
                         <tr>
                           <td className="pt-4 pb-2 text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide" colSpan={5}>
-                            <div className="border-b border-gray-200 dark:border-slate-700 pb-1">{label}</div>
+                            <div className="border-b border-gray-200 dark:border-neutral-700 pb-1">{label}</div>
                           </td>
                         </tr>
                         {list.map((a: any) => {
