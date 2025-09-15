@@ -356,20 +356,20 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
                         tabIndex={0}
                         onClick={open}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
-                        className="cursor-pointer rounded-md px-2 sm:px-3 py-2 hover:bg-slate-50/90 dark:hover:bg-neutral-800/60 transition-colors"
+                        className="cursor-pointer rounded-md px-2 sm:px-3 py-2 transition-transform duration-200 ease-out hover:scale-[1.02] hover:shadow-sm ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="w-10 h-10 rounded-full ring-1 ring-black/10 dark:ring-white/10 overflow-hidden bg-center bg-cover flex-shrink-0" style={img ? { backgroundImage: `url(${img})` } : { background: fallback }} />
                             <div className="min-w-0">
-                              <div className="font-medium truncate hover:underline" title={d.name}>
+                              <div className="font-medium truncate" title={d.name}>
                                 {d.name}
                               </div>
                               <div className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
                                 {d.course_name && (
                                   <span className="inline-flex items-center gap-1 mr-1.5">
-                                    <Badge tone="brand">{d.course_name}</Badge>
-                                    <span>·</span>
+                                  <Badge tone="brand">{d.course_name}</Badge>
+                                  <span>·</span>
                                   </span>
                                 )}
                                 Due {new Date(d.dueAt).toLocaleString()}
@@ -419,13 +419,13 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
                       tabIndex={0}
                       onClick={open}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
-                      className="cursor-pointer rounded-md px-2 sm:px-3 py-2 hover:bg-slate-50/90 dark:hover:bg-neutral-800/60 transition-colors"
+                      className="cursor-pointer rounded-md px-2 sm:px-3 py-2 transition-transform duration-200 ease-out hover:scale-[1.02] hover:shadow-sm ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="w-10 h-10 rounded-full ring-1 ring-black/10 dark:ring-white/10 overflow-hidden bg-center bg-cover flex-shrink-0" style={img ? { backgroundImage: `url(${img})` } : { background: fallback }} />
                           <div className="min-w-0">
-                            <div className="font-medium truncate hover:underline" title={a.title}>{a.title}</div>
+                            <div className="font-medium truncate" title={a.title}>{a.title}</div>
                             <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                               <Badge tone="brand">{a.courseName}</Badge>
                               <span className="mx-1">·</span>
