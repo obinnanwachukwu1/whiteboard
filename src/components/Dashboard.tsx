@@ -8,6 +8,7 @@ import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
 import { useActivityAnnouncements } from '../hooks/useCanvasQueries'
 import { useAppContext } from '../context/AppContext'
 import { CalendarClock, BookOpen, BarChart3 } from 'lucide-react'
+import { useNavigate } from '@tanstack/react-router'
 //
 
 type DueItem = {
@@ -32,6 +33,7 @@ type Props = {
 
 export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar, onOpenCourse, onOpenAssignment, onOpenAnnouncement }) => {
   const app = useAppContext()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   // Persisted course image URLs per baseUrl
@@ -109,10 +111,9 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
 
   // Announcements via activity_stream (single API call)
   const annsQ = useActivityAnnouncements(20)
-  const [showAllAnns, setShowAllAnns] = React.useState(false)
   const topAnnouncements = React.useMemo(() => {
     const list = annsQ.data || []
-    return (showAllAnns ? list : list.slice(0, 5)).map((a: any) => {
+    return list.slice(0, 5).map((a: any) => {
       const cid = a?.course_id ?? (() => {
         try {
           const u = new URL(a?.html_url || '')
@@ -143,7 +144,7 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
         topicId: tid,
       }
     }).filter((x) => x.courseId != null)
-  }, [annsQ.data, showAllAnns, orderedVisibleCourses])
+  }, [annsQ.data, orderedVisibleCourses])
 
   // Prefetch course info for banners/avatars (cache long) and persist URLs
   React.useEffect(() => {
@@ -229,15 +230,19 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
   }
 
 
-  // Prefer a precise loading flag for the Coming Up card
+  // Prefer a precise loading flag for the Assignments card
   const dueState = queryClient.getQueryState(['due-assignments', { days: 7 }]) as any
   const hasDue = Array.isArray(due) && due.length > 0
   const dueLoading = !hasDue && Boolean(loading || (dueState?.status === 'pending') || (dueState?.fetchStatus === 'fetching'))
+  const fmtDateTime = (iso?: string) => {
+    if (!iso) return '—'
+    try { return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) } catch { return '—' }
+  }
   const nextDue = React.useMemo(() => {
     if (!hasDue) return null as null | { title: string; when: string }
     const sorted = due.slice().sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
     const first = sorted[0]
-    return first ? { title: first.name, when: new Date(first.dueAt).toLocaleString() } : null
+    return first ? { title: first.name, when: fmtDateTime(first.dueAt) } : null
   }, [due, hasDue])
 
   const courseCount = orderedVisibleCourses.length
@@ -322,11 +327,14 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <Card>
-          <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold flex items-center gap-2">
-            <span className="w-7 h-7 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-slate-100 dark:bg-neutral-800 grid place-items-center">
-              <CalendarClock className="w-4 h-4 text-slate-600 dark:text-neutral-300" />
+          <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-2">
+              <span className="w-7 h-7 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-slate-100 dark:bg-neutral-800 grid place-items-center">
+                <CalendarClock className="w-4 h-4 text-slate-600 dark:text-neutral-300" />
+              </span>
+              <span>Assignments</span>
             </span>
-            <span>Coming Up</span>
+            <Button size="sm" variant="ghost" onClick={() => navigate({ to: '/assignments' })}>View all</Button>
           </h2>
           {dueLoading && (
             <div className="text-slate-500 dark:text-neutral-400 p-4 text-sm">Loading assignments…</div>
@@ -372,12 +380,11 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
                                   <span>·</span>
                                   </span>
                                 )}
-                                Due {new Date(d.dueAt).toLocaleString()}
+                                Due {fmtDateTime(d.dueAt)}
                                 {d.pointsPossible ? ` · ${d.pointsPossible} pts` : ''}
                               </div>
                             </div>
                           </div>
-                          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); open() }}>Open</Button>
                         </div>
                       </div>
                     </li>
@@ -388,11 +395,14 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
         </Card>
 
         <Card>
-          <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold flex items-center gap-2">
-            <span className="w-7 h-7 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-slate-100 dark:bg-neutral-800 grid place-items-center">
-              <BookOpen className="w-4 h-4 text-slate-600 dark:text-neutral-300" />
+          <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-2">
+              <span className="w-7 h-7 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-slate-100 dark:bg-neutral-800 grid place-items-center">
+                <BookOpen className="w-4 h-4 text-slate-600 dark:text-neutral-300" />
+              </span>
+              <span>Announcements</span>
             </span>
-            <span>Announcements</span>
+            <Button size="sm" variant="ghost" onClick={() => navigate({ to: '/announcements' })}>View all</Button>
           </h2>
           {annsQ.isLoading && (
             <div className="text-slate-500 dark:text-neutral-400 p-4 text-sm">Loading…</div>
@@ -429,11 +439,10 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
                             <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                               <Badge tone="brand">{a.courseName}</Badge>
                               <span className="mx-1">·</span>
-                              <span>{a.postedAt ? new Date(a.postedAt).toLocaleString() : '—'}</span>
+                              <span>{a.postedAt ? fmtDateTime(a.postedAt) : '—'}</span>
                             </div>
                           </div>
                         </div>
-                        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); open() }}>Open</Button>
                       </div>
                     </div>
                   </li>
@@ -441,11 +450,6 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
               })}
             </ul>
           )}
-          <div className="pt-2 text-right">
-            <Button size="sm" variant="ghost" onClick={() => setShowAllAnns((v) => !v)}>
-              {showAllAnns ? 'Show less' : 'View all'}
-            </Button>
-          </div>
         </Card>
       </div>
 
@@ -500,9 +504,6 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
                     <div className="min-w-0">
                       <div className="font-semibold truncate">{labelFor(c)}</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 truncate" title={c.name}>{c.name}</div>
-                    </div>
-                    <div className="shrink-0">
-                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onOpenCourse?.(c.id) }}>Open</Button>
                     </div>
                   </div>
                 </Card>
