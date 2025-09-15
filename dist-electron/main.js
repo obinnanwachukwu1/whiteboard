@@ -1,9 +1,10 @@
 var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, nativeImage, ipcMain, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import path$1 from "node:path";
+import fs$1 from "node:fs";
 import require$$1 from "util";
 import stream, { Readable } from "stream";
 import require$$1$1 from "path";
@@ -17,7 +18,6 @@ import require$$1$2 from "tty";
 import require$$0$2 from "os";
 import zlib from "zlib";
 import { EventEmitter } from "events";
-import fs$1 from "node:fs";
 function bind$2(fn, thisArg) {
   return function wrap2() {
     return fn.apply(thisArg, arguments);
@@ -11681,14 +11681,7 @@ var _eval = EvalError;
 var range = RangeError;
 var ref = ReferenceError;
 var syntax = SyntaxError;
-var type;
-var hasRequiredType;
-function requireType() {
-  if (hasRequiredType) return type;
-  hasRequiredType = 1;
-  type = TypeError;
-  return type;
-}
+var type = TypeError;
 var uri = URIError;
 var abs$1 = Math.abs;
 var floor$1 = Math.floor;
@@ -11934,7 +11927,7 @@ function requireCallBindApplyHelpers() {
   if (hasRequiredCallBindApplyHelpers) return callBindApplyHelpers;
   hasRequiredCallBindApplyHelpers = 1;
   var bind3 = functionBind;
-  var $TypeError2 = requireType();
+  var $TypeError2 = type;
   var $call2 = requireFunctionCall();
   var $actualApply = requireActualApply();
   callBindApplyHelpers = function callBindBasic(args) {
@@ -12007,7 +12000,7 @@ var $EvalError = _eval;
 var $RangeError = range;
 var $ReferenceError = ref;
 var $SyntaxError = syntax;
-var $TypeError$1 = requireType();
+var $TypeError$1 = type;
 var $URIError = uri;
 var abs = abs$1;
 var floor = floor$1;
@@ -12338,7 +12331,7 @@ var GetIntrinsic2 = getIntrinsic;
 var $defineProperty = GetIntrinsic2("%Object.defineProperty%", true);
 var hasToStringTag = requireShams()();
 var hasOwn$1 = hasown;
-var $TypeError = requireType();
+var $TypeError = type;
 var toStringTag = hasToStringTag ? Symbol.toStringTag : null;
 var esSetTostringtag = function setToStringTag(object, value) {
   var overrideIfSet = arguments.length > 2 && !!arguments[2] && arguments[2].force;
@@ -17420,9 +17413,27 @@ const RENDERER_DIST = path$1.join(process.env.APP_ROOT, "dist");
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$1.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
 let win;
 let appConfig = loadConfig();
+function getIconPath() {
+  const pub = process.env.VITE_PUBLIC || RENDERER_DIST;
+  const candidates = [
+    "icon.png",
+    "icon.icns",
+    "icon.ico",
+    // fallback to the template SVG if no PNG/ICO/ICNS is present
+    "electron-vite.svg"
+  ].map((name) => path$1.join(pub, name));
+  for (const p of candidates) {
+    try {
+      if (fs$1.existsSync(p)) return p;
+    } catch {
+    }
+  }
+  return void 0;
+}
 function createWindow() {
+  const icon = getIconPath();
   win = new BrowserWindow({
-    icon: path$1.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+    ...icon ? { icon } : {},
     // Make the titlebar blend with renderer UI on macOS
     // - hiddenInset keeps native traffic lights but removes the opaque title bar
     // - titleBarOverlay lets our content extend into the titlebar area
@@ -17466,6 +17477,13 @@ app.on("activate", () => {
 });
 app.whenReady().then(() => {
   appConfig = loadConfig();
+  if (process.platform === "darwin") {
+    const iconPath = getIconPath() || path$1.join(process.env.APP_ROOT, "build", "icons", "mac", "icon.icns");
+    try {
+      if (iconPath) app.dock.setIcon(nativeImage.createFromPath(iconPath));
+    } catch {
+    }
+  }
   createWindow();
 });
 ipcMain.handle("canvas:init", async (_evt, cfg) => {

@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, nativeImage } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs'
 import {
   initCanvas,
   clearToken,
@@ -59,9 +60,29 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 let win: BrowserWindow | null
 let appConfig: AppConfig = loadConfig()
 
+function getIconPath(): string | undefined {
+  const pub = process.env.VITE_PUBLIC || RENDERER_DIST
+  const candidates = [
+    'icon.png',
+    'icon.icns',
+    'icon.ico',
+    // fallback to the template SVG if no PNG/ICO/ICNS is present
+    'electron-vite.svg',
+  ].map((name) => path.join(pub, name))
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) return p
+    } catch {
+      // ignore fs errors and continue
+    }
+  }
+  return undefined
+}
+
 function createWindow() {
+  const icon = getIconPath()
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+    ...(icon ? { icon } : {}),
     // Make the titlebar blend with renderer UI on macOS
     // - hiddenInset keeps native traffic lights but removes the opaque title bar
     // - titleBarOverlay lets our content extend into the titlebar area
@@ -116,6 +137,15 @@ app.on('activate', () => {
 app.whenReady().then(() => {
   // load config and create window
   appConfig = loadConfig()
+  // Set dock icon on macOS during dev so it shows immediately
+  if (process.platform === 'darwin') {
+    const iconPath = getIconPath() || path.join(process.env.APP_ROOT, 'build', 'icons', 'mac', 'icon.icns')
+    try {
+      if (iconPath) app.dock.setIcon(nativeImage.createFromPath(iconPath))
+    } catch {
+      // ignore errors setting dock icon in dev
+    }
+  }
   createWindow()
 })
 
