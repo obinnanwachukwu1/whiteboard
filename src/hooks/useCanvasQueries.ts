@@ -236,7 +236,9 @@ export function useCourseInfo(courseId: string | number | undefined, options?: P
       return ensureOk(await window.canvas.getCourseInfo?.(courseId)) as CourseInfo
     },
     enabled: courseId != null && (options?.enabled ?? true),
-    staleTime: 1000 * 60 * 5,
+    // Course images rarely change; cache generously (7 days)
+    staleTime: 1000 * 60 * 60 * 24 * 7,
+    gcTime: 1000 * 60 * 60 * 24 * 14,
     ...options,
   })
 }

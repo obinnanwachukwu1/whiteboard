@@ -420,7 +420,8 @@ export class CanvasClient {
 
   // Course info + front page
   async getCourseInfo(courseId: string | number) {
-    return this.get(`/courses/${courseId}`, { 'include[]': ['syllabus_body'] })
+    // Include course_image to get image_download_url/image_url
+    return this.get(`/courses/${courseId}`, { 'include[]': ['syllabus_body', 'course_image'] })
   }
   async getCourseFrontPage(courseId: string | number) {
     return this.get(`/courses/${courseId}/front_page`)

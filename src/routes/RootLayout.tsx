@@ -387,7 +387,7 @@ export function RootLayout() {
             onTogglePrefetch={async (enabled) => { context.setPrefetchEnabled(enabled) }}
             onReorder={async (nextOrder) => { const next: SidebarConfig = { ...sidebarCfg, order: nextOrder }; setSidebarCfg(next); await saveUserSidebar(next) }}
           />
-          <main className="flex-1 overflow-y-auto flex flex-col bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-tl-lg">
+          <main className="flex-1 overflow-y-auto flex flex-col bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-tl-xl">
             <div className={`flex-1 p-6 ${currentView === 'course' ? 'pt-24' : ''}`}>
               <div className="max-w-6xl w-full mx-auto space-y-4">
                 <Outlet />

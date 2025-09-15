@@ -98,6 +98,8 @@ export type CourseInfo = {
   name?: string
   default_view?: string
   syllabus_body?: string
+  image_url?: string
+  image_download_url?: string
 }
 
 // Minimal file/folder types used in Files view

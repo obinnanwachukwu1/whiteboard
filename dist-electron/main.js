@@ -17106,7 +17106,7 @@ class CanvasClient {
   }
   // Course info + front page
   async getCourseInfo(courseId) {
-    return this.get(`/courses/${courseId}`, { "include[]": ["syllabus_body"] });
+    return this.get(`/courses/${courseId}`, { "include[]": ["syllabus_body", "course_image"] });
   }
   async getCourseFrontPage(courseId) {
     return this.get(`/courses/${courseId}/front_page`);
@@ -17373,6 +17373,7 @@ const DEFAULT_CONFIG = {
   cachedCourses: [],
   cachedDue: [],
   queryCache: void 0,
+  courseImages: {},
   sidebar: {
     hiddenCourseIds: [],
     customNames: {},

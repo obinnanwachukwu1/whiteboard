@@ -12,6 +12,8 @@ export type AppConfig = {
   cachedDue?: any[]
   // Optional dehydrated React Query cache snapshot
   queryCache?: any
+  // Persisted course images by baseUrl → { courseId: imageUrl }
+  courseImages?: Record<string, Record<string, string>>
   sidebar?: {
     hiddenCourseIds?: Array<string | number>
     customNames?: Record<string, string>
@@ -28,6 +30,7 @@ const DEFAULT_CONFIG: AppConfig = {
   cachedCourses: [],
   cachedDue: [],
   queryCache: undefined,
+  courseImages: {},
   sidebar: {
     hiddenCourseIds: [],
     customNames: {},
