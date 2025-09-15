@@ -467,7 +467,7 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
                   tabIndex={0}
                   onClick={() => onOpenCourse?.(c.id)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCourse?.(c.id) } }}
-                  className="cursor-pointer transition-transform duration-200 ease-out hover:scale-[1.02] hover:shadow-xl hover:ring-black/20 dark:hover:ring-white/20"
+                  className="cursor-pointer transition-transform duration-200 ease-out hover:scale-[1.02] hover:shadow-lg hover:ring-black/15 dark:hover:ring-white/20"
                 >
                   {/* Banner */}
                   <div
