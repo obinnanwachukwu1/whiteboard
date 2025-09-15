@@ -17,8 +17,11 @@ type Props = {
   courses: Course[]
   activeCourseId?: string | number | null
   sidebar?: SidebarConfig
-  current?: 'dashboard' | 'course' | 'allCourses' | 'settings'
+  current?: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'course' | 'allCourses' | 'settings'
   onSelectDashboard: () => void
+  onSelectAnnouncements?: () => void
+  onSelectAssignments?: () => void
+  onSelectGrades?: () => void
   onSelectCourse: (courseId: string | number) => void
   onOpenAllCourses: () => void
   onHideCourse: (courseId: string | number) => void
@@ -28,7 +31,7 @@ type Props = {
   onReorder?: (nextOrder: Array<string | number>) => void
 }
 
-export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, current = 'dashboard', onSelectDashboard, onSelectCourse, onOpenAllCourses, onHideCourse, onPrefetchCourse, prefetchEnabled: _prefetchEnabled = true, onTogglePrefetch: _onTogglePrefetch, onReorder }) => {
+export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, current = 'dashboard', onSelectDashboard, onSelectAnnouncements, onSelectAssignments, onSelectGrades, onSelectCourse, onOpenAllCourses, onHideCourse, onPrefetchCourse, prefetchEnabled: _prefetchEnabled = true, onTogglePrefetch: _onTogglePrefetch, onReorder }) => {
   const [menuOpenId, setMenuOpenId] = useState<string | number | null>(null)
   const [, setDragId] = useState<string | number | null>(null)
   const hidden = useMemo(() => new Set(sidebar?.hiddenCourseIds || []), [sidebar?.hiddenCourseIds])
@@ -102,6 +105,39 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
             aria-current={current === 'dashboard' ? 'page' : undefined}
           >
             Dashboard
+          </button>
+          <button
+            className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
+              current === 'announcements'
+                ? 'bg-brand/10 text-slate-900 dark:text-slate-100 font-semibold shadow-sm border-l-2 border-brand'
+                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-200 border-l-2 border-transparent'
+            }`}
+            onClick={() => onSelectAnnouncements?.()}
+            aria-current={current === 'announcements' ? 'page' : undefined}
+          >
+            Announcements
+          </button>
+          <button
+            className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
+              current === 'assignments'
+                ? 'bg-brand/10 text-slate-900 dark:text-slate-100 font-semibold shadow-sm border-l-2 border-brand'
+                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-200 border-l-2 border-transparent'
+            }`}
+            onClick={() => onSelectAssignments?.()}
+            aria-current={current === 'assignments' ? 'page' : undefined}
+          >
+            Assignments
+          </button>
+          <button
+            className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
+              current === 'grades'
+                ? 'bg-brand/10 text-slate-900 dark:text-slate-100 font-semibold shadow-sm border-l-2 border-brand'
+                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-200 border-l-2 border-transparent'
+            }`}
+            onClick={() => onSelectGrades?.()}
+            aria-current={current === 'grades' ? 'page' : undefined}
+          >
+            Grades
           </button>
         </nav>
       </div>

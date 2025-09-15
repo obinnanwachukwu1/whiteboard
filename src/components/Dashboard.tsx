@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { calculateCourseGrades, toAssignmentInputsFromRest } from '../utils/gradeCalc'
 import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
 import { useActivityAnnouncements } from '../hooks/useCanvasQueries'
+//
 
 type DueItem = {
   course_id: number | string
@@ -159,6 +160,7 @@ export const Dashboard: React.FC<Props> = ({ due, loading, courses = [], sidebar
   return (
     <div className="space-y-4">
       <h1 className="mt-0 mb-2 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Dashboard</h1>
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold">Coming Up</h2>

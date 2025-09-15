@@ -218,8 +218,14 @@ export function RootLayout() {
 
   // Derive current route and active course from pathname
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const currentView: 'dashboard' | 'course' | 'allCourses' | 'settings' = pathname.startsWith('/course/')
+  const currentView: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'course' | 'allCourses' | 'settings' = pathname.startsWith('/course/')
     ? 'course'
+    : pathname.startsWith('/announcements')
+    ? 'announcements'
+    : pathname.startsWith('/assignments')
+    ? 'assignments'
+    : pathname.startsWith('/grades')
+    ? 'grades'
     : pathname.startsWith('/all-courses')
     ? 'allCourses'
     : pathname.startsWith('/settings')
@@ -370,6 +376,9 @@ export function RootLayout() {
             sidebar={sidebarCfg}
             current={currentView}
             onSelectDashboard={() => { setActiveCourseId(null); navigate({ to: '/dashboard' }) }}
+            onSelectAnnouncements={() => { setActiveCourseId(null); navigate({ to: '/announcements' }) }}
+            onSelectAssignments={() => { setActiveCourseId(null); navigate({ to: '/assignments' }) }}
+            onSelectGrades={() => { setActiveCourseId(null); navigate({ to: '/grades' }) }}
             onSelectCourse={(id) => context.onOpenCourse(id)}
             onOpenAllCourses={() => navigate({ to: '/all-courses' })}
             onHideCourse={hideCourse}

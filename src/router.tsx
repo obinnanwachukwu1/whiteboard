@@ -6,6 +6,9 @@ import DashboardPage from './routes/DashboardPage'
 import AllCoursesPage from './routes/AllCoursesPage'
 import CoursePage from './routes/CoursePage'
 import SettingsPage from './routes/SettingsPage'
+import AnnouncementsPage from './routes/AnnouncementsPage'
+import AssignmentsPage from './routes/AssignmentsPage'
+import GradesPage from './routes/GradesPage'
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -35,6 +38,24 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 })
 
+const announcementsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/announcements',
+  component: AnnouncementsPage,
+})
+
+const assignmentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/assignments',
+  component: AssignmentsPage,
+})
+
+const gradesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/grades',
+  component: GradesPage,
+})
+
 function RedirectDashboard() { const navigate = useNavigate(); React.useEffect(() => { navigate({ to: '/dashboard', replace: true }) }, [navigate]); return null }
 
 const routeTree = rootRoute.addChildren([
@@ -43,6 +64,9 @@ const routeTree = rootRoute.addChildren([
   allCoursesRoute,
   courseRoute,
   settingsRoute,
+  announcementsRoute,
+  assignmentsRoute,
+  gradesRoute,
 ])
 
 export const router = createRouter({
