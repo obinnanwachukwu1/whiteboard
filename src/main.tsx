@@ -66,6 +66,12 @@ function useQueryPersistence(client: QueryClient) {
 }
 
 function Bootstrap({ children }: { children: React.ReactNode }) {
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
+      console.info('[whiteboard] Renderer boot location', window.location.href)
+    }
+  }, [])
+
   useQueryPersistence(queryClient)
   return <>{children}</>
 }

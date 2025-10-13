@@ -202,22 +202,22 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
 
       {/* Folders */}
       {listFolders.length > 0 && (
-        <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-neutral-700 mb-2">
+        <ul className="list-none m-0 p-0 mb-2">
           {listFolders.map((f: any) => (
-            <li key={f.id} className="py-2">
+            <li key={f.id} className="py-1">
               <div
                 role="button"
                 tabIndex={0}
                 onClick={() => setCurrent(String(f.id))}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCurrent(String(f.id)) } }}
-                className="group cursor-pointer flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 rounded-md px-2 sm:px-3 py-2 transition-colors"
+                className="group cursor-pointer flex items-center justify-between gap-3 rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 px-3 py-2 transition duration-200 ease-out hover:scale-[1.01] hover:shadow-sm hover:ring-[var(--app-accent-hover)] hover:bg-[var(--app-accent-bg)]"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-8 h-8 rounded-full bg-neutral-600/15 text-slate-600 dark:text-neutral-200 inline-flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-neutral-600/15 text-slate-600 dark:text-neutral-200 inline-flex items-center justify-center shrink-0">
                     <FolderIcon className="w-4 h-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium truncate group-hover:underline decoration-slate-300 dark:decoration-neutral-700">{f.name || f.full_name || 'Folder'}</div>
+                    <div className="font-medium truncate">{f.name || f.full_name || 'Folder'}</div>
                     <div className="text-xs text-slate-500 truncate">{f.full_name}</div>
                   </div>
                 </div>
@@ -248,6 +248,8 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
                     || /^(application\/(pdf|vnd\.openxmlformats-officedocument|vnd\.ms-)|image\/|audio\/|video\/)/i.test(String(f?.content_type || ''))
                   const type = fileTypeLabel(name, f?.content_type)
                   const sizeStr = typeof f?.size === 'number' ? formatBytes(f.size) : null
+                  const menuId = String(f.id)
+                  const isMenuOpen = menuOpenId === menuId
                   return (
                     <div
                       role="button"
@@ -260,14 +262,14 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
                         }
                       }}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (viewable) onOpenContent?.({ courseId, contentType: 'file', contentId: String(f.id), title: name }); else if (f?.url) window.system?.openExternal?.(f.url) } }}
-                      className="group cursor-pointer flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 px-2 sm:px-3 py-2 transition-colors relative"
+                      className={`group cursor-pointer flex items-center justify-between gap-3 rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 px-3 py-2 transition duration-200 ease-out hover:scale-[1.01] hover:shadow-sm hover:ring-[var(--app-accent-hover)] hover:bg-[var(--app-accent-bg)] relative ${isMenuOpen ? 'scale-[1.01] shadow-sm ring-[var(--app-accent-hover)] bg-[var(--app-accent-bg)]' : 'bg-white/70 dark:bg-neutral-900/70'}`}
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-8 h-8 rounded-full bg-neutral-600/15 text-slate-600 dark:text-neutral-200 inline-flex items-center justify-center shrink-0">
+                        <div className="w-9 h-9 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-neutral-600/15 text-slate-600 dark:text-neutral-200 inline-flex items-center justify-center shrink-0">
                           {iconForFile(name, f?.content_type)}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="font-medium truncate group-hover:underline decoration-slate-300 dark:decoration-neutral-700">{name}</div>
+                          <div className="font-medium truncate">{name}</div>
                           <div className="text-xs text-slate-500 truncate">
                             {type && <span>{type}</span>}
                             {updated && <span className="ml-2">• Updated {updated}</span>}
@@ -278,14 +280,14 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
                       {f?.url && (
                         <div className="shrink-0">
                           <button
-                            onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === String(f.id) ? null : String(f.id)) }}
-                            className="inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                            onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === menuId ? null : menuId) }}
+                            className={`inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ${isMenuOpen ? 'opacity-100' : ''}`}
                             aria-label="More options"
-                            ref={(el) => { anchorEls.current.set(String(f.id), el) }}
+                            ref={(el) => { anchorEls.current.set(menuId, el) }}
                           >
                             <MoreVertical className="w-4 h-4" />
                           </button>
-                          <Dropdown open={menuOpenId === String(f.id)} onOpenChange={(o) => setMenuOpenId(o ? String(f.id) : null)} align="right" offsetY={40} anchorEl={anchorEls.current.get(String(f.id))}>
+                          <Dropdown open={isMenuOpen} onOpenChange={(o) => setMenuOpenId(o ? menuId : null)} align="right" offsetY={40} anchorEl={anchorEls.current.get(menuId)}>
                             <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(f.url!) }}>
                               Open in Browser
                             </button>

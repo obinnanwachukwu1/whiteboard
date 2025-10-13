@@ -1,6 +1,20 @@
 import React from 'react'
 import { useAppContext } from '../context/AppContext'
 import { applyThemeAndAccent, computeAccentBg, type Accent } from '../utils/theme'
+type GpaRow = { min: number; gpa: number }
+const defaultGpaMap: GpaRow[] = [
+  { min: 93, gpa: 4.0 },
+  { min: 90, gpa: 3.7 },
+  { min: 87, gpa: 3.3 },
+  { min: 83, gpa: 3.0 },
+  { min: 80, gpa: 2.7 },
+  { min: 77, gpa: 2.3 },
+  { min: 73, gpa: 2.0 },
+  { min: 70, gpa: 1.7 },
+  { min: 67, gpa: 1.3 },
+  { min: 60, gpa: 1.0 },
+  { min: 0, gpa: 0.0 },
+]
 
 export default function SettingsPage() {
   const ctx = useAppContext()
@@ -9,6 +23,13 @@ export default function SettingsPage() {
   const [saving, setSaving] = React.useState(false)
   const [saved, setSaved] = React.useState<string | null>(null)
   const [accent, setAccent] = React.useState<Accent>('default')
+  const userKey = React.useMemo(() => {
+    const uid = (ctx?.profile as any)?.id
+    return ctx?.baseUrl && uid ? `${ctx.baseUrl}|${uid}` : null
+  }, [ctx?.baseUrl, (ctx?.profile as any)?.id])
+
+  const [prior, setPrior] = React.useState<{ credits: string; gpa: string }>({ credits: '', gpa: '' })
+  const [gpaMap, setGpaMap] = React.useState<GpaRow[]>(defaultGpaMap)
 
   React.useEffect(() => {
     let mounted = true
@@ -17,6 +38,45 @@ export default function SettingsPage() {
     })()
     return () => { mounted = false }
   }, [])
+
+  // Load per-user GPA settings
+  React.useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const cfg = await window.settings.get?.()
+        const data = (cfg?.ok ? (cfg.data as any) : {}) || {}
+        const per = userKey ? (data.userSettings?.[userKey] || {}) : {}
+        const gpa = (per?.gpa || data.gpa || {}) as any
+        if (!mounted) return
+        if (gpa.priorTotals) setPrior({ credits: String(gpa.priorTotals.credits ?? ''), gpa: String(gpa.priorTotals.gpa ?? '') })
+        if (Array.isArray(gpa.mapping) && gpa.mapping.length) setGpaMap(
+          gpa.mapping
+            .map((r: any) => ({ min: Number(r.min ?? 0), gpa: Number(r.gpa ?? 0) }))
+            .filter((r: any) => Number.isFinite(r.min) && Number.isFinite(r.gpa))
+            .sort((a: any, b: any) => b.min - a.min),
+        )
+      } catch {}
+    })()
+    return () => { mounted = false }
+  }, [userKey])
+
+  const persistGpa = React.useCallback(async (partial: Partial<{ priorTotals: { credits: string; gpa: string }; mapping: GpaRow[] }>) => {
+    try {
+      const cfg = await window.settings.get?.()
+      const data = (cfg?.ok ? (cfg.data as any) : {}) || {}
+      const map = (data.userSettings || {}) as Record<string, any>
+      if (userKey) {
+        const cur = map[userKey] || {}
+        const nextGpa = { ...(cur.gpa || {}), ...partial }
+        map[userKey] = { ...cur, gpa: nextGpa }
+        await window.settings.set?.({ userSettings: map })
+      } else {
+        const nextGpa = { ...(data.gpa || {}), ...partial }
+        await window.settings.set?.({ gpa: nextGpa } as any)
+      }
+    } catch {}
+  }, [userKey])
 
   const saveBaseUrl = async () => {
     setSaving(true)
@@ -155,6 +215,94 @@ export default function SettingsPage() {
             <div className="text-xs text-slate-600 dark:text-neutral-400">Prefetch course data while browsing</div>
           </div>
           <input className="self-start sm:self-auto" type="checkbox" checked={ctx.prefetchEnabled} onChange={(e) => ctx.setPrefetchEnabled(e.target.checked)} />
+        </div>
+      </section>
+
+      {/* Grades */}
+      <section className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 p-4 bg-white/60 dark:bg-neutral-900/60 backdrop-blur shadow-card">
+        <h2 className="mt-0 mb-3 text-lg font-semibold">Grades</h2>
+        <div className="grid gap-4 w-full max-w-3xl">
+          {/* Prior totals */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="text-sm">
+              <div className="mb-1">Prior Credits</div>
+              <input
+                className="w-full rounded-control border px-3 py-2 bg-white/90 dark:bg-neutral-900"
+                value={prior.credits}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^0-9.]/g, '')
+                  setPrior((p) => { const next = { ...p, credits: v }; persistGpa({ priorTotals: next }); return next })
+                }}
+                placeholder="e.g. 45"
+              />
+            </label>
+            <label className="text-sm">
+              <div className="mb-1">Prior Cumulative GPA</div>
+              <input
+                className="w-full rounded-control border px-3 py-2 bg-white/90 dark:bg-neutral-900"
+                value={prior.gpa}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^0-9.]/g, '')
+                  setPrior((p) => { const next = { ...p, gpa: v }; persistGpa({ priorTotals: next }); return next })
+                }}
+                placeholder="e.g. 3.65"
+              />
+            </label>
+          </div>
+
+          {/* GPA Mapping */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-sm font-semibold">GPA Mapping</div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="px-2 py-1 text-xs rounded-control ring-1 ring-black/10 dark:ring-white/10 bg-white/80 dark:bg-neutral-900/80"
+                  onClick={() => { setGpaMap(defaultGpaMap); persistGpa({ mapping: defaultGpaMap }) }}
+                >Reset</button>
+                <button
+                  className="px-2 py-1 text-xs rounded-control ring-1 ring-black/10 dark:ring-white/10 bg-white/80 dark:bg-neutral-900/80"
+                  onClick={() => {
+                    setGpaMap((prev) => { const next = [...prev, { min: 85, gpa: 3.5 }].sort((a, b) => b.min - a.min); persistGpa({ mapping: next }); return next })
+                  }}
+                >Add Row</button>
+              </div>
+            </div>
+            <div className="grid grid-cols-6 gap-2 text-[11px] text-slate-600 dark:text-neutral-300 mb-1">
+              <div className="col-span-3">≥ Percent</div>
+              <div className="col-span-2">GPA</div>
+              <div></div>
+            </div>
+            <div className="space-y-1">
+              {gpaMap.slice().sort((a, b) => b.min - a.min).map((row, idx) => (
+                <div key={`${idx}-${row.min}-${row.gpa}`} className="grid grid-cols-6 gap-2 items-center">
+                  <input
+                    className="col-span-3 rounded-control border px-2 py-1 text-sm bg-white/90 dark:bg-neutral-900"
+                    value={String(row.min)}
+                    onChange={(e) => {
+                      const v = Number(e.target.value.replace(/[^0-9.]/g, ''))
+                      setGpaMap((prev) => {
+                        const next = prev.slice(); next[idx] = { ...next[idx], min: Number.isFinite(v) ? v : 0 }; next.sort((a, b) => b.min - a.min)
+                        persistGpa({ mapping: next }); return next
+                      })
+                    }}
+                  />
+                  <input
+                    className="col-span-2 rounded-control border px-2 py-1 text-sm bg-white/90 dark:bg-neutral-900"
+                    value={String(row.gpa)}
+                    onChange={(e) => {
+                      const v = Number(e.target.value.replace(/[^0-9.]/g, ''))
+                      setGpaMap((prev) => { const next = prev.slice(); next[idx] = { ...next[idx], gpa: Number.isFinite(v) ? v : 0 }; persistGpa({ mapping: next }); return next })
+                    }}
+                  />
+                  <button
+                    className="text-xs px-2 py-1 rounded-control ring-1 ring-black/10 dark:ring-white/10 bg-white/80 dark:bg-neutral-900/80"
+                    onClick={() => { setGpaMap((prev) => { const next = prev.slice(0, idx).concat(prev.slice(idx + 1)); persistGpa({ mapping: next }); return next }) }}
+                  >Remove</button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="text-xs text-slate-500 dark:text-neutral-400">These settings drive the Current/Predicted GPA shown on the Grades page.</div>
         </div>
       </section>
 

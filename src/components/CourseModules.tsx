@@ -93,33 +93,33 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
       {!isLoading && modules && modules.length > 0 && (
         <div className="space-y-3">
           {(modules as CanvasModule[]).map((m, i) => (
-            <div key={i} className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-700 overflow-hidden">
-              <div className="px-4 py-2 font-medium bg-gradient-to-r from-slate-50/70 to-transparent dark:from-neutral-800/40 flex items-center justify-between">
+            <div key={i} className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 overflow-hidden transition duration-200 ease-out hover:scale-[1.005] hover:shadow-sm hover:ring-[var(--app-accent-hover)]">
+              <div className="px-4 py-2 font-medium bg-gradient-to-r from-[var(--app-accent-bg)]/50 to-transparent flex items-center justify-between">
                 <span>{m.name}</span>
                 <span className="text-xs text-slate-500">{m?.moduleItemsConnection?.nodes?.length ?? 0} items</span>
               </div>
               {(m.moduleItemsConnection?.nodes?.length ?? 0) > 0 && (
-                <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-neutral-700">
+                <ul className="list-none m-0 p-0">
                   {m.moduleItemsConnection?.nodes?.map((it: CanvasModuleItem, j: number) => {
                     const title = it.title || 'Item'
                     const kind = labelFor(it)
                     return (
-                      <li key={j} className="px-3 sm:px-4 py-2 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 transition-colors">
+                      <li key={j} className="px-3 sm:px-4 py-1">
                         <div
                           role="button"
                           tabIndex={0}
                           onClick={() => openItem(it, title)}
                           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openItem(it, title) } }}
-                          className="group cursor-pointer flex items-center justify-between gap-3"
+                          className="group cursor-pointer flex items-center justify-between gap-3 rounded-md px-1 py-2 transition duration-150 ease-out hover:bg-[var(--app-accent-bg)]/40"
                         >
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-8 h-8 rounded-full bg-neutral-600/15 text-slate-600 dark:text-neutral-200 inline-flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-neutral-600/15 text-slate-600 dark:text-neutral-200 inline-flex items-center justify-center">
                               {iconFor(it)}
                             </div>
                             <div className="truncate">
-                              <div className="truncate font-medium group-hover:underline decoration-slate-300 dark:decoration-neutral-700">{title}</div>
+                              <div className="truncate font-medium">{title}</div>
                               <div className="text-[11px] text-slate-500 mt-0.5">
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-neutral-800 dark:text-neutral-300">{kind}</span>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-white/80 dark:bg-neutral-900/80">{kind}</span>
                               </div>
                             </div>
                           </div>

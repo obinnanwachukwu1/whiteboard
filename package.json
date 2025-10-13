@@ -9,6 +9,7 @@
     "build:fast": "CSC_IDENTITY_AUTO_DISCOVERY=false npm_config_build_from_source=false vite build && electron-builder --dir",
     "pack:dir": "tsc && vite build && electron-builder --dir",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "test": "vitest run",
     "preview": "vite preview",
     "postinstall": "electron-builder install-app-deps"
   },
@@ -55,7 +56,8 @@
     "typescript": "^5.2.2",
     "vite": "^5.1.6",
     "vite-plugin-electron": "^0.28.6",
-    "vite-plugin-electron-renderer": "^0.14.5"
+    "vite-plugin-electron-renderer": "^0.14.5",
+    "vitest": "^3.2.4"
   },
   "main": "dist-electron/main.js"
 }

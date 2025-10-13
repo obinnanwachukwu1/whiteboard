@@ -22,7 +22,7 @@ export const CourseLinks: React.FC<Props> = ({ courseId }) => {
         <div className="text-slate-500 dark:text-neutral-400 text-sm">No links</div>
       )}
       {!isLoading && tabs && tabs.length > 0 && (
-        <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-neutral-700">
+        <ul className="list-none m-0 p-0">
           {tabs
             .slice()
             .sort((a: any, b: any) => (Number(a.position || 0) - Number(b.position || 0)))
@@ -32,17 +32,15 @@ export const CourseLinks: React.FC<Props> = ({ courseId }) => {
               const type = (t.type || '').toLowerCase()
               return (
                 <li key={i} className="py-1">
-                  <div className="flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 rounded-md px-2 sm:px-3 py-2 transition-colors">
+                  <div className="flex items-center justify-between gap-3 rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 px-3 py-2 transition duration-200 ease-out hover:scale-[1.01] hover:shadow-sm hover:ring-[var(--app-accent-hover)] hover:bg-[var(--app-accent-bg)]">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-neutral-600/15 text-slate-600 dark:text-neutral-200 inline-flex items-center justify-center">
+                      <div className="w-9 h-9 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-neutral-600/15 text-slate-600 dark:text-neutral-200 inline-flex items-center justify-center">
                         <LinkIcon className="w-4 h-4" />
                       </div>
                       <div className="truncate">
                         <span className="font-medium">{t.label || t.id}</span>
                         {type && (<span className="ml-2 text-xs text-slate-500">{type}</span>)}
-                        {isHidden && (
-                          <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-neutral-800 dark:text-neutral-300"><EyeOff className="w-3 h-3" /> hidden</span>
-                        )}
+                        {isHidden && (<span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-white/80 dark:bg-neutral-900/80"><EyeOff className="w-3 h-3" /> hidden</span>)}
                       </div>
                     </div>
                     <div className="shrink-0 relative">

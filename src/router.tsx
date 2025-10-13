@@ -1,4 +1,4 @@
-import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
+import { createHashHistory, createRootRoute, createRoute, createRouter, useRouterState } from '@tanstack/react-router'
 import React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { RootLayout } from './routes/RootLayout'
@@ -9,6 +9,7 @@ import SettingsPage from './routes/SettingsPage'
 import AnnouncementsPage from './routes/AnnouncementsPage'
 import AssignmentsPage from './routes/AssignmentsPage'
 import GradesPage from './routes/GradesPage'
+import { shouldUseHashHistory } from './utils/history'
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -56,7 +57,18 @@ const gradesRoute = createRoute({
   component: GradesPage,
 })
 
-function RedirectDashboard() { const navigate = useNavigate(); React.useEffect(() => { navigate({ to: '/dashboard', replace: true }) }, [navigate]); return null }
+function RedirectDashboard() {
+  const navigate = useNavigate()
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+
+  React.useEffect(() => {
+    if (pathname !== '/dashboard') {
+      navigate({ to: '/dashboard', replace: true })
+    }
+  }, [navigate, pathname])
+
+  return null
+}
 
 const routeTree = rootRoute.addChildren([
   createRoute({ getParentRoute: () => rootRoute, path: '/', component: RedirectDashboard }),
@@ -69,8 +81,13 @@ const routeTree = rootRoute.addChildren([
   gradesRoute,
 ])
 
+const history = typeof window !== 'undefined' && shouldUseHashHistory(window.location?.protocol)
+  ? createHashHistory()
+  : undefined
+
 export const router = createRouter({
   routeTree,
+  ...(history ? { history } : {}),
   defaultPreload: 'intent',
   defaultStaleTime: 1000 * 60,
 })
