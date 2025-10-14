@@ -7,6 +7,7 @@ import { ToastProvider } from './components/ui/Toaster'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { RouterProvider } from '@tanstack/react-router'
 import { router } from './router'
+import { bootstrapTheme } from './utils/themeBootstrap'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -76,20 +77,32 @@ function Bootstrap({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <ErrorBoundary>
-          <Bootstrap>
-            <RouterProvider router={router} />
-          </Bootstrap>
-        </ErrorBoundary>
-        <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
-      </ToastProvider>
-    </QueryClientProvider>
-  </React.StrictMode>,
-)
+async function main() {
+  if (typeof window !== 'undefined') {
+    try {
+      await bootstrapTheme()
+    } catch (err) {
+      console.warn('Failed to bootstrap theme', err)
+    }
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <ErrorBoundary>
+            <Bootstrap>
+              <RouterProvider router={router} />
+            </Bootstrap>
+          </ErrorBoundary>
+          <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
+        </ToastProvider>
+      </QueryClientProvider>
+    </React.StrictMode>,
+  )
+}
+
+main()
 
 // Use contextBridge
 window.ipcRenderer.on('main-process-message', (_event, message) => {

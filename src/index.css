@@ -15,6 +15,7 @@ body { background-color: var(--app-accent-root); }
  */
 :root {
   --app-accent-bg: rgb(255 255 255 / 0.8);
+  --app-accent-root: rgb(255 255 255);
   /* Dark header background: neutral black/gray glass, not blue */
   --app-accent-bg-dark: rgb(18 18 18 / 0.85);
   /* Override Tailwind v4 brand token to neutral gray to avoid blue tint in dark mode */
@@ -23,6 +24,7 @@ body { background-color: var(--app-accent-root); }
 
 /* Slightly deeper brand in dark to maintain contrast without blue hue */
 .dark {
+  --app-accent-root: rgb(18 18 18);
   --color-brand: 180 180 180; /* neutral-500-ish */
 }
 

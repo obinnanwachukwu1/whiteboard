@@ -295,7 +295,10 @@ export function RootLayout() {
   // Initial app loading screen while auth initializes
   if (hasToken === null) {
     return (
-      <div className="h-screen w-screen relative flex items-center justify-center bg-gray-50 dark:bg-neutral-950">
+      <div
+        className="h-screen w-screen relative flex items-center justify-center transition-colors"
+        style={{ backgroundColor: 'var(--app-accent-root, #f8fafc)' }}
+      >
         {/* Transparent draggable bar on startup */}
         <div className="absolute inset-x-0 top-0 h-14 app-drag titlebar-left-inset z-50 bg-transparent" aria-hidden />
         <div className="text-slate-600 dark:text-slate-300 text-sm animate-pulse">Loading…</div>
