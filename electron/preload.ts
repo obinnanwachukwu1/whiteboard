@@ -81,6 +81,8 @@ contextBridge.exposeInMainWorld('settings', {
       userSidebars?: Record<string, any>
       courseImages?: Record<string, Record<string, string>>
       sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> }
+      pdfGestureZoomEnabled?: boolean
+      pdfZoom?: Record<string, number>
     }>,
   ) => ipcRenderer.invoke('config:set', partial),
 })

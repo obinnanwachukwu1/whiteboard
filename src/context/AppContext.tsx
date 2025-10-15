@@ -11,6 +11,9 @@ export type AppContextValue = {
   setSidebar: (next: SidebarConfig) => Promise<void>
   prefetchEnabled: boolean
   setPrefetchEnabled: (v: boolean) => Promise<void>
+  pdfGestureZoomEnabled: boolean
+  setPdfGestureZoomEnabled: (v: boolean) => Promise<void>
+  saveUserSettings: (partial: Record<string, any>) => Promise<void>
   onOpenCourse: (id: string | number) => void
   onOpenAssignment: (courseId: string | number, restId: string | number, title?: string) => void
   onOpenAnnouncement: (courseId: string | number, topicId: string | number, title?: string) => void

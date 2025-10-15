@@ -24,6 +24,7 @@ export function RootLayout() {
   const [loading, setLoading] = useState(false)
   const [showToken, setShowToken] = useState(false)
   const [prefetchEnabled, setPrefetchEnabledState] = useState(true)
+  const [pdfGestureZoomEnabled, setPdfGestureZoomEnabledState] = useState(true)
   const [cachedCourses, setCachedCourses] = useState<any[] | null>(null)
   const [cachedDue, setCachedDue] = useState<any[] | null>(null)
   const [activeCourseId, setActiveCourseIdState] = useState<string | number | null>(null)
@@ -42,25 +43,27 @@ export function RootLayout() {
   useEffect(() => {
     (async () => {
       const cfg = await window.settings.get()
-      if (cfg.ok && cfg.data?.baseUrl) setBaseUrl(cfg.data.baseUrl)
+      const data = (cfg.ok ? (cfg.data as any) : {}) as any
+      if (data?.baseUrl) setBaseUrl(data.baseUrl)
       try {
-        const theme = (cfg.ok && cfg.data?.theme) ? cfg.data.theme : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-        const accent = (cfg.ok ? (cfg.data as any)?.accent : undefined) || 'default'
+        const theme = data?.theme ? data.theme : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        const accent = (data?.accent) || 'default'
         applyThemeAndAccent(theme as 'light' | 'dark', accent as any)
       } catch {}
-      if (cfg.ok && cfg.data?.sidebar) setSidebarCfg(cfg.data.sidebar)
-      if (cfg.ok && typeof cfg.data?.prefetchEnabled === 'boolean') setPrefetchEnabledState(!!cfg.data.prefetchEnabled)
-      if (cfg.ok && Array.isArray(cfg.data?.cachedCourses)) {
-        setCachedCourses(cfg.data.cachedCourses || [])
-        queryClient.setQueryData(['courses', { enrollment_state: 'active' }], cfg.data.cachedCourses || [])
+      if (data?.sidebar) setSidebarCfg(data.sidebar)
+      if (typeof data?.prefetchEnabled === 'boolean') setPrefetchEnabledState(!!data.prefetchEnabled)
+      if (typeof data?.pdfGestureZoomEnabled === 'boolean') setPdfGestureZoomEnabledState(!!data.pdfGestureZoomEnabled)
+      if (Array.isArray(data?.cachedCourses)) {
+        setCachedCourses(data.cachedCourses || [])
+        queryClient.setQueryData(['courses', { enrollment_state: 'active' }], data.cachedCourses || [])
       }
-      if (cfg.ok && Array.isArray(cfg.data?.cachedDue)) {
-        setCachedDue(cfg.data.cachedDue || [])
-        queryClient.setQueryData(['due-assignments', { days: 7 }], cfg.data.cachedDue || [])
+      if (Array.isArray(data?.cachedDue)) {
+        setCachedDue(data.cachedDue || [])
+        queryClient.setQueryData(['due-assignments', { days: 7 }], data.cachedDue || [])
       }
 
       setLoading(true)
-      const res = await window.canvas.init({ baseUrl: cfg.data?.baseUrl || baseUrl })
+      const res = await window.canvas.init({ baseUrl: data?.baseUrl || baseUrl })
       if (!res.ok) {
         setHasToken(false)
         setLoading(false)
@@ -96,14 +99,17 @@ export function RootLayout() {
         const perSettings = data?.userSettings?.[userKey]
         if (perSettings) {
           if (typeof perSettings.prefetchEnabled === 'boolean') setPrefetchEnabledState(!!perSettings.prefetchEnabled)
+          if (typeof perSettings.pdfGestureZoomEnabled === 'boolean') setPdfGestureZoomEnabledState(!!perSettings.pdfGestureZoomEnabled)
           const theme = perSettings.theme || (document.documentElement.classList.contains('dark') ? 'dark' : 'light')
           const accent = perSettings.accent || (data?.accent || 'default')
           try { applyThemeAndAccent(theme as any, accent as any) } catch {}
         } else {
           const next: any = {}
           if (typeof data?.prefetchEnabled === 'boolean') { next.prefetchEnabled = !!data.prefetchEnabled; setPrefetchEnabledState(!!data.prefetchEnabled) }
+          if (typeof data?.pdfGestureZoomEnabled === 'boolean') { next.pdfGestureZoomEnabled = !!data.pdfGestureZoomEnabled; setPdfGestureZoomEnabledState(!!data.pdfGestureZoomEnabled) }
           if (data?.theme) next.theme = data.theme
           if (data?.accent) next.accent = data.accent
+          if (data?.pdfZoom && typeof data.pdfZoom === 'object') next.pdfZoom = data.pdfZoom
           if (Object.keys(next).length) {
             const mapS = { ...(data.userSettings || {}) }
             mapS[userKey] = { ...(mapS[userKey] || {}), ...next }
@@ -133,7 +139,7 @@ export function RootLayout() {
     } catch {}
   }
 
-  const saveUserSettings = async (partial: Record<string, any>) => {
+  const saveUserSettings = React.useCallback(async (partial: Record<string, any>) => {
     try {
       const cfg = await window.settings.get?.()
       const map = (cfg?.ok ? (cfg.data as any)?.userSettings : undefined) || {}
@@ -145,7 +151,17 @@ export function RootLayout() {
         await window.settings.set?.(partial as any)
       }
     } catch {}
-  }
+  }, [userKey])
+
+  const setPrefetchEnabledPersisted = React.useCallback(async (v: boolean) => {
+    setPrefetchEnabledState(v)
+    await saveUserSettings({ prefetchEnabled: v })
+  }, [saveUserSettings])
+
+  const setPdfGestureZoomEnabledPersisted = React.useCallback(async (v: boolean) => {
+    setPdfGestureZoomEnabledState(v)
+    await saveUserSettings({ pdfGestureZoomEnabled: v })
+  }, [saveUserSettings])
 
   const hideCourse = async (courseId: string | number) => {
     const hidden = new Set(sidebarCfg.hiddenCourseIds || [])
@@ -246,6 +262,7 @@ export function RootLayout() {
     setCachedCourses([])
     setCachedDue([])
     setHasToken(false)
+    setPdfGestureZoomEnabledState(true)
     navigate({ to: '/dashboard' })
   }
 
@@ -258,7 +275,10 @@ export function RootLayout() {
     sidebar: sidebarCfg,
     setSidebar: onSidebarConfigChange,
     prefetchEnabled,
-    setPrefetchEnabled: async (v: boolean) => { setPrefetchEnabledState(v); await saveUserSettings({ prefetchEnabled: v }) },
+  setPrefetchEnabled: setPrefetchEnabledPersisted,
+  pdfGestureZoomEnabled,
+  setPdfGestureZoomEnabled: setPdfGestureZoomEnabledPersisted,
+  saveUserSettings,
     onOpenCourse: (id) => { setActiveCourseId(id); navigate({ to: '/course/$courseId', params: { courseId: String(id) } }) },
     onOpenAssignment: (courseId, restId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'assignments', type: 'assignment', contentId: String(restId), title } }) },
     onOpenAnnouncement: (courseId, topicId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'announcements', type: 'announcement', contentId: String(topicId), title } }) },

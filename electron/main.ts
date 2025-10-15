@@ -103,6 +103,14 @@ function createWindow() {
     },
   })
 
+  try {
+    win.webContents.setVisualZoomLevelLimits(1, 1)
+  } catch {}
+  try {
+    win.webContents.setZoomFactor(1)
+    win.webContents.setZoomLevel(0)
+  } catch {}
+
   // Test active push message to Renderer-process.
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', (new Date).toLocaleString())

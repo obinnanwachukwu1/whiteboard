@@ -19,6 +19,10 @@ export type AppConfig = {
     customNames?: Record<string, string>
     order?: Array<string | number>
   }
+  userSettings?: Record<string, any>
+  userSidebars?: Record<string, any>
+  pdfGestureZoomEnabled?: boolean
+  pdfZoom?: Record<string, number>
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -36,6 +40,10 @@ const DEFAULT_CONFIG: AppConfig = {
     customNames: {},
     order: [],
   },
+  userSettings: {},
+  userSidebars: {},
+  pdfGestureZoomEnabled: true,
+  pdfZoom: {},
 }
 
 function configPath() {

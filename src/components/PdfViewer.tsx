@@ -33,18 +33,18 @@ const MIN_SCALE = 0.5
 const MAX_SCALE = 3
 const PADDING_X = 48
 
-type Anchor = { pageNumber: number; relative: number; containerOffset: number }
+type Anchor = {
+  pageNumber: number
+  relY: number
+  relX: number
+  containerOffsetY: number
+  containerOffsetX: number
+}
 type PageMetrics = { width: number; height: number; scale: number }
 type PageRegistryEntry = {
   render: (targetScale: number) => Promise<number | null>
   cancel: () => void
   getElement: () => HTMLDivElement | null
-}
-
-type PinchSession = {
-  active: boolean
-  baseScale: number
-  anchor: Anchor | null
 }
 
 type SetScaleOptions = {
@@ -68,14 +68,16 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) =
   const [fitWidth, setFitWidth] = useState(false)
   const basePageWidthRef = useRef<number | null>(null)
   const [pageHeights, setPageHeights] = useState<number[]>([])
+  const [pageWidths, setPageWidths] = useState<number[]>([])
   const [defaultPageHeight, setDefaultPageHeight] = useState(900)
+  const [defaultPageWidth, setDefaultPageWidth] = useState(700)
   const [currentPage, setCurrentPage] = useState(1)
   const currentPageRef = useRef(1)
   const pageSubscribersRef = useRef(new Set<() => void>())
   const pageRegistryRef = useRef(new Map<number, PageRegistryEntry>())
   const anchorRef = useRef<Anchor | null>(null)
   const zoomModeRef = useRef<'idle' | 'gesture'>('idle')
-  const pinchSessionRef = useRef<PinchSession>({ active: false, baseScale: scale, anchor: null })
+  const gestureAnchorRef = useRef<Anchor | null>(null)
   const hudTimeoutRef = useRef<number | null>(null)
   const [zoomHudVisible, setZoomHudVisible] = useState(false)
   const [zoomHudValue, setZoomHudValue] = useState(() => Math.round(scale * 100))
@@ -97,10 +99,6 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) =
 
   useEffect(() => {
     scaleRef.current = scale
-    if (!pinchSessionRef.current.active) {
-      pinchSessionRef.current.baseScale = scale
-      pinchSessionRef.current.anchor = null
-    }
   }, [scale])
 
   useEffect(() => {
@@ -293,30 +291,44 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) =
     }
   }, [])
 
-  const handlePageMetrics = useCallback((pageNumber: number, metrics: PageMetrics) => {
-    const height = Number.isFinite(metrics.height) ? metrics.height : defaultPageHeight
-    setPageHeights((prev) => {
-      const next = prev.slice()
-      next[pageNumber - 1] = Math.round(height)
-      return next
-    })
-    if (pageNumber === 1) {
-      if (Number.isFinite(metrics.width) && Number.isFinite(metrics.scale) && metrics.scale > 0) {
-        basePageWidthRef.current = metrics.width / metrics.scale
+  const handlePageMetrics = useCallback(
+    (pageNumber: number, metrics: PageMetrics) => {
+      const height = Number.isFinite(metrics.height) ? metrics.height : defaultPageHeight
+      const width = Number.isFinite(metrics.width) ? metrics.width : defaultPageWidth
+      setPageHeights((prev) => {
+        const next = prev.slice()
+        next[pageNumber - 1] = Math.round(height)
+        return next
+      })
+      setPageWidths((prev) => {
+        const next = prev.slice()
+        next[pageNumber - 1] = Math.round(width)
+        return next
+      })
+      if (pageNumber === 1) {
+        if (Number.isFinite(metrics.width) && Number.isFinite(metrics.scale) && metrics.scale > 0) {
+          basePageWidthRef.current = metrics.width / metrics.scale
+        }
+        setDefaultPageHeight(Math.round(height))
+        setDefaultPageWidth(Math.round(width))
       }
-      setDefaultPageHeight(Math.round(height))
-    }
-  }, [defaultPageHeight])
+    },
+    [defaultPageHeight, defaultPageWidth]
+  )
 
   const captureAnchor = useCallback(
     (point?: { clientX?: number; clientY?: number }): Anchor | null => {
       const container = containerRef.current
       if (!container || pageRegistryRef.current.size === 0) return null
-      let targetOffset = container.scrollTop + container.clientHeight / 2
-      if (point && typeof point.clientY === 'number') {
-        const rect = container.getBoundingClientRect()
-        if (point.clientY >= rect.top && point.clientY <= rect.bottom) {
-          targetOffset = container.scrollTop + (point.clientY - rect.top)
+      const containerRect = container.getBoundingClientRect()
+      let targetY = container.scrollTop + container.clientHeight / 2
+      let targetX = container.scrollLeft + container.clientWidth / 2
+      if (point) {
+        if (typeof point.clientY === 'number' && point.clientY >= containerRect.top && point.clientY <= containerRect.bottom) {
+          targetY = container.scrollTop + (point.clientY - containerRect.top)
+        }
+        if (typeof point.clientX === 'number' && point.clientX >= containerRect.left && point.clientX <= containerRect.right) {
+          targetX = container.scrollLeft + (point.clientX - containerRect.left)
         }
       }
       let bestPage = currentPageRef.current
@@ -324,11 +336,12 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) =
       pageRegistryRef.current.forEach((entry, pageNumber) => {
         const el = entry.getElement()
         if (!el) return
-        const height = pageHeights[pageNumber - 1] ?? el.offsetHeight ?? defaultPageHeight
+        const pageRect = el.getBoundingClientRect()
+        const height = pageRect.height || pageHeights[pageNumber - 1] || defaultPageHeight
         if (!(height > 0)) return
-        const top = el.offsetTop
-        const mid = top + height / 2
-        const dist = Math.abs(targetOffset - mid)
+        const topWithin = container.scrollTop + (pageRect.top - containerRect.top)
+        const midY = topWithin + height / 2
+        const dist = Math.abs(targetY - midY)
         if (dist < bestDist) {
           bestDist = dist
           bestPage = pageNumber
@@ -337,37 +350,55 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) =
       const entry = pageRegistryRef.current.get(bestPage)
       const el = entry?.getElement()
       if (!el) return null
-      const height = pageHeights[bestPage - 1] ?? el.offsetHeight ?? defaultPageHeight
-      if (!(height > 0)) return null
-      const top = el.offsetTop
-      const relative = (targetOffset - top) / height
-      const offsetWithinContainer = targetOffset - container.scrollTop
+      const pageRect = el.getBoundingClientRect()
+      const height = pageRect.height || pageHeights[bestPage - 1] || defaultPageHeight
+      const width = pageRect.width || pageWidths[bestPage - 1] || defaultPageWidth
+      if (!(height > 0) || !(width > 0)) return null
+      const topWithin = container.scrollTop + (pageRect.top - containerRect.top)
+      const leftWithin = container.scrollLeft + (pageRect.left - containerRect.left)
+      const relY = (targetY - topWithin) / height
+      const relX = (targetX - leftWithin) / width
+      const offsetY = targetY - container.scrollTop
+      const offsetX = targetX - container.scrollLeft
       return {
         pageNumber: bestPage,
-        relative: Math.min(1, Math.max(0, relative)),
-        containerOffset: Math.min(Math.max(offsetWithinContainer, 0), container.clientHeight || 0),
+        relY: Math.min(1, Math.max(0, relY)),
+        relX: Math.min(1, Math.max(0, relX)),
+        containerOffsetY: Math.min(Math.max(offsetY, 0), container.clientHeight || 0),
+        containerOffsetX: Math.min(Math.max(offsetX, 0), container.clientWidth || 0),
       }
     },
-    [pageHeights, defaultPageHeight]
+    [pageHeights, pageWidths, defaultPageHeight, defaultPageWidth]
   )
 
   const restoreAnchor = useCallback(
-    (anchor: Anchor, overrideHeight?: number | null) => {
+    (anchor: Anchor, metrics?: { height?: number | null; width?: number | null }) => {
       const container = containerRef.current
       if (!container) return
       const entry = pageRegistryRef.current.get(anchor.pageNumber)
       const el = entry?.getElement()
       if (!el) return
-      const height = overrideHeight ?? pageHeights[anchor.pageNumber - 1] ?? el.offsetHeight ?? defaultPageHeight
-      if (!Number.isFinite(height) || height <= 0) return
-      const offsetWithinContainer =
-        Number.isFinite(anchor.containerOffset) && anchor.containerOffset >= 0
-          ? Math.min(anchor.containerOffset, container.clientHeight || 0)
+      const containerRect = container.getBoundingClientRect()
+      const pageRect = el.getBoundingClientRect()
+      const height = metrics?.height ?? pageRect.height ?? pageHeights[anchor.pageNumber - 1] ?? defaultPageHeight
+      const width = metrics?.width ?? pageRect.width ?? pageWidths[anchor.pageNumber - 1] ?? defaultPageWidth
+      if (!(height > 0) || !(width > 0)) return
+      const topWithin = container.scrollTop + (pageRect.top - containerRect.top)
+      const leftWithin = container.scrollLeft + (pageRect.left - containerRect.left)
+      const offsetY =
+        Number.isFinite(anchor.containerOffsetY) && anchor.containerOffsetY >= 0
+          ? Math.min(anchor.containerOffsetY, container.clientHeight || 0)
           : container.clientHeight / 2
-      const target = el.offsetTop + height * anchor.relative - offsetWithinContainer
-      container.scrollTop = Math.max(0, target)
+      const offsetX =
+        Number.isFinite(anchor.containerOffsetX) && anchor.containerOffsetX >= 0
+          ? Math.min(anchor.containerOffsetX, container.clientWidth || 0)
+          : container.clientWidth / 2
+      const targetY = topWithin + height * anchor.relY - offsetY
+      const targetX = leftWithin + width * anchor.relX - offsetX
+      container.scrollTop = Math.max(0, Math.min(targetY, container.scrollHeight - container.clientHeight))
+      container.scrollLeft = Math.max(0, Math.min(targetX, container.scrollWidth - container.clientWidth))
     },
-    [pageHeights, defaultPageHeight]
+    [pageHeights, pageWidths, defaultPageHeight, defaultPageWidth]
   )
 
   const updateCurrentPageFromScroll = useCallback(() => {
@@ -396,25 +427,39 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) =
       const clamped = clampScale(nextScale, MIN_SCALE, MAX_SCALE)
       if (Math.abs(scaleRef.current - clamped) < 0.0001) return
       if (!opts?.preserveFit) setFitWidth(false)
+      const pointArg =
+        opts?.point && (typeof opts.point.clientX === 'number' || typeof opts.point.clientY === 'number')
+          ? opts.point
+          : undefined
       let anchorOverride = opts?.anchor ?? null
+      if (!anchorOverride && zoomModeRef.current === 'gesture' && gestureAnchorRef.current) {
+        anchorOverride = gestureAnchorRef.current
+      }
       if (!anchorOverride) {
-        const pointArg =
-          opts?.point && (typeof opts.point.clientX === 'number' || typeof opts.point.clientY === 'number')
-            ? opts.point
-            : undefined
         anchorOverride = captureAnchor(pointArg) ?? null
       }
       if (!anchorOverride) {
         anchorOverride = captureAnchor()
       }
+      if (zoomModeRef.current === 'gesture') {
+        gestureAnchorRef.current = anchorOverride
+      } else {
+        gestureAnchorRef.current = null
+      }
       if (anchorOverride) {
         anchorRef.current = anchorOverride
+        const pageEntry = pageRegistryRef.current.get(anchorOverride.pageNumber)
+        const el = pageEntry?.getElement() || null
+        const rect = el?.getBoundingClientRect()
+        const immediateHeight = rect?.height ?? pageHeights[anchorOverride.pageNumber - 1] ?? null
+        const immediateWidth = rect?.width ?? pageWidths[anchorOverride.pageNumber - 1] ?? null
+        restoreAnchor(anchorOverride, { height: immediateHeight, width: immediateWidth })
       } else {
         anchorRef.current = null
       }
       setScale(clamped)
     },
-    [captureAnchor]
+    [captureAnchor, pageHeights, pageWidths, restoreAnchor]
   )
 
   const zoomIn = useCallback(() => {
@@ -476,9 +521,11 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) =
     entry
       .render(scale)
       .catch(() => null)
-      .then((height) => {
+      .then(() => {
         requestAnimationFrame(() => {
-          restoreAnchor(anchor, height)
+          const el = entry.getElement()
+          const rect = el?.getBoundingClientRect()
+          restoreAnchor(anchor, { height: rect?.height ?? null, width: rect?.width ?? null })
           anchorRef.current = null
           updateCurrentPageFromScroll()
         })
@@ -574,94 +621,23 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) =
     minScale: MIN_SCALE,
     maxScale: MAX_SCALE,
     getScale: () => scaleRef.current,
-    onZoom: (next) => setScaleAnchored(next),
+    onZoom: (next, _source, point) => setScaleAnchored(next, { point }),
+    onPan: (dx, dy) => {
+      const c = containerRef.current
+      if (!c) return
+      c.scrollLeft = Math.max(0, Math.min(c.scrollWidth - c.clientWidth, c.scrollLeft - dx))
+      c.scrollTop = Math.max(0, Math.min(c.scrollHeight - c.clientHeight, c.scrollTop - dy))
+    },
     onGestureStart: () => {
       zoomModeRef.current = 'gesture'
+      gestureAnchorRef.current = null
     },
     onGestureEnd: () => {
       zoomModeRef.current = 'idle'
+      gestureAnchorRef.current = null
       updateCurrentPageFromScroll()
     },
   })
-
-  useEffect(() => {
-    const ipc = (window as any)?.ipcRenderer
-    if (!ipc?.on || !ipc?.off) {
-      pinchSessionRef.current.active = false
-      return
-    }
-    if (!pdfGestureZoomEnabled) {
-      pinchSessionRef.current.active = false
-      return
-    }
-    const handler = (_event: unknown, payload: any) => {
-      if (!payload || !containerRef.current) return
-      const { phase, scale: pinchScale, centerX, centerY } = payload as {
-        phase?: 'begin' | 'update' | 'end'
-        scale?: number
-        centerX?: number | null
-        centerY?: number | null
-      }
-      if (!phase) return
-      const container = containerRef.current
-      const rect = container.getBoundingClientRect()
-      if (typeof centerX === 'number' && typeof centerY === 'number') {
-        if (centerX < rect.left || centerX > rect.right || centerY < rect.top || centerY > rect.bottom) {
-          if (phase === 'end') pinchSessionRef.current.active = false
-          return
-        }
-      }
-      const point =
-        typeof centerX === 'number' || typeof centerY === 'number'
-          ? { clientX: centerX ?? undefined, clientY: centerY ?? undefined }
-          : undefined
-      if (phase === 'begin') {
-        pinchSessionRef.current.active = true
-        pinchSessionRef.current.baseScale = scaleRef.current
-        pinchSessionRef.current.anchor = captureAnchor(point) ?? captureAnchor()
-        if (pinchSessionRef.current.anchor) {
-          anchorRef.current = pinchSessionRef.current.anchor
-        }
-        zoomModeRef.current = 'gesture'
-        return
-      }
-      if (phase === 'update') {
-        if (!pinchSessionRef.current.active) {
-          pinchSessionRef.current.active = true
-          pinchSessionRef.current.baseScale = scaleRef.current
-          pinchSessionRef.current.anchor = captureAnchor(point) ?? captureAnchor()
-          zoomModeRef.current = 'gesture'
-        }
-        let anchor = pinchSessionRef.current.anchor
-        if (point) {
-          const anchorFromPoint = captureAnchor(point)
-          if (anchorFromPoint) anchor = anchorFromPoint
-        }
-        pinchSessionRef.current.anchor = anchor ?? pinchSessionRef.current.anchor
-        const rawFactor = Number.isFinite(pinchScale) && pinchScale && pinchScale > 0 ? pinchScale : 1
-        const boostedFactor = Math.pow(rawFactor, 1.12)
-        const base = pinchSessionRef.current.baseScale || scaleRef.current
-        const next = clampScale(base * boostedFactor, MIN_SCALE, MAX_SCALE)
-        setScaleAnchored(next, { anchor, point })
-        return
-      }
-      if (phase === 'end') {
-        if (pinchSessionRef.current.active) {
-          pinchSessionRef.current.active = false
-          pinchSessionRef.current.baseScale = scaleRef.current
-          pinchSessionRef.current.anchor = null
-        }
-        zoomModeRef.current = 'idle'
-        updateCurrentPageFromScroll()
-      }
-    }
-    ipc.on('pdf-gesture-pinch', handler)
-    return () => {
-      ipc.off('pdf-gesture-pinch', handler)
-      pinchSessionRef.current.active = false
-      pinchSessionRef.current.anchor = null
-    }
-  }, [pdfGestureZoomEnabled, captureAnchor, setScaleAnchored, updateCurrentPageFromScroll])
 
   useEffect(() => {
     if (!pageInputEditing) setPageInputValue(String(currentPage))
@@ -752,7 +728,7 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) =
               {zoomHudValue}%
             </div>
           )}
-          <div className="p-6 flex flex-col items-center">
+          <div className="p-6 flex flex-col gap-4 items-center">
             {Array.from({ length: numPages }, (_, index) => (
               <PageView
                 key={`page-${index + 1}`}
@@ -916,10 +892,10 @@ const PageView: React.FC<PageViewProps> = React.memo(
     }, [pdf, scale, renderPage])
 
     return (
-      <div ref={outerRef} className="flex flex-col items-center mb-4 w-full" style={{ minHeight: `${placeholderHeight}px` }}>
+      <div ref={outerRef} className="mb-4 w-full" style={{ minHeight: `${placeholderHeight}px` }}>
         <div
           ref={surfaceRef}
-          className="relative inline-block bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-md shadow overflow-hidden"
+          className="relative inline-block bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-md shadow overflow-hidden mx-auto"
         >
           <canvas ref={canvasRef} className="block" />
         </div>
