@@ -112,3 +112,58 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
   white-space: nowrap !important;
   border: 0 !important;
 }
+
+/* PDF overlays */
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  transform-origin: 0 0;
+  pointer-events: auto;
+  user-select: text;
+  touch-action: inherit;
+  -webkit-text-size-adjust: none;
+  -moz-text-size-adjust: none;
+  text-size-adjust: none;
+}
+.textLayer :is(span, br) {
+  position: absolute;
+  white-space: pre;
+  transform-origin: 0% 0%;
+  cursor: text;
+  color: transparent;
+}
+.textLayer span::selection {
+  background: rgba(37, 99, 235, 0.35);
+}
+.textLayer br::selection {
+  background: transparent;
+}
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  pointer-events: none;
+  user-select: none;
+}
+.annotationLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: clip;
+  touch-action: inherit;
+}
+.annotationLayer a {
+  position: absolute;
+  border-radius: 0.125rem;
+  pointer-events: auto;
+  outline: none;
+  text-decoration: none;
+}
+.annotationLayer a:focus-visible,
+.annotationLayer a:hover {
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35);
+  background: rgba(37, 99, 235, 0.12);
+}
