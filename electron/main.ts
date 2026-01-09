@@ -1,5 +1,5 @@
-import { app, BrowserWindow, ipcMain, shell, nativeImage } from 'electron'
-import { fileURLToPath } from 'node:url'
+import { app, BrowserWindow, ipcMain, shell, nativeImage, protocol, net } from 'electron'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
 import {
@@ -21,7 +21,7 @@ import {
   getCoursePage as svcGetCoursePage,
   getAssignmentRest as svcGetAssignmentRest,
   getFile as svcGetFile,
-  getFileBytes as svcGetFileBytes,
+  downloadFile as svcDownloadFile,
   listAssignmentsWithSubmission as svcListAssignmentsWithSubmission,
   listAssignmentGroups as svcListAssignmentGroups,
   listMyEnrollmentsForCourse as svcListMyEnrollmentsForCourse,
@@ -100,7 +100,18 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       webviewTag: true,
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
     },
+  })
+
+  // Prevent new windows from spawning automatically (security best practice)
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https:') || url.startsWith('http:')) {
+      shell.openExternal(url)
+    }
+    return { action: 'deny' }
   })
 
   try {
@@ -145,6 +156,15 @@ app.on('activate', () => {
 app.whenReady().then(() => {
   // load config and create window
   appConfig = loadConfig()
+  
+  // Register custom protocol for secure file serving
+  protocol.handle('canvas-file', (req) => {
+    const url = req.url.replace(/^canvas-file:\/\//, '')
+    // Decode URL-encoded characters (e.g. %20 -> space)
+    const filePath = decodeURIComponent(url)
+    return net.fetch(pathToFileURL(filePath).toString())
+  })
+
   // Set dock icon on macOS during dev so it shows immediately
   if (process.platform === 'darwin') {
     const iconPath = getIconPath() || path.join(process.env.APP_ROOT, 'build', 'icons', 'mac', 'icon.icns')
@@ -434,8 +454,10 @@ ipcMain.handle('canvas:getAnnouncement', async (_evt, courseId: string | number,
 
 ipcMain.handle('canvas:getFileBytes', async (_evt, fileId: string | number) => {
   try {
-    const data = await svcGetFileBytes(fileId)
-    return { ok: true, data }
+    // Return path instead of bytes, prefixed with custom protocol
+    const path = await svcDownloadFile(fileId)
+    // Encode the path for the URL
+    return { ok: true, data: `canvas-file://${encodeURIComponent(path)}` }
   } catch (e: any) {
     const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
     return { ok: false, error: msg }
@@ -445,8 +467,12 @@ ipcMain.handle('canvas:getFileBytes', async (_evt, fileId: string | number) => {
 // System helpers
 ipcMain.handle('app:openExternal', async (_evt, url: string) => {
   try {
-    await shell.openExternal(url)
-    return { ok: true }
+    const parsed = new URL(url)
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:') {
+      await shell.openExternal(url)
+      return { ok: true }
+    }
+    return { ok: false, error: 'Invalid protocol' }
   } catch (e: any) {
     return { ok: false, error: String(e?.message || e) }
   }

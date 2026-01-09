@@ -1,26 +1,10 @@
 import { ipcRenderer, contextBridge } from 'electron'
 
 // --------- Expose some API to the Renderer process ---------
-contextBridge.exposeInMainWorld('ipcRenderer', {
-  on(...args: Parameters<typeof ipcRenderer.on>) {
-    const [channel, listener] = args
-    return ipcRenderer.on(channel, (event, ...args) => listener(event, ...args))
-  },
-  off(...args: Parameters<typeof ipcRenderer.off>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.off(channel, ...omit)
-  },
-  send(...args: Parameters<typeof ipcRenderer.send>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.send(channel, ...omit)
-  },
-  invoke(...args: Parameters<typeof ipcRenderer.invoke>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.invoke(channel, ...omit)
-  },
-
-  // You can expose other APTs you need here.
-  // ...
+contextBridge.exposeInMainWorld('electron', {
+  onMainProcessMessage: (callback: (message: string) => void) => {
+    return ipcRenderer.on('main-process-message', (_event, message) => callback(message))
+  }
 })
 
 // High-level Canvas API
@@ -40,15 +24,7 @@ contextBridge.exposeInMainWorld('canvas', {
   getAssignmentRest: (courseId: string | number, assignmentRestId: string | number) => ipcRenderer.invoke('canvas:getAssignmentRest', courseId, assignmentRestId),
   getFile: (fileId: string | number) => ipcRenderer.invoke('canvas:getFile', fileId),
   getFileBytes: async (fileId: string | number) => {
-    const res = await ipcRenderer.invoke('canvas:getFileBytes', fileId)
-    // Clone the ArrayBuffer to avoid issues when downstream libraries
-    // transfer the buffer to workers (detaching the original).
-    try {
-      if (res?.ok && res?.data && res.data instanceof ArrayBuffer) {
-        res.data = res.data.slice(0)
-      }
-    } catch {}
-    return res
+    return ipcRenderer.invoke('canvas:getFileBytes', fileId)
   },
   listAssignmentsWithSubmission: (courseId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listAssignmentsWithSubmission', courseId, perPage),
   listAssignmentGroups: (courseId: string | number, includeAssignments?: boolean) => ipcRenderer.invoke('canvas:listAssignmentGroups', courseId, includeAssignments),
@@ -83,6 +59,7 @@ contextBridge.exposeInMainWorld('settings', {
       sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> }
       pdfGestureZoomEnabled?: boolean
       pdfZoom?: Record<string, number>
+      lastUserId?: string
     }>,
   ) => ipcRenderer.invoke('config:set', partial),
 })

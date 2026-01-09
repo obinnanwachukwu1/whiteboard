@@ -1,4 +1,5 @@
 import React from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAppContext } from '../context/AppContext'
 import { applyThemeAndAccent, computeAccentBg, type Accent } from '../utils/theme'
 type GpaRow = { min: number; gpa: number }
@@ -60,6 +61,17 @@ export default function SettingsPage() {
     })()
     return () => { mounted = false }
   }, [userKey])
+
+  const queryClient = useQueryClient()
+
+  const onClearCache = async () => {
+    if (!window.confirm('This will clear all offline data and force a full reload. Continue?')) return
+    try {
+      await window.settings.set?.({ queryCache: undefined, cachedCourses: undefined, cachedDue: undefined, courseImages: undefined })
+      queryClient.clear()
+      window.location.reload()
+    } catch {}
+  }
 
   const persistGpa = React.useCallback(async (partial: Partial<{ priorTotals: { credits: string; gpa: string }; mapping: GpaRow[] }>) => {
     try {
@@ -215,6 +227,18 @@ export default function SettingsPage() {
             <div className="text-xs text-slate-600 dark:text-neutral-400">Prefetch course data while browsing</div>
           </div>
           <input className="self-start sm:self-auto" type="checkbox" checked={ctx.prefetchEnabled} onChange={(e) => ctx.setPrefetchEnabled(e.target.checked)} />
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 w-full max-w-3xl mt-4 border-t border-gray-100 dark:border-neutral-800 pt-4">
+          <div className="text-sm">
+            <div className="mb-0.5 text-red-600 dark:text-red-400">Clear Cache</div>
+            <div className="text-xs text-slate-600 dark:text-neutral-400">Fixes sync issues by removing all offline data</div>
+          </div>
+          <button 
+            className="self-start sm:self-auto px-3 py-1.5 rounded bg-white dark:bg-neutral-800 ring-1 ring-gray-200 dark:ring-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-700 text-sm transition-colors"
+            onClick={onClearCache}
+          >
+            Clear Data
+          </button>
         </div>
       </section>
 

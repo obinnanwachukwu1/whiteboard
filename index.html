@@ -8,6 +8,23 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <title>Whiteboard</title>
+    <script>
+      // Immediate theme bootstrap to prevent white flash
+      (function() {
+        try {
+          const stored = localStorage.getItem('app-theme');
+          const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const isDark = stored === 'dark' || (!stored && sysDark);
+          if (isDark) document.documentElement.classList.add('dark');
+          
+          // Also restore accent variables if present
+          const accentBg = localStorage.getItem('app-accent-bg');
+          const accentActive = localStorage.getItem('app-accent-active');
+          if (accentBg) document.documentElement.style.setProperty('--app-accent-bg', accentBg);
+          if (accentActive) document.documentElement.style.setProperty('--app-accent-active', accentActive);
+        } catch {}
+      })();
+    </script>
   </head>
   <body class="m-0 bg-ui-bg text-ui-text font-sans dark:bg-slate-950 dark:text-slate-100">
     <div id="root" class="h-full"></div>

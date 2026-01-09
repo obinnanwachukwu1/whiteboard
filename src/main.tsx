@@ -40,7 +40,17 @@ function useQueryPersistence(client: QueryClient) {
   // Debounced, filtered persistence to reduce disk writes and navigation lag
   React.useEffect(() => {
     let t: any = null
-    const allowKeys = new Set(['profile', 'courses', 'due-assignments'])
+    const allowKeys = new Set([
+      'profile',
+      'courses',
+      'due-assignments',
+      'course-gradebook',
+      'activity-announcements',
+      'course-info',
+      'upcoming',
+      'todo',
+      'course-tabs'
+    ])
     const flush = () => {
       try {
         const snap = dehydrate(client, {
@@ -105,6 +115,6 @@ async function main() {
 main()
 
 // Use contextBridge
-window.ipcRenderer.on('main-process-message', (_event, message) => {
+window.electron.onMainProcessMessage((message) => {
   console.log(message)
 })

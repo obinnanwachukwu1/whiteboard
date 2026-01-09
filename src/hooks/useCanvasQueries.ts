@@ -45,7 +45,7 @@ export function useDueAssignments(params: { days?: number; onlyPublished?: boole
   return useQuery<DueItem[], Error, DueItem[]>({
     queryKey: ['due-assignments', params],
     queryFn: async () => ensureOk(await window.canvas.listDueAssignments(params)),
-    staleTime: 1000 * 30, // 30s — keeps dashboard fresh
+    staleTime: 1000 * 60 * 2, // 2 minutes — keeps dashboard fresh
     ...options,
   })
 }
@@ -107,7 +107,7 @@ export function useActivityAnnouncements(n = 20, options?: Partial<UseQueryOptio
       anns.sort((a, b) => new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime())
       return anns.slice(0, Math.max(1, n))
     },
-    staleTime: 1000 * 60, // 1 minute
+    staleTime: 1000 * 60 * 5, // 5 minutes
     ...options,
   })
 }
@@ -152,12 +152,14 @@ export function useFileMeta(fileId: string | number | undefined, options?: Parti
   })
 }
 
-export function useFileBytes(fileId: string | number | undefined, options?: Partial<UseQueryOptions<ArrayBuffer, Error, ArrayBuffer>>) {
-  return useQuery<ArrayBuffer, Error, ArrayBuffer>({
+export function useFileBytes(fileId: string | number | undefined, options?: Partial<UseQueryOptions<string, Error, string>>) {
+  return useQuery<string, Error, string>({
     queryKey: ['file-bytes', fileId],
     queryFn: async () => {
       if (fileId == null) throw new Error('fileId is required')
-      return ensureOk(await window.canvas.getFileBytes?.(fileId))
+      const res = await window.canvas.getFileBytes?.(fileId)
+      if (!res?.ok) throw new Error(res?.error || 'IPC call failed')
+      return res.data as unknown as string
     },
     enabled: fileId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 60, // 1h caching for file bytes

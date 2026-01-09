@@ -23,6 +23,7 @@ export type AppConfig = {
   userSidebars?: Record<string, any>
   pdfGestureZoomEnabled?: boolean
   pdfZoom?: Record<string, number>
+  lastUserId?: string
 }
 
 const DEFAULT_CONFIG: AppConfig = {

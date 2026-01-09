@@ -29,6 +29,7 @@ export function RootLayout() {
   const [cachedDue, setCachedDue] = useState<any[] | null>(null)
   const [activeCourseId, setActiveCourseIdState] = useState<string | number | null>(null)
   const [sidebarCfg, setSidebarCfg] = useState<SidebarConfig>({ hiddenCourseIds: [], customNames: {}, order: [] })
+  const [courseImages, setCourseImagesState] = useState<Record<string, string>>({})
 
   // Queries
   const profileQ = useProfile({ enabled: hasToken === true })
@@ -51,6 +52,16 @@ export function RootLayout() {
         applyThemeAndAccent(theme as 'light' | 'dark', accent as any)
       } catch {}
       if (data?.sidebar) setSidebarCfg(data.sidebar)
+      // Attempt to restore per-user sidebar immediately
+      if (data?.lastUserId) {
+         const url = data.baseUrl || baseUrl
+         const key = `${url}|${data.lastUserId}`
+         if (data?.userSidebars?.[key]) setSidebarCfg(data.userSidebars[key])
+      }
+      if (data?.courseImages) {
+        const url = data.baseUrl || baseUrl
+        setCourseImagesState(data.courseImages[url] || {})
+      }
       if (typeof data?.prefetchEnabled === 'boolean') setPrefetchEnabledState(!!data.prefetchEnabled)
       if (typeof data?.pdfGestureZoomEnabled === 'boolean') setPdfGestureZoomEnabledState(!!data.pdfGestureZoomEnabled)
       if (Array.isArray(data?.cachedCourses)) {
@@ -117,6 +128,10 @@ export function RootLayout() {
             try { applyThemeAndAccent((next.theme || (document.documentElement.classList.contains('dark') ? 'dark' : 'light')) as any, (next.accent || 'default') as any) } catch {}
           }
         }
+        
+        // Save lastUserId for next boot
+        const uid = userKey.split('|')[1]
+        if (uid) window.settings.set({ lastUserId: uid }).catch(() => {})
       } catch {}
     })()
   }, [userKey])
@@ -126,9 +141,20 @@ export function RootLayout() {
   useEffect(() => { if (coursesQ.error) addToast({ title: 'Failed to load courses', description: String(coursesQ.error.message), variant: 'destructive' }) }, [coursesQ.error, addToast])
   useEffect(() => { if (dueQ.error) addToast({ title: 'Failed to load assignments', description: String(dueQ.error.message), variant: 'destructive' }) }, [dueQ.error, addToast])
 
-  // Local memory snapshots for initial paint
-  useEffect(() => { if (Array.isArray(coursesQ.data) && coursesQ.data.length) setCachedCourses(coursesQ.data) }, [coursesQ.data])
-  useEffect(() => { if (Array.isArray(dueQ.data)) setCachedDue(dueQ.data) }, [dueQ.data])
+  // Local memory snapshots for initial paint + persistence
+  useEffect(() => { 
+    if (Array.isArray(coursesQ.data) && coursesQ.data.length) {
+      setCachedCourses(coursesQ.data)
+      window.settings.set({ cachedCourses: coursesQ.data }).catch(() => {})
+    }
+  }, [coursesQ.data])
+  
+  useEffect(() => { 
+    if (Array.isArray(dueQ.data)) {
+      setCachedDue(dueQ.data)
+      window.settings.set({ cachedDue: dueQ.data }).catch(() => {})
+    }
+  }, [dueQ.data])
 
   const saveUserSidebar = async (next: SidebarConfig) => {
     try {
@@ -255,6 +281,16 @@ export function RootLayout() {
 
   const setActiveCourseId = (id: string | number | null) => setActiveCourseIdState(id)
 
+  const saveCourseImages = async (map: Record<string, string>) => {
+    setCourseImagesState(map)
+    try {
+      const cfg = await window.settings.get?.()
+      const all = (cfg?.ok ? (cfg.data as any)?.courseImages : undefined) || {}
+      all[baseUrl] = map
+      await window.settings.set?.({ courseImages: all })
+    } catch {}
+  }
+
   const onSignOut = async () => {
     try { await window.canvas.clearToken?.(baseUrl) } catch {}
     try { await window.settings.set?.({ cachedCourses: [], cachedDue: [], queryCache: undefined }) } catch {}
@@ -274,6 +310,8 @@ export function RootLayout() {
     loading: loading || profileQ.isLoading || (coursesQ.isLoading && !(cachedCourses && cachedCourses.length)) || (dueQ.isLoading && !(cachedDue && cachedDue.length)),
     sidebar: sidebarCfg,
     setSidebar: onSidebarConfigChange,
+    courseImages,
+    setCourseImages: saveCourseImages,
     prefetchEnabled,
   setPrefetchEnabled: setPrefetchEnabledPersisted,
   pdfGestureZoomEnabled,
@@ -315,13 +353,45 @@ export function RootLayout() {
   // Initial app loading screen while auth initializes
   if (hasToken === null) {
     return (
-      <div
-        className="h-screen w-screen relative flex items-center justify-center transition-colors"
-        style={{ backgroundColor: 'var(--app-accent-root, #f8fafc)' }}
-      >
+      <div className="h-screen flex flex-col bg-white dark:bg-neutral-950">
         {/* Transparent draggable bar on startup */}
         <div className="absolute inset-x-0 top-0 h-14 app-drag titlebar-left-inset z-50 bg-transparent" aria-hidden />
-        <div className="text-slate-600 dark:text-slate-300 text-sm animate-pulse">Loading…</div>
+        
+        {/* Skeleton Header */}
+        <div className="h-14 border-b border-gray-200 dark:border-neutral-800 flex items-center justify-end px-4 gap-4">
+          <div className="h-4 w-32 bg-gray-200 dark:bg-neutral-800 rounded animate-pulse" />
+          <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-neutral-800 animate-pulse" />
+        </div>
+
+        <div className="flex flex-1 overflow-hidden">
+          {/* Skeleton Sidebar */}
+          <div className="w-64 border-r border-gray-200 dark:border-neutral-800 p-4 space-y-6 hidden md:block">
+            <div className="space-y-3">
+              <div className="h-4 w-20 bg-gray-200 dark:bg-neutral-800 rounded animate-pulse" />
+              <div className="space-y-2">
+                <div className="h-8 w-full bg-gray-100 dark:bg-neutral-900 rounded animate-pulse" />
+                <div className="h-8 w-full bg-gray-100 dark:bg-neutral-900 rounded animate-pulse" />
+                <div className="h-8 w-full bg-gray-100 dark:bg-neutral-900 rounded animate-pulse" />
+              </div>
+            </div>
+          </div>
+
+          {/* Skeleton Main Content */}
+          <main className="flex-1 p-6 space-y-6 bg-gray-50 dark:bg-neutral-950">
+            <div className="max-w-6xl w-full mx-auto space-y-6">
+              <div className="h-8 w-48 bg-gray-200 dark:bg-neutral-800 rounded animate-pulse" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="h-24 bg-gray-200 dark:bg-neutral-800 rounded-xl animate-pulse" />
+                <div className="h-24 bg-gray-200 dark:bg-neutral-800 rounded-xl animate-pulse" />
+                <div className="h-24 bg-gray-200 dark:bg-neutral-800 rounded-xl animate-pulse" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="h-64 bg-gray-200 dark:bg-neutral-800 rounded-xl animate-pulse" />
+                <div className="h-64 bg-gray-200 dark:bg-neutral-800 rounded-xl animate-pulse" />
+              </div>
+            </div>
+          </main>
+        </div>
       </div>
     )
   }

@@ -86,11 +86,53 @@ export function computeAccentHover(accent: Accent, dark: boolean): string {
   return dark ? 'rgb(38 38 38 / 0.9)' : 'rgb(241 245 249 / 0.95)'
 }
 
+export function computeAccentActive(accent: Accent, dark: boolean): string {
+  if (accent === 'default') return dark ? 'rgb(255 255 255 / 0.1)' : 'rgb(0 0 0 / 0.06)'
+  if (!dark) {
+    // Light mode: distinct active state (400s)
+    switch (accent) {
+      case 'red': return 'rgb(248 113 113 / 0.5)' // red-400
+      case 'orange': return 'rgb(251 146 60 / 0.5)' // orange-400
+      case 'yellow': return 'rgb(250 204 21 / 0.5)' // yellow-400
+      case 'green': return 'rgb(74 222 128 / 0.5)' // green-400
+      case 'blue': return 'rgb(96 165 250 / 0.5)' // blue-400
+      case 'indigo': return 'rgb(129 140 248 / 0.5)' // indigo-400
+      case 'violet': return 'rgb(167 139 250 / 0.5)' // violet-400
+    }
+  } else {
+    // Dark mode: distinct active state (600s)
+    switch (accent) {
+      case 'red': return 'rgb(220 38 38 / 0.5)' // red-600
+      case 'orange': return 'rgb(234 88 12 / 0.5)' // orange-600
+      case 'yellow': return 'rgb(202 138 4 / 0.5)' // yellow-600
+      case 'green': return 'rgb(22 163 74 / 0.5)' // green-600
+      case 'blue': return 'rgb(37 99 235 / 0.5)' // blue-600
+      case 'indigo': return 'rgb(79 70 229 / 0.5)' // indigo-600
+      case 'violet': return 'rgb(124 58 237 / 0.5)' // violet-600
+    }
+  }
+  return dark ? 'rgb(255 255 255 / 0.1)' : 'rgb(0 0 0 / 0.06)'
+}
+
 export function applyThemeAndAccent(theme: 'light' | 'dark', accent: Accent) {
   const dark = theme === 'dark'
   const root = document.documentElement
   root.classList.toggle('dark', dark)
-  root.style.setProperty('--app-accent-bg', computeAccentBg(accent, dark))
-  root.style.setProperty('--app-accent-root', computeAccentBase(accent, dark))
-  root.style.setProperty('--app-accent-hover', computeAccentHover(accent, dark))
+  
+  const bg = computeAccentBg(accent, dark)
+  const base = computeAccentBase(accent, dark)
+  const hover = computeAccentHover(accent, dark)
+  const active = computeAccentActive(accent, dark)
+
+  root.style.setProperty('--app-accent-bg', bg)
+  root.style.setProperty('--app-accent-root', base)
+  root.style.setProperty('--app-accent-hover', hover)
+  root.style.setProperty('--app-accent-active', active)
+
+  // Mirror to localStorage for instant boot
+  try {
+    localStorage.setItem('app-theme', theme)
+    localStorage.setItem('app-accent-bg', bg)
+    localStorage.setItem('app-accent-active', active)
+  } catch {}
 }

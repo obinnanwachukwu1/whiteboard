@@ -62,8 +62,8 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
         <button
           className={`w-full text-left py-2 pl-7 pr-8 rounded-md text-sm transition-all outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
             active
-              ? 'bg-brand/10 text-slate-900 dark:text-slate-100 font-semibold shadow-sm border-l-2 border-brand'
-              : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-200 border-l-2 border-transparent'
+              ? 'bg-[var(--app-accent-active)] text-slate-900 dark:text-slate-100 font-semibold shadow-sm ring-1 ring-black/5 dark:ring-white/10'
+              : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
           }`}
           onClick={onSelect}
           title={c.name}
@@ -98,8 +98,8 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
           <button
           className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
             current === 'dashboard'
-                ? 'bg-brand/10 text-slate-900 dark:text-slate-100 font-semibold shadow-sm border-l-2 border-brand'
-                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-200 border-l-2 border-transparent'
+                ? 'bg-[var(--app-accent-active)] text-slate-900 dark:text-slate-100 font-semibold shadow-sm ring-1 ring-black/5 dark:ring-white/10'
+                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
           }`}
             onClick={onSelectDashboard}
             aria-current={current === 'dashboard' ? 'page' : undefined}
@@ -109,8 +109,8 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
           <button
             className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
               current === 'announcements'
-                ? 'bg-brand/10 text-slate-900 dark:text-slate-100 font-semibold shadow-sm border-l-2 border-brand'
-                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-200 border-l-2 border-transparent'
+                ? 'bg-[var(--app-accent-active)] text-slate-900 dark:text-slate-100 font-semibold shadow-sm ring-1 ring-black/5 dark:ring-white/10'
+                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectAnnouncements?.()}
             aria-current={current === 'announcements' ? 'page' : undefined}
@@ -120,8 +120,8 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
           <button
             className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
               current === 'assignments'
-                ? 'bg-brand/10 text-slate-900 dark:text-slate-100 font-semibold shadow-sm border-l-2 border-brand'
-                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-200 border-l-2 border-transparent'
+                ? 'bg-[var(--app-accent-active)] text-slate-900 dark:text-slate-100 font-semibold shadow-sm ring-1 ring-black/5 dark:ring-white/10'
+                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectAssignments?.()}
             aria-current={current === 'assignments' ? 'page' : undefined}
@@ -131,8 +131,8 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
           <button
             className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
               current === 'grades'
-                ? 'bg-brand/10 text-slate-900 dark:text-slate-100 font-semibold shadow-sm border-l-2 border-brand'
-                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-200 border-l-2 border-transparent'
+                ? 'bg-[var(--app-accent-active)] text-slate-900 dark:text-slate-100 font-semibold shadow-sm ring-1 ring-black/5 dark:ring-white/10'
+                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectGrades?.()}
             aria-current={current === 'grades' ? 'page' : undefined}
@@ -184,8 +184,8 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
         <button
           className={`w-full text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
             current === 'allCourses'
-              ? 'bg-brand/10 text-slate-900 dark:text-slate-100 font-semibold shadow-sm border-l-2 border-brand'
-              : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-700 dark:text-slate-200 border-l-2 border-transparent'
+              ? 'bg-[var(--app-accent-active)] text-slate-900 dark:text-slate-100 font-semibold shadow-sm ring-1 ring-black/5 dark:ring-white/10'
+              : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-700 dark:text-slate-200'
           }`}
           onClick={onOpenAllCourses}
           aria-current={current === 'allCourses' ? 'page' : undefined}

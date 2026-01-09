@@ -9,6 +9,8 @@ export type AppContextValue = {
   loading: boolean
   sidebar: SidebarConfig
   setSidebar: (next: SidebarConfig) => Promise<void>
+  courseImages: Record<string, string>
+  setCourseImages: (map: Record<string, string>) => Promise<void>
   prefetchEnabled: boolean
   setPrefetchEnabled: (v: boolean) => Promise<void>
   pdfGestureZoomEnabled: boolean
