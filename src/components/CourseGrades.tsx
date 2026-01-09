@@ -79,8 +79,8 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between mb-3 shrink-0">
         <h3 className="m-0 text-slate-900 dark:text-slate-100 text-base font-semibold">Grades</h3>
         <div className="flex items-center gap-2">
           <Button
@@ -98,65 +98,65 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
           <Button size="sm" variant="ghost" onClick={clearOverrides}>Clear What‑If</Button>
         </div>
       </div>
-      {(isLoading || (isFetching && !data)) && (
-        <div className="text-slate-500 dark:text-neutral-400">Loading…</div>
-      )}
-      {error && <div className="text-red-600">{String(error.message || error)}</div>}
 
-      {calc && (
-        <div className="mb-4 flex items-end justify-between">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 px-3 py-2">
-              <div className="text-[11px] text-slate-500 dark:text-neutral-400">Current</div>
-              <div className="text-xl font-semibold tracking-tight">{calc.current.totals.percent ?? '—'}%</div>
+      <div className="flex-1 overflow-auto min-h-0 pb-4">
+        {(isLoading || (isFetching && !data)) && (
+          <div className="text-slate-500 dark:text-neutral-400">Loading…</div>
+        )}
+        {error && <div className="text-red-600">{String(error.message || error)}</div>}
+
+        {calc && (
+          <div className="mb-4 flex items-end justify-between">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 px-3 py-2">
+                <div className="text-[11px] text-slate-500 dark:text-neutral-400">Current</div>
+                <div className="text-xl font-semibold tracking-tight">{calc.current.totals.percent ?? '—'}%</div>
+              </div>
+              <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 px-3 py-2">
+                <div className="text-[11px] text-slate-500 dark:text-neutral-400">Final (What‑If)</div>
+                <div className="text-xl font-semibold tracking-tight">{calc.final.totals.percent ?? '—'}%</div>
+              </div>
             </div>
-            <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 px-3 py-2">
-              <div className="text-[11px] text-slate-500 dark:text-neutral-400">Final (What‑If)</div>
-              <div className="text-xl font-semibold tracking-tight">{calc.final.totals.percent ?? '—'}%</div>
+            <div className="text-right">
+              <div className="text-2xl md:text-3xl font-semibold tracking-tight">
+                {(outOfTotal ? calc.final.totals.percent : calc.current.totals.percent) ?? '—'}%
+              </div>
+              <label className="mt-2 inline-flex items-center gap-3 select-none">
+                <input
+                  type="checkbox"
+                  checked={outOfTotal}
+                  onChange={(e) => setOutOfTotal(e.target.checked)}
+                  className="align-middle accent-indigo-600 dark:accent-neutral-300"
+                />
+                <span className="text-slate-700 dark:text-neutral-200 text-base md:text-lg font-medium">
+                  Show final grade
+                </span>
+              </label>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-2xl md:text-3xl font-semibold tracking-tight">
-              {(outOfTotal ? calc.final.totals.percent : calc.current.totals.percent) ?? '—'}%
-            </div>
-            <label className="mt-2 inline-flex items-center gap-3 select-none">
-              <input
-                type="checkbox"
-                checked={outOfTotal}
-                onChange={(e) => setOutOfTotal(e.target.checked)}
-                className="align-middle accent-indigo-600 dark:accent-neutral-300"
-              />
-              <span className="text-slate-700 dark:text-neutral-200 text-base md:text-lg font-medium">
-                Show final grade
-              </span>
-            </label>
-          </div>
-        </div>
-      )}
+        )}
 
-      {rawAssignments.length > 0 && (
-        <div className="overflow-x-auto">
-          {(() => {
-            const groupsById = new Map<string, any>(groups.map((g: any) => [String(g.id), g]))
-            const byGroup: Record<string, any[]> = {}
-            for (const a of rawAssignments) {
-              const gid = a?.assignment_group_id != null ? String(a.assignment_group_id) : 'ungrouped'
-              if (!byGroup[gid]) byGroup[gid] = []
-              byGroup[gid].push(a)
-            }
-            const order = Object.keys(byGroup)
-            return (
-              <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left border-b border-gray-200 dark:border-neutral-800 bg-[var(--app-accent-bg)]/30">
-                    <th className="py-2 pr-3">Assignment</th>
-                    <th className="py-2 pr-3 w-24 text-right">Pts</th>
-                    <th className="py-2 pr-0 w-56 text-right">Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {order.map((gid) => {
+        {rawAssignments.length > 0 && (
+          <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left border-b border-gray-200 dark:border-neutral-800 bg-[var(--app-accent-bg)]/30">
+                  <th className="py-2 pr-3 pl-3">Assignment</th>
+                  <th className="py-2 pr-3 w-24 text-right">Pts</th>
+                  <th className="py-2 pr-3 w-56 text-right">Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  const groupsById = new Map<string, any>(groups.map((g: any) => [String(g.id), g]))
+                  const byGroup: Record<string, any[]> = {}
+                  for (const a of rawAssignments) {
+                    const gid = a?.assignment_group_id != null ? String(a.assignment_group_id) : 'ungrouped'
+                    if (!byGroup[gid]) byGroup[gid] = []
+                    byGroup[gid].push(a)
+                  }
+                  const order = Object.keys(byGroup)
+                  return order.map((gid) => {
                     const g = groupsById.get(gid)
                     const gName = g?.name || (gid === 'ungrouped' ? 'Ungrouped' : 'Group ' + gid)
                     const weight = g?.groupWeight != null ? Number(g.groupWeight) : null
@@ -165,7 +165,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                     return (
                       <React.Fragment key={gid}>
                         <tr>
-                          <td className="pt-4 pb-2 text-xs font-semibold text-slate-600 dark:text-neutral-300 uppercase tracking-wide" colSpan={5}>
+                          <td className="pt-4 pb-2 pl-3 text-xs font-semibold text-slate-600 dark:text-neutral-300 uppercase tracking-wide" colSpan={3}>
                             <div className="border-b border-gray-200 dark:border-neutral-800 pb-1">{label}</div>
                           </td>
                         </tr>
@@ -180,12 +180,12 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                           const display = typeof showPct === 'number' && Number.isFinite(showPct) ? `${Math.round(showPct * 10) / 10}%` : (typeof score === 'string' ? score : '—')
                           return (
                             <tr key={id} className="border-b border-gray-100 dark:border-neutral-800 hover:bg-[var(--app-accent-bg)]/40 transition-colors">
-                              <td className="py-2 pr-3 max-w-0">
+                              <td className="py-2 pr-3 pl-3 max-w-0">
                                 <div className="font-medium truncate" title={a?.name}>{a?.name}</div>
                                 <div className="text-xs text-slate-500 whitespace-nowrap">{a?.due_at ? new Date(a?.due_at).toLocaleString() : 'No due date'}</div>
                               </td>
                               <td className="py-2 pr-3 whitespace-nowrap text-right tabular-nums">{pts ?? '—'}</td>
-                              <td className="py-2 pr-0 whitespace-nowrap text-right">
+                              <td className="py-2 pr-3 whitespace-nowrap text-right">
                                 <div className="inline-flex items-center gap-2 justify-end w-full">
                                   {editingId !== id ? (
                                     <>
@@ -194,7 +194,6 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                                         aria-label="Edit"
                                         className="text-brand hover:text-indigo-600"
                                         onClick={() => {
-                                          // Prefill with API percent if no current override so cursor can move immediately
                                           setRawWhatIfPct((prev) => {
                                             const curr = prev[id]
                                             if ((curr == null || String(curr).trim() === '') && apiPct != null) {
@@ -206,7 +205,6 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                                           setTimeout(() => {
                                             const ref = inputRefs.current[String(id)]
                                             ref?.focus()
-                                            // place caret at end
                                             try {
                                               const val = ref?.value || ''
                                               ref?.setSelectionRange(val.length, val.length)
@@ -238,7 +236,6 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                                         value={raw}
                                         onChange={(e) => onChangeWhatIf(id, e.target.value)}
                                         onBlur={() => {
-                                          // If left empty, treat as 0 per user request
                                           if (!raw || raw.trim() === '') {
                                             setRawWhatIfPct((prev) => ({ ...prev, [id]: '0' }))
                                           }
@@ -250,7 +247,6 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                                           e.preventDefault()
                                           const text = (e.clipboardData || (window as any).clipboardData).getData('text') || ''
                                           onChangeWhatIf(id, text)
-                                          // focus will remain; caret at end next tick
                                           setTimeout(() => {
                                             const ref = inputRefs.current[String(id)]
                                             const val = ref?.value || ''
@@ -283,14 +279,13 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                         })}
                       </React.Fragment>
                     )
-                  })}
-                </tbody>
-              </table>
-              </div>
-            )
-          })()}
-        </div>
-      )}
+                  })
+                })()}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

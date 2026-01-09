@@ -1,15 +1,15 @@
 import React from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Card } from './ui/Card'
-import { FileText, Calendar, Star, Home as HomeIcon, BookOpen, Megaphone, ClipboardList, ScrollText, Percent, Link as LinkIcon } from 'lucide-react'
-import { useCourseAssignments, useCourseInfo, useCourseFrontPage, useCourseTabs, useCourseFiles } from '../hooks/useCanvasQueries'
-import type { CanvasAssignment } from '../types/canvas'
+import { FileText, Home as HomeIcon, BookOpen, Megaphone, ClipboardList, ScrollText, Percent, Link as LinkIcon } from 'lucide-react'
+import { useCourseInfo, useCourseFrontPage, useCourseTabs, useCourseFiles } from '../hooks/useCanvasQueries'
 import { CourseGrades } from './CourseGrades'
 import { CourseModules } from './CourseModules'
 import { CourseFiles } from './CourseFiles'
 import { CanvasContentView } from './CanvasContentView'
 import { CourseLinks } from './CourseLinks'
 import { CourseAnnouncements } from './CourseAnnouncements'
+import { CourseAssignments } from './CourseAssignments'
 import { FloatingCourseTabs, type CourseTabKey } from './FloatingCourseTabs'
 import { HtmlContent } from './HtmlContent'
 import { computeResolvedTabs, hasFilesFromTabs } from '../utils/courseTabs'
@@ -34,12 +34,9 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
   const queryClient = useQueryClient()
   const [availableTabs, setAvailableTabs] = React.useState<ResolvedTab[] | null>(null)
 
-  const assignmentsQ = useCourseAssignments(courseId, 200, { enabled: courseId != null && activeTab === 'assignments' })
   const infoQ = useCourseInfo(courseId)
   const frontQ = useCourseFrontPage(courseId, { enabled: activeTab === 'home' })
   const tabsQ = useCourseTabs(courseId, true, { staleTime: 1000 * 60 * 60 * 24 })
-  const assignments: CanvasAssignment[] = (assignmentsQ.data || []) as CanvasAssignment[]
-  const showLoading = (!assignments || assignments.length === 0) && assignmentsQ.isLoading
 
   // Determine available tabs
   const defaultView = (infoQ.data?.default_view || '').toLowerCase()
@@ -176,7 +173,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
   // No detail/content resets here; parent controls tab/content. Keep tabs seeded via cache above.
 
   return (
-    <Card id="course-content-anchor" className="flex-1 overflow-y-auto relative">
+    <Card id="course-content-anchor" className="flex-1 flex flex-col overflow-hidden relative">
       {availableTabs && (
         <FloatingCourseTabs
           current={activeTab}
@@ -210,42 +207,48 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
       )}
 
       {content ? (
-        <div className="-m-5">
-          <CanvasContentView
-            courseId={courseId}
-            contentType={content.contentType}
-            contentId={content.contentId}
-            title={content.title}
-            onBack={onClearDetail}
-            onNavigate={handleNavigate}
-          />
+        <div className="flex-1 -m-5 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-5">
+            <CanvasContentView
+              courseId={courseId}
+              contentType={content.contentType}
+              contentId={content.contentId}
+              title={content.title}
+              onBack={onClearDetail}
+              onNavigate={handleNavigate}
+            />
+          </div>
         </div>
       ) : (
-        <>
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {activeTab === 'home' && (
-            <div className="mt-2">
-              {frontQ.isLoading && <div className="text-slate-500 dark:text-neutral-400">Loading…</div>}
-              {frontQ.error && <div className="text-red-600">{String((frontQ.error as any)?.message || frontQ.error)}</div>}
-              {frontQ.data?.body && (
-                <HtmlContent html={frontQ.data.body} className="rich-html" onNavigate={handleNavigate} />
-              )}
+            <div className="flex-1 overflow-y-auto">
+              <div className="mt-2">
+                {frontQ.isLoading && <div className="text-slate-500 dark:text-neutral-400">Loading…</div>}
+                {frontQ.error && <div className="text-red-600">{String((frontQ.error as any)?.message || frontQ.error)}</div>}
+                {frontQ.data?.body && (
+                  <HtmlContent html={frontQ.data.body} className="rich-html" onNavigate={handleNavigate} />
+                )}
+              </div>
             </div>
           )}
 
           {/* No separate wiki tab; Home renders front page */}
 
           {activeTab === 'syllabus' && (
-            <div className="mt-2">
-              {hasSyllabus ? (
-                <HtmlContent html={infoQ.data?.syllabus_body || ''} className="rich-html" onNavigate={handleNavigate} />
-              ) : (
-                <div className="text-slate-500 dark:text-neutral-400">No syllabus</div>
-              )}
+            <div className="flex-1 overflow-y-auto">
+              <div className="mt-2">
+                {hasSyllabus ? (
+                  <HtmlContent html={infoQ.data?.syllabus_body || ''} className="rich-html" onNavigate={handleNavigate} />
+                ) : (
+                  <div className="text-slate-500 dark:text-neutral-400">No syllabus</div>
+                )}
+              </div>
             </div>
           )}
 
           {activeTab === 'announcements' && (
-            <div className="mt-2">
+            <div className="flex-1 flex flex-col overflow-hidden">
               <CourseAnnouncements
                 courseId={courseId}
                 onOpen={(topicId, title) => onOpenDetail({ contentType: 'announcement', contentId: topicId, title })}
@@ -254,7 +257,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
           )}
 
           {activeTab === 'modules' && (
-            <div className="mt-2">
+            <div className="flex-1 flex flex-col overflow-hidden">
               <CourseModules
                 courseId={courseId}
                 onOpenExternal={async (url) => { (await import('../utils/openExternal')).openExternal(url) }}
@@ -264,13 +267,13 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
           )}
 
           {activeTab === 'links' && (
-            <div className="mt-2">
+            <div className="flex-1 flex flex-col overflow-hidden">
               <CourseLinks courseId={courseId} />
             </div>
           )}
 
           {activeTab === 'files' && (
-            <div className="mt-2">
+            <div className="flex-1 flex flex-col overflow-hidden">
               <CourseFiles
                 courseId={courseId}
                 onOpenContent={(c) => onOpenDetail({ contentType: 'file', contentId: String(c.contentId), title: c.title })}
@@ -279,59 +282,20 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
           )}
 
           {activeTab === 'assignments' && (
-            <div className="mt-2">
-              <h3 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-base font-semibold">Assignments</h3>
-              {showLoading && <div className="text-slate-500 dark:text-neutral-400 p-2">Loading…</div>}
-              {assignmentsQ.error && <div className="text-red-600 p-2">{String((assignmentsQ.error as any).message || assignmentsQ.error)}</div>}
-              {!showLoading && !assignmentsQ.error && assignments.length === 0 && (
-                <div className="text-slate-500 dark:text-neutral-400 p-3 flex items-center gap-2">📭 <span>No assignments found</span></div>
-              )}
-              {!showLoading && !assignmentsQ.error && assignments.length > 0 && (
-                <ul className="list-none m-0 p-0">
-                  {assignments.map((a, i) => {
-                    const dueStr = a.dueAt ? new Date(a.dueAt).toLocaleString() : null
-                    const restId = String((a._id ?? a.id ?? '') as any)
-                    return (
-                      <li className="py-1" key={i}>
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => restId && onOpenDetail({ contentType: 'assignment', contentId: restId, title: a.name })}
-                          onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && restId) { e.preventDefault(); onOpenDetail({ contentType: 'assignment', contentId: restId, title: a.name }) } }}
-                          className="cursor-pointer flex items-center justify-between gap-3 rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 px-3 py-2 transition duration-200 ease-out hover:scale-[1.01] hover:shadow-sm hover:ring-[var(--app-accent-hover)] hover:bg-[var(--app-accent-bg)]"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-9 h-9 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-neutral-600/15 text-slate-600 dark:text-neutral-200 inline-flex items-center justify-center">
-                              <FileText className="w-4 h-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="font-medium leading-snug truncate">{a.name}</div>
-                              <div className="mt-1 flex items-center gap-2 text-xs text-slate-600 dark:text-neutral-300">
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-white/80 dark:bg-neutral-900/80">
-                                  <Star className="w-3 h-3" /> {typeof a.pointsPossible === 'number' ? `${a.pointsPossible} pts` : '—'}
-                                </span>
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-white/80 dark:bg-neutral-900/80">
-                                  <Calendar className="w-3 h-3" /> {dueStr ? `Due ${dueStr}` : 'No due date'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="shrink-0 text-xs text-slate-500">Open</div>
-                        </div>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <CourseAssignments 
+                courseId={courseId}
+                onOpenDetail={onOpenDetail}
+              />
             </div>
           )}
 
           {activeTab === 'grades' && (
-            <div className="mt-2">
+            <div className="flex-1 flex flex-col overflow-hidden">
               <CourseGrades courseId={courseId} />
             </div>
           )}
-        </>
+        </div>
       )}
     </Card>
   )

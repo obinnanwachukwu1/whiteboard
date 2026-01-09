@@ -2,9 +2,10 @@ import React from 'react'
 import { FileText, File, Image as ImageIcon, Video, Folder as FolderIcon, ChevronRight, ArrowUpDown, FileArchive, FileSpreadsheet, FileAudio, FileCode2, Presentation, MoreVertical } from 'lucide-react'
 import { Button } from './ui/Button'
 import { useCourseFolders, useFolderFiles } from '../hooks/useCanvasQueries'
-import { VirtualList } from './ui/VirtualList'
 import type { CanvasFolder, CanvasFile } from '../types/canvas'
 import { Dropdown } from './ui/Dropdown'
+import { ListItemRow } from './ui/ListItemRow'
+import { MetadataBadge } from './ui/MetadataBadge'
 
 type Props = {
   courseId: string | number
@@ -159,9 +160,17 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
     return arr
   }, [filesQ.data, sortKey, sortOrder])
 
+  // Combined list: folders first, then files
+  type ListItem = { type: 'folder'; data: CanvasFolder } | { type: 'file'; data: CanvasFile }
+  const combinedItems = React.useMemo<ListItem[]>(() => {
+    const folderItems: ListItem[] = listFolders.map((f) => ({ type: 'folder', data: f }))
+    const fileItems: ListItem[] = files.map((f) => ({ type: 'file', data: f }))
+    return [...folderItems, ...fileItems]
+  }, [listFolders, files])
+
   return (
-    <div>
-      <div className="mt-0 mb-3 flex items-center justify-between gap-3">
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
         <h3 className="m-0 text-slate-900 dark:text-slate-100 text-base font-semibold">Files</h3>
         <div className="flex items-center gap-2 text-sm">
           <label className="text-slate-600 dark:text-slate-300">Sort:</label>
@@ -183,125 +192,109 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
           </Button>
         </div>
       </div>
-      {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
-      {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
-      {!isLoading && (folders as any[]).length === 0 && (
-        <div className="text-slate-500 dark:text-neutral-400 text-sm">No files</div>
-      )}
-
-      {/* Breadcrumb */}
-      <div className="text-sm text-slate-600 dark:text-neutral-300 mb-2 flex items-center gap-1">
-        <button className="hover:underline" onClick={() => setCurrent(courseRootId || null)}>{courseRootId ? 'Course Files' : 'Root'}</button>
-        {breadcrumb.map((f: any) => (
-          <React.Fragment key={f.id}>
-            <ChevronRight className="w-4 h-4 opacity-60" />
-            <button className="hover:underline" onClick={() => setCurrent(String(f.id))}>{f.name || f.full_name || 'Folder'}</button>
-          </React.Fragment>
-        ))}
-      </div>
-
-      {/* Folders */}
-      {listFolders.length > 0 && (
-        <ul className="list-none m-0 p-0 mb-2">
-          {listFolders.map((f: any) => (
-            <li key={f.id} className="py-1">
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => setCurrent(String(f.id))}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCurrent(String(f.id)) } }}
-                className="group cursor-pointer flex items-center justify-between gap-3 rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 px-3 py-2 transition duration-200 ease-out hover:scale-[1.01] hover:shadow-sm hover:ring-[var(--app-accent-hover)] hover:bg-[var(--app-accent-bg)]"
-              >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-9 h-9 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-neutral-600/15 text-slate-600 dark:text-neutral-200 inline-flex items-center justify-center shrink-0">
-                    <FolderIcon className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium truncate">{f.name || f.full_name || 'Folder'}</div>
-                    <div className="text-xs text-slate-500 truncate">{f.full_name}</div>
-                  </div>
-                </div>
-              </div>
-            </li>
+      
+      {/* Content Area */}
+      <div className="flex-1 overflow-y-auto min-h-0 pb-4">
+        {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
+        {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
+        
+        {/* Breadcrumb */}
+        <div className="text-sm text-slate-600 dark:text-neutral-300 mb-2 flex items-center gap-1 overflow-x-auto whitespace-nowrap">
+          <button className="hover:underline" onClick={() => setCurrent(courseRootId || null)}>{courseRootId ? 'Course Files' : 'Root'}</button>
+          {breadcrumb.map((f: any) => (
+            <React.Fragment key={f.id}>
+              <ChevronRight className="w-4 h-4 opacity-60" />
+              <button className="hover:underline" onClick={() => setCurrent(String(f.id))}>{f.name || f.full_name || 'Folder'}</button>
+            </React.Fragment>
           ))}
-        </ul>
-      )}
-
-      {/* Files in current folder */}
-      {current != null && (
-        <div>
-          {filesQ.isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading files…</div>}
-          {!filesQ.isLoading && files.length === 0 && listFolders.length === 0 && (
-            <div className="text-slate-500 dark:text-neutral-400 text-sm">No items in this folder</div>
-          )}
-          {!filesQ.isLoading && files.length > 0 && (
-            <div>
-              <VirtualList<CanvasFile>
-                items={files as CanvasFile[]}
-                height={listFolders.length === 0 ? 560 : 480}
-                itemHeight={64}
-                className="bg-transparent"
-                renderItem={(f) => {
-                  const updated = f?.updated_at ? new Date(f.updated_at).toLocaleString() : ''
-                  const name = f?.display_name || f?.filename || 'File'
-                  const viewable = /\.(pdf|docx?|pptx?|xlsx?|jpe?g|png|gif|webp|bmp|svg|avif|mp3|wav|ogg|m4a|aac|mp4|webm|mov|m4v)$/i.test(String(name))
-                    || /^(application\/(pdf|vnd\.openxmlformats-officedocument|vnd\.ms-)|image\/|audio\/|video\/)/i.test(String(f?.content_type || ''))
-                  const type = fileTypeLabel(name, f?.content_type)
-                  const sizeStr = typeof f?.size === 'number' ? formatBytes(f.size) : null
-                  const menuId = String(f.id)
-                  const isMenuOpen = menuOpenId === menuId
-                  return (
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={async () => {
-                        if (viewable) {
-                          onOpenContent?.({ courseId, contentType: 'file', contentId: String(f.id), title: name })
-                        } else if (f?.url) {
-                          (await import('../utils/openExternal')).openExternal(f.url)
-                        }
-                      }}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (viewable) onOpenContent?.({ courseId, contentType: 'file', contentId: String(f.id), title: name }); else if (f?.url) window.system?.openExternal?.(f.url) } }}
-                      className={`group cursor-pointer flex items-center justify-between gap-3 rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 px-3 py-2 transition duration-200 ease-out hover:scale-[1.01] hover:shadow-sm hover:ring-[var(--app-accent-hover)] hover:bg-[var(--app-accent-bg)] relative ${isMenuOpen ? 'scale-[1.01] shadow-sm ring-[var(--app-accent-hover)] bg-[var(--app-accent-bg)]' : 'bg-white/70 dark:bg-neutral-900/70'}`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-9 h-9 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-neutral-600/15 text-slate-600 dark:text-neutral-200 inline-flex items-center justify-center shrink-0">
-                          {iconForFile(name, f?.content_type)}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium truncate">{name}</div>
-                          <div className="text-xs text-slate-500 truncate">
-                            {type && <span>{type}</span>}
-                            {updated && <span className="ml-2">• Updated {updated}</span>}
-                            {sizeStr && <span className="ml-2">• {sizeStr}</span>}
-                          </div>
-                        </div>
-                      </div>
-                      {f?.url && (
-                        <div className="shrink-0">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === menuId ? null : menuId) }}
-                            className={`inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ${isMenuOpen ? 'opacity-100' : ''}`}
-                            aria-label="More options"
-                            ref={(el) => { anchorEls.current.set(menuId, el) }}
-                          >
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-                          <Dropdown open={isMenuOpen} onOpenChange={(o) => setMenuOpenId(o ? menuId : null)} align="right" offsetY={40} anchorEl={anchorEls.current.get(menuId)}>
-                            <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(f.url!) }}>
-                              Open in Browser
-                            </button>
-                          </Dropdown>
-                        </div>
-                      )}
-                    </div>
-                  )
-                }}
-              />
-            </div>
-          )}
         </div>
-      )}
+
+        {!isLoading && (folders as any[]).length === 0 && (
+          <div className="text-slate-500 dark:text-neutral-400 text-sm">No files</div>
+        )}
+
+        {/* Combined folders + files list */}
+        {effectiveCurrent != null && (
+          <>
+            {filesQ.isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading files…</div>}
+            {!filesQ.isLoading && combinedItems.length === 0 && (
+              <div className="text-slate-500 dark:text-neutral-400 text-sm">No items in this folder</div>
+            )}
+            {!filesQ.isLoading && combinedItems.length > 0 && (
+              <ul className="list-none m-0 p-0 space-y-1">
+                {combinedItems.map((item) => {
+                  if (item.type === 'folder') {
+                    const f = item.data
+                    return (
+                      <li key={`folder-${f.id}`}>
+                        <ListItemRow
+                          icon={<FolderIcon className="w-4 h-4" />}
+                          title={f.name || f.full_name || 'Folder'}
+                          subtitle={<MetadataBadge>Folder</MetadataBadge>}
+                          onClick={() => setCurrent(String(f.id))}
+                        />
+                      </li>
+                    )
+                  } else {
+                    const f = item.data
+                    const name = f?.display_name || f?.filename || 'File'
+                    const viewable = /\.(pdf|docx?|pptx?|xlsx?|jpe?g|png|gif|webp|bmp|svg|avif|mp3|wav|ogg|m4a|aac|mp4|webm|mov|m4v)$/i.test(String(name))
+                      || /^(application\/(pdf|vnd\.openxmlformats-officedocument|vnd\.ms-)|image\/|audio\/|video\/)/i.test(String(f?.content_type || ''))
+                    const type = fileTypeLabel(name, f?.content_type)
+                    const sizeStr = typeof f?.size === 'number' ? formatBytes(f.size) : null
+                    const menuId = String(f.id)
+                    const isMenuOpen = menuOpenId === menuId
+
+                    const handleOpen = async () => {
+                      if (viewable) {
+                        onOpenContent?.({ courseId, contentType: 'file', contentId: String(f.id), title: name })
+                      } else if (f?.url) {
+                        (await import('../utils/openExternal')).openExternal(f.url)
+                      }
+                    }
+
+                    return (
+                      <li key={`file-${f.id}`}>
+                        <ListItemRow
+                          icon={iconForFile(name, f?.content_type)}
+                          title={name}
+                          subtitle={
+                            <>
+                              {type && <MetadataBadge>{type}</MetadataBadge>}
+                              {sizeStr && <span>{sizeStr}</span>}
+                            </>
+                          }
+                          onClick={handleOpen}
+                          menuOpen={isMenuOpen}
+                          menu={
+                            f?.url ? (
+                              <>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : menuId) }}
+                                  className={`inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ${isMenuOpen ? 'opacity-100' : ''}`}
+                                  aria-label="More options"
+                                  ref={(el) => { anchorEls.current.set(menuId, el) }}
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </button>
+                                <Dropdown open={isMenuOpen} onOpenChange={(o) => setMenuOpenId(o ? menuId : null)} align="right" offsetY={40} anchorEl={anchorEls.current.get(menuId)}>
+                                  <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(f.url!) }}>
+                                    Open in Browser
+                                  </button>
+                                </Dropdown>
+                              </>
+                            ) : undefined
+                          }
+                        />
+                      </li>
+                    )
+                  }
+                })}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }

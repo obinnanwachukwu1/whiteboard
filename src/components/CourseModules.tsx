@@ -3,6 +3,8 @@ import { FileText, File, MessageSquare, Link as LinkIcon, BookOpen, MoreVertical
 import { Dropdown } from './ui/Dropdown'
 import { useCourseModules } from '../hooks/useCanvasQueries'
 import type { CanvasModule, CanvasModuleItem, CanvasFile } from '../types/canvas'
+import { ListItemRow } from './ui/ListItemRow'
+import { MetadataBadge } from './ui/MetadataBadge'
 
 type Props = {
   courseId: string | number
@@ -18,7 +20,6 @@ type Props = {
 export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpenContent }) => {
   const { data: modules = null, isLoading, error } = useCourseModules(courseId)
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
-  // menu animation handled by Dropdown
   const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
 
   async function openItem(it: CanvasModuleItem, title: string) {
@@ -56,8 +57,6 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
     }
   }
 
-  // No global listeners; handled by Dropdown
-
   const iconFor = (n: CanvasModuleItem) => {
     switch (n?.__typename) {
       case 'AssignmentModuleItem': return <FileText className="w-4 h-4" />
@@ -83,75 +82,74 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
   }
 
   return (
-    <div>
-      <h3 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-base font-semibold">Modules</h3>
-      {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
-      {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
-      {!isLoading && modules && modules.length === 0 && (
-        <div className="text-slate-500 dark:text-neutral-400 text-sm">No modules</div>
-      )}
-      {!isLoading && modules && modules.length > 0 && (
-        <div className="space-y-3">
-          {(modules as CanvasModule[]).map((m, i) => (
-            <div key={i} className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 overflow-hidden transition duration-200 ease-out hover:scale-[1.005] hover:shadow-sm hover:ring-[var(--app-accent-hover)]">
-              <div className="px-4 py-2 font-medium bg-gradient-to-r from-[var(--app-accent-bg)]/50 to-transparent flex items-center justify-between">
-                <span>{m.name}</span>
-                <span className="text-xs text-slate-500">{m?.moduleItemsConnection?.nodes?.length ?? 0} items</span>
-              </div>
-              {(m.moduleItemsConnection?.nodes?.length ?? 0) > 0 && (
-                <ul className="list-none m-0 p-0">
-                  {m.moduleItemsConnection?.nodes?.map((it: CanvasModuleItem, j: number) => {
-                    const title = it.title || 'Item'
-                    const kind = labelFor(it)
-                    return (
-                      <li key={j} className="px-3 sm:px-4 py-1">
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => openItem(it, title)}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openItem(it, title) } }}
-                          className="group cursor-pointer flex items-center justify-between gap-3 rounded-md px-1 py-2 transition duration-150 ease-out hover:bg-[var(--app-accent-bg)]/40"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-8 h-8 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-neutral-600/15 text-slate-600 dark:text-neutral-200 inline-flex items-center justify-center">
-                              {iconFor(it)}
-                            </div>
-                            <div className="truncate">
-                              <div className="truncate font-medium">{title}</div>
-                              <div className="text-[11px] text-slate-500 mt-0.5">
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-white/80 dark:bg-neutral-900/80">{kind}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="shrink-0 flex items-center gap-1 sm:gap-2 relative">
-                            {it.htmlUrl && (
-                              <>
-                                <button
-                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpenId(menuOpenId === String(it.id || `${i}-${j}`) ? null : String(it.id || `${i}-${j}`)) }}
-                                  className="inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-                                  aria-label="More options"
-                                  ref={(el) => { anchorEls.current.set(String(it.id || `${i}-${j}`), el) }}
-                                >
-                                  <MoreVertical className="w-4 h-4" />
-                                </button>
-                                <Dropdown open={menuOpenId === String(it.id || `${i}-${j}`)} onOpenChange={(o) => setMenuOpenId(o ? String(it.id || `${i}-${j}`) : null)} align="right" offsetY={32} anchorEl={anchorEls.current.get(String(it.id || `${i}-${j}`))}>
-                                  <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(it.htmlUrl!) }}>
-                                    Open in Browser
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between mb-3 shrink-0">
+        <h3 className="m-0 text-slate-900 dark:text-slate-100 text-base font-semibold">Modules</h3>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto min-h-0 pb-4">
+        {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
+        {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
+        {!isLoading && modules && modules.length === 0 && (
+          <div className="text-slate-500 dark:text-neutral-400 text-sm">No modules</div>
+        )}
+        {!isLoading && modules && modules.length > 0 && (
+          <div className="space-y-3">
+            {(modules as CanvasModule[]).map((m, i) => (
+              <div key={i}>
+                {/* Module header */}
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-medium text-slate-600 dark:text-neutral-300">{m.name}</span>
+                  <span className="text-xs text-slate-400">{m?.moduleItemsConnection?.nodes?.length ?? 0} items</span>
+                </div>
+                
+                {/* Module items as card-style list */}
+                {(m.moduleItemsConnection?.nodes?.length ?? 0) > 0 && (
+                  <ul className="list-none m-0 p-0 space-y-1">
+                    {m.moduleItemsConnection?.nodes?.map((it: CanvasModuleItem, j: number) => {
+                      const title = it.title || 'Item'
+                      const kind = labelFor(it)
+                      const menuId = String(it.id || `${i}-${j}`)
+                      const isMenuOpen = menuOpenId === menuId
+                      
+                      return (
+                        <li key={j}>
+                          <ListItemRow
+                            icon={iconFor(it)}
+                            title={title}
+                            subtitle={<MetadataBadge>{kind}</MetadataBadge>}
+                            menuOpen={isMenuOpen}
+                            onClick={() => openItem(it, title)}
+                            menu={
+                              it.htmlUrl ? (
+                                <>
+                                  <button
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : menuId) }}
+                                    className={`inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ${isMenuOpen ? 'opacity-100' : ''}`}
+                                    aria-label="More options"
+                                    ref={(el) => { anchorEls.current.set(menuId, el) }}
+                                  >
+                                    <MoreVertical className="w-4 h-4" />
                                   </button>
-                                </Dropdown>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+                                  <Dropdown open={isMenuOpen} onOpenChange={(o) => setMenuOpenId(o ? menuId : null)} align="right" offsetY={32} anchorEl={anchorEls.current.get(menuId)}>
+                                    <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(it.htmlUrl!) }}>
+                                      Open in Browser
+                                    </button>
+                                  </Dropdown>
+                                </>
+                              ) : undefined
+                            }
+                          />
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
