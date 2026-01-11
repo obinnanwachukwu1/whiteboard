@@ -9,6 +9,8 @@ import { MetadataBadge } from './ui/MetadataBadge'
 
 type Props = {
   courseId: string | number
+  currentFolderId?: string | null
+  onFolderChange?: (folderId: string | null) => void
   onOpenContent?: (content: { courseId: string | number; contentType: 'file'; contentId: string; title: string }) => void
 }
 
@@ -66,9 +68,18 @@ function fileTypeLabel(name?: string, contentType?: string) {
   return null
 }
 
-export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
+export const CourseFiles: React.FC<Props> = ({ courseId, currentFolderId, onFolderChange, onOpenContent }) => {
   const { data: folders = [], isLoading, error } = useCourseFolders(courseId, 100)
-  const [current, setCurrent] = React.useState<string | null>(null)
+  // Use controlled folder state if provided, otherwise use local state
+  const [localCurrent, setLocalCurrent] = React.useState<string | null>(null)
+  const current = currentFolderId !== undefined ? currentFolderId : localCurrent
+  const setCurrent = React.useCallback((folderId: string | null) => {
+    if (onFolderChange) {
+      onFolderChange(folderId)
+    } else {
+      setLocalCurrent(folderId)
+    }
+  }, [onFolderChange])
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
   const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
 
@@ -107,7 +118,7 @@ export const CourseFiles: React.FC<Props> = ({ courseId, onOpenContent }) => {
     if (!isLoading && current == null && courseRootId) {
       setCurrent(courseRootId)
     }
-  }, [isLoading, current, courseRootId])
+  }, [isLoading, current, courseRootId, setCurrent])
 
   const breadcrumb = React.useMemo(() => {
     const out: any[] = []

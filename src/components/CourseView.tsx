@@ -33,6 +33,8 @@ type Props = {
 export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName, activeTab, onChangeTab, content, onOpenDetail, onClearDetail, baseUrl, onNavigateCourse }) => {
   const queryClient = useQueryClient()
   const [availableTabs, setAvailableTabs] = React.useState<ResolvedTab[] | null>(null)
+  // Persist current folder for Files tab so navigating back from a file returns to the same folder
+  const [currentFolderId, setCurrentFolderId] = React.useState<string | null>(null)
 
   const infoQ = useCourseInfo(courseId)
   const frontQ = useCourseFrontPage(courseId, { enabled: activeTab === 'home' })
@@ -62,6 +64,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
   // Reset and seed availableTabs on course change
   React.useEffect(() => {
     setAvailableTabs(null)
+    setCurrentFolderId(null) // Reset folder when switching courses
     const cachedTabs = queryClient.getQueryData<ResolvedTab[]>(['course-resolved-tabs', String(courseId)])
     if (cachedTabs && cachedTabs.length) setAvailableTabs(cachedTabs)
   }, [courseId])
@@ -276,6 +279,8 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
             <div className="flex-1 flex flex-col overflow-hidden">
               <CourseFiles
                 courseId={courseId}
+                currentFolderId={currentFolderId}
+                onFolderChange={setCurrentFolderId}
                 onOpenContent={(c) => onOpenDetail({ contentType: 'file', contentId: String(c.contentId), title: c.title })}
               />
             </div>
