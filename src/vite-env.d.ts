@@ -20,6 +20,7 @@ declare global {
           userSidebars?: Record<string, any>
           pdfGestureZoomEnabled?: boolean
           pdfZoom?: Record<string, number>
+          lastUserId?: string
         }
         error?: string
       }>
@@ -38,6 +39,7 @@ declare global {
         userSidebars?: Record<string, any>
         pdfGestureZoomEnabled?: boolean
         pdfZoom?: Record<string, number>
+        lastUserId?: string
       }>) => Promise<{ ok: boolean; data?: any; error?: string }>
     }
     canvas: {
@@ -55,7 +57,8 @@ declare global {
       getCoursePage: (courseId: string | number, slugOrUrl: string) => Promise<{ ok: boolean; data?: any; error?: string }>
       getAssignmentRest: (courseId: string | number, assignmentRestId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
       getFile: (fileId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
-      getFileBytes: (fileId: string | number) => Promise<{ ok: boolean; data?: ArrayBuffer; error?: string }>
+      // Returns a canvas-file:// URL to the local file
+      getFileBytes: (fileId: string | number) => Promise<{ ok: boolean; data?: string; error?: string }>
       listAssignmentsWithSubmission: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
       listAssignmentGroups: (courseId: string | number, includeAssignments?: boolean) => Promise<{ ok: boolean; data?: any; error?: string }>
       listMyEnrollmentsForCourse: (courseId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
@@ -73,7 +76,9 @@ declare global {
     system: {
       openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>
     }
-    ipcRenderer: any
+    electron: {
+      onMainProcessMessage: (callback: (message: string) => void) => void
+    }
   }
 }
 

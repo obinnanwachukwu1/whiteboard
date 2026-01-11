@@ -34,9 +34,6 @@ const MIN_SCALE = 0.25
 const MAX_SCALE = 5
 const ZOOM_STEP = 0.25
 
-const hasPdfHeader = (bytes: Uint8Array) =>
-  bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46
-
 export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) => {
   const { fileId, className = '', fullscreen = false, onPageChange } = props
 
@@ -55,11 +52,11 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) =
   const [pageInputEditing, setPageInputEditing] = useState(false)
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map())
 
-  const fileBytesQ = useFileBytes(fileId)
+  const fileUrlQ = useFileBytes(fileId)
   const fileMetaQ = useFileMeta(fileId)
-  const fileUrl = (fileMetaQ.data as any)?.url as string | undefined
-  const hasBytes = !!fileBytesQ.data && (fileBytesQ.data as ArrayBuffer).byteLength > 0
-  const isBytesLoading = !!(fileBytesQ.isLoading || fileBytesQ.isFetching)
+  const remoteUrl = (fileMetaQ.data as any)?.url as string | undefined
+  const localUrl = fileUrlQ.data as string | undefined
+  const isUrlLoading = !!(fileUrlQ.isLoading || fileUrlQ.isFetching)
 
   const { baseUrl, profile, saveUserSettings, pdfGestureZoomEnabled } = useAppContext()
   const userId = (profile as any)?.id
@@ -101,34 +98,28 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) =
     pageRefs.current.clear()
 
     const load = async () => {
-      if (!hasBytes && isBytesLoading) return
+      if (!localUrl && !remoteUrl) {
+        if (isUrlLoading) return
+        setError('No PDF URL available')
+        return
+      }
+      
+      const targetUrl = localUrl || remoteUrl
       let pdfDoc: PDFDocumentProxy | null = null
+      
       try {
-        if (hasBytes) {
-          const ab = fileBytesQ.data as ArrayBuffer
-          const bytes = new Uint8Array(ab).slice()
-          if (!hasPdfHeader(bytes)) {
-            throw new Error('Invalid PDF bytes (missing %PDF header)')
-          }
-          const task = pdfjsLib.getDocument({ data: bytes, useSystemFonts: true, disableFontFace: false, verbosity: 0 } as any)
-          loadingTaskRef.current = task
-          pdfDoc = await task.promise
-        } else if (fileUrl) {
-          const resp = await fetch(fileUrl, { method: 'GET', credentials: 'omit' })
-          if (!resp.ok) throw new Error(`Failed to fetch PDF via URL: ${resp.status}`)
-          const buf = await resp.arrayBuffer()
-          if (!buf || buf.byteLength === 0) throw new Error('Empty PDF data from URL')
-          const bytes = new Uint8Array(buf).slice()
-          if (!hasPdfHeader(bytes)) {
-            try { window.system?.openExternal?.(fileUrl) } catch {}
-            throw new Error('Invalid PDF structure from URL')
-          }
-          const task = pdfjsLib.getDocument({ data: bytes, useSystemFonts: true, disableFontFace: false, verbosity: 0 } as any)
-          loadingTaskRef.current = task
-          pdfDoc = await task.promise
-        } else {
-          throw new Error('No PDF data available')
-        }
+        const loadingTask = pdfjsLib.getDocument({
+          url: targetUrl,
+          useSystemFonts: true,
+          disableFontFace: false,
+          verbosity: 0,
+          // If using local canvas-file://, we assume fetch handles it.
+          // For remote, we might need credentials: 'omit' but pdf.js handles standard fetch.
+        } as any)
+        
+        loadingTaskRef.current = loadingTask
+        pdfDoc = await loadingTask.promise
+
         if (cancelled) {
           try { pdfDoc.destroy() } catch {}
           return
@@ -153,7 +144,7 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) =
       }
       loadingTaskRef.current = null
     }
-  }, [fileId, hasBytes, fileUrl, isBytesLoading, fileBytesQ.data])
+  }, [fileId, localUrl, remoteUrl, isUrlLoading])
 
   // Cleanup PDF on unmount
   useEffect(() => {
@@ -323,11 +314,11 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) =
   })
 
   // Error state
-  if (error || fileBytesQ.error) {
+  if (error || fileUrlQ.error) {
     return (
       <div className={`flex items-center justify-center p-8 ${className}`}>
         <div className="text-red-600 dark:text-red-400 text-sm">
-          {String(error || (fileBytesQ.error as any)?.message || 'Failed to load PDF')}
+          {String(error || (fileUrlQ.error as any)?.message || 'Failed to load PDF')}
         </div>
       </div>
     )

@@ -12,11 +12,16 @@ function getSystemTheme(): 'light' | 'dark' {
 export async function bootstrapTheme() {
   if (typeof window === 'undefined') return
 
+  // 1. Synchronously apply system preference immediately to avoid FOUC
   let theme: 'light' | 'dark' = getSystemTheme()
-  let accent: Accent = 'default'
+  const root = document.documentElement
+  root.classList.toggle('dark', theme === 'dark')
+  root.style.setProperty('color-scheme', theme)
 
+  let accent: Accent = 'default'
   const settingsApi = (window as any).settings
 
+  // 2. Asynchronously load user preference overrides
   if (settingsApi?.get) {
     try {
       const cfg = await settingsApi.get()

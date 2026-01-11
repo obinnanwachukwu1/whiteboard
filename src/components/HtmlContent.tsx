@@ -14,8 +14,8 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
       USE_PROFILES: { html: true },
       ADD_ATTR: ['style', 'target', 'rel', 'class', 'id', 'srcset', 'sizes', 'loading', 'decoding', 'referrerpolicy', 'allow', 'allowfullscreen', 'frameborder'],
       ADD_TAGS: ['img', 'video', 'audio', 'source', 'picture', 'figure', 'figcaption', 'iframe'],
-      // Keep links and images functional
-      ALLOW_UNKNOWN_PROTOCOLS: true,
+      // Keep links and images functional, but block unknown protocols
+      ALLOW_UNKNOWN_PROTOCOLS: false,
     } as any)
   }, [html])
 

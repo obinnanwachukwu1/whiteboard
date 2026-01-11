@@ -13,6 +13,15 @@
     "preview": "vite preview",
     "postinstall": "electron-builder install-app-deps"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild",
+      "keytar",
+      "cpu-features",
+      "ssh2"
+    ]
+  },
   "dependencies": {
     "@apollo/client": "^3.13.9",
     "@dnd-kit/core": "^6.3.1",

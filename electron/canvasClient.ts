@@ -2,6 +2,9 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
+import { pipeline } from 'node:stream/promises'
+import { createWriteStream } from 'node:fs'
+import { Readable } from 'node:stream'
 
 const DEFAULT_BASE_URL = 'https://gatech.instructure.com'
 const API_PREFIX = '/api/v1'
@@ -437,6 +440,38 @@ export class CanvasClient {
     return this.get(`/files/${fileId}`)
   }
 
+  async downloadFile(fileId: string | number): Promise<string> {
+    const meta = await this.get(`/files/${fileId}`)
+    const url = meta.url
+    if (!url) throw new Error('No file URL available')
+
+    const tempDir = app.getPath('temp')
+    // Sanitize filename to avoid directory traversal
+    const safeName = (meta.filename || `file-${fileId}`).replace(/[^a-zA-Z0-9.-]/g, '_')
+    const destPath = path.join(tempDir, `canvas-${fileId}-${safeName}`)
+
+    // Check if file already exists and is recent (simple cache)
+    if (fs.existsSync(destPath)) {
+      // Just return it (could add expiry check)
+      return destPath
+    }
+
+    const response = await fetch(url)
+    if (!response.ok) throw new Error(`Failed to fetch file: ${response.statusText}`)
+    if (!response.body) throw new Error('No response body')
+
+    // Node.js 18+ fetch returns a Web ReadableStream, needing conversion for pipeline if using older Node logic,
+    // but pipeline works with async iterables.
+    // However, explicit cast to NodeJS.ReadableStream might be safer or just use fs.writeFileSync for smaller files? 
+    // No, we want streaming.
+    // Readable.fromWeb(response.body) is available in Node 16+
+
+    const fileStream = createWriteStream(destPath)
+    await pipeline(Readable.fromWeb(response.body as any), fileStream)
+    
+    return destPath
+  }
+
   async getFileBytes(fileId: string | number) {
     // Get file metadata first to get the signed URL
     const meta = await this.get(`/files/${fileId}`)
@@ -713,6 +748,10 @@ export async function getAssignmentRest(courseId: string | number, assignmentRes
 }
 export async function getFile(fileId: string | number) {
   return ensureClient().getFile(fileId)
+}
+
+export async function downloadFile(fileId: string | number) {
+  return ensureClient().downloadFile(fileId)
 }
 
 export async function getFileBytes(fileId: string | number) {
