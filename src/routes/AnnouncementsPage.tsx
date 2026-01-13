@@ -1,10 +1,12 @@
 import React from 'react'
 import { useActivityAnnouncements } from '../hooks/useCanvasQueries'
 import { useQueryClient } from '@tanstack/react-query'
-import { BookOpen } from 'lucide-react'
+import { BookOpen, Megaphone } from 'lucide-react'
 import { useAppContext } from '../context/AppContext'
 import { Badge } from '../components/ui/Badge'
-import { Button } from '../components/ui/Button'
+import { ListItemRow } from '../components/ui/ListItemRow'
+import { formatDateTime } from '../utils/dateFormat'
+import { SkeletonList } from '../components/Skeleton'
 
 function extractIdFromUrl(url?: string, key?: string): string | null {
   if (!url || !key) return null
@@ -80,14 +82,14 @@ export default function AnnouncementsPage() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h1 className="mt-0 mb-2 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <h1 className="mt-0 mb-0 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
           <span className="w-7 h-7 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-slate-100 dark:bg-neutral-800 grid place-items-center">
             <BookOpen className="w-4 h-4 text-slate-600 dark:text-neutral-300" />
           </span>
           <span>Announcements</span>
         </h1>
-        <select className="rounded-control border px-2 py-1 text-sm bg-white/90 dark:bg-neutral-900" value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)}>
+        <select className="rounded-control border px-2 py-1 text-xs sm:text-sm bg-white/90 dark:bg-neutral-900 max-w-[160px] sm:max-w-none" value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)}>
           <option value="all">All Courses</option>
           {orderedCourses.map((c: any) => (
             <option key={String(c.id)} value={String(c.id)}>{labelFor(c)}</option>
@@ -96,11 +98,14 @@ export default function AnnouncementsPage() {
       </div>
 
       {annsQ.isLoading ? (
-        <div className="text-slate-500 dark:text-neutral-400 p-2 text-sm">Loading announcements…</div>
+        <SkeletonList count={5} hasAvatar variant="row" />
       ) : list.length === 0 ? (
-        <div className="text-slate-500 dark:text-neutral-400 p-2 text-sm">No announcements</div>
+        <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-4 text-center">
+          <Megaphone className="w-8 h-8 mx-auto text-slate-400 dark:text-neutral-500 mb-2" />
+          <div className="text-sm text-slate-500 dark:text-neutral-400">No announcements</div>
+        </div>
       ) : (
-        <ul className="list-none m-0 p-0 divide-y divide-gray-100 dark:divide-neutral-800">
+        <div className="space-y-2">
           {list.map((a: any, i: number) => {
             const open = () => {
               const cid = a.courseId
@@ -111,28 +116,29 @@ export default function AnnouncementsPage() {
             const img = courseImageUrl(a.courseId)
             const hue = courseHueFor(a.courseId || '', a.courseName || '')
             const fallback = `linear-gradient(135deg, hsl(${hue} 75% 62%), hsl(${(hue + 24) % 360} 85% 50%))`
+            
             return (
-              <li key={i} className="py-1">
-                <div role="button" tabIndex={0} onClick={open} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }} className="cursor-pointer rounded-md px-2 sm:px-3 py-2 transition-transform duration-200 ease-out hover:scale-[1.02] hover:shadow-sm ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-full ring-1 ring-black/10 dark:ring-white/10 overflow-hidden bg-center bg-cover flex-shrink-0" style={img ? { backgroundImage: `url(${img})` } : { background: fallback }} />
-                      <div className="min-w-0">
-                        <div className="font-medium truncate" title={a.title}>{a.title}</div>
-                        <div className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
-                          <Badge tone="brand">{a.courseName}</Badge>
-                          <span className="mx-1">·</span>
-                          <span>{a.postedAt ? new Date(a.postedAt).toLocaleString() : '—'}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); open() }}>Open</Button>
-                  </div>
-                </div>
-              </li>
+              <ListItemRow
+                key={i}
+                icon={
+                  <div
+                    className="w-full h-full rounded-full bg-center bg-cover"
+                    style={img ? { backgroundImage: `url(${img})` } : { background: fallback }}
+                  />
+                }
+                title={a.title}
+                subtitle={
+                  <>
+                    <Badge tone="brand">{a.courseName}</Badge>
+                    <span className="mx-1">·</span>
+                    <span>{formatDateTime(a.postedAt)}</span>
+                  </>
+                }
+                onClick={open}
+              />
             )
           })}
-        </ul>
+        </div>
       )}
     </div>
   )

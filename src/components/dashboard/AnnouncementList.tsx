@@ -5,6 +5,8 @@ import { Badge } from '../ui/Badge'
 import { BookOpen } from 'lucide-react'
 import { courseHueFor } from '../../utils/colorHelpers'
 import { extractAnnouncementIdFromUrl, extractCourseIdFromUrl } from '../../utils/urlHelpers'
+import { formatDateTime } from '../../utils/dateFormat'
+import { SkeletonList } from '../Skeleton'
 
 type Announcement = {
   courseId?: string | number
@@ -25,11 +27,6 @@ type Props = {
 }
 
 export const AnnouncementList: React.FC<Props> = ({ announcements, loading, onOpenAnnouncement, onOpenCourse, courseImageUrl, navigate }) => {
-  const fmtDateTime = (iso?: string) => {
-    if (!iso) return '—'
-    try { return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) } catch { return '—' }
-  }
-
   return (
     <Card>
       <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold flex items-center justify-between gap-2">
@@ -42,7 +39,7 @@ export const AnnouncementList: React.FC<Props> = ({ announcements, loading, onOp
         <Button size="sm" variant="ghost" className="shrink-0 ml-auto" onClick={() => navigate({ to: '/announcements' })}>View all</Button>
       </h2>
       {loading && (
-        <div className="text-slate-500 dark:text-neutral-400 p-4 text-sm">Loading…</div>
+        <SkeletonList count={3} hasAvatar variant="simple" />
       )}
       {!loading && announcements.length === 0 ? (
         <div className="text-slate-500 dark:text-neutral-400 p-4 text-sm">No announcements</div>
@@ -76,7 +73,7 @@ export const AnnouncementList: React.FC<Props> = ({ announcements, loading, onOp
                         <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                           <Badge tone="brand">{a.courseName}</Badge>
                           <span className="mx-1">·</span>
-                          <span>{a.postedAt ? fmtDateTime(a.postedAt) : '—'}</span>
+                          <span>{a.postedAt ? formatDateTime(a.postedAt) : '—'}</span>
                         </div>
                       </div>
                     </div>

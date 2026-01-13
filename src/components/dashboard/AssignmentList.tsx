@@ -5,7 +5,9 @@ import { Badge } from '../ui/Badge'
 import { CalendarClock } from 'lucide-react'
 import { courseHueFor } from '../../utils/colorHelpers'
 import { extractAssignmentIdFromUrl } from '../../utils/urlHelpers'
+import { formatDateTime } from '../../utils/dateFormat'
 import type { DueItem } from '../../hooks/useDashboardData'
+import { SkeletonList } from '../Skeleton'
 
 type Props = {
   due: DueItem[]
@@ -17,11 +19,6 @@ type Props = {
 }
 
 export const AssignmentList: React.FC<Props> = ({ due, loading, onOpenAssignment, onOpenCourse, courseImageUrl, navigate }) => {
-  const fmtDateTime = (iso?: string) => {
-    if (!iso) return '—'
-    try { return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) } catch { return '—' }
-  }
-
   return (
     <Card>
       <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold flex items-center justify-between gap-2">
@@ -34,7 +31,7 @@ export const AssignmentList: React.FC<Props> = ({ due, loading, onOpenAssignment
         <Button size="sm" variant="ghost" className="shrink-0 ml-auto" onClick={() => navigate({ to: '/assignments' })}>View all</Button>
       </h2>
       {loading && (
-        <div className="text-slate-500 dark:text-neutral-400 p-4 text-sm">Loading assignments…</div>
+        <SkeletonList count={3} hasAvatar variant="simple" />
       )}
       {!loading && due.length === 0 && (
         <div className="text-slate-500 dark:text-neutral-400 p-4 text-sm">No upcoming assignments</div>
@@ -77,7 +74,7 @@ export const AssignmentList: React.FC<Props> = ({ due, loading, onOpenAssignment
                               <span>·</span>
                               </span>
                             )}
-                            Due {fmtDateTime(d.dueAt)}
+                            Due {formatDateTime(d.dueAt)}
                             {d.pointsPossible ? ` · ${d.pointsPossible} pts` : ''}
                           </div>
                         </div>

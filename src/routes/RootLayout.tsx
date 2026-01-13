@@ -10,6 +10,9 @@ import { toAssignmentInputsFromRest, toAssignmentGroupInputsFromRest } from '../
 import { AppProvider, type AppContextValue } from '../context/AppContext'
 import { applyThemeAndAccent } from '../utils/theme'
 import { Eye, EyeOff, ExternalLink } from 'lucide-react'
+import { SearchModal } from '../components/SearchModal'
+import { InboxPanel } from '../components/InboxPanel'
+import { Skeleton, SkeletonList, SkeletonStats } from '../components/Skeleton'
 
 // Context definitions moved to src/context/AppContext.tsx
 
@@ -30,6 +33,21 @@ export function RootLayout() {
   const [activeCourseId, setActiveCourseIdState] = useState<string | number | null>(null)
   const [sidebarCfg, setSidebarCfg] = useState<SidebarConfig>({ hiddenCourseIds: [], customNames: {}, order: [] })
   const [courseImages, setCourseImagesState] = useState<Record<string, string>>({})
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [inboxOpen, setInboxOpen] = useState(false)
+
+  // Global Cmd+K / Ctrl+K keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+K (Mac) or Ctrl+K (Windows/Linux)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(prev => !prev)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Queries
   const profileQ = useProfile({ enabled: hasToken === true })
@@ -359,35 +377,27 @@ export function RootLayout() {
         
         {/* Skeleton Header */}
         <div className="h-14 border-b border-gray-200 dark:border-neutral-800 flex items-center justify-end px-4 gap-4">
-          <div className="h-4 w-32 bg-gray-200 dark:bg-neutral-800 rounded animate-pulse" />
-          <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-neutral-800 animate-pulse" />
+          <Skeleton height="h-4" width="w-32" />
+          <Skeleton width="w-8" height="h-8" variant="circular" />
         </div>
 
         <div className="flex flex-1 overflow-hidden">
           {/* Skeleton Sidebar */}
           <div className="w-64 border-r border-gray-200 dark:border-neutral-800 p-4 space-y-6 hidden md:block">
             <div className="space-y-3">
-              <div className="h-4 w-20 bg-gray-200 dark:bg-neutral-800 rounded animate-pulse" />
-              <div className="space-y-2">
-                <div className="h-8 w-full bg-gray-100 dark:bg-neutral-900 rounded animate-pulse" />
-                <div className="h-8 w-full bg-gray-100 dark:bg-neutral-900 rounded animate-pulse" />
-                <div className="h-8 w-full bg-gray-100 dark:bg-neutral-900 rounded animate-pulse" />
-              </div>
+              <Skeleton height="h-4" width="w-20" />
+              <SkeletonList count={3} variant="row" />
             </div>
           </div>
 
           {/* Skeleton Main Content */}
           <main className="flex-1 p-6 space-y-6 bg-gray-50 dark:bg-neutral-950">
             <div className="max-w-6xl w-full mx-auto space-y-6">
-              <div className="h-8 w-48 bg-gray-200 dark:bg-neutral-800 rounded animate-pulse" />
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="h-24 bg-gray-200 dark:bg-neutral-800 rounded-xl animate-pulse" />
-                <div className="h-24 bg-gray-200 dark:bg-neutral-800 rounded-xl animate-pulse" />
-                <div className="h-24 bg-gray-200 dark:bg-neutral-800 rounded-xl animate-pulse" />
-              </div>
+              <Skeleton height="h-8" width="w-48" />
+              <SkeletonStats count={3} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="h-64 bg-gray-200 dark:bg-neutral-800 rounded-xl animate-pulse" />
-                <div className="h-64 bg-gray-200 dark:bg-neutral-800 rounded-xl animate-pulse" />
+                <Skeleton height="h-64" width="w-full" variant="rounded" />
+                <Skeleton height="h-64" width="w-full" variant="rounded" />
               </div>
             </div>
           </main>
@@ -461,7 +471,7 @@ export function RootLayout() {
   return (
     <AppProvider value={context}>
       <div className="h-screen flex flex-col">
-        <Header profile={profileQ.data} />
+        <Header profile={profileQ.data} onOpenSearch={() => setSearchOpen(true)} onOpenInbox={() => setInboxOpen(true)} />
         <div className="flex flex-1 overflow-hidden">
           <Sidebar
             courses={visibleCourses}
@@ -489,6 +499,8 @@ export function RootLayout() {
           </main>
         </div>
       </div>
+      <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
+      <InboxPanel isOpen={inboxOpen} onClose={() => setInboxOpen(false)} />
     </AppProvider>
   )
 }

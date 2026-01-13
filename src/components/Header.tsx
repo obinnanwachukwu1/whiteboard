@@ -4,12 +4,16 @@ import { useNavigate } from '@tanstack/react-router'
 // removed theme toggle button
 import { applyThemeAndAccent, type Accent } from '../utils/theme'
 import { useAppContext } from '../context/AppContext'
+import { Search, Command } from 'lucide-react'
+import { InboxButton } from './InboxButton'
 
 type Props = {
   profile?: any | null
+  onOpenSearch?: () => void
+  onOpenInbox?: () => void
 }
 
-export const Header: React.FC<Props> = ({ profile }) => {
+export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) => {
   const navigate = useNavigate()
   const app = useAppContext()
   const name = profile?.short_name || profile?.name || 'Whiteboard'
@@ -85,6 +89,24 @@ export const Header: React.FC<Props> = ({ profile }) => {
         <div className="font-semibold tracking-tight">Whiteboard</div> */}
       </div>
       <div className="flex items-center gap-3 app-no-drag relative">
+        {/* Search button */}
+        {onOpenSearch && (
+          <button
+            onClick={onOpenSearch}
+            className="group inline-flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-slate-600 dark:text-slate-300 hover:[background-color:var(--app-accent-hover)] ring-1 ring-black/5 dark:ring-white/10 bg-white/50 dark:bg-neutral-800/50 transition-all"
+            title="Search (⌘K)"
+          >
+            <Search className="w-4 h-4" />
+            <span className="hidden sm:inline">Search</span>
+            <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-neutral-700 text-[10px] text-slate-500 dark:text-neutral-400 font-mono">
+              <Command className="w-2.5 h-2.5" />K
+            </kbd>
+          </button>
+        )}
+        
+        {/* Inbox button */}
+        {onOpenInbox && <InboxButton onClick={onOpenInbox} />}
+        
         <button
           ref={nameBtnRef}
           className="group inline-flex items-center gap-2 rounded-md px-2 py-1 -mr-1 hover:[background-color:var(--app-accent-hover)] ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10 transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"

@@ -103,22 +103,22 @@ export default function AssignmentsPage() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h1 className="mt-0 mb-2 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <h1 className="mt-0 mb-0 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
           <span className="w-7 h-7 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-slate-100 dark:bg-neutral-800 grid place-items-center">
             <CalendarClock className="w-4 h-4 text-slate-600 dark:text-neutral-300" />
           </span>
           <span>Assignments</span>
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-control ring-1 ring-black/10 dark:ring-white/10 overflow-hidden">
             {(['table','kanban','calendar'] as const).map((k) => (
-              <button key={k} className={`px-3 py-1.5 text-sm ${view === k ? 'bg-slate-900 text-white' : 'bg-white/80 dark:bg-neutral-900/60 text-slate-700 dark:text-neutral-300 hover:bg-slate-100/70 dark:hover:bg-neutral-800/60'}`} onClick={() => setView(k)}>
-                {k === 'table' ? 'Table' : k === 'kanban' ? 'Kanban' : 'Calendar'}
+              <button key={k} className={`px-2 sm:px-3 py-1.5 text-xs sm:text-sm ${view === k ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white/80 dark:bg-neutral-900/60 text-slate-700 dark:text-neutral-300 hover:bg-slate-100/70 dark:hover:bg-neutral-800/60'}`} onClick={() => setView(k)}>
+                {k === 'table' ? 'Table' : k === 'kanban' ? 'Kanban' : 'Cal'}
               </button>
             ))}
           </div>
-          <select className="rounded-control border px-2 py-1 text-sm bg-white/90 dark:bg-neutral-900" value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)}>
+          <select className="rounded-control border px-2 py-1 text-xs sm:text-sm bg-white/90 dark:bg-neutral-900 max-w-[160px] sm:max-w-none" value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)}>
             <option value="all">All Courses</option>
             {orderedCourses.map((c: any) => (
               <option key={String(c.id)} value={String(c.id)}>{labelFor(c)}</option>
@@ -128,16 +128,57 @@ export default function AssignmentsPage() {
       </div>
 
       {view === 'table' && (
-        <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 overflow-hidden">
-          <div className="grid grid-cols-[minmax(220px,2fr)_minmax(160px,1fr)_minmax(160px,1fr)_minmax(120px,1fr)] gap-2 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-neutral-300 border-b border-gray-200 dark:border-neutral-800">
-            <div>Title</div>
-            <div>Course</div>
-            <div>Due</div>
-            <div>Status</div>
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden md:block rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 overflow-hidden">
+            <div className="grid grid-cols-[2fr_1fr_1fr_120px] gap-2 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-neutral-300 border-b border-gray-200 dark:border-neutral-800">
+              <div>Title</div>
+              <div>Course</div>
+              <div>Due</div>
+              <div>Status</div>
+            </div>
+            <div className="divide-y divide-gray-100 dark:divide-neutral-800">
+              {allDue.length === 0 && (
+                <div className="p-3 text-sm text-slate-500 dark:text-neutral-400">No assignments</div>
+              )}
+              {allDue.slice().sort((a,b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime()).map((d, i) => {
+                const id = assignId(d)
+                const open = () => {
+                  const rid = String(d.assignment_rest_id || extractIdFromUrl(d.htmlUrl, 'assignments') || '')
+                  if (rid) ctx.onOpenAssignment(d.course_id, rid, d.name)
+                  else ctx.onOpenCourse(d.course_id)
+                }
+                const img = courseImageUrl(d.course_id)
+                const hue = courseHueFor(d.course_id, d.course_name || String(d.course_id))
+                const fallback = `linear-gradient(135deg, hsl(${hue} 75% 62%), hsl(${(hue + 24) % 360} 85% 50%))`
+                const fmt = (iso?: string) => { try { return new Date(iso || '').toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) } catch { return '—' } }
+                return (
+                  <div key={id + ':' + i} role="button" tabIndex={0} onClick={open} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }} className="grid grid-cols-[2fr_1fr_1fr_120px] gap-2 px-3 py-2 cursor-pointer transition-transform duration-200 ease-out hover:scale-[1.01] hover:shadow-sm ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10">
+                    <div className="min-w-0 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-center bg-cover flex-shrink-0" style={img ? { backgroundImage: `url(${img})` } : { background: fallback }} />
+                      <div className="truncate" title={d.name}>{d.name}</div>
+                    </div>
+                    <div className="min-w-0 text-sm text-slate-600 dark:text-neutral-300 truncate">
+                      <Badge tone="brand">{d.course_name || String(d.course_id)}</Badge>
+                    </div>
+                    <div className="text-sm text-slate-600 dark:text-neutral-300">{fmt(d.dueAt)}</div>
+                    <div className="text-sm">
+                      <select value={kanban[id] || 'todo'} onChange={(e) => setStatus(id, e.target.value as KanbanStatus)} onClick={(e) => e.stopPropagation()} className="rounded-control border px-2 py-1 text-xs bg-white/90 dark:bg-neutral-900">
+                        <option value="todo">To Do</option>
+                        <option value="doing">Doing</option>
+                        <option value="done">Done</option>
+                      </select>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-          <div className="divide-y divide-gray-100 dark:divide-neutral-800">
+
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-2">
             {allDue.length === 0 && (
-              <div className="p-3 text-sm text-slate-500 dark:text-neutral-400">No assignments</div>
+              <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-3 text-sm text-slate-500 dark:text-neutral-400">No assignments</div>
             )}
             {allDue.slice().sort((a,b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime()).map((d, i) => {
               const id = assignId(d)
@@ -151,17 +192,32 @@ export default function AssignmentsPage() {
               const fallback = `linear-gradient(135deg, hsl(${hue} 75% 62%), hsl(${(hue + 24) % 360} 85% 50%))`
               const fmt = (iso?: string) => { try { return new Date(iso || '').toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) } catch { return '—' } }
               return (
-                <div key={id + ':' + i} role="button" tabIndex={0} onClick={open} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }} className="grid grid-cols-[minmax(220px,2fr)_minmax(160px,1fr)_minmax(160px,1fr)_minmax(120px,1fr)] gap-2 px-3 py-2 cursor-pointer transition-transform duration-200 ease-out hover:scale-[1.01] hover:shadow-sm ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10">
-                  <div className="min-w-0 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-center bg-cover flex-shrink-0" style={img ? { backgroundImage: `url(${img})` } : { background: fallback }} />
-                    <div className="truncate" title={d.name}>{d.name}</div>
+                <div
+                  key={id + ':' + i}
+                  role="button"
+                  tabIndex={0}
+                  onClick={open}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
+                  className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-3 cursor-pointer transition-transform duration-200 ease-out hover:scale-[1.01] hover:shadow-sm hover:ring-black/10 dark:hover:ring-white/10"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-center bg-cover flex-shrink-0" style={img ? { backgroundImage: `url(${img})` } : { background: fallback }} />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium truncate" title={d.name}>{d.name}</div>
+                      <div className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 flex flex-wrap items-center gap-1.5">
+                        <Badge tone="brand">{d.course_name || String(d.course_id)}</Badge>
+                        <span>·</span>
+                        <span>{fmt(d.dueAt)}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="min-w-0 text-sm text-slate-600 dark:text-neutral-300 truncate">
-                    <Badge tone="brand">{d.course_name || String(d.course_id)}</Badge>
-                  </div>
-                  <div className="text-sm text-slate-600 dark:text-neutral-300">{fmt(d.dueAt)}</div>
-                  <div className="text-sm">
-                    <select value={kanban[id] || 'todo'} onChange={(e) => setStatus(id, e.target.value as KanbanStatus)} className="rounded-control border px-2 py-1 text-xs bg-white/90 dark:bg-neutral-900">
+                  <div className="mt-2 flex justify-end">
+                    <select
+                      value={kanban[id] || 'todo'}
+                      onChange={(e) => setStatus(id, e.target.value as KanbanStatus)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="rounded-control border px-2 py-1 text-xs bg-white/90 dark:bg-neutral-900"
+                    >
                       <option value="todo">To Do</option>
                       <option value="doing">Doing</option>
                       <option value="done">Done</option>
@@ -171,7 +227,7 @@ export default function AssignmentsPage() {
               )
             })}
           </div>
-        </div>
+        </>
       )}
 
       {view === 'kanban' && (
@@ -260,6 +316,30 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
     return map
   }, [items])
 
+  // Get items in this month for mobile list view
+  const itemsInMonth = React.useMemo(() => {
+    return items.filter((it) => {
+      const dt = new Date(it.dueAt)
+      return dt.getFullYear() === month.getFullYear() && dt.getMonth() === month.getMonth()
+    }).sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
+  }, [items, month])
+
+  // Group by date for mobile list
+  const groupedByDate = React.useMemo(() => {
+    const groups: { date: Date; items: DueItem[] }[] = []
+    let currentDate: string | null = null
+    for (const it of itemsInMonth) {
+      const dt = new Date(it.dueAt)
+      const dateKey = dt.toDateString()
+      if (dateKey !== currentDate) {
+        groups.push({ date: dt, items: [] })
+        currentDate = dateKey
+      }
+      groups[groups.length - 1].items.push(it)
+    }
+    return groups
+  }, [itemsInMonth])
+
   const cells: Array<{ date: Date | null }> = []
   for (let i = 0; i < firstWeekday; i++) cells.push({ date: null })
   for (let d = 1; d <= daysInMonth; d++) cells.push({ date: new Date(month.getFullYear(), month.getMonth(), d) })
@@ -274,40 +354,88 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
           <Button size="sm" variant="ghost" onClick={nextMonth}>Next</Button>
         </div>
       </div>
-      <div className="grid grid-cols-7 gap-1">
-        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => (
-          <div key={d} className="text-xs text-slate-500 dark:text-neutral-400 px-1 py-1 text-center">{d}</div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {cells.map((cell, idx) => {
-          const date = cell.date
-          if (!date) return <div key={idx} className="h-24 rounded-md bg-transparent" />
-          const k = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
-          const list = byDate.get(k) || []
-          return (
-            <div key={idx} className="h-28 rounded-md ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-1 overflow-hidden">
-              <div className="text-[11px] text-slate-500 dark:text-neutral-400 mb-1">{date.getDate()}</div>
-              <div className="space-y-1 overflow-auto max-h-[6rem] pr-1">
-                {list.map((it, i) => {
-                  const open = () => {
-                    const rid = String(it.assignment_rest_id || extractIdFromUrl(it.htmlUrl, 'assignments') || '')
-                    if (rid) onOpenAssignment?.(it.course_id, rid, it.name)
-                    else onOpenCourse?.(it.course_id)
-                  }
-                  return (
-                    <div key={i} onClick={open} className="text-[11px] rounded px-1 py-0.5 bg-white dark:bg-neutral-900 ring-1 ring-gray-200 dark:ring-neutral-800 cursor-pointer hover:bg-slate-50 dark:hover:bg-neutral-800">
-                      <div className="truncate" title={it.name}>{it.name}</div>
-                    </div>
-                  )
-                })}
-                {list.length === 0 && (
-                  <div className="text-[11px] text-slate-400">—</div>
-                )}
+
+      {/* Desktop Calendar Grid */}
+      <div className="hidden md:block">
+        <div className="grid grid-cols-7 gap-1">
+          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => (
+            <div key={d} className="text-xs text-slate-500 dark:text-neutral-400 px-1 py-1 text-center">{d}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((cell, idx) => {
+            const date = cell.date
+            if (!date) return <div key={idx} className="h-24 rounded-md bg-transparent" />
+            const k = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+            const list = byDate.get(k) || []
+            return (
+              <div key={idx} className="h-28 rounded-md ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-1 overflow-hidden">
+                <div className="text-[11px] text-slate-500 dark:text-neutral-400 mb-1">{date.getDate()}</div>
+                <div className="space-y-1 overflow-auto max-h-[6rem] pr-1">
+                  {list.map((it, i) => {
+                    const open = () => {
+                      const rid = String(it.assignment_rest_id || extractIdFromUrl(it.htmlUrl, 'assignments') || '')
+                      if (rid) onOpenAssignment?.(it.course_id, rid, it.name)
+                      else onOpenCourse?.(it.course_id)
+                    }
+                    return (
+                      <div key={i} onClick={open} className="text-[11px] rounded px-1 py-0.5 bg-white dark:bg-neutral-900 ring-1 ring-gray-200 dark:ring-neutral-800 cursor-pointer hover:bg-slate-50 dark:hover:bg-neutral-800">
+                        <div className="truncate" title={it.name}>{it.name}</div>
+                      </div>
+                    )
+                  })}
+                  {list.length === 0 && (
+                    <div className="text-[11px] text-slate-400">—</div>
+                  )}
+                </div>
               </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Mobile List View */}
+      <div className="md:hidden space-y-3">
+        {groupedByDate.length === 0 && (
+          <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-3 text-sm text-slate-500 dark:text-neutral-400">
+            No assignments this month
+          </div>
+        )}
+        {groupedByDate.map(({ date, items: dayItems }, gi) => (
+          <div key={gi}>
+            <div className="text-xs font-semibold text-slate-600 dark:text-neutral-300 mb-1.5 px-1">
+              {date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
             </div>
-          )
-        })}
+            <div className="space-y-2">
+              {dayItems.map((it, i) => {
+                const open = () => {
+                  const rid = String(it.assignment_rest_id || extractIdFromUrl(it.htmlUrl, 'assignments') || '')
+                  if (rid) onOpenAssignment?.(it.course_id, rid, it.name)
+                  else onOpenCourse?.(it.course_id)
+                }
+                const time = new Date(it.dueAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+                return (
+                  <div
+                    key={i}
+                    role="button"
+                    tabIndex={0}
+                    onClick={open}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
+                    className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 px-3 py-2 cursor-pointer hover:ring-black/10 dark:hover:ring-white/10"
+                  >
+                    <div className="font-medium truncate" title={it.name}>{it.name}</div>
+                    <div className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 flex items-center gap-1.5">
+                      <span>{it.course_name || String(it.course_id)}</span>
+                      <span>·</span>
+                      <span>{time}</span>
+                      {it.pointsPossible ? <><span>·</span><span>{it.pointsPossible} pts</span></> : null}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
