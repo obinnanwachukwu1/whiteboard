@@ -77,6 +77,26 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 }
 .animate-pop { animation: popIn 0.2s ease-out; }
 
+/* Slide-in from right for panels/drawers */
+@keyframes slideInRight {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(0); }
+}
+.animate-slide-in-right { animation: slideInRight 0.25s ease-out; }
+
+/* Modal animations */
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+.animate-fade-in { animation: fadeIn 0.15s ease-out; }
+
+@keyframes modalIn {
+  0% { opacity: 0; transform: scale(0.95) translateY(10px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-modal-in { animation: modalIn 0.2s ease-out; }
+
 /* Lightweight rich HTML defaults (no typography plugin) */
 .rich-html { color: inherit; }
 .rich-html h1 { font-size: 1.875rem; line-height: 2.25rem; font-weight: 700; margin: 1.25rem 0 0.75rem; }
@@ -166,4 +186,29 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 .annotationLayer a:hover {
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35);
   background: rgba(37, 99, 235, 0.12);
+}
+
+/* Skeleton shimmer animation (alternative to pulse) */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #e5e7eb 0%,
+    #f3f4f6 50%,
+    #e5e7eb 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+.dark .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #262626 0%,
+    #3f3f46 50%,
+    #262626 100%
+  );
+  background-size: 200% 100%;
 }
