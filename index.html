@@ -10,21 +10,36 @@
     <title>Whiteboard</title>
     <script>
       // Immediate theme bootstrap to prevent white flash
+      // This runs synchronously before anything else renders
       (function() {
         try {
-          const stored = localStorage.getItem('app-theme');
-          const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          const isDark = stored === 'dark' || (!stored && sysDark);
-          if (isDark) document.documentElement.classList.add('dark');
+          var stored = localStorage.getItem('app-theme');
+          var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var isDark = stored === 'dark' || (!stored && sysDark);
+          
+          // Apply dark class immediately
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.backgroundColor = '#020617'; // slate-950
+            document.documentElement.style.colorScheme = 'dark';
+          } else {
+            document.documentElement.style.backgroundColor = '#ffffff';
+            document.documentElement.style.colorScheme = 'light';
+          }
           
           // Also restore accent variables if present
-          const accentBg = localStorage.getItem('app-accent-bg');
-          const accentActive = localStorage.getItem('app-accent-active');
+          var accentBg = localStorage.getItem('app-accent-bg');
+          var accentActive = localStorage.getItem('app-accent-active');
           if (accentBg) document.documentElement.style.setProperty('--app-accent-bg', accentBg);
           if (accentActive) document.documentElement.style.setProperty('--app-accent-active', accentActive);
-        } catch {}
+        } catch(e) {}
       })();
     </script>
+    <style>
+      /* Critical CSS to prevent flash - applied before external CSS loads */
+      html.dark { background-color: #020617; color: #f1f5f9; }
+      html:not(.dark) { background-color: #ffffff; color: #0f172a; }
+    </style>
   </head>
   <body class="m-0 bg-ui-bg text-ui-text font-sans dark:bg-slate-950 dark:text-slate-100">
     <div id="root" class="h-full"></div>

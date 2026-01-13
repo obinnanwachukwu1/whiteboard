@@ -502,6 +502,126 @@ export class CanvasClient {
     return this.paginate<any>(`/folders/${folderId}/files`, { per_page: Math.min(100, Math.max(1, perPage)) })
   }
 
+  async listCourseUsers(courseId: string | number, perPage = 100) {
+    const p: Record<string, any> = {
+      per_page: Math.min(100, Math.max(1, perPage)),
+      'include[]': ['avatar_url', 'enrollments', 'email'],
+    }
+    return this.paginate<any>(`/courses/${courseId}/users`, p)
+  }
+
+  // Groups
+  async listCourseGroups(courseId: string | number, perPage = 100) {
+    const p: Record<string, any> = {
+      per_page: Math.min(100, Math.max(1, perPage)),
+      'include[]': ['users'],
+    }
+    return this.paginate<any>(`/courses/${courseId}/groups`, p)
+  }
+
+  async listMyGroups(contextType?: 'Account' | 'Course') {
+    const p: Record<string, any> = { per_page: 100 }
+    if (contextType) p.context_type = contextType
+    return this.paginate<any>('/users/self/groups', p)
+  }
+
+  async listGroupUsers(groupId: string | number, perPage = 100) {
+    const p: Record<string, any> = {
+      per_page: Math.min(100, Math.max(1, perPage)),
+      'include[]': ['avatar_url'],
+    }
+    return this.paginate<any>(`/groups/${groupId}/users`, p)
+  }
+
+  // Conversations (Inbox)
+  async listConversations(params: { scope?: 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'; perPage?: number } = {}) {
+    const p: Record<string, any> = {
+      per_page: params.perPage ?? 25,
+      'include[]': ['participant_avatars'],
+    }
+    if (params.scope) p.scope = params.scope
+    return this.paginate<any>('/conversations', p)
+  }
+
+  async getConversation(conversationId: string | number) {
+    return this.get(`/conversations/${conversationId}`, {
+      'include[]': ['participant_avatars'],
+      auto_mark_as_read: false, // Don't mark as read just by viewing
+    })
+  }
+
+  async getUnreadCount() {
+    return this.get<{ unread_count: string }>('/conversations/unread_count')
+  }
+
+  async createConversation(params: {
+    recipients: string[]
+    subject?: string
+    body: string
+    groupConversation?: boolean
+    contextCode?: string // e.g., 'course_12345'
+  }) {
+    // Canvas expects recipients as URLSearchParams-style array: recipients[]=1&recipients[]=2
+    const formData = new URLSearchParams()
+    for (const r of params.recipients) {
+      formData.append('recipients[]', r)
+    }
+    formData.append('body', params.body)
+    formData.append('group_conversation', String(params.groupConversation ?? true))
+    if (params.subject) formData.append('subject', params.subject)
+    if (params.contextCode) formData.append('context_code', params.contextCode)
+    
+    const resp = await this.axios.request({
+      method: 'POST',
+      url: this.url('/conversations'),
+      data: formData.toString(),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
+    return resp.data
+  }
+
+  async addMessage(conversationId: string | number, body: string, includedMessages?: string[]) {
+    const data: Record<string, any> = { body }
+    if (includedMessages && includedMessages.length > 0) {
+      data['included_messages[]'] = includedMessages
+    }
+    return this.post(`/conversations/${conversationId}/add_message`, data)
+  }
+
+  async updateConversation(conversationId: string | number, params: {
+    workflowState?: 'read' | 'unread' | 'archived'
+    starred?: boolean
+    subscribed?: boolean
+  }) {
+    const data: Record<string, any> = {}
+    if (params.workflowState) data['conversation[workflow_state]'] = params.workflowState
+    if (params.starred !== undefined) data['conversation[starred]'] = params.starred
+    if (params.subscribed !== undefined) data['conversation[subscribed]'] = params.subscribed
+    return this.put(`/conversations/${conversationId}`, data)
+  }
+
+  async deleteConversation(conversationId: string | number) {
+    return this.del(`/conversations/${conversationId}`)
+  }
+
+  async searchRecipients(params: {
+    search: string
+    context?: string // e.g., 'course_12345'
+    type?: 'user' | 'context'
+    perPage?: number
+  }) {
+    const p: Record<string, any> = {
+      search: params.search,
+      per_page: params.perPage ?? 10,
+      permissions: ['send_messages_all'],
+    }
+    if (params.context) p.context = params.context
+    if (params.type) p.type = params.type
+    return this.get('/search/recipients', p)
+  }
+
   async listCourseFiles(courseId: string | number, perPage = 100, sort: 'name' | 'size' | 'created_at' | 'updated_at' = 'updated_at', order: 'asc' | 'desc' = 'desc') {
     const p: Record<string, any> = { per_page: Math.min(100, Math.max(1, perPage)), sort, order }
     return this.paginate<any>(`/courses/${courseId}/files`, p)
@@ -768,4 +888,68 @@ export async function listCourseFolders(courseId: string | number, perPage = 100
 
 export async function listFolderFiles(folderId: string | number, perPage = 100) {
   return ensureClient().listFolderFiles(folderId, perPage)
+}
+
+export async function listCourseUsers(courseId: string | number, perPage = 100) {
+  return ensureClient().listCourseUsers(courseId, perPage)
+}
+
+export async function listCourseGroups(courseId: string | number, perPage = 100) {
+  return ensureClient().listCourseGroups(courseId, perPage)
+}
+
+export async function listMyGroups(contextType?: 'Account' | 'Course') {
+  return ensureClient().listMyGroups(contextType)
+}
+
+export async function listGroupUsers(groupId: string | number, perPage = 100) {
+  return ensureClient().listGroupUsers(groupId, perPage)
+}
+
+// Conversations (Inbox)
+export async function listConversations(params?: { scope?: 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'; perPage?: number }) {
+  return ensureClient().listConversations(params)
+}
+
+export async function getConversation(conversationId: string | number) {
+  return ensureClient().getConversation(conversationId)
+}
+
+export async function getUnreadCount() {
+  return ensureClient().getUnreadCount()
+}
+
+export async function createConversation(params: {
+  recipients: string[]
+  subject?: string
+  body: string
+  groupConversation?: boolean
+  contextCode?: string
+}) {
+  return ensureClient().createConversation(params)
+}
+
+export async function addMessage(conversationId: string | number, body: string, includedMessages?: string[]) {
+  return ensureClient().addMessage(conversationId, body, includedMessages)
+}
+
+export async function updateConversation(conversationId: string | number, params: {
+  workflowState?: 'read' | 'unread' | 'archived'
+  starred?: boolean
+  subscribed?: boolean
+}) {
+  return ensureClient().updateConversation(conversationId, params)
+}
+
+export async function deleteConversation(conversationId: string | number) {
+  return ensureClient().deleteConversation(conversationId)
+}
+
+export async function searchRecipients(params: {
+  search: string
+  context?: string
+  type?: 'user' | 'context'
+  perPage?: number
+}) {
+  return ensureClient().searchRecipients(params)
 }

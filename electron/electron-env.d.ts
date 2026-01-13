@@ -53,6 +53,19 @@ interface Window {
     listCourseFolders: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
     listFolderFiles: (folderId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
     listCourseFiles: (courseId: string | number, perPage?: number, sort?: 'name' | 'size' | 'created_at' | 'updated_at', order?: 'asc' | 'desc') => Promise<{ ok: boolean; data?: any; error?: string }>
+    listCourseUsers: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
+    listCourseGroups: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
+    listMyGroups: (contextType?: 'Account' | 'Course') => Promise<{ ok: boolean; data?: any; error?: string }>
+    listGroupUsers: (groupId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
+    // Conversations (Inbox)
+    listConversations: (params?: { scope?: 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'; perPage?: number }) => Promise<{ ok: boolean; data?: any; error?: string }>
+    getConversation: (conversationId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
+    getUnreadCount: () => Promise<{ ok: boolean; data?: { unread_count: string }; error?: string }>
+    createConversation: (params: { recipients: string[]; subject?: string; body: string; groupConversation?: boolean; contextCode?: string }) => Promise<{ ok: boolean; data?: any; error?: string }>
+    addMessage: (conversationId: string | number, body: string, includedMessages?: string[]) => Promise<{ ok: boolean; data?: any; error?: string }>
+    updateConversation: (conversationId: string | number, params: { workflowState?: 'read' | 'unread' | 'archived'; starred?: boolean; subscribed?: boolean }) => Promise<{ ok: boolean; data?: any; error?: string }>
+    deleteConversation: (conversationId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
+    searchRecipients: (params: { search: string; context?: string; type?: 'user' | 'context'; perPage?: number }) => Promise<{ ok: boolean; data?: any; error?: string }>
   }
   settings: {
     get: () => Promise<{ ok: boolean; data?: { baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'; prefetchEnabled?: boolean; cachedCourses?: any[]; cachedDue?: any[]; queryCache?: any; userSettings?: Record<string, any>; userSidebars?: Record<string, any>; courseImages?: Record<string, Record<string, string>>; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> }; pdfGestureZoomEnabled?: boolean; pdfZoom?: Record<string, number>; lastUserId?: string }; error?: string }>

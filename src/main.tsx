@@ -1,3 +1,15 @@
+// Polyfill URL.parse for older Chromium versions (Electron 30 uses Chrome 124, URL.parse added in Chrome 126)
+// This is needed by pdfjs-dist v5.x
+if (typeof URL.parse !== 'function') {
+  (URL as any).parse = function(url: string, base?: string): URL | null {
+    try {
+      return new URL(url, base)
+    } catch {
+      return null
+    }
+  }
+}
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'

@@ -35,6 +35,19 @@ import {
   listCourseFiles as svcListCourseFiles,
   listCourseFolders as svcListCourseFolders,
   listFolderFiles as svcListFolderFiles,
+  listCourseUsers as svcListCourseUsers,
+  listCourseGroups as svcListCourseGroups,
+  listMyGroups as svcListMyGroups,
+  listGroupUsers as svcListGroupUsers,
+  // Conversations
+  listConversations as svcListConversations,
+  getConversation as svcGetConversation,
+  getUnreadCount as svcGetUnreadCount,
+  createConversation as svcCreateConversation,
+  addMessage as svcAddMessage,
+  updateConversation as svcUpdateConversation,
+  deleteConversation as svcDeleteConversation,
+  searchRecipients as svcSearchRecipients,
 } from './canvasClient'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -81,8 +94,16 @@ function getIconPath(): string | undefined {
 
 function createWindow() {
   const icon = getIconPath()
+  // Determine initial background color based on saved theme to prevent flash
+  const savedTheme = appConfig?.theme
+  const isDark = savedTheme === 'dark' || (!savedTheme && process.platform === 'darwin')
+  const bgColor = isDark ? '#020617' : '#ffffff' // slate-950 for dark, white for light
+  
   win = new BrowserWindow({
     ...(icon ? { icon } : {}),
+    // Start hidden to prevent white flash - will show on ready-to-show
+    show: false,
+    backgroundColor: bgColor,
     // Make the titlebar blend with renderer UI on macOS
     // - hiddenInset keeps native traffic lights but removes the opaque title bar
     // - titleBarOverlay lets our content extend into the titlebar area
@@ -92,7 +113,7 @@ function createWindow() {
           trafficLightPosition: { x: 20, y: 20 }, // add some padding around the traffic lights
           titleBarOverlay: {
             color: '#00000000', // transparent so the Header background shows through
-            symbolColor: '#ffffff', // good contrast on both light & dark headers
+            symbolColor: isDark ? '#ffffff' : '#000000', // contrast based on theme
             height: 56, // match Header height (h-14)
           },
         }
@@ -104,6 +125,11 @@ function createWindow() {
       contextIsolation: true,
       sandbox: true,
     },
+  })
+  
+  // Show window once content is ready (prevents white flash)
+  win.once('ready-to-show', () => {
+    win?.show()
   })
 
   // Prevent new windows from spawning automatically (security best practice)
@@ -442,6 +468,46 @@ ipcMain.handle('canvas:listFolderFiles', async (_evt, folderId: string | number,
   }
 })
 
+ipcMain.handle('canvas:listCourseUsers', async (_evt, courseId: string | number, perPage = 100) => {
+  try {
+    const data = await svcListCourseUsers(courseId, perPage)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:listCourseGroups', async (_evt, courseId: string | number, perPage = 100) => {
+  try {
+    const data = await svcListCourseGroups(courseId, perPage)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:listMyGroups', async (_evt, contextType?: 'Account' | 'Course') => {
+  try {
+    const data = await svcListMyGroups(contextType)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:listGroupUsers', async (_evt, groupId: string | number, perPage = 100) => {
+  try {
+    const data = await svcListGroupUsers(groupId, perPage)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
 ipcMain.handle('canvas:getAnnouncement', async (_evt, courseId: string | number, topicId: string | number) => {
   try {
     const data = await svcGetAnnouncement(courseId, topicId)
@@ -458,6 +524,102 @@ ipcMain.handle('canvas:getFileBytes', async (_evt, fileId: string | number) => {
     const path = await svcDownloadFile(fileId)
     // Encode the path for the URL
     return { ok: true, data: `canvas-file://${encodeURIComponent(path)}` }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+// Conversations (Inbox)
+ipcMain.handle('canvas:listConversations', async (_evt, params?: { scope?: 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'; perPage?: number }) => {
+  try {
+    const data = await svcListConversations(params)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:getConversation', async (_evt, conversationId: string | number) => {
+  try {
+    const data = await svcGetConversation(conversationId)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:getUnreadCount', async () => {
+  try {
+    const data = await svcGetUnreadCount()
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:createConversation', async (_evt, params: {
+  recipients: string[]
+  subject?: string
+  body: string
+  groupConversation?: boolean
+  contextCode?: string
+}) => {
+  try {
+    const data = await svcCreateConversation(params)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:addMessage', async (_evt, conversationId: string | number, body: string, includedMessages?: string[]) => {
+  try {
+    const data = await svcAddMessage(conversationId, body, includedMessages)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:updateConversation', async (_evt, conversationId: string | number, params: {
+  workflowState?: 'read' | 'unread' | 'archived'
+  starred?: boolean
+  subscribed?: boolean
+}) => {
+  try {
+    const data = await svcUpdateConversation(conversationId, params)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:deleteConversation', async (_evt, conversationId: string | number) => {
+  try {
+    const data = await svcDeleteConversation(conversationId)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:searchRecipients', async (_evt, params: {
+  search: string
+  context?: string
+  type?: 'user' | 'context'
+  perPage?: number
+}) => {
+  try {
+    const data = await svcSearchRecipients(params)
+    return { ok: true, data }
   } catch (e: any) {
     const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
     return { ok: false, error: msg }

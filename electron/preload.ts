@@ -39,6 +39,19 @@ contextBridge.exposeInMainWorld('canvas', {
   listCourseFiles: (courseId: string | number, perPage?: number, sort?: 'name' | 'size' | 'created_at' | 'updated_at', order?: 'asc' | 'desc') => ipcRenderer.invoke('canvas:listCourseFiles', courseId, perPage, sort, order),
   listCourseFolders: (courseId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listCourseFolders', courseId, perPage),
   listFolderFiles: (folderId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listFolderFiles', folderId, perPage),
+  listCourseUsers: (courseId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listCourseUsers', courseId, perPage),
+  listCourseGroups: (courseId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listCourseGroups', courseId, perPage),
+  listMyGroups: (contextType?: 'Account' | 'Course') => ipcRenderer.invoke('canvas:listMyGroups', contextType),
+  listGroupUsers: (groupId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listGroupUsers', groupId, perPage),
+  // Conversations (Inbox)
+  listConversations: (params?: { scope?: 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'; perPage?: number }) => ipcRenderer.invoke('canvas:listConversations', params),
+  getConversation: (conversationId: string | number) => ipcRenderer.invoke('canvas:getConversation', conversationId),
+  getUnreadCount: () => ipcRenderer.invoke('canvas:getUnreadCount'),
+  createConversation: (params: { recipients: string[]; subject?: string; body: string; groupConversation?: boolean; contextCode?: string }) => ipcRenderer.invoke('canvas:createConversation', params),
+  addMessage: (conversationId: string | number, body: string, includedMessages?: string[]) => ipcRenderer.invoke('canvas:addMessage', conversationId, body, includedMessages),
+  updateConversation: (conversationId: string | number, params: { workflowState?: 'read' | 'unread' | 'archived'; starred?: boolean; subscribed?: boolean }) => ipcRenderer.invoke('canvas:updateConversation', conversationId, params),
+  deleteConversation: (conversationId: string | number) => ipcRenderer.invoke('canvas:deleteConversation', conversationId),
+  searchRecipients: (params: { search: string; context?: string; type?: 'user' | 'context'; perPage?: number }) => ipcRenderer.invoke('canvas:searchRecipients', params),
 })
 
 contextBridge.exposeInMainWorld('settings', {
