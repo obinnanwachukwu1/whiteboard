@@ -28,6 +28,12 @@ export default function CoursePage() {
     navigate({ to: '/course/$courseId', params: { courseId }, search: { tab: t } })
   }
 
+  const onClearDetail = () => {
+    setCourseDetail(null)
+    // Update URL to remove detail params, keeping the current tab
+    navigate({ to: '/course/$courseId', params: { courseId }, search: { tab: courseTab } })
+  }
+
   const onOpenDetail = (d: { contentType: 'assignment'|'announcement'|'page'|'file'; contentId: string; title: string }) => {
     setCourseDetail(d)
     const tabFor: any = d.contentType === 'assignment' ? 'assignments' : d.contentType === 'announcement' ? 'announcements' : d.contentType === 'page' ? 'home' : 'files'
@@ -78,7 +84,7 @@ export default function CoursePage() {
 
         if (cancelled) return
 
-        const otherTabs = ['announcements', 'modules', 'files', 'assignments', 'grades', 'home', 'syllabus', 'links']
+        const otherTabs = ['announcements', 'modules', 'files', 'assignments', 'grades', 'home', 'syllabus', 'links', 'people']
           .filter((t) => t !== (search?.tab || courseTab || 'announcements'))
 
         // Medium-priority: modules + assignments list
@@ -135,6 +141,21 @@ export default function CoursePage() {
               staleTime: 1000 * 60 * 5,
             })
           })
+          // People: prefetch in idle since it's typically less frequently accessed
+          if (otherTabs.includes('people')) enqueuePrefetch(async () => {
+            const canvas = window.canvas as typeof window.canvas & {
+              listCourseUsers?: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
+            }
+            await queryClient.prefetchQuery({
+              queryKey: ['course-users', id, 100],
+              queryFn: async () => {
+                const res = await canvas.listCourseUsers?.(id, 100)
+                if (!res?.ok) throw new Error(res?.error || 'Failed to load course users')
+                return res.data || []
+              },
+              staleTime: 1000 * 60 * 10, // 10 min cache
+            })
+          })
         })
 
         // Files: just prefetch top-level folders
@@ -179,7 +200,7 @@ export default function CoursePage() {
         onChangeTab={onChangeTab}
         content={courseDetail}
         onOpenDetail={onOpenDetail}
-        onClearDetail={() => setCourseDetail(null)}
+        onClearDetail={onClearDetail}
         baseUrl={ctx.baseUrl}
         onNavigateCourse={onNavigateCourse}
       />

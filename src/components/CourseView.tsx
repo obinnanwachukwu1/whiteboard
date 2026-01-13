@@ -1,7 +1,7 @@
 import React from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Card } from './ui/Card'
-import { FileText, Home as HomeIcon, BookOpen, Megaphone, ClipboardList, ScrollText, Percent, Link as LinkIcon } from 'lucide-react'
+import { FileText, Home as HomeIcon, BookOpen, Megaphone, ClipboardList, ScrollText, Percent, Link as LinkIcon, Users } from 'lucide-react'
 import { useCourseInfo, useCourseFrontPage, useCourseTabs, useCourseFiles } from '../hooks/useCanvasQueries'
 import { CourseGrades } from './CourseGrades'
 import { CourseModules } from './CourseModules'
@@ -10,6 +10,7 @@ import { CanvasContentView } from './CanvasContentView'
 import { CourseLinks } from './CourseLinks'
 import { CourseAnnouncements } from './CourseAnnouncements'
 import { CourseAssignments } from './CourseAssignments'
+import { CoursePeople } from './CoursePeople'
 import { FloatingCourseTabs, type CourseTabKey } from './FloatingCourseTabs'
 import { HtmlContent } from './HtmlContent'
 import { computeResolvedTabs, hasFilesFromTabs } from '../utils/courseTabs'
@@ -192,6 +193,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
             links: LinkIcon,
             assignments: ClipboardList,
             grades: Percent,
+            people: Users,
           } as const)[t.key] })) as any}
         />
       )}
@@ -298,6 +300,12 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
           {activeTab === 'grades' && (
             <div className="flex-1 flex flex-col overflow-hidden">
               <CourseGrades courseId={courseId} />
+            </div>
+          )}
+
+          {activeTab === 'people' && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <CoursePeople courseId={courseId} />
             </div>
           )}
         </div>
