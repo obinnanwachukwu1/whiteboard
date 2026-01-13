@@ -15,6 +15,11 @@ import type {
   CourseInfo,
   AnnouncementDetail,
   CourseFrontPage,
+  CanvasUser,
+  CanvasGroup,
+  Conversation,
+  ConversationScope,
+  Recipient,
 } from '../types/canvas'
 
 type IpcResult<T> = { ok: boolean; data?: T; error?: string }
@@ -298,6 +303,116 @@ export function useFolderFiles(folderId: string | number | undefined, perPage = 
     },
     enabled: folderId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 5,
+    ...options,
+  })
+}
+
+export function useCourseUsers(courseId: string | number | undefined, perPage = 100, options?: Partial<UseQueryOptions<CanvasUser[], Error, CanvasUser[]>>) {
+  return useQuery<CanvasUser[], Error, CanvasUser[]>({
+    queryKey: ['course-users', courseId, perPage],
+    queryFn: async () => {
+      if (courseId == null) return []
+      const canvas = window.canvas as typeof window.canvas & {
+        listCourseUsers?: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
+      }
+      const res = await canvas.listCourseUsers?.(courseId, perPage)
+      if (!res?.ok) throw new Error(res?.error || 'Failed to load course users')
+      return res.data || []
+    },
+    enabled: courseId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 10, // 10 min cache - users don't change often
+    ...options,
+  })
+}
+
+export function useCourseGroups(courseId: string | number | undefined, perPage = 100, options?: Partial<UseQueryOptions<CanvasGroup[], Error, CanvasGroup[]>>) {
+  return useQuery<CanvasGroup[], Error, CanvasGroup[]>({
+    queryKey: ['course-groups', courseId, perPage],
+    queryFn: async () => {
+      if (courseId == null) return []
+      const canvas = window.canvas as typeof window.canvas & {
+        listCourseGroups?: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
+      }
+      const res = await canvas.listCourseGroups?.(courseId, perPage)
+      if (!res?.ok) throw new Error(res?.error || 'Failed to load course groups')
+      return res.data || []
+    },
+    enabled: courseId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 10, // 10 min cache
+    ...options,
+  })
+}
+
+export function useMyGroups(contextType?: 'Account' | 'Course', options?: Partial<UseQueryOptions<CanvasGroup[], Error, CanvasGroup[]>>) {
+  return useQuery<CanvasGroup[], Error, CanvasGroup[]>({
+    queryKey: ['my-groups', contextType],
+    queryFn: async () => {
+      const canvas = window.canvas as typeof window.canvas & {
+        listMyGroups?: (contextType?: 'Account' | 'Course') => Promise<{ ok: boolean; data?: any; error?: string }>
+      }
+      const res = await canvas.listMyGroups?.(contextType)
+      if (!res?.ok) throw new Error(res?.error || 'Failed to load my groups')
+      return res.data || []
+    },
+    staleTime: 1000 * 60 * 10, // 10 min cache
+    ...options,
+  })
+}
+
+// Conversations (Inbox)
+export function useConversations(scope?: ConversationScope, perPage = 25, options?: Partial<UseQueryOptions<Conversation[], Error, Conversation[]>>) {
+  return useQuery<Conversation[], Error, Conversation[]>({
+    queryKey: ['conversations', scope, perPage],
+    queryFn: async () => {
+      const res = await window.canvas.listConversations?.({ scope, perPage })
+      if (!res?.ok) throw new Error(res?.error || 'Failed to load conversations')
+      return res.data || []
+    },
+    staleTime: 1000 * 30, // 30 seconds - messages can change frequently
+    ...options,
+  })
+}
+
+export function useConversation(conversationId: string | number | undefined, options?: Partial<UseQueryOptions<Conversation, Error, Conversation>>) {
+  return useQuery<Conversation, Error, Conversation>({
+    queryKey: ['conversation', conversationId],
+    queryFn: async () => {
+      if (conversationId == null) throw new Error('conversationId is required')
+      const res = await window.canvas.getConversation?.(conversationId)
+      if (!res?.ok) throw new Error(res?.error || 'Failed to load conversation')
+      return res.data
+    },
+    enabled: conversationId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 30, // 30 seconds
+    ...options,
+  })
+}
+
+export function useUnreadCount(options?: Partial<UseQueryOptions<number, Error, number>>) {
+  return useQuery<number, Error, number>({
+    queryKey: ['unread-count'],
+    queryFn: async () => {
+      const res = await window.canvas.getUnreadCount?.()
+      if (!res?.ok) throw new Error(res?.error || 'Failed to load unread count')
+      return parseInt(res.data?.unread_count || '0', 10)
+    },
+    staleTime: 1000 * 60, // 1 minute
+    refetchInterval: 1000 * 60 * 2, // Poll every 2 minutes for new messages
+    ...options,
+  })
+}
+
+export function useRecipientSearch(search: string, context?: string, options?: Partial<UseQueryOptions<Recipient[], Error, Recipient[]>>) {
+  return useQuery<Recipient[], Error, Recipient[]>({
+    queryKey: ['recipient-search', search, context],
+    queryFn: async () => {
+      if (!search.trim()) return []
+      const res = await window.canvas.searchRecipients?.({ search, context, perPage: 10 })
+      if (!res?.ok) throw new Error(res?.error || 'Failed to search recipients')
+      return res.data || []
+    },
+    enabled: search.trim().length >= 2 && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5, // 5 minutes
     ...options,
   })
 }

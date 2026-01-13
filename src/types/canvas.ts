@@ -129,3 +129,97 @@ export type AnnouncementDetail = {
 }
 
 export type CourseFrontPage = { body?: string } | null
+
+export type CanvasEnrollment = {
+  type?: string
+  role?: string
+  enrollment_state?: string
+  course_id?: string | number
+}
+
+export type CanvasUser = {
+  id: string | number
+  name?: string
+  short_name?: string
+  sortable_name?: string
+  avatar_url?: string
+  email?: string
+  enrollments?: CanvasEnrollment[]
+}
+
+export type CanvasGroup = {
+  id: string | number
+  name?: string
+  description?: string
+  members_count?: number
+  context_type?: 'Course' | 'Account'
+  course_id?: string | number
+  avatar_url?: string
+  users?: CanvasUser[]
+}
+
+// Conversations (Inbox)
+export type ConversationParticipant = {
+  id: string | number
+  name?: string
+  full_name?: string
+  avatar_url?: string
+}
+
+export type ConversationMessage = {
+  id: string | number
+  author_id: string | number
+  created_at: string
+  body: string
+  generated?: boolean
+  media_comment?: {
+    content_type?: string
+    url?: string
+  }
+  forwarded_messages?: ConversationMessage[]
+  attachments?: Array<{
+    id: string | number
+    display_name?: string
+    filename?: string
+    url?: string
+    content_type?: string
+    size?: number
+  }>
+}
+
+export type Conversation = {
+  id: string | number
+  subject?: string
+  workflow_state: 'read' | 'unread' | 'archived'
+  last_message?: string
+  last_message_at?: string
+  last_authored_message?: string
+  last_authored_message_at?: string
+  message_count: number
+  subscribed: boolean
+  private: boolean
+  starred: boolean
+  properties?: string[]
+  audience?: (string | number)[]
+  audience_contexts?: Record<string, { roles?: string[] }>
+  avatar_url?: string
+  participants?: ConversationParticipant[]
+  visible: boolean
+  context_code?: string
+  context_name?: string
+  // Full conversation includes messages
+  messages?: ConversationMessage[]
+}
+
+export type ConversationScope = 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'
+
+export type Recipient = {
+  id: string
+  name: string
+  full_name?: string
+  avatar_url?: string
+  type: 'user' | 'context'
+  user_count?: number // For group/context recipients
+  common_courses?: Record<string, string[]>
+  common_groups?: Record<string, string[]>
+}
