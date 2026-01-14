@@ -357,6 +357,255 @@ Add messaging capability via a slide-over panel accessible from a mail icon in t
 
 ---
 
+## Phase 5: Dashboard Redesign 🎯
+
+Transform the dashboard from a redundant content dump into a **smart command center** that answers: "What should I focus on right now?"
+
+### 5.1 Problem Statement
+
+**Current issues:**
+- StatCards (Due/Courses/Avg Grade) are redundant — info is either obvious or available elsewhere
+- Assignment/Announcement lists replicate dedicated tabs
+- Course grid duplicates sidebar functionality
+- No prioritization — everything is equally weighted
+- Vertical layout wastes horizontal space
+
+**User needs:**
+- See the most important things at a glance
+- Understand *why* something matters (grade impact, urgency)
+- Discover things they might not know about (new announcements)
+- Two-column scanning (left-to-right), not vertical scrolling
+
+---
+
+### 5.2 New Dashboard Layout
+
+**Two-column layout: 60% Priority / 40% Activity**
+
+```
+┌──────────────────── 60% ────────────────────┬───────── 40% ─────────┐
+│ 🎯 Priority                    [7 days ▾]   │ 📌 Activity           │
+│                                             │                       │
+│ [●] Midterm Exam                            │ 📣 Week 5 Recap  [✓]  │
+│     CS 101 · 2 days · High stakes           │    BIO 150 · 2h ago   │
+│                                             │                       │
+│ [●] Lab Report 3                            │ 📅 Office Hours       │
+│     CHEM 101 · 3 days · 8% of grade         │    CS 101 · Tmrw 2pm  │
+│                                             │                       │
+│ [●] Problem Set 5                           │ 📣 Lab Rescheduled    │
+│     MATH 200 · 5 days · 15 pts              │    CHEM 101 · 5h ago  │
+│                                             │                       │
+│ [●] Reading Response                        │ 📅 Quiz 3             │
+│     BIO 150 · 6 days · 10 pts               │    MATH · Thu 10am    │
+│                                             │                       │
+│ [●] Homework 7                              │                       │
+│     CS 101 · 7 days · 5 pts                 │                       │
+│                                             │                       │
+│  ▸ 2 more due later                         │                       │
+└─────────────────────────────────────────────┴───────────────────────┘
+```
+
+---
+
+### 5.3 Section Specifications
+
+#### Left Column: Priority (60%)
+
+**Purpose:** Top 5 assignments ranked by smart priority score
+
+**Priority Score Formula:**
+```
+priority = (effectiveWeight × urgencyMultiplier) + statusWeight
+
+Where:
+- effectiveWeight = assignment's % of final grade (0-100)
+- urgencyMultiplier = 3 (≤24h), 2 (≤48h), 1.5 (≤72h), 1 (>72h)
+- statusWeight = 0 if submitted, 100 if not submitted
+```
+
+**Display per item:**
+| Element | Description |
+|---------|-------------|
+| Course avatar | Color dot or image from course |
+| Title | Assignment name (truncated if needed) |
+| Course + Time | "CS 101 · 2 days" |
+| Weight indicator | Contextual text based on impact |
+
+**Weight Display Logic:**
+| Effective Weight | Display |
+|------------------|---------|
+| ≥15% | **"High stakes"** (emphasized) |
+| 5-14% | "X% of grade" |
+| <5% | Just show points: "15 pts" |
+
+**"Also Due" (Collapsed):**
+- Single line below priority items
+- Shows count of items beyond selected time horizon
+- Format: "▸ 2 more due later"
+- Expandable on click to show list
+
+**Time Horizon Dropdown:**
+- Located in section header: `[7 days ▾]`
+- Options: 3 days, 7 days, 14 days, 30 days
+- Persisted to localStorage
+
+---
+
+#### Right Column: Activity (40%)
+
+**Purpose:** Mixed feed of announcements and calendar events
+
+**Content types:**
+| Type | Icon | Source |
+|------|------|--------|
+| Announcement | 📣 | Activity stream (type: Announcement) |
+| Calendar Event | 📅 | `/users/self/upcoming_events` |
+| Discussion Reply | 💬 | Future: Activity stream (type: DiscussionTopic) |
+
+**Display per item:**
+| Element | Description |
+|---------|-------------|
+| Type icon | 📣, 📅, or 💬 |
+| Title | Announcement title or event name |
+| Course + Time | "BIO 150 · 2h ago" or "CS 101 · Tomorrow 2pm" |
+| Mark as read | [✓] button for announcements |
+
+**Mark as Read Feature:**
+- Click [✓] to mark announcement as read
+- Stored in localStorage: `whiteboard:read-announcements` (array of IDs)
+- Read announcements hidden from dashboard
+- Still visible (grayed out) on `/announcements` page
+
+**Empty State:**
+- "All caught up! ✨" when no unread announcements and no upcoming events
+
+---
+
+### 5.4 Components to Remove
+
+| Component | Action |
+|-----------|--------|
+| `src/components/dashboard/StatCards.tsx` | **Delete** |
+| `src/components/dashboard/AssignmentList.tsx` | Keep (used elsewhere), remove from Dashboard |
+| `src/components/dashboard/AnnouncementList.tsx` | Keep (used elsewhere), remove from Dashboard |
+| `src/components/dashboard/CourseCard.tsx` | Keep (potential reuse), remove from Dashboard |
+| Course grid in `Dashboard.tsx` | Remove |
+
+---
+
+### 5.5 Files to Create
+
+#### Utilities
+
+| File | Purpose |
+|------|---------|
+| `src/utils/assignmentWeight.ts` | Calculate effective % of grade for an assignment |
+| `src/utils/priorityScore.ts` | Calculate priority score for ranking |
+| `src/utils/readAnnouncements.ts` | localStorage helpers for marking announcements read |
+
+#### Hooks
+
+| File | Purpose |
+|------|---------|
+| `src/hooks/usePriorityAssignments.ts` | Fetch + rank top N assignments by priority |
+| `src/hooks/useUpcomingEvents.ts` | Fetch calendar events via `listUpcoming()` |
+| `src/hooks/useUnreadAnnouncements.ts` | Filter announcements excluding read ones |
+| `src/hooks/useDashboardSettings.ts` | Time horizon preference (localStorage) |
+| `src/hooks/useActivityFeed.ts` | Merge announcements + events into unified feed |
+
+#### Components
+
+| File | Purpose |
+|------|---------|
+| `src/components/dashboard/PriorityList.tsx` | Left column container |
+| `src/components/dashboard/PriorityItem.tsx` | Single priority row |
+| `src/components/dashboard/AlsoDue.tsx` | Collapsible "X more due later" section |
+| `src/components/dashboard/ActivityPanel.tsx` | Right column container |
+| `src/components/dashboard/ActivityItem.tsx` | Single activity row (announcement or event) |
+| `src/components/dashboard/TimeHorizonDropdown.tsx` | Dropdown for time filter |
+
+---
+
+### 5.6 Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/components/Dashboard.tsx` | Complete rewrite with two-column layout |
+| `src/hooks/useDashboardData.ts` | Simplify — remove course grid logic, add priority calculation |
+| `src/routes/AnnouncementsPage.tsx` | Show read announcements as grayed out |
+| `src/routes/SettingsPage.tsx` | Add Dashboard section with default time horizon |
+
+---
+
+### 5.7 Canvas API Usage
+
+| Endpoint | Purpose | Status |
+|----------|---------|--------|
+| `GET /users/self/upcoming_events` | Calendar events | ✅ Already implemented in `canvasClient.ts` |
+| `GET /users/self/activity_stream` | Announcements | ✅ Already implemented |
+| `GET /courses/:id/assignment_groups` | Grade weights | ✅ Already implemented |
+| `GET /courses/:id/assignments` | Assignment data | ✅ Already implemented |
+
+No new API endpoints needed.
+
+---
+
+### 5.8 Responsive Behavior
+
+| Viewport | Layout |
+|----------|--------|
+| Desktop (≥1024px) | Two columns: 60/40 |
+| Tablet (768-1023px) | Two columns: 55/45 |
+| Mobile (<768px) | Single column, Priority stacked above Activity |
+
+---
+
+### 5.9 Implementation Checklist
+
+**Phase 1: Utilities & Data Layer**
+- [ ] Create `src/utils/assignmentWeight.ts` - Calculate effective weight
+- [ ] Create `src/utils/priorityScore.ts` - Priority ranking algorithm
+- [ ] Create `src/utils/readAnnouncements.ts` - localStorage helpers
+- [ ] Create `src/hooks/useDashboardSettings.ts` - Time horizon state
+- [ ] Create `src/hooks/useUpcomingEvents.ts` - Calendar events hook
+- [ ] Create `src/hooks/useUnreadAnnouncements.ts` - Filtered announcements
+- [ ] Create `src/hooks/usePriorityAssignments.ts` - Ranked assignments
+- [ ] Create `src/hooks/useActivityFeed.ts` - Merged activity feed
+
+**Phase 2: UI Components**
+- [ ] Create `src/components/dashboard/PriorityItem.tsx`
+- [ ] Create `src/components/dashboard/PriorityList.tsx`
+- [ ] Create `src/components/dashboard/AlsoDue.tsx`
+- [ ] Create `src/components/dashboard/ActivityItem.tsx`
+- [ ] Create `src/components/dashboard/ActivityPanel.tsx`
+- [ ] Create `src/components/dashboard/TimeHorizonDropdown.tsx`
+
+**Phase 3: Dashboard Refactor**
+- [ ] Rewrite `src/components/Dashboard.tsx` with new layout
+- [ ] Update `src/hooks/useDashboardData.ts`
+- [ ] Delete `src/components/dashboard/StatCards.tsx`
+- [ ] Update `src/routes/AnnouncementsPage.tsx` to show read items grayed
+
+**Phase 4: Settings & Polish**
+- [ ] Add Dashboard settings to `src/routes/SettingsPage.tsx`
+- [ ] Add skeleton loading states
+- [ ] Add empty states
+- [ ] Test responsive behavior
+- [ ] Persist preferences to localStorage
+
+---
+
+### 5.10 Future Enhancements
+
+- [ ] Discussion replies in Activity feed (requires discussion API)
+- [ ] "Mark all as read" for announcements
+- [ ] Drag-to-reorder priority items (manual override)
+- [ ] Priority notifications for high-stakes items
+- [ ] Weekly summary view
+- [ ] Sync read state across devices (if user auth added)
+
+---
+
 ### Dependencies to Add
 
 ```bash
