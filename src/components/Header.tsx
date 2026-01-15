@@ -84,7 +84,7 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
 
   return (
     <header
-      className={`h-14 backdrop-blur text-slate-900 dark:text-slate-100 flex items-center justify-between ${isWin ? 'pl-20 pr-5' : 'px-5'} select-none app-drag titlebar-left-inset titlebar-right-inset relative z-[100] ${isWin ? 'flex-row-reverse' : ''}`}
+      className={`h-14 backdrop-blur text-slate-900 dark:text-slate-100 flex items-center justify-between select-none app-drag relative z-[100] ${isWin ? 'flex-row-reverse pl-4 titlebar-right-inset' : 'px-5 titlebar-left-inset'}`}
       style={{
         backgroundColor: 'var(--app-accent-bg)',
       }}
@@ -114,7 +114,7 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
         
         <button
           ref={nameBtnRef}
-          className={`group inline-flex items-center gap-2 rounded-md px-2 py-1 ${isWin ? 'ml-0' : '-mr-1'} hover:[background-color:var(--app-accent-hover)] ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10 transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30`}
+          className="group inline-flex items-center gap-2 rounded-md px-2 py-1 hover:[background-color:var(--app-accent-hover)] ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10 transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
           onClick={() => setMenuOpen((v) => !v)}
           aria-haspopup="menu"
           aria-expanded={menuOpen}

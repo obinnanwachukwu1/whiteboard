@@ -33,6 +33,12 @@ app.whenReady().then(() => {
 
 // Register indexing IPC handlers
 registerIndexingIPC()
+
+// Set application name for dev mode
+if (process.env.NODE_ENV === 'development') {
+  app.setName('Whiteboard')
+}
+
 import {
   listCourseModulesGql as svcListCourseModulesGql,
   listUpcoming as svcListUpcoming,

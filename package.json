@@ -1,5 +1,8 @@
 {
   "name": "whiteboard",
+  "productName": "Whiteboard",
+  "description": "A fast, focused Canvas LMS client.",
+  "author": "Obinna Nwachukwu",
   "private": true,
   "version": "1.0.0",
   "type": "module",
