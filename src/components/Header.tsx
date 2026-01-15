@@ -18,6 +18,11 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
   const app = useAppContext()
   const name = profile?.short_name || profile?.name || 'Whiteboard'
   const avatar = profile?.avatar_url
+  const isWin =
+    // Prefer UA sniffing here so layout doesn't depend on preload injecting a class.
+    // (The preload runs from dist-electron/preload.mjs in dev, so changes may not apply until rebuild/restart.)
+    (typeof navigator !== 'undefined' && /windows/i.test(navigator.userAgent)) ||
+    (typeof navigator !== 'undefined' && typeof (navigator as any).platform === 'string' && /^win/i.test((navigator as any).platform))
   const [dark, setDark] = useState<boolean>(false)
   const [accent, setAccent] = useState<Accent>('default')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -79,7 +84,7 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
 
   return (
     <header
-      className="h-14 backdrop-blur text-slate-900 dark:text-slate-100 flex items-center justify-between px-5 select-none app-drag titlebar-left-inset relative z-[100]"
+      className={`h-14 backdrop-blur text-slate-900 dark:text-slate-100 flex items-center justify-between ${isWin ? 'pl-20 pr-5' : 'px-5'} select-none app-drag titlebar-left-inset titlebar-right-inset relative z-[100] ${isWin ? 'flex-row-reverse' : ''}`}
       style={{
         backgroundColor: 'var(--app-accent-bg)',
       }}
@@ -88,9 +93,9 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
         {/* <div className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-brand/10 text-brand">WB</div>
         <div className="font-semibold tracking-tight">Whiteboard</div> */}
       </div>
-      <div className="flex items-center gap-3 app-no-drag relative">
+      <div className={`flex items-center ${isWin ? 'gap-2' : 'gap-3'} app-no-drag relative`}>
         {/* Search button */}
-        {onOpenSearch && (
+        {!isWin && onOpenSearch && (
           <button
             onClick={onOpenSearch}
             className="group inline-flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-slate-600 dark:text-slate-300 hover:[background-color:var(--app-accent-hover)] ring-1 ring-black/5 dark:ring-white/10 bg-white/50 dark:bg-neutral-800/50 transition-all"
@@ -105,11 +110,11 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
         )}
         
         {/* Inbox button */}
-        {onOpenInbox && <InboxButton onClick={onOpenInbox} />}
+        {!isWin && onOpenInbox && <InboxButton onClick={onOpenInbox} />}
         
         <button
           ref={nameBtnRef}
-          className="group inline-flex items-center gap-2 rounded-md px-2 py-1 -mr-1 hover:[background-color:var(--app-accent-hover)] ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10 transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+          className={`group inline-flex items-center gap-2 rounded-md px-2 py-1 ${isWin ? 'ml-0' : '-mr-1'} hover:[background-color:var(--app-accent-hover)] ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10 transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30`}
           onClick={() => setMenuOpen((v) => !v)}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
@@ -122,13 +127,29 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
               alt={name}
             />
           )}
-          <div className="flex flex-col leading-tight items-end text-right">
+          <div className={`flex flex-col leading-tight ${isWin ? 'items-start text-left' : 'items-end text-right'}`}>
             <div className="font-medium text-sm">{name}</div>
             {profile?.primary_email && (
               <div className="text-[11px] text-slate-500 dark:text-neutral-400">{profile.primary_email}</div>
             )}
           </div>
         </button>
+
+        {/* Windows ordering: Account, Inbox, Search */}
+        {isWin && onOpenInbox && <InboxButton onClick={onOpenInbox} />}
+        {isWin && onOpenSearch && (
+          <button
+            onClick={onOpenSearch}
+            className="group inline-flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-slate-600 dark:text-slate-300 hover:[background-color:var(--app-accent-hover)] ring-1 ring-black/5 dark:ring-white/10 bg-white/50 dark:bg-neutral-800/50 transition-all"
+            title="Search (Ctrl+K)"
+          >
+            <Search className="w-4 h-4" />
+            <span className="hidden sm:inline">Search</span>
+            <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-neutral-700 text-[10px] text-slate-500 dark:text-neutral-400 font-mono">
+              <Command className="w-2.5 h-2.5" />K
+            </kbd>
+          </button>
+        )}
 
         <Dropdown open={menuOpen} onOpenChange={setMenuOpen} align="right" offsetY={48} anchorEl={nameBtnRef.current}>
           <div className="px-3 py-2 text-[11px] text-slate-600 dark:text-neutral-400 border-b border-black/5 dark:border-white/10">

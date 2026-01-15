@@ -139,6 +139,21 @@ function createWindow() {
           },
         }
       : {}),
+    // Windows: extend content into titlebar while keeping native caption buttons.
+    // Also auto-hide the menu bar (the Windows "toolbar") so only our React header shows.
+    ...(process.platform === 'win32'
+      ? {
+          titleBarStyle: 'hidden' as const,
+          titleBarOverlay: {
+            color: '#00000000', // transparent so the Header background shows through
+            symbolColor: isDark ? '#ffffff' : '#000000',
+            height: 56, // match Header height (h-14)
+          },
+          autoHideMenuBar: true,
+        }
+      : process.platform !== 'darwin'
+        ? { autoHideMenuBar: true }
+        : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       webviewTag: true,

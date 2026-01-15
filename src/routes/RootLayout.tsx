@@ -15,6 +15,7 @@ import { Eye, EyeOff, ExternalLink } from 'lucide-react'
 import { SearchModal } from '../components/SearchModal'
 import { InboxPanel } from '../components/InboxPanel'
 import { Skeleton, SkeletonList, SkeletonStats } from '../components/Skeleton'
+import { useWindowControlsOverlayInsets } from '../hooks/useWindowControlsOverlayInsets'
 
 // Context definitions moved to src/context/AppContext.tsx
 
@@ -38,6 +39,8 @@ function AIPanelKeyboardHandler() {
 }
 
 export function RootLayout() {
+  useWindowControlsOverlayInsets()
+
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { add: addToast } = useToast()
@@ -459,7 +462,7 @@ export function RootLayout() {
     return (
       <div className="h-screen flex flex-col bg-white dark:bg-neutral-950">
         {/* Transparent draggable bar on startup */}
-        <div className="absolute inset-x-0 top-0 h-14 app-drag titlebar-left-inset z-50 bg-transparent" aria-hidden />
+        <div className="absolute inset-x-0 top-0 h-14 app-drag titlebar-left-inset titlebar-right-inset z-50 bg-transparent" aria-hidden />
         
         {/* Skeleton Header */}
         <div className="h-14 border-b border-gray-200 dark:border-neutral-800 flex items-center justify-end px-4 gap-4">
@@ -499,7 +502,7 @@ export function RootLayout() {
     return (
       <div className="h-screen w-screen relative overflow-hidden flex flex-col">
         {/* Transparent draggable bar (doesn't affect layout) */}
-        <div className="absolute inset-x-0 top-0 h-14 app-drag titlebar-left-inset z-50 bg-transparent" aria-hidden />
+        <div className="absolute inset-x-0 top-0 h-14 app-drag titlebar-left-inset titlebar-right-inset z-50 bg-transparent" aria-hidden />
         {/* Animated gradient ribbon overlay */}
         <div className="absolute inset-x-0 -top-1/3 h-1/2 -z-10 bg-gradient-to-r from-sky-400 via-violet-500 to-rose-400 opacity-40 blur-3xl animate-gradient" />
         {/* Ambient orbs */}

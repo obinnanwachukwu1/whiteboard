@@ -541,6 +541,7 @@ const ComposeMessage: React.FC<{
 
 // Main InboxPanel Component
 export const InboxPanel: React.FC<Props> = ({ isOpen, onClose }) => {
+  const isWin = typeof navigator !== 'undefined' && /windows/i.test(navigator.userAgent)
   const [scope, setScope] = useState<ConversationScope | 'all'>('all')
   const [selectedConversation, setSelectedConversation] = useState<string | number | null>(null)
   const [isComposing, setIsComposing] = useState(false)
@@ -585,7 +586,7 @@ export const InboxPanel: React.FC<Props> = ({ isOpen, onClose }) => {
       {/* Panel */}
       <div
         ref={panelRef}
-        className="fixed right-0 top-0 bottom-0 w-full max-w-lg bg-white dark:bg-neutral-900 shadow-2xl z-[201] flex flex-col animate-slide-in-right"
+        className={`fixed top-0 bottom-0 w-full max-w-lg bg-white dark:bg-neutral-900 shadow-2xl z-[201] flex flex-col ${isWin ? 'left-0 animate-slide-in-left' : 'right-0 animate-slide-in-right'}`}
       >
         {/* Header */}
         <div className="flex-shrink-0 h-14 px-4 flex items-center justify-between border-b border-slate-200 dark:border-neutral-700 app-drag">

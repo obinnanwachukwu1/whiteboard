@@ -125,6 +125,7 @@ contextBridge.exposeInMainWorld('embedding', {
 // Platform helpers + body class for macOS styling hooks
 contextBridge.exposeInMainWorld('platform', {
   isMac: process.platform === 'darwin',
+  isWindows: process.platform === 'win32',
 })
 
 // Tag the <html> or <body> so renderer CSS can adjust spacing for traffic lights
@@ -132,5 +133,9 @@ try {
   if (process.platform === 'darwin') {
     const el = document.documentElement || document.body
     el.classList.add('mac')
+  }
+  if (process.platform === 'win32') {
+    const el = document.documentElement || document.body
+    el.classList.add('win')
   }
 } catch {}

@@ -42,9 +42,12 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 .app-drag { -webkit-app-region: drag; }
 .app-no-drag { -webkit-app-region: no-drag; }
 
-/* macOS traffic lights spacing when using hidden/overlay titlebar */
-/* Adjust if you tweak overlay height or want a different inset. */
-.mac .titlebar-left-inset { padding-left: 120px; }
+/* Titlebar insets for native window controls (mac traffic lights / Windows caption buttons). */
+.titlebar-left-inset { padding-left: var(--titlebar-left-inset, 0px); }
+.titlebar-right-inset { padding-right: var(--titlebar-right-inset, 0px); }
+/* Fallback defaults (overridden when Window Controls Overlay API is available). */
+.mac { --titlebar-left-inset: 120px; }
+.win { --titlebar-right-inset: 148px; }
 
 /* Design tokens: consistent radii & card shadow */
 /* Match container's new xl radius for cards; slightly smaller for controls */
@@ -83,6 +86,12 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
   100% { transform: translateX(0); }
 }
 .animate-slide-in-right { animation: slideInRight 0.25s ease-out; }
+
+@keyframes slideInLeft {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(0); }
+}
+.animate-slide-in-left { animation: slideInLeft 0.25s ease-out; }
 
 /* Modal animations */
 @keyframes fadeIn {
