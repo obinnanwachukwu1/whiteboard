@@ -12,6 +12,27 @@ import {
   CanvasError,
 } from './canvasClient'
 import { loadConfig, saveConfig, type AppConfig } from './config'
+import { AIManager } from './ai/manager'
+import { EmbeddingManager, IndexableItem, EmbeddingStatus } from './embedding/manager'
+import type { SearchResult } from './embedding/vectorStore'
+import { FileMetaStore } from './embedding/fileMetaStore'
+import { cleanupTempFiles } from './embedding/tempCleaner'
+import { registerIndexingIPC } from './embedding/indexingService'
+
+const aiManager = new AIManager()
+const embeddingManager = new EmbeddingManager()
+const fileMetaStore = new FileMetaStore()
+
+// Load file metadata on startup
+app.whenReady().then(() => {
+  fileMetaStore.load().catch(console.error)
+  
+  // Clean up old temp files (fire and forget)
+  cleanupTempFiles().catch(console.error)
+})
+
+// Register indexing IPC handlers
+registerIndexingIPC()
 import {
   listCourseModulesGql as svcListCourseModulesGql,
   listUpcoming as svcListUpcoming,
@@ -166,9 +187,16 @@ function createWindow() {
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    aiManager.stop()
+    embeddingManager.shutdown().catch(console.error)
     app.quit()
     win = null
   }
+})
+
+app.on('will-quit', () => {
+  aiManager.stop()
+  embeddingManager.shutdown().catch(console.error)
 })
 
 app.on('activate', () => {
@@ -183,12 +211,29 @@ app.whenReady().then(() => {
   // load config and create window
   appConfig = loadConfig()
   
+  // Initialize AI Manager
+  aiManager.start(!!appConfig.aiEnabled)
+  
   // Register custom protocol for secure file serving
+  // SECURITY: Only allow access to files in the temp directory
   protocol.handle('canvas-file', (req) => {
     const url = req.url.replace(/^canvas-file:\/\//, '')
     // Decode URL-encoded characters (e.g. %20 -> space)
     const filePath = decodeURIComponent(url)
-    return net.fetch(pathToFileURL(filePath).toString())
+    
+    // Security check: resolve to absolute path and verify it's in temp directory
+    const tempDir = app.getPath('temp')
+    const resolvedPath = path.resolve(filePath)
+    
+    if (!resolvedPath.startsWith(tempDir)) {
+      console.warn(`[Security] Blocked access to file outside temp dir: ${resolvedPath}`)
+      return new Response('Forbidden: Access denied to files outside temp directory', { 
+        status: 403,
+        headers: { 'Content-Type': 'text/plain' }
+      })
+    }
+    
+    return net.fetch(pathToFileURL(resolvedPath).toString())
   })
 
   // Set dock icon on macOS during dev so it shows immediately
@@ -652,8 +697,186 @@ ipcMain.handle('config:get', async () => {
 
 ipcMain.handle('config:set', async (_evt, partial: Partial<AppConfig>) => {
   try {
+    const oldConfig = appConfig
     appConfig = saveConfig(partial)
+
+    // Handle AI toggle
+    if (partial.aiEnabled !== undefined && partial.aiEnabled !== oldConfig.aiEnabled) {
+      if (partial.aiEnabled) {
+        aiManager.start(true)
+      } else {
+        aiManager.stop()
+      }
+    }
+
     return { ok: true, data: appConfig }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+// ============ Embedding IPC Handlers ============
+
+// Forward download progress events to renderer
+embeddingManager.on('download-progress', (progress) => {
+  if (win) {
+    win.webContents.send('embedding:download-progress', progress)
+  }
+})
+
+ipcMain.handle('embedding:status', async (): Promise<{ ok: boolean; data?: EmbeddingStatus; error?: string }> => {
+  try {
+    const status = embeddingManager.getStatus()
+    return { ok: true, data: status }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('embedding:search', async (_evt, query: string, k = 10, opts?: any): Promise<{ ok: boolean; data?: SearchResult[]; error?: string }> => {
+  try {
+    const results = await embeddingManager.search(query, k, opts || {})
+    return { ok: true, data: results }
+  } catch (e: any) {
+    console.error('[Embedding] Search error:', e)
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('embedding:index', async (_evt, items: IndexableItem[]): Promise<{ ok: boolean; data?: { indexed: number; skipped: number }; error?: string }> => {
+  try {
+    const result = await embeddingManager.index(items)
+    return { ok: true, data: result }
+  } catch (e: any) {
+    console.error('[Embedding] Index error:', e)
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('embedding:clear', async (): Promise<{ ok: boolean; error?: string }> => {
+  try {
+    await embeddingManager.clear()
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+// File indexing handlers
+ipcMain.handle('embedding:indexFile', async (
+  _evt,
+  fileId: string,
+  courseId: string,
+  courseName: string,
+  fileName: string,
+  fileSize: number,
+  updatedAt?: string,
+  url?: string
+): Promise<{ ok: boolean; data?: { chunks: number; pageCount: number; truncated: boolean; skipped?: boolean }; error?: string }> => {
+  try {
+    // Check if file needs indexing (version check)
+    if (!fileMetaStore.needsIndexing(fileId, updatedAt)) {
+      console.log(`[embedding:indexFile] Skipping ${fileName} (up to date)`)
+      return { 
+        ok: true, 
+        data: { 
+          chunks: 0, 
+          pageCount: 0, 
+          truncated: false, 
+          skipped: true 
+        } 
+      }
+    }
+
+    // Import dynamically to avoid circular dependencies
+    const { prepareFileForIndexing } = await import('./embedding/fileIndexer')
+    
+    // Prepare the file (download, extract, chunk)
+    const result = await prepareFileForIndexing({
+      fileId,
+      courseId,
+      courseName,
+      fileName,
+      fileSize,
+      updatedAt,
+      url,
+    })
+
+    if (result.error) {
+      if (updatedAt) {
+        fileMetaStore.recordFailure(fileId, updatedAt, result.error)
+      }
+      return { ok: false, error: result.error }
+    }
+
+    if (result.chunks.length === 0) {
+      if (updatedAt) {
+        // Record success even if 0 chunks (e.g. empty file), so we don't retry forever
+        fileMetaStore.recordSuccess(fileId, updatedAt, 0, result.truncated)
+      }
+      return { ok: true, data: { chunks: 0, pageCount: result.pageCount, truncated: result.truncated } }
+    }
+
+    // Remove any existing chunks for this file
+    embeddingManager.removeByFileId(fileId)
+
+    // Index the chunks
+    const chunksForIndexing = result.chunks.map(c => ({
+      id: c.id,
+      text: c.text,
+      metadata: c.metadata,
+    }))
+
+    await embeddingManager.indexFileChunks(chunksForIndexing)
+
+    // Record success
+    if (updatedAt) {
+      // Calculate content hash from all chunks if needed, or just rely on file metadata
+      fileMetaStore.recordSuccess(fileId, updatedAt, result.chunks.length, result.truncated)
+    }
+
+    return {
+      ok: true,
+      data: {
+        chunks: result.chunks.length,
+        pageCount: result.pageCount,
+        truncated: result.truncated,
+      },
+    }
+  } catch (e: any) {
+    console.error('[embedding:indexFile] Error:', e)
+    if (updatedAt) {
+      fileMetaStore.recordFailure(fileId, updatedAt, String(e?.message || e))
+    }
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('embedding:pruneCourse', async (
+  _evt,
+  courseId: string
+): Promise<{ ok: boolean; data?: number; error?: string }> => {
+  try {
+    const removed = await embeddingManager.removeByCourseId(courseId)
+    return { ok: true, data: removed }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('embedding:getStorageStats', async (): Promise<{
+  ok: boolean
+  data?: {
+    totalEntries: number
+    totalBytes: number
+    byCourse: Record<string, { entries: number; bytes: number }>
+    byType: Record<string, { entries: number; bytes: number }>
+  }
+  error?: string
+}> => {
+  try {
+    const stats = embeddingManager.getStorageStats()
+    return { ok: true, data: stats }
   } catch (e: any) {
     return { ok: false, error: String(e?.message || e) }
   }

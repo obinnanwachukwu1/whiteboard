@@ -73,6 +73,7 @@ contextBridge.exposeInMainWorld('settings', {
       pdfGestureZoomEnabled?: boolean
       pdfZoom?: Record<string, number>
       lastUserId?: string
+      aiEnabled?: boolean
     }>,
   ) => ipcRenderer.invoke('config:set', partial),
 })
@@ -80,6 +81,45 @@ contextBridge.exposeInMainWorld('settings', {
 // System helpers
 contextBridge.exposeInMainWorld('system', {
   openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
+})
+
+// AI Helpers
+contextBridge.exposeInMainWorld('ai', {
+  chat: (messages: any[], max_tokens?: number) => ipcRenderer.invoke('ai:chat', { messages, max_tokens })
+})
+
+// Embedding / Deep Search Helpers
+contextBridge.exposeInMainWorld('embedding', {
+  search: (query: string, k?: number, opts?: { courseIds?: string[]; types?: Array<'announcement' | 'assignment' | 'page' | 'module' | 'file'>; minScore?: number }) => ipcRenderer.invoke('embedding:search', query, k, opts),
+  index: (items: Array<{
+    id: string
+    type: 'announcement' | 'assignment' | 'page' | 'module' | 'file'
+    courseId: string
+    courseName: string
+    title: string
+    content: string
+    url?: string
+  }>) => ipcRenderer.invoke('embedding:index', items),
+  getStatus: () => ipcRenderer.invoke('embedding:status'),
+  clear: () => ipcRenderer.invoke('embedding:clear'),
+  // File indexing APIs
+  indexFile: (
+    fileId: string,
+    courseId: string,
+    courseName: string,
+    fileName: string,
+    fileSize: number,
+    updatedAt?: string,
+    url?: string
+  ) => ipcRenderer.invoke('embedding:indexFile', fileId, courseId, courseName, fileName, fileSize, updatedAt, url),
+  pruneCourse: (courseId: string) => ipcRenderer.invoke('embedding:pruneCourse', courseId),
+  getStorageStats: () => ipcRenderer.invoke('embedding:getStorageStats'),
+  onDownloadProgress: (callback: (progress: { file: string; downloaded: number; total: number; percent: number }) => void) => {
+    const handler = (_event: any, progress: any) => callback(progress)
+    ipcRenderer.on('embedding:download-progress', handler)
+    // Return cleanup function
+    return () => ipcRenderer.removeListener('embedding:download-progress', handler)
+  }
 })
 
 // Platform helpers + body class for macOS styling hooks

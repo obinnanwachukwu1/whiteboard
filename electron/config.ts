@@ -24,6 +24,7 @@ export type AppConfig = {
   pdfGestureZoomEnabled?: boolean
   pdfZoom?: Record<string, number>
   lastUserId?: string
+  aiEnabled?: boolean
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -32,6 +33,7 @@ const DEFAULT_CONFIG: AppConfig = {
   theme: 'light',
   accent: 'default',
   prefetchEnabled: true,
+  aiEnabled: false, // Default to disabled to be safe, user must opt-in
   cachedCourses: [],
   cachedDue: [],
   queryCache: undefined,

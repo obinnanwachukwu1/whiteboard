@@ -27,7 +27,8 @@ export default defineConfig(({ command }) => {
           vite: {
             build: {
               rollupOptions: {
-                external: ['keytar'],
+                // Native modules that can't be bundled
+                external: ['keytar', 'onnxruntime-node'],
               },
             },
           },

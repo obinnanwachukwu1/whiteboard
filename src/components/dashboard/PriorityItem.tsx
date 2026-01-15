@@ -1,6 +1,9 @@
 import React from 'react'
 import { courseHueFor } from '../../utils/colorHelpers'
 import type { DashboardAssignment } from '../../hooks/usePriorityAssignments'
+import { BrainCircuit } from 'lucide-react'
+import { useAI } from '../../hooks/useAI'
+import { useAppContext } from '../../context/AppContext'
 
 type Props = {
   assignment: DashboardAssignment
@@ -13,11 +16,27 @@ type Props = {
  * Shows: course avatar, title, course label, relative time, weight indicator
  */
 export const PriorityItem: React.FC<Props> = ({ assignment, courseImageUrl, onClick }) => {
+  const { explainPriority, loading: aiLoading } = useAI()
+  const { aiEnabled } = useAppContext()
+  const showAI = aiEnabled
   const hue = courseHueFor(assignment.courseId, assignment.courseName || '')
   const fallbackBg = `linear-gradient(135deg, hsl(${hue} 70% 55%), hsl(${(hue + 30) % 360} 80% 45%))`
   
   const isPastDue = assignment.hoursUntilDue !== null && assignment.hoursUntilDue < 0
   
+  const handleExplain = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!showAI) return
+    const explanation = await explainPriority(
+      assignment.name,
+      assignment.relativeTime,
+      assignment.weightDisplay.text
+    )
+    if (explanation) {
+      alert(`AI Coach says:\n\n${explanation}`) // Temporary until we have a tooltip component
+    }
+  }
+
   return (
     <div
       role="button"
@@ -74,6 +93,19 @@ export const PriorityItem: React.FC<Props> = ({ assignment, courseImageUrl, onCl
           )}
         </div>
       </div>
+      
+      {/* AI Analysis Button */}
+      {showAI && (
+        <button
+          type="button"
+          onClick={handleExplain}
+          disabled={aiLoading}
+          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+          title="Why is this prioritized?"
+        >
+          <BrainCircuit className={`w-4 h-4 ${aiLoading ? 'animate-pulse' : ''}`} />
+        </button>
+      )}
     </div>
   )
 }

@@ -15,6 +15,7 @@ export type NormalizedAnnouncement = {
   courseId: string | number
   courseName: string
   title: string
+  message?: string
   postedAt: Date | null
   htmlUrl?: string
   isRead: boolean
@@ -97,6 +98,7 @@ export function useUnreadAnnouncements(options?: {
         courseId,
         courseName: String(courseId),
         title: ann.title || 'Announcement',
+        message: ann.message, // Capture message
         postedAt,
         htmlUrl: ann.html_url,
         isRead,

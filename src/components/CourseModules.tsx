@@ -1,10 +1,12 @@
 import React from 'react'
-import { FileText, File, MessageSquare, Link as LinkIcon, BookOpen, MoreVertical } from 'lucide-react'
+import { FileText, File, MessageSquare, Link as LinkIcon, BookOpen, MoreVertical, Sparkles } from 'lucide-react'
 import { Dropdown } from './ui/Dropdown'
 import { useCourseModules } from '../hooks/useCanvasQueries'
 import type { CanvasModule, CanvasModuleItem, CanvasFile } from '../types/canvas'
 import { ListItemRow } from './ui/ListItemRow'
 import { MetadataBadge } from './ui/MetadataBadge'
+import { useAIPanel } from '../context/AIPanelContext'
+import { useAppContext } from '../context/AppContext'
 
 type Props = {
   courseId: string | number
@@ -21,6 +23,8 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
   const { data: modules = null, isLoading, error } = useCourseModules(courseId)
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
   const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
+  const aiPanel = useAIPanel()
+  const app = useAppContext()
 
   async function openItem(it: CanvasModuleItem, title: string) {
     if (it.__typename === 'PageModuleItem' || it.pageUrl) {
@@ -121,7 +125,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
                             menuOpen={isMenuOpen}
                             onClick={() => openItem(it, title)}
                             menu={
-                              it.htmlUrl ? (
+                              (
                                 <>
                                   <button
                                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : menuId) }}
@@ -132,12 +136,27 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
                                     <MoreVertical className="w-4 h-4" />
                                   </button>
                                   <Dropdown open={isMenuOpen} onOpenChange={(o) => setMenuOpenId(o ? menuId : null)} align="right" offsetY={32} anchorEl={anchorEls.current.get(menuId)}>
-                                    <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(it.htmlUrl!) }}>
-                                      Open in Browser
-                                    </button>
+                                    {it.htmlUrl && (
+                                      <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(it.htmlUrl!) }}>
+                                        Open in Browser
+                                      </button>
+                                    )}
+                                    {app.aiEnabled && (
+                                      <button 
+                                        className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 text-indigo-600 dark:text-indigo-400"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setMenuOpenId(null)
+                                          aiPanel.open(`Explain this module item: "${title}"`, 'ask-ai', true)
+                                        }}
+                                      >
+                                        <Sparkles className="w-3 h-3" />
+                                        Explain
+                                      </button>
+                                    )}
                                   </Dropdown>
                                 </>
-                              ) : undefined
+                              )
                             }
                           />
                         </li>

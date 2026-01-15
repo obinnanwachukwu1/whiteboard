@@ -67,10 +67,92 @@ interface Window {
     deleteConversation: (conversationId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
     searchRecipients: (params: { search: string; context?: string; type?: 'user' | 'context'; perPage?: number }) => Promise<{ ok: boolean; data?: any; error?: string }>
   }
-  settings: {
-    get: () => Promise<{ ok: boolean; data?: { baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'; prefetchEnabled?: boolean; cachedCourses?: any[]; cachedDue?: any[]; queryCache?: any; userSettings?: Record<string, any>; userSidebars?: Record<string, any>; courseImages?: Record<string, Record<string, string>>; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> }; pdfGestureZoomEnabled?: boolean; pdfZoom?: Record<string, number>; lastUserId?: string }; error?: string }>
-    set: (partial: Partial<{ baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'; prefetchEnabled?: boolean; cachedCourses?: any[]; cachedDue?: any[]; queryCache?: any; userSettings?: Record<string, any>; userSidebars?: Record<string, any>; courseImages?: Record<string, Record<string, string>>; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> }; pdfGestureZoomEnabled?: boolean; pdfZoom?: Record<string, number>; lastUserId?: string }>) => Promise<{ ok: boolean; data?: any; error?: string }>
-  }
+    settings: {
+      get: () => Promise<{ ok: boolean; data?: { baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'; prefetchEnabled?: boolean; cachedCourses?: any[]; cachedDue?: any[]; queryCache?: any; userSettings?: Record<string, any>; userSidebars?: Record<string, any>; courseImages?: Record<string, Record<string, string>>; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> }; pdfGestureZoomEnabled?: boolean; pdfZoom?: Record<string, number>; lastUserId?: string; embeddingsEnabled?: boolean; aiEnabled?: boolean }; error?: string }>
+      set: (partial: Partial<{ baseUrl: string; verbose?: boolean; theme?: 'light' | 'dark'; accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'; prefetchEnabled?: boolean; cachedCourses?: any[]; cachedDue?: any[]; queryCache?: any; userSettings?: Record<string, any>; userSidebars?: Record<string, any>; courseImages?: Record<string, Record<string, string>>; sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> }; pdfGestureZoomEnabled?: boolean; pdfZoom?: Record<string, number>; lastUserId?: string; embeddingsEnabled?: boolean; aiEnabled?: boolean }>) => Promise<{ ok: boolean; data?: any; error?: string }>
+    }
+    ai: {
+      chat: (messages: any[], max_tokens?: number) => Promise<{ ok: boolean; choices?: any[]; error?: any }>
+    }
+    embedding: {
+      search: (query: string, k?: number, opts?: { courseIds?: string[]; types?: Array<'announcement' | 'assignment' | 'page' | 'module' | 'file'>; minScore?: number; dedupe?: boolean }) => Promise<{
+        ok: boolean
+        data?: Array<{
+          id: string
+          score: number
+          metadata: {
+            type: 'announcement' | 'assignment' | 'page' | 'module' | 'file'
+            courseId: string
+            courseName: string
+            title: string
+            snippet: string
+            url?: string
+            contentHash: string
+          }
+        }>
+        error?: string
+      }>
+      index: (items: Array<{
+        id: string
+        type: 'announcement' | 'assignment' | 'page' | 'module' | 'file'
+        courseId: string
+        courseName: string
+        title: string
+        content: string
+        url?: string
+      }>) => Promise<{
+        ok: boolean
+        data?: { indexed: number; skipped: number }
+        error?: string
+      }>
+      getStatus: () => Promise<{
+        ok: boolean
+        data?: {
+          ready: boolean
+          modelDownloaded: boolean
+          itemCount: number
+          memoryUsedMB: number
+          memoryLimitMB: number
+        }
+        error?: string
+      }>
+      clear: () => Promise<{ ok: boolean; error?: string }>
+      // File indexing APIs
+      indexFile: (
+        fileId: string,
+        courseId: string,
+        courseName: string,
+        fileName: string,
+        fileSize: number,
+        updatedAt?: string,
+        url?: string
+      ) => Promise<{
+        ok: boolean
+        data?: { chunks: number; pageCount: number; truncated: boolean; skipped?: boolean }
+        error?: string
+      }>
+      pruneCourse: (courseId: string) => Promise<{
+        ok: boolean
+        data?: number
+        error?: string
+      }>
+      getStorageStats: () => Promise<{
+        ok: boolean
+        data?: {
+          totalEntries: number
+          totalBytes: number
+          byCourse: Record<string, { entries: number; bytes: number }>
+          byType: Record<string, { entries: number; bytes: number }>
+        }
+        error?: string
+      }>
+      onDownloadProgress: (callback: (progress: {
+        file: string
+        downloaded: number
+        total: number
+        percent: number
+      }) => void) => () => void
+    }
   system: {
     openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>
   }

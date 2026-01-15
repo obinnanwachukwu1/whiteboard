@@ -10,7 +10,15 @@
   },
   "files": [
     "dist",
-    "dist-electron"
+    "dist-electron",
+    // Native modules that need to be included unpacked
+    "node_modules/onnxruntime-node/**/*",
+    "node_modules/keytar/**/*"
+  ],
+  "asarUnpack": [
+    // Native .node binaries must be unpacked from asar
+    "node_modules/onnxruntime-node/**/*.node",
+    "node_modules/keytar/**/*.node"
   ],
   "mac": {
     "icon": "build/icons/mac/icon.icns",

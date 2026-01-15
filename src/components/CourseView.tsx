@@ -31,7 +31,7 @@ type Props = {
   onNavigateCourse?: (courseId: string | number, init?: { type: 'assignment' | 'announcement' | 'page' | 'file'; id: string; title?: string }) => void
 }
 
-export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName, activeTab, onChangeTab, content, onOpenDetail, onClearDetail, baseUrl, onNavigateCourse }) => {
+export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, onChangeTab, content, onOpenDetail, onClearDetail, baseUrl, onNavigateCourse }) => {
   const queryClient = useQueryClient()
   const [availableTabs, setAvailableTabs] = React.useState<ResolvedTab[] | null>(null)
   // Persist current folder for Files tab so navigating back from a file returns to the same folder
@@ -216,6 +216,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName: _courseName,
           <div className="flex-1 overflow-y-auto p-5">
             <CanvasContentView
               courseId={courseId}
+              courseName={courseName}
               contentType={content.contentType}
               contentId={content.contentId}
               title={content.title}

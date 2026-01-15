@@ -21,6 +21,8 @@ declare global {
           pdfGestureZoomEnabled?: boolean
           pdfZoom?: Record<string, number>
           lastUserId?: string
+          embeddingsEnabled?: boolean
+          aiEnabled?: boolean
         }
         error?: string
       }>
@@ -40,7 +42,91 @@ declare global {
         pdfGestureZoomEnabled?: boolean
         pdfZoom?: Record<string, number>
         lastUserId?: string
+        embeddingsEnabled?: boolean
+        aiEnabled?: boolean
       }>) => Promise<{ ok: boolean; data?: any; error?: string }>
+    }
+    ai: {
+      chat: (messages: any[], max_tokens?: number) => Promise<{ ok: boolean; choices?: any[]; error?: any }>
+    }
+    embedding: {
+      search: (query: string, k?: number, opts?: { courseIds?: string[]; types?: Array<'announcement' | 'assignment' | 'page' | 'module' | 'file'>; minScore?: number; dedupe?: boolean }) => Promise<{
+        ok: boolean
+        data?: Array<{
+          id: string
+          score: number
+          metadata: {
+            type: 'announcement' | 'assignment' | 'page' | 'module' | 'file'
+            courseId: string
+            courseName: string
+            title: string
+            snippet: string
+            url?: string
+            contentHash: string
+          }
+        }>
+        error?: string
+      }>
+      index: (items: Array<{
+        id: string
+        type: 'announcement' | 'assignment' | 'page' | 'module' | 'file'
+        courseId: string
+        courseName: string
+        title: string
+        content: string
+        url?: string
+      }>) => Promise<{
+        ok: boolean
+        data?: { indexed: number; skipped: number }
+        error?: string
+      }>
+      getStatus: () => Promise<{
+        ok: boolean
+        data?: {
+          ready: boolean
+          modelDownloaded: boolean
+          itemCount: number
+          memoryUsedMB: number
+          memoryLimitMB: number
+        }
+        error?: string
+      }>
+      clear: () => Promise<{ ok: boolean; error?: string }>
+      // File indexing APIs
+      indexFile: (
+        fileId: string,
+        courseId: string,
+        courseName: string,
+        fileName: string,
+        fileSize: number,
+        updatedAt?: string,
+        url?: string
+      ) => Promise<{
+        ok: boolean
+        data?: { chunks: number; pageCount: number; truncated: boolean; skipped?: boolean }
+        error?: string
+      }>
+      pruneCourse: (courseId: string) => Promise<{
+        ok: boolean
+        data?: number
+        error?: string
+      }>
+      getStorageStats: () => Promise<{
+        ok: boolean
+        data?: {
+          totalEntries: number
+          totalBytes: number
+          byCourse: Record<string, { entries: number; bytes: number }>
+          byType: Record<string, { entries: number; bytes: number }>
+        }
+        error?: string
+      }>
+      onDownloadProgress: (callback: (progress: {
+        file: string
+        downloaded: number
+        total: number
+        percent: number
+      }) => void) => () => void  // Returns cleanup function
     }
     canvas: {
       init: (cfg: { token?: string; baseUrl?: string; verbose?: boolean }) => Promise<{ ok: boolean; insecure?: boolean; error?: string }>

@@ -81,6 +81,7 @@ export type CanvasTab = {
 export type ActivityAnnouncement = {
   type?: string
   title?: string
+  message?: string
   created_at?: string
   html_url?: string
   course_id?: string | number

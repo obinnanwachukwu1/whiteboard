@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react'
+import React, { Suspense, useEffect, useRef } from 'react'
 import { useFileMeta, useFileBytes } from '../hooks/useCanvasQueries'
 import { PdfViewer } from './PdfViewer'
 
@@ -12,6 +12,9 @@ type Props = {
   fileId: string | number
   className?: string
   isFullscreen?: boolean
+  // Optional course context for Tier 2 on-open indexing
+  courseId?: string | number
+  courseName?: string
 }
 
 function extFromName(name?: string): string | null {
@@ -21,14 +24,51 @@ function extFromName(name?: string): string | null {
   return name.slice(i + 1).toLowerCase()
 }
 
-export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscreen = false }) => {
+export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscreen = false, courseId, courseName }) => {
   const metaQ = useFileMeta(fileId)
   const fileUrlQ = useFileBytes(fileId) // Returns canvas-file:// URL
+  const hasTriggeredIndexing = useRef(false)
   
   const name = (metaQ.data as any)?.display_name || (metaQ.data as any)?.filename || (metaQ.data as any)?.name
   const remoteUrl = (metaQ.data as any)?.url as string | undefined
   const contentType = (metaQ.data as any)?.content_type as string | undefined
+  const fileSize = (metaQ.data as any)?.size as number | undefined
+  const updatedAt = (metaQ.data as any)?.updated_at as string | undefined
   const ext = (extFromName(name || '') || '').toLowerCase()
+
+  // Tier 2: On-open indexing - trigger indexing when user opens a file
+  useEffect(() => {
+    if (!metaQ.data || !courseId || hasTriggeredIndexing.current) return
+    
+    // Only index PDF and DOCX files (other formats not supported yet)
+    const isIndexable = ext === 'pdf' || ext === 'docx'
+    if (!isIndexable) return
+    
+    hasTriggeredIndexing.current = true
+    
+    // Fire and forget - don't block the UI
+    window.embedding?.indexFile?.(
+      String(fileId),
+      String(courseId),
+      courseName || 'Unknown Course',
+      name || 'Unknown File',
+      fileSize || 0,
+      updatedAt,
+      remoteUrl
+    ).then(result => {
+      if (result?.ok && result.data) {
+        if (result.data.skipped) {
+          console.log(`[FileViewer] Tier 2: ${name} already indexed`)
+        } else {
+          console.log(`[FileViewer] Tier 2 indexed ${name}: ${result.data.chunks} chunks`)
+        }
+      } else if (result?.error) {
+        console.warn(`[FileViewer] Tier 2 indexing failed for ${name}:`, result.error)
+      }
+    }).catch(err => {
+      console.warn(`[FileViewer] Tier 2 indexing error:`, err)
+    })
+  }, [metaQ.data, courseId, courseName, fileId, name, fileSize, updatedAt, remoteUrl, ext])
 
   // Use the local downloaded URL if available, otherwise fallback to remote
   const localUrl = fileUrlQ.data

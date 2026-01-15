@@ -9,6 +9,7 @@ export type ActivityFeedItem = {
   id: string
   type: 'announcement' | 'event'
   title: string
+  message?: string // Added for AI summarization
   courseName: string
   timestamp: Date | null
   htmlUrl?: string
@@ -48,6 +49,7 @@ export function useActivityFeed(options?: {
         id: ann.id,
         type: 'announcement',
         title: ann.title,
+        message: ann.message, // Pass message content
         courseName: ann.courseName,
         timestamp: ann.postedAt,
         htmlUrl: ann.htmlUrl,

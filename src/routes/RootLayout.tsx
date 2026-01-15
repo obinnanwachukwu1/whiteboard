@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, useRef } from 'react'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { Header } from '../components/Header'
 import { Sidebar, type SidebarConfig } from '../components/Sidebar'
@@ -8,6 +8,8 @@ import { useToast } from '../components/ui/Toaster'
 import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
 import { toAssignmentInputsFromRest, toAssignmentGroupInputsFromRest } from '../utils/gradeCalc'
 import { AppProvider, type AppContextValue } from '../context/AppContext'
+import { AIPanelProvider, useAIPanel } from '../context/AIPanelContext'
+import { AIPanel } from '../components/AIPanel'
 import { applyThemeAndAccent } from '../utils/theme'
 import { Eye, EyeOff, ExternalLink } from 'lucide-react'
 import { SearchModal } from '../components/SearchModal'
@@ -15,6 +17,25 @@ import { InboxPanel } from '../components/InboxPanel'
 import { Skeleton, SkeletonList, SkeletonStats } from '../components/Skeleton'
 
 // Context definitions moved to src/context/AppContext.tsx
+
+// Wrapper component to handle Cmd+I keyboard shortcut (must be inside AIPanelProvider)
+function AIPanelKeyboardHandler() {
+  const aiPanel = useAIPanel()
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+I (Mac) or Ctrl+I (Windows/Linux)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'i') {
+        e.preventDefault()
+        aiPanel.toggle()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [aiPanel.toggle])
+
+  return <AIPanel />
+}
 
 export function RootLayout() {
   const queryClient = useQueryClient()
@@ -28,6 +49,8 @@ export function RootLayout() {
   const [showToken, setShowToken] = useState(false)
   const [prefetchEnabled, setPrefetchEnabledState] = useState(true)
   const [pdfGestureZoomEnabled, setPdfGestureZoomEnabledState] = useState(true)
+  const [embeddingsEnabled, setEmbeddingsEnabledState] = useState(true)
+  const [aiEnabled, setAiEnabledState] = useState(false)
   const [cachedCourses, setCachedCourses] = useState<any[] | null>(null)
   const [cachedDue, setCachedDue] = useState<any[] | null>(null)
   const [activeCourseId, setActiveCourseIdState] = useState<string | number | null>(null)
@@ -80,16 +103,19 @@ export function RootLayout() {
         const url = data.baseUrl || baseUrl
         setCourseImagesState(data.courseImages[url] || {})
       }
-      if (typeof data?.prefetchEnabled === 'boolean') setPrefetchEnabledState(!!data.prefetchEnabled)
-      if (typeof data?.pdfGestureZoomEnabled === 'boolean') setPdfGestureZoomEnabledState(!!data.pdfGestureZoomEnabled)
-      if (Array.isArray(data?.cachedCourses)) {
-        setCachedCourses(data.cachedCourses || [])
-        queryClient.setQueryData(['courses', { enrollment_state: 'active' }], data.cachedCourses || [])
-      }
-      if (Array.isArray(data?.cachedDue)) {
-        setCachedDue(data.cachedDue || [])
-        queryClient.setQueryData(['due-assignments', { days: 7 }], data.cachedDue || [])
-      }
+       if (typeof data?.prefetchEnabled === 'boolean') setPrefetchEnabledState(!!data.prefetchEnabled)
+       if (typeof data?.pdfGestureZoomEnabled === 'boolean') setPdfGestureZoomEnabledState(!!data.pdfGestureZoomEnabled)
+       if (typeof data?.embeddingsEnabled === 'boolean') setEmbeddingsEnabledState(!!data.embeddingsEnabled)
+       if (typeof data?.aiEnabled === 'boolean') setAiEnabledState(!!data.aiEnabled)
+       if (Array.isArray(data?.cachedCourses)) {
+         setCachedCourses(data.cachedCourses || [])
+         queryClient.setQueryData(['courses', { enrollment_state: 'active' }], data.cachedCourses || [])
+       }
+       if (Array.isArray(data?.cachedDue)) {
+         setCachedDue(data.cachedDue || [])
+         queryClient.setQueryData(['due-assignments', { days: 7 }], data.cachedDue || [])
+       }
+
 
       setLoading(true)
       const res = await window.canvas.init({ baseUrl: data?.baseUrl || baseUrl })
@@ -207,6 +233,32 @@ export function RootLayout() {
     await saveUserSettings({ pdfGestureZoomEnabled: v })
   }, [saveUserSettings])
 
+  const setEmbeddingsEnabledPersisted = React.useCallback(async (v: boolean) => {
+    setEmbeddingsEnabledState(v)
+
+    // Deep Search must be enabled for AI features
+    if (!v) {
+      setAiEnabledState(false)
+      try { await window.settings.set?.({ embeddingsEnabled: false, aiEnabled: false }) } catch {}
+      return
+    }
+
+    try { await window.settings.set?.({ embeddingsEnabled: true }) } catch {}
+  }, [])
+
+  const setAiEnabledPersisted = React.useCallback(async (v: boolean) => {
+    // Deep Search must be enabled for AI features
+    if (v) {
+      setEmbeddingsEnabledState(true)
+      setAiEnabledState(true)
+      try { await window.settings.set?.({ embeddingsEnabled: true, aiEnabled: true }) } catch {}
+      return
+    }
+
+    setAiEnabledState(false)
+    try { await window.settings.set?.({ aiEnabled: false }) } catch {}
+  }, [])
+
   const hideCourse = async (courseId: string | number) => {
     const hidden = new Set(sidebarCfg.hiddenCourseIds || [])
     hidden.add(courseId)
@@ -214,6 +266,33 @@ export function RootLayout() {
     setSidebarCfg(next)
     await saveUserSidebar(next)
   }
+  
+  // Track previous hidden course IDs for embedding cleanup
+  const prevHiddenRef = useRef<Set<string | number>>(new Set())
+  
+  // Effect to prune embeddings when a course is unpinned
+  useEffect(() => {
+    const prevHidden = prevHiddenRef.current
+    const currHidden = new Set(sidebarCfg.hiddenCourseIds || [])
+    
+    // Find newly hidden courses and prune their embeddings
+    for (const courseId of currHidden) {
+      if (!prevHidden.has(courseId)) {
+        // Course was just unpinned → purge its embeddings
+        console.log(`[Cleanup] Course ${courseId} unpinned, pruning embeddings...`)
+        window.embedding?.pruneCourse?.(String(courseId)).then((result) => {
+          if (result?.ok && typeof result.data === 'number') {
+            console.log(`[Cleanup] Removed ${result.data} entries for course ${courseId}`)
+          }
+        }).catch((e) => {
+          console.warn(`[Cleanup] Failed to prune course ${courseId}:`, e)
+        })
+      }
+    }
+    
+    prevHiddenRef.current = currHidden
+  }, [sidebarCfg.hiddenCourseIds])
+  
   const onSidebarConfigChange = async (next: SidebarConfig) => {
     setSidebarCfg(next)
     await saveUserSidebar(next)
@@ -331,13 +410,20 @@ export function RootLayout() {
     courseImages,
     setCourseImages: saveCourseImages,
     prefetchEnabled,
-  setPrefetchEnabled: setPrefetchEnabledPersisted,
-  pdfGestureZoomEnabled,
-  setPdfGestureZoomEnabled: setPdfGestureZoomEnabledPersisted,
-  saveUserSettings,
+    setPrefetchEnabled: setPrefetchEnabledPersisted,
+    pdfGestureZoomEnabled,
+    setPdfGestureZoomEnabled: setPdfGestureZoomEnabledPersisted,
+    embeddingsEnabled,
+    setEmbeddingsEnabled: setEmbeddingsEnabledPersisted,
+    aiEnabled,
+    setAiEnabled: setAiEnabledPersisted,
+    saveUserSettings,
     onOpenCourse: (id) => { setActiveCourseId(id); navigate({ to: '/course/$courseId', params: { courseId: String(id) } }) },
     onOpenAssignment: (courseId, restId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'assignments', type: 'assignment', contentId: String(restId), title } }) },
     onOpenAnnouncement: (courseId, topicId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'announcements', type: 'announcement', contentId: String(topicId), title } }) },
+    onOpenPage: (courseId, pageUrlOrSlug, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'home', type: 'page', contentId: String(pageUrlOrSlug), title } }) },
+    onOpenFile: (courseId, fileId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'files', type: 'file', contentId: String(fileId), title } }) },
+    onOpenModules: (courseId) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'modules' } }) },
     onSignOut,
   }
 
@@ -469,38 +555,46 @@ export function RootLayout() {
   }
 
   return (
-    <AppProvider value={context}>
-      <div className="h-screen flex flex-col">
-        <Header profile={profileQ.data} onOpenSearch={() => setSearchOpen(true)} onOpenInbox={() => setInboxOpen(true)} />
-        <div className="flex flex-1 overflow-hidden">
-          <Sidebar
-            courses={visibleCourses}
-            activeCourseId={(currentView === 'course' ? (derivedCourseId ?? activeCourseId) : null)}
-            sidebar={sidebarCfg}
-            current={currentView}
-            onSelectDashboard={() => { setActiveCourseId(null); navigate({ to: '/dashboard' }) }}
-            onSelectAnnouncements={() => { setActiveCourseId(null); navigate({ to: '/announcements' }) }}
-            onSelectAssignments={() => { setActiveCourseId(null); navigate({ to: '/assignments' }) }}
-            onSelectGrades={() => { setActiveCourseId(null); navigate({ to: '/grades' }) }}
-            onSelectCourse={(id) => context.onOpenCourse(id)}
-            onOpenAllCourses={() => navigate({ to: '/all-courses' })}
-            onHideCourse={hideCourse}
-            onPrefetchCourse={(id) => { if (prefetchEnabled) prefetchCourseData(id) }}
-            prefetchEnabled={prefetchEnabled}
-            onTogglePrefetch={async (enabled) => { context.setPrefetchEnabled(enabled) }}
-            onReorder={async (nextOrder) => { const next: SidebarConfig = { ...sidebarCfg, order: nextOrder }; setSidebarCfg(next); await saveUserSidebar(next) }}
-          />
-          <main className="flex-1 overflow-y-auto flex flex-col bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-tl-xl">
-            <div className={`flex-1 p-6 ${currentView === 'course' ? 'pt-24' : ''}`}>
-              <div className="max-w-6xl w-full mx-auto space-y-4">
-                <Outlet />
+    <AIPanelProvider 
+      embeddingsEnabled={embeddingsEnabled}
+      aiEnabled={aiEnabled} 
+      dueAssignments={dueQ.data || cachedDue || []}
+      courses={coursesQ.data || cachedCourses || []}
+    >
+      <AppProvider value={context}>
+        <div className="h-screen flex flex-col">
+          <Header profile={profileQ.data} onOpenSearch={() => setSearchOpen(true)} onOpenInbox={() => setInboxOpen(true)} />
+          <div className="flex flex-1 overflow-hidden">
+            <Sidebar
+              courses={visibleCourses}
+              activeCourseId={(currentView === 'course' ? (derivedCourseId ?? activeCourseId) : null)}
+              sidebar={sidebarCfg}
+              current={currentView}
+              onSelectDashboard={() => { setActiveCourseId(null); navigate({ to: '/dashboard' }) }}
+              onSelectAnnouncements={() => { setActiveCourseId(null); navigate({ to: '/announcements' }) }}
+              onSelectAssignments={() => { setActiveCourseId(null); navigate({ to: '/assignments' }) }}
+              onSelectGrades={() => { setActiveCourseId(null); navigate({ to: '/grades' }) }}
+              onSelectCourse={(id) => context.onOpenCourse(id)}
+              onOpenAllCourses={() => navigate({ to: '/all-courses' })}
+              onHideCourse={hideCourse}
+              onPrefetchCourse={(id) => { if (prefetchEnabled) prefetchCourseData(id) }}
+              prefetchEnabled={prefetchEnabled}
+              onTogglePrefetch={async (enabled) => { context.setPrefetchEnabled(enabled) }}
+              onReorder={async (nextOrder) => { const next: SidebarConfig = { ...sidebarCfg, order: nextOrder }; setSidebarCfg(next); await saveUserSidebar(next) }}
+            />
+            <main className="flex-1 overflow-y-auto flex flex-col bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-tl-xl">
+              <div className={`flex-1 p-6 ${currentView === 'course' ? 'pt-24' : ''}`}>
+                <div className="max-w-6xl w-full mx-auto space-y-4">
+                  <Outlet />
+                </div>
               </div>
-            </div>
-          </main>
+            </main>
+          </div>
         </div>
-      </div>
-      <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
-      <InboxPanel isOpen={inboxOpen} onClose={() => setInboxOpen(false)} />
-    </AppProvider>
+        <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
+        <InboxPanel isOpen={inboxOpen} onClose={() => setInboxOpen(false)} />
+        <AIPanelKeyboardHandler />
+      </AppProvider>
+    </AIPanelProvider>
   )
 }

@@ -19,7 +19,10 @@
       "esbuild",
       "keytar",
       "cpu-features",
-      "ssh2"
+      "ssh2",
+      "onnxruntime-node",
+      "sharp",
+      "protobufjs"
     ]
   },
   "dependencies": {
@@ -27,6 +30,7 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@huggingface/transformers": "^3.8.1",
     "@tailwindcss/vite": "^4.1.12",
     "@tanstack/react-query": "^5.85.5",
     "@tanstack/react-query-devtools": "^5.85.5",
@@ -40,11 +44,14 @@
     "jszip": "^3.10.1",
     "keytar": "^7.9.0",
     "lucide-react": "^0.540.0",
+    "mammoth": "^1.11.0",
     "marked": "^12.0.2",
+    "onnxruntime-node": "^1.23.2",
     "pdfjs-dist": "^5.4.54",
     "postinstall": "^0.11.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "unpdf": "^1.4.0",
     "xlsx": "^0.18.5",
     "zod": "^4.0.17"
   },

@@ -17,9 +17,12 @@ import {
   Layers, 
   FileCode,
   Loader2,
-  Command
+  Sparkles
 } from 'lucide-react'
 import { useGlobalSearch } from '../hooks/useGlobalSearch'
+import { useAppContext } from '../context/AppContext'
+import { useAIPanel } from '../context/AIPanelContext'
+import { coordinateSearch } from '../utils/coordinator'
 import type { SearchResult, SearchResultType } from '../utils/searchIndex'
 
 type Props = {
@@ -68,6 +71,8 @@ function getTypeLabel(type: SearchResultType): string {
 
 export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const navigate = useNavigate()
+  const app = useAppContext()
+  const aiPanel = useAIPanel()
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -75,76 +80,134 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const { 
     query, 
     setQuery, 
-    results, 
+    results: standardResults, 
     isReady, 
     isBuilding, 
-    isSearching,
+    isSearching: isStandardSearching,
     clearSearch 
   } = useGlobalSearch()
 
-  // Focus input when modal opens
+  // Deep Search State
+  const [isDeepSearching, setIsDeepSearching] = useState(false)
+  const [deepResults, setDeepResults] = useState<SearchResult[]>([])
+  const [deepSearchActive, setDeepSearchActive] = useState(false)
+
+  // Unified results view
+  const results = deepSearchActive ? deepResults : standardResults
+  const isSearching = isStandardSearching || isDeepSearching
+
+  // Reset deep search when query changes significantly
   useEffect(() => {
-    if (isOpen) {
-      // Small delay to ensure modal is rendered
-      const timer = setTimeout(() => {
-        inputRef.current?.focus()
-      }, 50)
-      return () => clearTimeout(timer)
-    } else {
+    if (deepSearchActive && query.trim() === '') {
+      setDeepSearchActive(false)
+      setDeepResults([])
+    }
+  }, [query, deepSearchActive])
+
+  // Reset everything when closing
+  useEffect(() => {
+    if (!isOpen) {
       clearSearch()
+      setDeepSearchActive(false)
+      setDeepResults([])
       setSelectedIndex(0)
+    } else {
+      setTimeout(() => inputRef.current?.focus(), 50)
     }
   }, [isOpen, clearSearch])
 
-  // Reset selection when results change
-  useEffect(() => {
-    setSelectedIndex(0)
-  }, [results])
+  // Execute Deep Search
+  const handleDeepSearch = async () => {
+    if (!query.trim() || isDeepSearching) return
+    
+    setIsDeepSearching(true)
+    setDeepSearchActive(true)
+    setDeepResults([]) 
+
+    try {
+      let searchQuery = query
+      let options: any = {}
+
+      // Pass 1: Coordinate (if AI enabled)
+      if (app.aiEnabled && window.ai) {
+        const plan = await coordinateSearch(query, app.courses)
+        searchQuery = plan.rewrittenQuery
+        options = {
+          courseIds: plan.filters?.courseIds,
+          types: plan.filters?.types,
+          minScore: 0.2
+        }
+      }
+
+      // Pass 2: Execute Vector Search
+      const res = await window.embedding.search(searchQuery, 15, options)
+      
+      if (res.ok && res.data) {
+        const mapped: SearchResult[] = res.data.map(item => ({
+          id: item.id,
+          type: item.metadata.type as SearchResultType,
+          title: item.metadata.title,
+          subtitle: item.metadata.snippet,
+          courseId: item.metadata.courseId,
+          courseName: item.metadata.courseName,
+          url: item.metadata.url,
+          score: item.score
+        }))
+        setDeepResults(mapped)
+      }
+    } catch (e) {
+      console.error('Deep search failed', e)
+    } finally {
+      setIsDeepSearching(false)
+    }
+  }
+
+  // Handle Ask AI
+  const handleAskAI = () => {
+    onClose()
+    clearSearch()
+    aiPanel.open(query.trim(), 'ask-ai', true)
+  }
 
   // Navigate to result
   const navigateToResult = useCallback((result: SearchResult) => {
-    // Always close modal and clear search first
     onClose()
     clearSearch()
     
-    // Then navigate based on type
     if (result.type === 'course') {
       navigate({ to: '/course/$courseId', params: { courseId: String(result.id) } })
       return
     }
     
-    // All other types require courseId
-    if (!result.courseId) {
-      console.warn('Search result missing courseId:', result)
-      return
-    }
-    
+    if (!result.courseId) return
     const courseId = String(result.courseId)
     
     switch (result.type) {
       case 'assignment':
+        const assignId = result.id.includes(':') ? result.id.split(':').pop() : result.contentId
         navigate({ 
           to: '/course/$courseId', 
           params: { courseId },
-          search: { tab: 'assignments', type: 'assignment', contentId: String(result.contentId), title: result.title }
+          search: { tab: 'assignments', type: 'assignment', contentId: String(assignId), title: result.title }
         })
         break
       case 'announcement':
+        const annId = result.id.includes(':') ? result.id.split(':').pop() : result.contentId
         navigate({ 
           to: '/course/$courseId', 
           params: { courseId },
-          search: { tab: 'announcements', type: 'announcement', contentId: String(result.contentId), title: result.title }
+          search: { tab: 'announcements', type: 'announcement', contentId: String(annId), title: result.title }
         })
         break
       case 'file':
+        const fileId = result.id.includes(':') ? result.id.split(':').pop() : result.contentId
         navigate({ 
           to: '/course/$courseId', 
           params: { courseId },
-          search: { tab: 'files', type: 'file', contentId: String(result.contentId), title: result.title }
+          search: { tab: 'files', type: 'file', contentId: String(fileId), title: result.title }
         })
         break
       case 'module':
-        // Just open modules tab
         navigate({ 
           to: '/course/$courseId', 
           params: { courseId },
@@ -152,32 +215,33 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
         })
         break
       case 'page':
-        // For pages, use pageUrl as contentId (it's the slug), or fall back to contentId
-        const pageContentId = result.pageUrl || result.contentId
-        if (pageContentId) {
+        const pageId = result.pageUrl || result.contentId || (result.id.includes(':') ? result.id.split(':').pop() : '')
+        if (pageId) {
           navigate({ 
             to: '/course/$courseId', 
             params: { courseId },
-            search: { tab: 'home', type: 'page', contentId: String(pageContentId), title: result.title }
-          })
-        } else {
-          // Just open modules tab if no specific page
-          navigate({ 
-            to: '/course/$courseId', 
-            params: { courseId },
-            search: { tab: 'modules' }
+            search: { tab: 'home', type: 'page', contentId: String(pageId), title: result.title }
           })
         }
         break
     }
   }, [navigate, onClose, clearSearch])
 
+  // Determine special action visibility
+  const showDeepSearchAction = app.embeddingsEnabled && !deepSearchActive && query.trim().length > 0 && !isDeepSearching
+  const showAskAIAction = app.aiEnabled && query.trim().length > 0 && !deepSearchActive && !isDeepSearching
+
+  // Calculate total items for navigation
+  const deepSearchIndex = showDeepSearchAction ? results.length : -1
+  const askAIIndex = showAskAIAction ? results.length + (showDeepSearchAction ? 1 : 0) : -1
+  const maxIndex = Math.max(0, results.length + (showDeepSearchAction ? 1 : 0) + (showAskAIAction ? 1 : 0) - 1)
+
   // Keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault()
-        setSelectedIndex(prev => Math.min(prev + 1, results.length - 1))
+        setSelectedIndex(prev => Math.min(prev + 1, maxIndex))
         break
       case 'ArrowUp':
         e.preventDefault()
@@ -185,7 +249,11 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
         break
       case 'Enter':
         e.preventDefault()
-        if (results[selectedIndex]) {
+        if (selectedIndex === deepSearchIndex) {
+          handleDeepSearch()
+        } else if (selectedIndex === askAIIndex) {
+          handleAskAI()
+        } else if (results[selectedIndex]) {
           navigateToResult(results[selectedIndex])
         }
         break
@@ -193,83 +261,72 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
         e.preventDefault()
         onClose()
         break
+      case 'Backspace':
+        if (query === '') {
+          onClose()
+        }
+        break
     }
-  }, [results, selectedIndex, navigateToResult, onClose])
+  }, [results, selectedIndex, maxIndex, deepSearchIndex, askAIIndex, navigateToResult, onClose, handleDeepSearch, handleAskAI, query])
 
-  // Scroll selected item into view
+  // Reset selection when results change
   useEffect(() => {
-    if (listRef.current && results.length > 0) {
-      const selectedEl = listRef.current.children[selectedIndex] as HTMLElement | undefined
-      selectedEl?.scrollIntoView({ block: 'nearest' })
-    }
-  }, [selectedIndex, results.length])
+    setSelectedIndex(0)
+  }, [results.length, deepSearchActive])
 
   if (!isOpen) return null
 
   return createPortal(
     <div 
       className="fixed inset-0 z-[200] flex items-start justify-center pt-[15vh]"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       
-      {/* Modal */}
       <div 
         className="relative w-full max-w-xl mx-4 bg-white dark:bg-neutral-900 rounded-xl shadow-2xl ring-1 ring-black/10 dark:ring-white/10 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
         role="dialog"
         aria-modal="true"
-        aria-label="Global search"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Search input */}
+        {/* Input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-neutral-800">
-          <Search className="w-5 h-5 text-slate-400 shrink-0" />
+          {deepSearchActive ? (
+            <Sparkles className="w-5 h-5 text-indigo-500 shrink-0" />
+          ) : (
+            <Search className="w-5 h-5 text-slate-400 shrink-0" />
+          )}
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isReady ? "Search courses, assignments, files..." : "Building search index..."}
+            placeholder={deepSearchActive ? "Deep Search..." : (isReady ? "Search courses, assignments, files..." : "Building search index...")}
             disabled={!isReady && !isBuilding}
             className="flex-1 bg-transparent text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-neutral-500 text-base outline-none disabled:opacity-50"
           />
           {(isSearching || isBuilding) && (
             <Loader2 className="w-4 h-4 text-slate-400 animate-spin shrink-0" />
           )}
-          <button
-            onClick={onClose}
-            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-neutral-800 text-slate-500 transition-colors"
-            aria-label="Close search"
-          >
+          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-neutral-800 text-slate-500 transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
         
-        {/* Results */}
+        {/* Results List */}
         <div ref={listRef} className="max-h-[50vh] overflow-y-auto">
-          {!query.trim() && (
+          {/* Empty State */}
+          {!isSearching && query.trim() && results.length === 0 && (
             <div className="px-4 py-8 text-center text-slate-500 dark:text-neutral-400">
-              <div className="flex items-center justify-center gap-1 text-sm mb-2">
-                <Command className="w-4 h-4" />
-                <span>+</span>
-                <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-neutral-800 text-xs font-mono">K</kbd>
-                <span className="ml-1">to search anywhere</span>
-              </div>
-              <p className="text-xs">Type to search across all your courses</p>
+              <p className="text-sm font-medium">No results found</p>
+              <p className="text-xs mt-1">
+                {deepSearchActive ? 'Try rephrasing your query.' : 'Use Deep Search or Ask AI below.'}
+              </p>
             </div>
           )}
-          
-          {query.trim() && results.length === 0 && !isSearching && (
-            <div className="px-4 py-8 text-center text-slate-500 dark:text-neutral-400">
-              <p className="text-sm">No results found for "{query}"</p>
-              <p className="text-xs mt-1">Try a different search term</p>
-            </div>
-          )}
-          
+
+          {/* Result Items */}
           {results.map((result, index) => (
             <button
               key={`${result.type}-${result.id}`}
@@ -280,7 +337,6 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
               }`}
               onClick={(e) => {
                 e.preventDefault()
-                e.stopPropagation()
                 navigateToResult(result)
               }}
               onMouseEnter={() => setSelectedIndex(index)}
@@ -301,9 +357,10 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
                       {result.courseName}
                     </span>
                   )}
-                  {result.subtitle && !result.courseName && (
-                    <span className="text-xs text-slate-500 dark:text-neutral-400 truncate">
-                      {result.subtitle}
+                  {/* Show snippet in Deep Search mode if available */}
+                  {deepSearchActive && result.subtitle && (
+                    <span className="text-xs text-slate-500 dark:text-neutral-400 truncate max-w-[200px]">
+                      — {result.subtitle}
                     </span>
                   )}
                 </div>
@@ -315,26 +372,75 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
               )}
             </button>
           ))}
-        </div>
-        
-        {/* Footer */}
-        <div className="px-4 py-2 border-t border-gray-200 dark:border-neutral-800 flex items-center justify-between text-xs text-slate-500 dark:text-neutral-400">
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1">
-              <kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-neutral-800 font-mono">↑↓</kbd>
-              navigate
-            </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-neutral-800 font-mono">↵</kbd>
-              open
-            </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-neutral-800 font-mono">esc</kbd>
-              close
-            </span>
-          </div>
-          {isReady && (
-            <span>{results.length > 0 ? `${results.length} results` : ''}</span>
+
+          {/* Deep Search Action Item */}
+          {showDeepSearchAction && (
+            <button
+              className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors border-t border-gray-100 dark:border-neutral-800 ${
+                selectedIndex === deepSearchIndex
+                  ? 'bg-[var(--app-accent-bg)]'
+                  : 'hover:bg-slate-50 dark:hover:bg-neutral-800/50'
+              }`}
+              onClick={(e) => {
+                e.preventDefault()
+                handleDeepSearch()
+              }}
+              onMouseEnter={() => setSelectedIndex(deepSearchIndex)}
+            >
+              <div className="mt-0.5 p-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">
+                <Search className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-slate-900 dark:text-slate-100 truncate">
+                  Deep Search
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs text-slate-500 dark:text-neutral-400 truncate">
+                    Use semantics to find related content
+                  </span>
+                </div>
+              </div>
+              {selectedIndex === deepSearchIndex && (
+                <kbd className="self-center px-1.5 py-0.5 rounded bg-slate-200 dark:bg-neutral-700 text-[10px] text-slate-500 dark:text-neutral-400 font-mono shrink-0">
+                  ↵
+                </kbd>
+              )}
+            </button>
+          )}
+
+          {/* Ask AI Action Item */}
+          {showAskAIAction && (
+            <button
+              className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors border-t border-gray-100 dark:border-neutral-800 ${
+                selectedIndex === askAIIndex
+                  ? 'bg-[var(--app-accent-bg)]'
+                  : 'hover:bg-slate-50 dark:hover:bg-neutral-800/50'
+              }`}
+              onClick={(e) => {
+                e.preventDefault()
+                handleAskAI()
+              }}
+              onMouseEnter={() => setSelectedIndex(askAIIndex)}
+            >
+              <div className="mt-0.5 p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-slate-900 dark:text-slate-100 truncate">
+                  Ask AI
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs text-slate-500 dark:text-neutral-400 truncate">
+                    Chat with your course data
+                  </span>
+                </div>
+              </div>
+              {selectedIndex === askAIIndex && (
+                <kbd className="self-center px-1.5 py-0.5 rounded bg-slate-200 dark:bg-neutral-700 text-[10px] text-slate-500 dark:text-neutral-400 font-mono shrink-0">
+                  ↵
+                </kbd>
+              )}
+            </button>
           )}
         </div>
       </div>

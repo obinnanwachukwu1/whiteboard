@@ -15,10 +15,17 @@ export type AppContextValue = {
   setPrefetchEnabled: (v: boolean) => Promise<void>
   pdfGestureZoomEnabled: boolean
   setPdfGestureZoomEnabled: (v: boolean) => Promise<void>
+  embeddingsEnabled: boolean
+  setEmbeddingsEnabled: (v: boolean) => Promise<void>
+  aiEnabled: boolean
+  setAiEnabled: (v: boolean) => Promise<void>
   saveUserSettings: (partial: Record<string, any>) => Promise<void>
   onOpenCourse: (id: string | number) => void
   onOpenAssignment: (courseId: string | number, restId: string | number, title?: string) => void
   onOpenAnnouncement: (courseId: string | number, topicId: string | number, title?: string) => void
+  onOpenPage: (courseId: string | number, pageUrlOrSlug: string, title?: string) => void
+  onOpenFile: (courseId: string | number, fileId: string | number, title?: string) => void
+  onOpenModules: (courseId: string | number) => void
   onSignOut: () => Promise<void>
 }
 
