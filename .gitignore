@@ -37,3 +37,7 @@ dist-electron/
 *.njsproj
 *.sln
 *.sw?
+
+# Agent Documentation
+AGENTS.md
+PLAN.md
