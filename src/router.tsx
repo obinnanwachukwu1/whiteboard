@@ -9,6 +9,7 @@ import SettingsPage from './routes/SettingsPage'
 import AnnouncementsPage from './routes/AnnouncementsPage'
 import AssignmentsPage from './routes/AssignmentsPage'
 import GradesPage from './routes/GradesPage'
+import DiscussionsPage from './routes/DiscussionsPage'
 import { shouldUseHashHistory } from './utils/history'
 
 const rootRoute = createRootRoute({
@@ -57,6 +58,12 @@ const gradesRoute = createRoute({
   component: GradesPage,
 })
 
+const discussionsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/discussions',
+  component: DiscussionsPage,
+})
+
 function RedirectDashboard() {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
@@ -79,6 +86,7 @@ const routeTree = rootRoute.addChildren([
   announcementsRoute,
   assignmentsRoute,
   gradesRoute,
+  discussionsRoute,
 ])
 
 const history = typeof window !== 'undefined' && shouldUseHashHistory(window.location?.protocol)

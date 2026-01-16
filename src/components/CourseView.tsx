@@ -1,7 +1,7 @@
 import React from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Card } from './ui/Card'
-import { FileText, Home as HomeIcon, BookOpen, Megaphone, ClipboardList, ScrollText, Percent, Link as LinkIcon, Users } from 'lucide-react'
+import { FileText, Home as HomeIcon, BookOpen, Megaphone, MessageCircle, ClipboardList, ScrollText, Percent, Link as LinkIcon, Users } from 'lucide-react'
 import { useCourseInfo, useCourseFrontPage, useCourseTabs, useCourseFiles } from '../hooks/useCanvasQueries'
 import { CourseGrades } from './CourseGrades'
 import { CourseModules } from './CourseModules'
@@ -10,6 +10,8 @@ import { CanvasContentView } from './CanvasContentView'
 import { CourseLinks } from './CourseLinks'
 import { CourseAnnouncements } from './CourseAnnouncements'
 import { CourseAssignments } from './CourseAssignments'
+import { CourseDiscussions } from './CourseDiscussions'
+import { DiscussionDetail } from './DiscussionDetail'
 import { CoursePeople } from './CoursePeople'
 import { FloatingCourseTabs, type CourseTabKey } from './FloatingCourseTabs'
 import { HtmlContent } from './HtmlContent'
@@ -17,7 +19,7 @@ import { computeResolvedTabs, hasFilesFromTabs } from '../utils/courseTabs'
 import type { ResolvedTab } from '../types/ui'
 
 
-type Detail = { contentType: 'page' | 'assignment' | 'file' | 'announcement'; contentId: string; title: string }
+type Detail = { contentType: 'page' | 'assignment' | 'file' | 'announcement' | 'discussion'; contentId: string; title: string }
 
 type Props = {
   courseId: string | number
@@ -188,6 +190,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
             wiki: HomeIcon,
             syllabus: ScrollText,
             announcements: Megaphone,
+            discussions: MessageCircle,
             files: FileText,
             modules: BookOpen,
             links: LinkIcon,
@@ -214,15 +217,24 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
       {content ? (
         <div className="flex-1 -m-5 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto p-5">
-            <CanvasContentView
-              courseId={courseId}
-              courseName={courseName}
-              contentType={content.contentType}
-              contentId={content.contentId}
-              title={content.title}
-              onBack={onClearDetail}
-              onNavigate={handleNavigate}
-            />
+            {content.contentType === 'discussion' ? (
+              <DiscussionDetail
+                courseId={courseId}
+                topicId={content.contentId}
+                title={content.title}
+                onBack={onClearDetail}
+              />
+            ) : (
+              <CanvasContentView
+                courseId={courseId}
+                courseName={courseName}
+                contentType={content.contentType}
+                contentId={content.contentId}
+                title={content.title}
+                onBack={onClearDetail}
+                onNavigate={handleNavigate}
+              />
+            )}
           </div>
         </div>
       ) : (
@@ -258,6 +270,15 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
               <CourseAnnouncements
                 courseId={courseId}
                 onOpen={(topicId, title) => onOpenDetail({ contentType: 'announcement', contentId: topicId, title })}
+              />
+            </div>
+          )}
+
+          {activeTab === 'discussions' && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <CourseDiscussions
+                courseId={courseId}
+                onOpen={(topicId, title) => onOpenDetail({ contentType: 'discussion', contentId: topicId, title })}
               />
             </div>
           )}

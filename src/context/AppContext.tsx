@@ -23,6 +23,7 @@ export type AppContextValue = {
   onOpenCourse: (id: string | number) => void
   onOpenAssignment: (courseId: string | number, restId: string | number, title?: string) => void
   onOpenAnnouncement: (courseId: string | number, topicId: string | number, title?: string) => void
+  onOpenDiscussion: (courseId: string | number, topicId: string | number, title?: string) => void
   onOpenPage: (courseId: string | number, pageUrlOrSlug: string, title?: string) => void
   onOpenFile: (courseId: string | number, fileId: string | number, title?: string) => void
   onOpenModules: (courseId: string | number) => void

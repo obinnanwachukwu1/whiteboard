@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { BookOpen, Megaphone, FileText, Percent, Link as LinkIcon } from 'lucide-react'
 
-export type CourseTabKey = 'home' | 'wiki' | 'syllabus' | 'announcements' | 'files' | 'modules' | 'links' | 'assignments' | 'grades' | 'people'
+export type CourseTabKey = 'home' | 'wiki' | 'syllabus' | 'announcements' | 'discussions' | 'files' | 'modules' | 'links' | 'assignments' | 'grades' | 'people'
 
 type TabDesc = { key: CourseTabKey; label: string; Icon: React.ComponentType<any> }
 type Props = {

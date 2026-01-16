@@ -2,7 +2,7 @@ import React from 'react'
 
 type Props = {
   icon: React.ReactNode
-  title: string
+  title: React.ReactNode
   subtitle?: React.ReactNode
   badges?: React.ReactNode
   menu?: React.ReactNode

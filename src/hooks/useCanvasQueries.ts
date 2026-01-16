@@ -20,6 +20,8 @@ import type {
   Conversation,
   ConversationScope,
   Recipient,
+  DiscussionTopic,
+  DiscussionView,
 } from '../types/canvas'
 
 type IpcResult<T> = { ok: boolean; data?: T; error?: string }
@@ -229,6 +231,56 @@ export function useAnnouncement(courseId: string | number | undefined, topicId: 
     queryFn: async () => {
       if (courseId == null || topicId == null) return null
       return ensureOk(await window.canvas.getAnnouncement?.(courseId, topicId)) as AnnouncementDetail
+    },
+    enabled: courseId != null && topicId != null && (options?.enabled ?? true),
+    ...options,
+  })
+}
+
+// Discussions
+export function useCourseDiscussions(
+  courseId: string | number | undefined,
+  perPage = 50,
+  options?: Partial<UseQueryOptions<DiscussionTopic[], Error, DiscussionTopic[]>>
+) {
+  return useQuery<DiscussionTopic[], Error, DiscussionTopic[]>({
+    queryKey: ['course-discussions', courseId, perPage],
+    queryFn: async () => {
+      if (courseId == null) return []
+      return ensureOk(await window.canvas.listCourseDiscussions?.(courseId, perPage)) as DiscussionTopic[]
+    },
+    enabled: courseId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
+    ...options,
+  })
+}
+
+export function useDiscussion(
+  courseId: string | number | undefined,
+  topicId: string | number | undefined,
+  options?: Partial<UseQueryOptions<DiscussionTopic | null, Error, DiscussionTopic | null>>
+) {
+  return useQuery<DiscussionTopic | null, Error, DiscussionTopic | null>({
+    queryKey: ['discussion', courseId, topicId],
+    queryFn: async () => {
+      if (courseId == null || topicId == null) return null
+      return ensureOk(await window.canvas.getDiscussion?.(courseId, topicId)) as DiscussionTopic
+    },
+    enabled: courseId != null && topicId != null && (options?.enabled ?? true),
+    ...options,
+  })
+}
+
+export function useDiscussionView(
+  courseId: string | number | undefined,
+  topicId: string | number | undefined,
+  options?: Partial<UseQueryOptions<DiscussionView | null, Error, DiscussionView | null>>
+) {
+  return useQuery<DiscussionView | null, Error, DiscussionView | null>({
+    queryKey: ['discussion-view', courseId, topicId],
+    queryFn: async () => {
+      if (courseId == null || topicId == null) return null
+      return ensureOk(await window.canvas.getDiscussionView?.(courseId, topicId)) as DiscussionView
     },
     enabled: courseId != null && topicId != null && (options?.enabled ?? true),
     ...options,

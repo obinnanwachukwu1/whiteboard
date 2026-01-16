@@ -17,11 +17,12 @@ type Props = {
   courses: Course[]
   activeCourseId?: string | number | null
   sidebar?: SidebarConfig
-  current?: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'course' | 'allCourses' | 'settings'
+  current?: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions' | 'course' | 'allCourses' | 'settings'
   onSelectDashboard: () => void
   onSelectAnnouncements?: () => void
   onSelectAssignments?: () => void
   onSelectGrades?: () => void
+  onSelectDiscussions?: () => void
   onSelectCourse: (courseId: string | number) => void
   onOpenAllCourses: () => void
   onHideCourse: (courseId: string | number) => void
@@ -31,7 +32,7 @@ type Props = {
   onReorder?: (nextOrder: Array<string | number>) => void
 }
 
-export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, current = 'dashboard', onSelectDashboard, onSelectAnnouncements, onSelectAssignments, onSelectGrades, onSelectCourse, onOpenAllCourses, onHideCourse, onPrefetchCourse, prefetchEnabled: _prefetchEnabled = true, onTogglePrefetch: _onTogglePrefetch, onReorder }) => {
+export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, current = 'dashboard', onSelectDashboard, onSelectAnnouncements, onSelectAssignments, onSelectGrades, onSelectDiscussions, onSelectCourse, onOpenAllCourses, onHideCourse, onPrefetchCourse, prefetchEnabled: _prefetchEnabled = true, onTogglePrefetch: _onTogglePrefetch, onReorder }) => {
   const [menuOpenId, setMenuOpenId] = useState<string | number | null>(null)
   const [, setDragId] = useState<string | number | null>(null)
   const hidden = useMemo(() => new Set(sidebar?.hiddenCourseIds || []), [sidebar?.hiddenCourseIds])
@@ -138,6 +139,17 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
             aria-current={current === 'grades' ? 'page' : undefined}
           >
             Grades
+          </button>
+          <button
+            className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
+              current === 'discussions'
+                ? 'bg-[var(--app-accent-active)] text-slate-900 dark:text-slate-100 font-semibold shadow-sm ring-1 ring-black/5 dark:ring-white/10'
+                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
+            }`}
+            onClick={() => onSelectDiscussions?.()}
+            aria-current={current === 'discussions' ? 'page' : undefined}
+          >
+            Discussions
           </button>
         </nav>
       </div>

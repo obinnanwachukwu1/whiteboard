@@ -87,12 +87,67 @@ export type ActivityAnnouncement = {
   course_id?: string | number
 }
 
-export type CourseDiscussion = {
+// Discussion Topics
+export type DiscussionTopic = {
   id: string | number
-  title?: string
-  posted_at?: string
+  title: string
+  message?: string                    // HTML body of the discussion prompt
   html_url?: string
+  posted_at?: string
+  last_reply_at?: string
+  discussion_subentry_count?: number  // Total reply count
+  read_state?: 'read' | 'unread'
+  unread_count?: number
+  subscribed?: boolean
+  user_name?: string                  // Author name
+  user_id?: string | number
+  locked?: boolean
+  pinned?: boolean
+  require_initial_post?: boolean      // Must post before seeing others
+  discussion_type?: 'side_comment' | 'threaded'
+  assignment_id?: string | number     // If graded discussion
+  delayed_post_at?: string
+  lock_at?: string
+  author?: {
+    id: string | number
+    display_name?: string
+    avatar_image_url?: string
+  }
 }
+
+export type DiscussionEntry = {
+  id: string | number
+  user_id: string | number
+  user_name?: string
+  message: string                     // HTML content
+  created_at: string
+  updated_at?: string
+  read_state?: 'read' | 'unread'
+  forced_read_state?: boolean
+  replies?: DiscussionEntry[]         // Nested replies (threaded discussions)
+  recent_replies?: DiscussionEntry[]  // For side_comment type
+  has_more_replies?: boolean
+  attachment?: {
+    id: string | number
+    display_name?: string
+    url?: string
+  }
+}
+
+export type DiscussionParticipant = {
+  id: string | number
+  display_name?: string
+  avatar_image_url?: string
+}
+
+export type DiscussionView = {
+  participants: DiscussionParticipant[]
+  unread_entries: (string | number)[]
+  view: DiscussionEntry[]             // Top-level entries
+}
+
+// Legacy alias for backward compatibility
+export type CourseDiscussion = DiscussionTopic
 
 export type CourseInfo = {
   id?: string | number

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, nativeImage, protocol, net } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, nativeImage, protocol, net, Tray, Menu } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -39,6 +39,11 @@ if (process.env.NODE_ENV === 'development') {
   app.setName('Whiteboard')
 }
 
+// Windows notifications require a valid App User Model ID matching appId in electron-builder
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.obinnanwachukwu.whiteboard')
+}
+
 import {
   listCourseModulesGql as svcListCourseModulesGql,
   listUpcoming as svcListUpcoming,
@@ -57,6 +62,12 @@ import {
   listCourseAnnouncements as svcListCourseAnnouncements,
   listCourseAnnouncementsPage as svcListCourseAnnouncementsPage,
   getAnnouncement as svcGetAnnouncement,
+  // Discussions
+  listCourseDiscussions as svcListCourseDiscussions,
+  getDiscussion as svcGetDiscussion,
+  getDiscussionView as svcGetDiscussionView,
+  postDiscussionEntry as svcPostDiscussionEntry,
+  postDiscussionReply as svcPostDiscussionReply,
   getCourseInfo as svcGetCourseInfo,
   getCourseFrontPage as svcGetCourseFrontPage,
   listCourseFiles as svcListCourseFiles,
@@ -98,6 +109,8 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
 let win: BrowserWindow | null
+let tray: Tray | null = null
+let isQuitting = false
 let appConfig: AppConfig = loadConfig()
 
 function getIconPath(): string | undefined {
@@ -182,6 +195,18 @@ function createWindow() {
     return { action: 'deny' }
   })
 
+  // Close behavior: minimize to tray unless quitting
+  win.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault()
+      win?.hide()
+      if (process.platform === 'darwin') {
+        app.dock.hide()
+      }
+    }
+    // If isQuitting is true, let the window close normally
+  })
+
   try {
     win.webContents.setVisualZoomLevelLimits(1, 1)
   } catch {}
@@ -206,13 +231,20 @@ function createWindow() {
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
+//
+// NOTE: With tray integration, we don't quit on window close for any platform.
+// We only quit if isQuitting is true.
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  if (isQuitting) {
     aiManager.stop()
     embeddingManager.shutdown().catch(console.error)
     app.quit()
     win = null
   }
+})
+
+app.on('before-quit', () => {
+  isQuitting = true
 })
 
 app.on('will-quit', () => {
@@ -225,6 +257,12 @@ app.on('activate', () => {
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
+  } else {
+    // If window exists but hidden/minimized, show it
+    if (win) {
+      if (process.platform === 'darwin') app.dock.show()
+      win.show()
+    }
   }
 })
 
@@ -266,6 +304,45 @@ app.whenReady().then(() => {
       // ignore errors setting dock icon in dev
     }
   }
+  
+  // Create system tray
+  if (!tray) {
+    const iconPath = getIconPath() || path.join(process.env.APP_ROOT, 'build', 'icons', 'mac', 'icon.icns')
+    if (iconPath) {
+      // Resize for tray (usually 16x16 or 22x22)
+      // NativeImage handles scaling automatically on macOS
+      const trayIcon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
+      tray = new Tray(trayIcon)
+      
+      const contextMenu = Menu.buildFromTemplate([
+        { 
+          label: 'Open Whiteboard', 
+          click: () => {
+            if (process.platform === 'darwin') app.dock.show()
+            win?.show()
+          } 
+        },
+        { type: 'separator' },
+        { 
+          label: 'Quit', 
+          click: () => {
+            isQuitting = true
+            app.quit()
+          } 
+        }
+      ])
+      
+      tray.setToolTip('Whiteboard')
+      tray.setContextMenu(contextMenu)
+
+      // On Windows/Linux, left-click should also open the context menu
+      // (On macOS, setContextMenu takes over all clicks automatically)
+      tray.on('click', () => {
+        tray?.popUpContextMenu()
+      })
+    }
+  }
+
   createWindow()
 })
 
@@ -577,6 +654,57 @@ ipcMain.handle('canvas:listGroupUsers', async (_evt, groupId: string | number, p
 ipcMain.handle('canvas:getAnnouncement', async (_evt, courseId: string | number, topicId: string | number) => {
   try {
     const data = await svcGetAnnouncement(courseId, topicId)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+// Discussions
+ipcMain.handle('canvas:listCourseDiscussions', async (_evt, courseId: string | number, perPage?: number) => {
+  try {
+    const data = await svcListCourseDiscussions(courseId, perPage)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:getDiscussion', async (_evt, courseId: string | number, topicId: string | number) => {
+  try {
+    const data = await svcGetDiscussion(courseId, topicId)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:getDiscussionView', async (_evt, courseId: string | number, topicId: string | number) => {
+  try {
+    const data = await svcGetDiscussionView(courseId, topicId)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:postDiscussionEntry', async (_evt, courseId: string | number, topicId: string | number, message: string) => {
+  try {
+    const data = await svcPostDiscussionEntry(courseId, topicId, message)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:postDiscussionReply', async (_evt, courseId: string | number, topicId: string | number, entryId: string | number, message: string) => {
+  try {
+    const data = await svcPostDiscussionReply(courseId, topicId, entryId, message)
     return { ok: true, data }
   } catch (e: any) {
     const msg = e instanceof CanvasError ? e.message : String(e?.message || e)

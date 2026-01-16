@@ -36,6 +36,12 @@ contextBridge.exposeInMainWorld('canvas', {
   getCourseInfo: (courseId: string | number) => ipcRenderer.invoke('canvas:getCourseInfo', courseId),
   getCourseFrontPage: (courseId: string | number) => ipcRenderer.invoke('canvas:getCourseFrontPage', courseId),
   getAnnouncement: (courseId: string | number, topicId: string | number) => ipcRenderer.invoke('canvas:getAnnouncement', courseId, topicId),
+  // Discussions
+  listCourseDiscussions: (courseId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listCourseDiscussions', courseId, perPage),
+  getDiscussion: (courseId: string | number, topicId: string | number) => ipcRenderer.invoke('canvas:getDiscussion', courseId, topicId),
+  getDiscussionView: (courseId: string | number, topicId: string | number) => ipcRenderer.invoke('canvas:getDiscussionView', courseId, topicId),
+  postDiscussionEntry: (courseId: string | number, topicId: string | number, message: string) => ipcRenderer.invoke('canvas:postDiscussionEntry', courseId, topicId, message),
+  postDiscussionReply: (courseId: string | number, topicId: string | number, entryId: string | number, message: string) => ipcRenderer.invoke('canvas:postDiscussionReply', courseId, topicId, entryId, message),
   listCourseFiles: (courseId: string | number, perPage?: number, sort?: 'name' | 'size' | 'created_at' | 'updated_at', order?: 'asc' | 'desc') => ipcRenderer.invoke('canvas:listCourseFiles', courseId, perPage, sort, order),
   listCourseFolders: (courseId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listCourseFolders', courseId, perPage),
   listFolderFiles: (folderId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listFolderFiles', folderId, perPage),

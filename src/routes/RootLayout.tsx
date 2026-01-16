@@ -16,6 +16,7 @@ import { SearchModal } from '../components/SearchModal'
 import { InboxPanel } from '../components/InboxPanel'
 import { Skeleton, SkeletonList, SkeletonStats } from '../components/Skeleton'
 import { useWindowControlsOverlayInsets } from '../hooks/useWindowControlsOverlayInsets'
+import { NotificationManager } from '../components/NotificationManager'
 
 // Context definitions moved to src/context/AppContext.tsx
 
@@ -360,7 +361,7 @@ export function RootLayout() {
 
   // Derive current route and active course from pathname
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const currentView: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'course' | 'allCourses' | 'settings' = pathname.startsWith('/course/')
+  const currentView: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions' | 'course' | 'allCourses' | 'settings' = pathname.startsWith('/course/')
     ? 'course'
     : pathname.startsWith('/announcements')
     ? 'announcements'
@@ -368,6 +369,8 @@ export function RootLayout() {
     ? 'assignments'
     : pathname.startsWith('/grades')
     ? 'grades'
+    : pathname.startsWith('/discussions')
+    ? 'discussions'
     : pathname.startsWith('/all-courses')
     ? 'allCourses'
     : pathname.startsWith('/settings')
@@ -424,6 +427,7 @@ export function RootLayout() {
     onOpenCourse: (id) => { setActiveCourseId(id); navigate({ to: '/course/$courseId', params: { courseId: String(id) } }) },
     onOpenAssignment: (courseId, restId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'assignments', type: 'assignment', contentId: String(restId), title } }) },
     onOpenAnnouncement: (courseId, topicId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'announcements', type: 'announcement', contentId: String(topicId), title } }) },
+    onOpenDiscussion: (courseId, topicId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'discussions', type: 'discussion', contentId: String(topicId), title } }) },
     onOpenPage: (courseId, pageUrlOrSlug, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'home', type: 'page', contentId: String(pageUrlOrSlug), title } }) },
     onOpenFile: (courseId, fileId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'files', type: 'file', contentId: String(fileId), title } }) },
     onOpenModules: (courseId) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'modules' } }) },
@@ -577,6 +581,7 @@ export function RootLayout() {
               onSelectAnnouncements={() => { setActiveCourseId(null); navigate({ to: '/announcements' }) }}
               onSelectAssignments={() => { setActiveCourseId(null); navigate({ to: '/assignments' }) }}
               onSelectGrades={() => { setActiveCourseId(null); navigate({ to: '/grades' }) }}
+              onSelectDiscussions={() => { setActiveCourseId(null); navigate({ to: '/discussions' }) }}
               onSelectCourse={(id) => context.onOpenCourse(id)}
               onOpenAllCourses={() => navigate({ to: '/all-courses' })}
               onHideCourse={hideCourse}
@@ -597,6 +602,7 @@ export function RootLayout() {
         <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
         <InboxPanel isOpen={inboxOpen} onClose={() => setInboxOpen(false)} />
         <AIPanelKeyboardHandler />
+        <NotificationManager />
       </AppProvider>
     </AIPanelProvider>
   )

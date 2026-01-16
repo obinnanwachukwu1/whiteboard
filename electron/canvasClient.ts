@@ -219,6 +219,47 @@ export class CanvasClient {
     return this.get<any>(`/courses/${courseId}/discussion_topics/${topicId}`)
   }
 
+  // Discussions (NOT announcements)
+  listCourseDiscussions(courseId: string | number, perPage = 50) {
+    const p: Record<string, any> = {
+      per_page: Math.min(100, Math.max(1, perPage)),
+      order_by: 'recent_activity',
+      scope: 'unlocked',
+      exclude_context_module_locked_topics: true,
+    }
+    // Note: without only_announcements=true, this returns actual discussions
+    return this.paginate<any>(`/courses/${courseId}/discussion_topics`, p)
+      .then((topics) => topics.filter((t: any) => !t.is_announcement))
+  }
+
+  getDiscussion(courseId: string | number, topicId: string | number) {
+    return this.get<any>(`/courses/${courseId}/discussion_topics/${topicId}`)
+  }
+
+  getDiscussionView(courseId: string | number, topicId: string | number) {
+    return this.get<any>(`/courses/${courseId}/discussion_topics/${topicId}/view`, {
+      include_new_entries: true,
+    })
+  }
+
+  postDiscussionEntry(courseId: string | number, topicId: string | number, message: string) {
+    return this.post<any>(`/courses/${courseId}/discussion_topics/${topicId}/entries`, {
+      message,
+    })
+  }
+
+  postDiscussionReply(
+    courseId: string | number,
+    topicId: string | number,
+    entryId: string | number,
+    message: string
+  ) {
+    return this.post<any>(
+      `/courses/${courseId}/discussion_topics/${topicId}/entries/${entryId}/replies`,
+      { message }
+    )
+  }
+
   listMyEnrollmentsForCourse(courseId: string | number) {
     // Useful for comparing to Canvas-computed current/final grades
     const p: Record<string, any> = { user_id: 'self', 'type[]': ['StudentEnrollment'] }
@@ -833,6 +874,36 @@ export async function listCourseAnnouncementsPage(courseId: string | number, pag
 
 export async function getAnnouncement(courseId: string | number, topicId: string | number) {
   return ensureClient().getAnnouncement(courseId, topicId)
+}
+
+// Discussions
+export async function listCourseDiscussions(courseId: string | number, perPage = 50) {
+  return ensureClient().listCourseDiscussions(courseId, perPage)
+}
+
+export async function getDiscussion(courseId: string | number, topicId: string | number) {
+  return ensureClient().getDiscussion(courseId, topicId)
+}
+
+export async function getDiscussionView(courseId: string | number, topicId: string | number) {
+  return ensureClient().getDiscussionView(courseId, topicId)
+}
+
+export async function postDiscussionEntry(
+  courseId: string | number,
+  topicId: string | number,
+  message: string
+) {
+  return ensureClient().postDiscussionEntry(courseId, topicId, message)
+}
+
+export async function postDiscussionReply(
+  courseId: string | number,
+  topicId: string | number,
+  entryId: string | number,
+  message: string
+) {
+  return ensureClient().postDiscussionReply(courseId, topicId, entryId, message)
 }
 
 export async function listCourseModulesGql(courseId: string | number, first = 20, itemsFirst = 50) {

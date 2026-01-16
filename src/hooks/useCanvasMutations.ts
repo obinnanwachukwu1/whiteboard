@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { Conversation } from '../types/canvas'
+import type { Conversation, DiscussionEntry } from '../types/canvas'
 
 type IpcResult<T> = { ok: boolean; data?: T; error?: string }
 
@@ -100,6 +100,59 @@ export function useDeleteConversation() {
       queryClient.removeQueries({ queryKey: ['conversation', conversationId] })
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
       queryClient.invalidateQueries({ queryKey: ['unread-count'] })
+    },
+  })
+}
+
+// Post a top-level reply to a discussion
+export function usePostDiscussionEntry() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      courseId,
+      topicId,
+      message,
+    }: {
+      courseId: string | number
+      topicId: string | number
+      message: string
+    }) => {
+      const res = await window.canvas.postDiscussionEntry(courseId, topicId, message)
+      return ensureOk(res) as DiscussionEntry
+    },
+    onSuccess: (_data, variables) => {
+      // Invalidate the discussion view to show new reply
+      queryClient.invalidateQueries({ queryKey: ['discussion-view', variables.courseId, variables.topicId] })
+      queryClient.invalidateQueries({ queryKey: ['discussion', variables.courseId, variables.topicId] })
+      queryClient.invalidateQueries({ queryKey: ['course-discussions', variables.courseId] })
+    },
+  })
+}
+
+// Reply to a specific entry in a discussion (threaded reply)
+export function usePostDiscussionReply() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      courseId,
+      topicId,
+      entryId,
+      message,
+    }: {
+      courseId: string | number
+      topicId: string | number
+      entryId: string | number
+      message: string
+    }) => {
+      const res = await window.canvas.postDiscussionReply(courseId, topicId, entryId, message)
+      return ensureOk(res) as DiscussionEntry
+    },
+    onSuccess: (_data, variables) => {
+      // Invalidate the discussion view to show new reply
+      queryClient.invalidateQueries({ queryKey: ['discussion-view', variables.courseId, variables.topicId] })
+      queryClient.invalidateQueries({ queryKey: ['discussion', variables.courseId, variables.topicId] })
     },
   })
 }

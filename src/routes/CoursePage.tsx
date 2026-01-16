@@ -34,17 +34,17 @@ export default function CoursePage() {
     navigate({ to: '/course/$courseId', params: { courseId }, search: { tab: courseTab } })
   }
 
-  const onOpenDetail = (d: { contentType: 'assignment'|'announcement'|'page'|'file'; contentId: string; title: string }) => {
+  const onOpenDetail = (d: { contentType: 'assignment'|'announcement'|'page'|'file'|'discussion'; contentId: string; title: string }) => {
     setCourseDetail(d)
-    const tabFor: any = d.contentType === 'assignment' ? 'assignments' : d.contentType === 'announcement' ? 'announcements' : d.contentType === 'page' ? 'home' : 'files'
+    const tabFor: any = d.contentType === 'assignment' ? 'assignments' : d.contentType === 'announcement' ? 'announcements' : d.contentType === 'discussion' ? 'discussions' : d.contentType === 'page' ? 'home' : 'files'
     setCourseTab(tabFor)
     navigate({ to: '/course/$courseId', params: { courseId }, search: { tab: tabFor, type: d.contentType, contentId: d.contentId, title: d.title } })
   }
 
-  const onNavigateCourse = (cid: string | number, init?: { type: 'assignment'|'announcement'|'page'|'file'; id: string; title?: string }) => {
+  const onNavigateCourse = (cid: string | number, init?: { type: 'assignment'|'announcement'|'page'|'file'|'discussion'; id: string; title?: string }) => {
     if (!cid) return
     if (init) {
-      const t = init.type === 'assignment' ? 'assignments' : init.type === 'announcement' ? 'announcements' : init.type === 'page' ? 'home' : 'files'
+      const t = init.type === 'assignment' ? 'assignments' : init.type === 'announcement' ? 'announcements' : init.type === 'discussion' ? 'discussions' : init.type === 'page' ? 'home' : 'files'
       navigate({ to: '/course/$courseId', params: { courseId: String(cid) }, search: { tab: t, type: init.type, contentId: String(init.id), title: init.title } })
     } else {
       navigate({ to: '/course/$courseId', params: { courseId: String(cid) } })

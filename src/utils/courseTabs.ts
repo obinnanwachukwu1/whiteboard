@@ -20,6 +20,7 @@ export function computeResolvedTabs(
   if (hasHome) list.push({ key: 'home', label: 'Home' })
   if (hasSyllabus) list.push({ key: 'syllabus', label: 'Syllabus' })
   list.push({ key: 'announcements', label: 'Announcements' })
+  list.push({ key: 'discussions', label: 'Discussions' })
   if (hasFiles) list.push({ key: 'files', label: 'Files' })
   list.push({ key: 'modules', label: 'Modules' })
   if (hasLinks) list.push({ key: 'links', label: 'Links' })
