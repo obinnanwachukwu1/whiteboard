@@ -13,7 +13,11 @@
     "dist-electron",
     // Native modules that need to be included unpacked
     "node_modules/onnxruntime-node/**/*",
-    "node_modules/keytar/**/*"
+    "node_modules/keytar/**/*",
+    // Dependencies of native modules that electron-builder might miss with pnpm
+    "node_modules/onnxruntime-common/**/*",
+    "node_modules/adm-zip/**/*",
+    "node_modules/global-agent/**/*"
   ],
   "asarUnpack": [
     // Native .node binaries must be unpacked from asar

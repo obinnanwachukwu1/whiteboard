@@ -38,6 +38,9 @@ importers:
       '@tanstack/router-devtools':
         specifier: ^1.131.28
         version: 1.146.2(@tanstack/react-router@1.146.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@tanstack/router-core@1.146.2)(csstype@3.2.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(solid-js@1.9.10)
+      adm-zip:
+        specifier: ^0.5.16
+        version: 0.5.16
       axios:
         specifier: ^1.11.0
         version: 1.13.2
@@ -50,6 +53,9 @@ importers:
       flexsearch:
         specifier: ^0.8.212
         version: 0.8.212
+      global-agent:
+        specifier: ^3.0.0
+        version: 3.0.0
       graphql:
         specifier: ^16.11.0
         version: 16.12.0
@@ -68,6 +74,9 @@ importers:
       marked:
         specifier: ^12.0.2
         version: 12.0.2
+      onnxruntime-common:
+        specifier: 1.23.2
+        version: 1.23.2
       onnxruntime-node:
         specifier: ^1.23.2
         version: 1.23.2
