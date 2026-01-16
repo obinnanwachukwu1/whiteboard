@@ -12,8 +12,19 @@ function getSystemTheme(): 'light' | 'dark' {
 export async function bootstrapTheme() {
   if (typeof window === 'undefined') return
 
-  // 1. Synchronously apply system preference immediately to avoid FOUC
-  let theme: 'light' | 'dark' = getSystemTheme()
+  // 1. Synchronously apply stored preference first (fallback to system)
+  let theme: 'light' | 'dark' = 'light'
+  try {
+    const stored = localStorage.getItem('app-theme')
+    if (stored === 'light' || stored === 'dark') {
+      theme = stored
+    } else {
+      theme = getSystemTheme()
+    }
+  } catch {
+    theme = getSystemTheme()
+  }
+
   const root = document.documentElement
   root.classList.toggle('dark', theme === 'dark')
   root.style.setProperty('color-scheme', theme)

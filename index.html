@@ -29,8 +29,10 @@
           
           // Also restore accent variables if present
           var accentBg = localStorage.getItem('app-accent-bg');
+          var accentRoot = localStorage.getItem('app-accent-root');
           var accentActive = localStorage.getItem('app-accent-active');
           if (accentBg) document.documentElement.style.setProperty('--app-accent-bg', accentBg);
+          if (accentRoot) document.documentElement.style.setProperty('--app-accent-root', accentRoot);
           if (accentActive) document.documentElement.style.setProperty('--app-accent-active', accentActive);
         } catch(e) {}
       })();

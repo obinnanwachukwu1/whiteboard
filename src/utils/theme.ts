@@ -133,6 +133,7 @@ export function applyThemeAndAccent(theme: 'light' | 'dark', accent: Accent) {
   try {
     localStorage.setItem('app-theme', theme)
     localStorage.setItem('app-accent-bg', bg)
+    localStorage.setItem('app-accent-root', base)
     localStorage.setItem('app-accent-active', active)
   } catch {}
 }
