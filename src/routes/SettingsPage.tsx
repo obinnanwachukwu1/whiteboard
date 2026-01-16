@@ -2,7 +2,7 @@ import React from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAppContext } from '../context/AppContext'
 import { applyThemeAndAccent, computeAccentBg, type Accent } from '../utils/theme'
-import { Loader2, RefreshCw, HardDrive, Database, Cpu } from 'lucide-react'
+import { Loader2, RefreshCw, HardDrive, Database, Cpu, Bell } from 'lucide-react'
 
 type GpaRow = { min: number; gpa: number }
 const defaultGpaMap: GpaRow[] = [
@@ -34,6 +34,12 @@ export default function SettingsPage() {
 
   const [prior, setPrior] = React.useState<{ credits: string; gpa: string }>({ credits: '', gpa: '' })
   const [gpaMap, setGpaMap] = React.useState<GpaRow[]>(defaultGpaMap)
+  const [notifSettings, setNotifSettings] = React.useState({
+    enabled: true,
+    notifyDueAssignments: true,
+    notifyNewGrades: true,
+    notifyNewAnnouncements: true,
+  })
 
   // AI Status State
   const [aiStatus, setAiStatus] = React.useState<{
@@ -83,6 +89,15 @@ export default function SettingsPage() {
             .filter((r: any) => Number.isFinite(r.min) && Number.isFinite(r.gpa))
             .sort((a: any, b: any) => b.min - a.min),
         )
+
+        // Load notifications
+        const notif = (data.userSettings?.notifications || {})
+        setNotifSettings({
+          enabled: notif.enabled ?? true,
+          notifyDueAssignments: notif.notifyDueAssignments ?? true,
+          notifyNewGrades: notif.notifyNewGrades ?? true,
+          notifyNewAnnouncements: notif.notifyNewAnnouncements ?? true,
+        })
       } catch {}
     })()
     return () => { mounted = false }
@@ -169,6 +184,23 @@ export default function SettingsPage() {
     } catch {}
   }, [userKey])
 
+  const persistNotifications = React.useCallback(async (partial: Partial<typeof notifSettings>) => {
+    try {
+      const cfg = await window.settings.get?.()
+      const data = (cfg?.ok ? (cfg.data as any) : {}) || {}
+      const currentAll = data.userSettings || {}
+      const currentNotif = currentAll.notifications || {}
+      const next = { ...currentNotif, ...partial }
+      
+      await window.settings.set?.({
+        userSettings: {
+          ...currentAll,
+          notifications: next
+        }
+      })
+    } catch {}
+  }, [])
+
   const saveBaseUrl = async () => {
     setSaving(true)
     try {
@@ -184,6 +216,9 @@ export default function SettingsPage() {
     setTheme(t)
     applyThemeAndAccent(t, accent)
     try {
+      // Always save to global theme for startup consistency
+      await window.settings.set?.({ theme: t })
+      
       const cfg = await window.settings.get?.()
       const userKey = ctx?.profile?.id ? `${ctx.baseUrl}|${ctx.profile.id}` : null
       if (userKey) {
@@ -191,8 +226,6 @@ export default function SettingsPage() {
         const cur = map[userKey] || {}
         map[userKey] = { ...cur, theme: t }
         await window.settings.set?.({ userSettings: map })
-      } else {
-        await window.settings.set?.({ theme: t })
       }
     } catch {}
     setSaved('Theme updated')
@@ -203,6 +236,9 @@ export default function SettingsPage() {
     setAccent(a)
     applyThemeAndAccent(theme, a)
     try {
+      // Always save to global accent for startup consistency
+      await window.settings.set?.({ accent: a })
+
       const cfg = await window.settings.get?.()
       const userKey = ctx?.profile?.id ? `${ctx.baseUrl}|${ctx.profile.id}` : null
       if (userKey) {
@@ -210,8 +246,6 @@ export default function SettingsPage() {
         const cur = map[userKey] || {}
         map[userKey] = { ...cur, accent: a }
         await window.settings.set?.({ userSettings: map })
-      } else {
-        await window.settings.set?.({ accent: a })
       }
     } catch {}
     setSaved('Accent updated')
@@ -323,6 +357,76 @@ export default function SettingsPage() {
               onChange={(e) => { setAiEnabled(e.target.checked).catch(() => {}) }}
               title={!embeddingsEnabled ? 'Enable Deep Search first' : undefined}
             />
+          </div>
+        </div>
+      </section>
+
+      {/* Notifications */}
+      <section className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 p-4 bg-white/60 dark:bg-neutral-900/60 backdrop-blur shadow-card">
+        <h2 className="mt-0 mb-3 text-lg font-semibold flex items-center gap-2">
+          <Bell className="w-5 h-5 text-indigo-500" />
+          Notifications
+        </h2>
+        <div className="grid gap-4 w-full max-w-3xl">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="text-sm">
+              <div className="mb-0.5 font-medium text-slate-900 dark:text-slate-100">Enable Desktop Notifications</div>
+              <div className="text-xs text-slate-600 dark:text-neutral-400">
+                Receive alerts for important updates.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={notifSettings.enabled}
+              onChange={(e) => {
+                const v = e.target.checked
+                setNotifSettings(p => ({ ...p, enabled: v }))
+                persistNotifications({ enabled: v })
+                if (v && Notification.permission === 'default') Notification.requestPermission()
+              }}
+            />
+          </div>
+
+          <div className="border-t border-gray-100 dark:border-neutral-800 pt-4 grid gap-4 pl-4 opacity-90">
+             <div className="flex items-center justify-between gap-2">
+               <div className="text-sm text-slate-700 dark:text-slate-300">Due Assignments (24h before)</div>
+               <input
+                 type="checkbox"
+                 checked={notifSettings.notifyDueAssignments}
+                 disabled={!notifSettings.enabled}
+                 onChange={(e) => {
+                   const v = e.target.checked
+                   setNotifSettings(p => ({ ...p, notifyDueAssignments: v }))
+                   persistNotifications({ notifyDueAssignments: v })
+                 }}
+               />
+             </div>
+             <div className="flex items-center justify-between gap-2">
+               <div className="text-sm text-slate-700 dark:text-slate-300">New Grades</div>
+               <input
+                 type="checkbox"
+                 checked={notifSettings.notifyNewGrades}
+                 disabled={!notifSettings.enabled}
+                 onChange={(e) => {
+                   const v = e.target.checked
+                   setNotifSettings(p => ({ ...p, notifyNewGrades: v }))
+                   persistNotifications({ notifyNewGrades: v })
+                 }}
+               />
+             </div>
+             <div className="flex items-center justify-between gap-2">
+               <div className="text-sm text-slate-700 dark:text-slate-300">New Announcements</div>
+               <input
+                 type="checkbox"
+                 checked={notifSettings.notifyNewAnnouncements}
+                 disabled={!notifSettings.enabled}
+                 onChange={(e) => {
+                   const v = e.target.checked
+                   setNotifSettings(p => ({ ...p, notifyNewAnnouncements: v }))
+                   persistNotifications({ notifyNewAnnouncements: v })
+                 }}
+               />
+             </div>
           </div>
         </div>
       </section>
