@@ -1,6 +1,6 @@
 import React from 'react'
 import { useCourses } from '../hooks/useCanvasQueries'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, useQueries } from '@tanstack/react-query'
 import { BookOpen, MessageCircle, Pin, Lock } from 'lucide-react'
 import { useAppContext } from '../context/AppContext'
 import { Badge } from '../components/ui/Badge'
@@ -45,49 +45,43 @@ export default function DiscussionsPage() {
     ? orderedCourses.map((c: any) => String(c.id))
     : [courseFilter]
 
-  // We need to fetch discussions per course
-  const [allDiscussions, setAllDiscussions] = React.useState<Array<DiscussionTopic & { courseId: string; courseName: string }>>([])
-  const [isLoading, setIsLoading] = React.useState(true)
+  const queries = useQueries({
+    queries: coursesToFetch.map((courseId) => ({
+      queryKey: ['course-discussions', courseId, 50],
+      queryFn: async () => {
+        const res = await window.canvas.listCourseDiscussions?.(courseId, 50)
+        if (!res?.ok) throw new Error(res?.error || 'Failed to load discussions')
+        return res.data || []
+      },
+      staleTime: 1000 * 60 * 5,
+    }))
+  })
 
-  React.useEffect(() => {
-    let cancelled = false
-    setIsLoading(true)
+  const isLoading = queries.some((q) => q.isLoading)
 
-    const fetchAll = async () => {
-      const results: Array<DiscussionTopic & { courseId: string; courseName: string }> = []
-
-      await Promise.all(
-        coursesToFetch.map(async (courseId) => {
-          try {
-            const res = await window.canvas.listCourseDiscussions?.(courseId, 20)
-            if (res?.ok && Array.isArray(res.data)) {
-              const course = orderedCourses.find((c: any) => String(c.id) === courseId)
-              const courseName = course ? labelFor(course) : courseId
-              for (const d of res.data) {
-                results.push({ ...d, courseId, courseName })
-              }
-            }
-          } catch (err) {
-            console.error(`Failed to fetch discussions for course ${courseId}:`, err)
-          }
-        })
-      )
-
-      if (!cancelled) {
-        // Sort by last activity
-        results.sort((a, b) => {
-          const aDate = a.last_reply_at || a.posted_at || ''
-          const bDate = b.last_reply_at || b.posted_at || ''
-          return bDate.localeCompare(aDate)
-        })
-        setAllDiscussions(results)
-        setIsLoading(false)
+  const allDiscussions = React.useMemo(() => {
+    const results: Array<DiscussionTopic & { courseId: string; courseName: string }> = []
+    
+    queries.forEach((q, i) => {
+      if (q.data && Array.isArray(q.data)) {
+        const courseId = coursesToFetch[i]
+        const course = orderedCourses.find((c: any) => String(c.id) === courseId)
+        const courseName = course ? labelFor(course) : courseId
+        for (const d of q.data) {
+          results.push({ ...d, courseId, courseName })
+        }
       }
-    }
+    })
 
-    fetchAll()
-    return () => { cancelled = true }
-  }, [coursesToFetch.join(','), orderedCourses])
+    // Sort by last activity
+    results.sort((a, b) => {
+      const aDate = a.last_reply_at || a.posted_at || ''
+      const bDate = b.last_reply_at || b.posted_at || ''
+      return bDate.localeCompare(aDate)
+    })
+    
+    return results
+  }, [queries, coursesToFetch, orderedCourses])
 
   // Visual helpers
   function hashString(input: string) {

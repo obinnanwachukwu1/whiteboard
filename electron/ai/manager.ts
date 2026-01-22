@@ -22,7 +22,8 @@ export class AIManager {
   private isReady = false;
 
   constructor() {
-    this.socketPath = path.join('/tmp', `whiteboard-ai-${randomUUID()}.sock`);
+    // Socket path will be initialized in start() once we have app.getPath('temp')
+    this.socketPath = ''; 
     // Register IPC handler immediately
     this.setupIPC();
   }
@@ -56,7 +57,7 @@ export class AIManager {
     }
 
     this.isEnabled = true;
-
+    
     // Determine path to binary
     const isDev = !app.isPackaged;
     const binaryName = 'afmbridge-server';
@@ -67,6 +68,11 @@ export class AIManager {
       this.binaryPath = path.join(process.resourcesPath, 'bin', binaryName);
     }
 
+    // Use /tmp with a short name to avoid "unixDomainSocketPathTooLong" (limit is ~104 chars)
+    // app.getPath('temp') on macOS can be very long (/var/folders/...)
+    const shortId = randomUUID().split('-')[0];
+    this.socketPath = path.join('/tmp', `wb-${shortId}.sock`);
+
     this.startProcess();
   }
 
@@ -74,6 +80,15 @@ export class AIManager {
     if (this.isShuttingDown || !this.isEnabled) return;
 
     this.isReady = false;
+
+    // Ensure binary is executable (especially in packaged app)
+    try {
+      if (fs.existsSync(this.binaryPath)) {
+        fs.chmodSync(this.binaryPath, 0o755);
+      }
+    } catch (e) {
+      console.warn('[AI] Failed to ensure binary is executable:', e);
+    }
 
     console.log(`[AI] Starting AI Server at: ${this.binaryPath}`);
     console.log(`[AI] Socket Path: ${this.socketPath}`);

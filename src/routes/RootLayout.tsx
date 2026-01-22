@@ -356,6 +356,17 @@ export function RootLayout() {
           staleTime: 1000 * 60 * 5,
         })
       })
+      enqueuePrefetch(async () => {
+        await queryClient.prefetchQuery({
+          queryKey: ['course-discussions', id, 50],
+          queryFn: async () => {
+            const res = await window.canvas.listCourseDiscussions?.(id, 50)
+            if (!res?.ok) throw new Error(res?.error || 'Failed to load discussions')
+            return res.data || []
+          },
+          staleTime: 1000 * 60 * 5,
+        })
+      })
     })
   }
 

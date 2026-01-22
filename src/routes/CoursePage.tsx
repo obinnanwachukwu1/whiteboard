@@ -84,7 +84,7 @@ export default function CoursePage() {
 
         if (cancelled) return
 
-        const otherTabs = ['announcements', 'modules', 'files', 'assignments', 'grades', 'home', 'syllabus', 'links', 'people']
+        const otherTabs = ['announcements', 'modules', 'files', 'assignments', 'grades', 'home', 'syllabus', 'links', 'people', 'discussions']
           .filter((t) => t !== (search?.tab || courseTab || 'announcements'))
 
         // Medium-priority: modules + assignments list
@@ -111,13 +111,24 @@ export default function CoursePage() {
           })
         })
 
-        // Announcements list
+        // Announcements + Discussions list
         if (otherTabs.includes('announcements')) enqueuePrefetch(async () => {
           await queryClient.prefetchQuery({
             queryKey: ['course-announcements', id, 50],
             queryFn: async () => {
               const res = await window.canvas.listCourseAnnouncements?.(id, 50)
               if (!res?.ok) throw new Error(res?.error || 'Failed to load announcements')
+              return res.data || []
+            },
+            staleTime: 1000 * 60 * 5,
+          })
+        })
+        if (otherTabs.includes('discussions')) enqueuePrefetch(async () => {
+          await queryClient.prefetchQuery({
+            queryKey: ['course-discussions', id, 50],
+            queryFn: async () => {
+              const res = await window.canvas.listCourseDiscussions?.(id, 50)
+              if (!res?.ok) throw new Error(res?.error || 'Failed to load discussions')
               return res.data || []
             },
             staleTime: 1000 * 60 * 5,

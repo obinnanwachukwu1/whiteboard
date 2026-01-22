@@ -19,6 +19,15 @@
     "node_modules/adm-zip/**/*",
     "node_modules/global-agent/**/*"
   ],
+  "extraResources": [
+    {
+      "from": "resources/bin",
+      "to": "bin",
+      "filter": [
+        "**/*"
+      ]
+    }
+  ],
   "asarUnpack": [
     // Native .node binaries must be unpacked from asar
     "node_modules/onnxruntime-node/**/*.node",
