@@ -132,6 +132,26 @@ function getIconPath(): string | undefined {
   return undefined
 }
 
+function getTrayIconPath(): string | undefined {
+  const pub = process.env.VITE_PUBLIC || RENDERER_DIST
+  const candidates = [
+    'TrayIconTemplate.png', // macOS automatic light/dark mode
+    'tray.png',
+    'icon.png',
+    'icon.icns',
+    'icon.ico',
+    'electron-vite.svg',
+  ].map((name) => path.join(pub, name))
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) return p
+    } catch {
+      // ignore fs errors and continue
+    }
+  }
+  return undefined
+}
+
 function createWindow() {
   const icon = getIconPath()
   // Determine initial background color based on saved theme to prevent flash
@@ -307,11 +327,23 @@ app.whenReady().then(() => {
   
   // Create system tray
   if (!tray) {
-    const iconPath = getIconPath() || path.join(process.env.APP_ROOT, 'build', 'icons', 'mac', 'icon.icns')
+    const iconPath = getTrayIconPath() || path.join(process.env.APP_ROOT, 'build', 'icons', 'mac', 'icon.icns')
     if (iconPath) {
       // Resize for tray (usually 16x16 or 22x22)
       // NativeImage handles scaling automatically on macOS
-      const trayIcon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
+      let trayIcon = nativeImage.createFromPath(iconPath)
+      
+      // If it's not a template image (which should be sized correctly by user), resize it
+      // Standard macOS tray icon is 22px height (44px @2x)
+      // We always resize to ensure consistent display, even for templates
+      if (iconPath.endsWith('Template.png')) {
+        // User requested 16x16 logical size for this specific icon
+        trayIcon = trayIcon.resize({ width: 16, height: 16 })
+        trayIcon.setTemplateImage(true)
+      } else {
+        trayIcon = trayIcon.resize({ width: 16, height: 16 })
+      }
+      
       tray = new Tray(trayIcon)
       
       const contextMenu = Menu.buildFromTemplate([
