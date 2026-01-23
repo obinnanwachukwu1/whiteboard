@@ -208,6 +208,59 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
   border: 0 !important;
 }
 
+/* Canvas/DesignPLUS Grid System Shim */
+.rich-html .row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-right: -15px;
+  margin-left: -15px;
+}
+.rich-html .col-lg-3, .rich-html .col-md-3, .rich-html .col-sm-12,
+.rich-html .col-lg-6, .rich-html .col-md-6 {
+  position: relative;
+  width: 100%;
+  padding-right: 15px;
+  padding-left: 15px;
+}
+@media (min-width: 768px) {
+  .rich-html .col-md-3 { flex: 0 0 25%; max-width: 25%; }
+  .rich-html .col-md-6 { flex: 0 0 50%; max-width: 50%; }
+}
+@media (min-width: 992px) {
+  .rich-html .col-lg-3 { flex: 0 0 25%; max-width: 25%; }
+  .rich-html .col-lg-6 { flex: 0 0 50%; max-width: 50%; }
+}
+
+/* DesignPLUS Wrapper Basic Styling */
+.rich-html .dp-wrapper {
+  margin: 1rem 0;
+}
+.rich-html .dp-header {
+  border-bottom: 2px solid #00254c; /* GT Gold/Blue usually, defaulting to dark blue */
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+}
+.rich-html .dp-content-block {
+  margin-bottom: 1.5rem;
+  background: #fff;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+.dark .rich-html .dp-content-block {
+  background: #1f2937;
+}
+.rich-html .dp-content-block h3 {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+/* Fix images in grid */
+.rich-html img {
+  height: auto;
+  max-width: 100%;
+}
+
 /* PDF overlays */
 .textLayer {
   position: absolute;
