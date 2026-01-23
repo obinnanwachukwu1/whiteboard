@@ -106,11 +106,10 @@ export async function prefetchNavTab(
         break
 
       case 'discussions':
-        // This is heavy: iterates all courses. We'll pick top 3 visible courses to be safe.
-        // Or if the user has a lot of courses, this might be too much.
-        // Let's just do top 3.
-        const topCourses = courses.slice(0, 3)
-        await Promise.all(topCourses.map(c => 
+        // DiscussionsPage loads discussions for ALL visible courses.
+        // We'll prefetch the first 6 to cover a typical full-time load.
+        const discussionCourses = courses.slice(0, 6)
+        await Promise.all(discussionCourses.map(c => 
           queryClient.prefetchQuery({
             queryKey: ['course-discussions', String(c.id), 50],
             queryFn: async () => {

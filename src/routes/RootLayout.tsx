@@ -651,7 +651,13 @@ export function RootLayout() {
               onOpenAllCourses={() => navigate({ to: '/all-courses' })}
               onHideCourse={hideCourse}
               onPrefetchCourse={(id) => { if (prefetchEnabled) prefetchCourseData(id) }}
-              onPrefetchNav={(tab) => { if (prefetchEnabled) enqueuePrefetch(() => prefetchNavTab(queryClient, tab, context.courses)) }}
+              onPrefetchNav={(tab) => { 
+                if (prefetchEnabled) {
+                  const hidden = new Set(sidebarCfg.hiddenCourseIds || [])
+                  const visible = (context.courses || []).filter(c => !hidden.has(String(c.id)))
+                  enqueuePrefetch(() => prefetchNavTab(queryClient, tab, visible)) 
+                }
+              }}
               onReorder={async (nextOrder) => { const next: SidebarConfig = { ...sidebarCfg, order: nextOrder }; setSidebarCfg(next); await saveUserSidebar(next) }}
             />
             <main className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-tl-xl">
