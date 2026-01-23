@@ -246,6 +246,105 @@ export class AIManager {
         stream: false
       });
     });
+
+    // Streaming IPC handler
+    ipcMain.on('ai:chat-stream', async (event, { id, messages, max_tokens = 500 }) => {
+      if (!this.process || !this.isReady) {
+        event.sender.send('ai:stream:error', { id, error: 'AI features are disabled or not available.' });
+        return;
+      }
+
+      try {
+        await this.streamRequest({
+          model: 'ondevice',
+          messages,
+          max_tokens,
+          stream: true
+        }, (chunk) => {
+          event.sender.send('ai:stream:chunk', { id, content: chunk });
+        });
+        
+        event.sender.send('ai:stream:done', { id });
+      } catch (error: any) {
+        event.sender.send('ai:stream:error', { id, error: error.message || 'Unknown stream error' });
+      }
+    });
+  }
+
+  private streamRequest(payload: any, onChunk: (content: string) => void): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const postData = JSON.stringify(payload);
+
+      const options = {
+        socketPath: this.socketPath,
+        path: '/v1/chat/completions',
+        method: 'POST',
+        timeout: REQUEST_TIMEOUT_MS,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData),
+        },
+      };
+
+      const req = http.request(options, (res) => {
+        res.setEncoding('utf8');
+        
+        let buffer = '';
+
+        res.on('data', (chunk) => {
+          buffer += chunk;
+          
+          // Process lines
+          const lines = buffer.split('\n');
+          // Keep the last partial line in the buffer
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith('data: ')) continue;
+            
+            const dataStr = trimmed.slice(6); // Remove 'data: '
+            
+            if (dataStr === '[DONE]') continue;
+            
+            try {
+              const json = JSON.parse(dataStr);
+              const content = json.choices?.[0]?.delta?.content;
+              if (content) {
+                onChunk(content);
+              }
+            } catch (e) {
+              // Ignore parse errors for partial chunks that might have slipped through
+              console.warn('[AI Stream] Parse error:', e);
+            }
+          }
+        });
+
+        res.on('end', () => {
+          // Process any remaining buffer (unlikely to be valid if it didn't end with newline, but check)
+          if (buffer.startsWith('data: ') && buffer !== 'data: [DONE]') {
+             try {
+              const json = JSON.parse(buffer.slice(6));
+              const content = json.choices?.[0]?.delta?.content;
+              if (content) onChunk(content);
+            } catch {}
+          }
+          resolve();
+        });
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Request timeout'));
+      });
+
+      req.on('error', (e) => {
+        reject(e);
+      });
+
+      req.write(postData);
+      req.end();
+    });
   }
 
   private sendRequest(payload: any): Promise<{ ok: boolean; choices?: any[]; error?: any }> {

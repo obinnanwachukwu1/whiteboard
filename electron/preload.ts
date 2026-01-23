@@ -97,7 +97,24 @@ contextBridge.exposeInMainWorld('system', {
 
 // AI Helpers
 contextBridge.exposeInMainWorld('ai', {
-  chat: (messages: any[], max_tokens?: number) => ipcRenderer.invoke('ai:chat', { messages, max_tokens })
+  chat: (messages: any[], max_tokens?: number) => ipcRenderer.invoke('ai:chat', { messages, max_tokens }),
+  chatStream: (messages: any[], onChunk: (content: string) => void) => {
+    const id = Math.random().toString(36).substring(7);
+    
+    const chunkHandler = (_: any, data: { id: string, content: string }) => {
+      if (data.id === id) onChunk(data.content);
+    };
+    
+    // We can also listen for done/error to clean up automatically if we wanted,
+    // but the caller is responsible for calling the returned cleanup function.
+    
+    ipcRenderer.on('ai:stream:chunk', chunkHandler);
+    ipcRenderer.send('ai:chat-stream', { id, messages });
+    
+    return () => {
+      ipcRenderer.removeListener('ai:stream:chunk', chunkHandler);
+    };
+  }
 })
 
 // Embedding / Deep Search Helpers

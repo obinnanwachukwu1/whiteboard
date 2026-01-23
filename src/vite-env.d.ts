@@ -48,6 +48,7 @@ declare global {
     }
     ai: {
       chat: (messages: any[], max_tokens?: number) => Promise<{ ok: boolean; choices?: any[]; error?: any }>
+      chatStream: (messages: any[], onChunk: (content: string) => void) => () => void
     }
     embedding: {
       search: (query: string, k?: number, opts?: { courseIds?: string[]; types?: Array<'announcement' | 'assignment' | 'page' | 'module' | 'file'>; minScore?: number; dedupe?: boolean }) => Promise<{

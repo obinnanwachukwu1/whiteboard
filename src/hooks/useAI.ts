@@ -55,6 +55,26 @@ export const useAI = () => {
     ]);
   };
 
+  const streamSummarize = (text: string, onUpdate: (text: string) => void, bulletPoints = 2): (() => void) => {
+    let accumulated = '';
+    const messages = [
+      {
+        role: 'system',
+        content: `You are a helpful assistant. Summarize the following text into exactly ${bulletPoints} concise bullet points. Return ONLY the bullet points, no intro/outro.`
+      },
+      {
+        role: 'user',
+        content: text
+      }
+    ];
+    
+    // @ts-ignore - Exposed via preload
+    return window.ai.chatStream(messages, (chunk) => {
+      accumulated += chunk;
+      onUpdate(accumulated);
+    });
+  };
+
   const explainPriority = async (assignmentName: string, dueDate: string, weight: string): Promise<string | null> => {
     return chat([
       {
@@ -71,6 +91,7 @@ export const useAI = () => {
   return {
     chat,
     summarize,
+    streamSummarize,
     explainPriority,
     loading,
     error
