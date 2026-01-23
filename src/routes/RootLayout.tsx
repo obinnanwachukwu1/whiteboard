@@ -316,6 +316,27 @@ export function RootLayout() {
     await saveUserSidebar(next)
   }
 
+  // Proactive prefetch for global nav tabs on idle
+  useEffect(() => {
+    if (!prefetchEnabled || !hasToken || !coursesQ.data?.length) return
+
+    const visibleCourses = coursesQ.data.filter(c => {
+      const hidden = new Set(sidebarCfg.hiddenCourseIds || [])
+      return !hidden.has(String(c.id))
+    })
+
+    requestIdle(() => {
+      // Prefetch Dashboard first (highest value)
+      enqueuePrefetch(() => prefetchNavTab(queryClient, 'dashboard', visibleCourses))
+      
+      // Then the rest in sequence
+      enqueuePrefetch(() => prefetchNavTab(queryClient, 'assignments', visibleCourses))
+      enqueuePrefetch(() => prefetchNavTab(queryClient, 'announcements', visibleCourses))
+      enqueuePrefetch(() => prefetchNavTab(queryClient, 'grades', visibleCourses))
+      enqueuePrefetch(() => prefetchNavTab(queryClient, 'discussions', visibleCourses))
+    })
+  }, [prefetchEnabled, hasToken, coursesQ.data, sidebarCfg.hiddenCourseIds, queryClient])
+
   const prefetchCourseData = (courseId: string | number) => {
     const id = String(courseId)
     
