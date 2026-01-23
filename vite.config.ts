@@ -59,6 +59,26 @@ function copyPdfJsAssets(): Plugin {
   }
 }
 
+// Ensure preload stays valid CJS (no ESM export tokens)
+function fixPreloadCjsExport(): Plugin {
+  return {
+    name: 'fix-preload-cjs-export',
+    writeBundle(options) {
+      const outDir = options.dir || path.resolve(__dirname, 'dist-electron')
+      const preloadPath = path.join(outDir, 'preload.cjs')
+      if (!fs.existsSync(preloadPath)) return
+      const src = fs.readFileSync(preloadPath, 'utf8')
+      if (src.includes('export default require_preload();')) {
+        const updated = src.replace(
+          'export default require_preload();',
+          'module.exports = require_preload();',
+        )
+        fs.writeFileSync(preloadPath, updated)
+      }
+    },
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
   const isDev = command === 'serve' || !!process.env.VITE_DEV_SERVER_URL
@@ -96,11 +116,15 @@ export default defineConfig(({ command }) => {
             args.reload()
           },
           vite: {
+            plugins: [fixPreloadCjsExport()],
             build: {
               rollupOptions: {
                 external: ['keytar'],
                 output: {
+                  // BrowserWindow preloads must be classic scripts (CJS), not ESM.
+                  // (ESM `import` in preload will throw "Cannot use import statement outside a module".)
                   format: 'cjs',
+                  entryFileNames: 'preload.cjs',
                 },
               },
             },

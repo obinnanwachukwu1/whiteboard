@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, nativeImage, protocol, net, Tray, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, nativeImage, protocol, net, Tray, Menu, dialog } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -98,7 +98,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // │ │
 // │ ├─┬ dist-electron
 // │ │ ├── main.js
-// │ │ └── preload.mjs
+// │ │ └── preload.js / preload.mjs
 // │
 process.env.APP_ROOT = path.join(__dirname, '..')
 
@@ -166,6 +166,19 @@ function getTrayIconPath(): string | undefined {
   return undefined
 }
 
+function getPreloadPath(): string {
+  const candidates = [
+    path.join(__dirname, 'preload.cjs'),
+    path.join(__dirname, 'preload.js'),
+  ]
+  const resolved = candidates.find((p) => fs.existsSync(p))
+  if (!resolved) {
+    console.warn('[preload] No preload script found, defaulting to preload.js')
+    return path.join(__dirname, 'preload.js')
+  }
+  return resolved
+}
+
 function createWindow() {
   const icon = getIconPath()
   // Determine initial background color based on saved theme to prevent flash
@@ -203,7 +216,7 @@ function createWindow() {
         ? { autoHideMenuBar: true }
         : {}),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
+      preload: getPreloadPath(),
       webviewTag: true,
       nodeIntegration: false,
       contextIsolation: true,
@@ -1105,6 +1118,27 @@ ipcMain.handle('app:openExternal', async (_evt, url: string) => {
     return { ok: false, error: 'Invalid protocol' }
   } catch (e: any) {
     return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('app:downloadFile', async (_evt, fileId: string | number, suggestedName?: string) => {
+  try {
+    const downloadedPath = await svcDownloadFile(fileId)
+    const defaultName = suggestedName || path.basename(downloadedPath)
+
+    const result = await dialog.showSaveDialog({
+      defaultPath: defaultName,
+    })
+
+    if (result.canceled || !result.filePath) {
+      return { ok: false, error: 'cancelled' }
+    }
+
+    await fs.promises.copyFile(downloadedPath, result.filePath)
+    return { ok: true, data: result.filePath }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
   }
 })
 

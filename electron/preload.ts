@@ -1,4 +1,5 @@
-import { ipcRenderer, contextBridge } from 'electron'
+/* eslint-disable @typescript-eslint/no-var-requires */
+const { ipcRenderer, contextBridge } = require('electron') as typeof import('electron')
 
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('electron', {
@@ -93,6 +94,8 @@ contextBridge.exposeInMainWorld('settings', {
 // System helpers
 contextBridge.exposeInMainWorld('system', {
   openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
+  downloadFile: (fileId: string | number, suggestedName?: string) =>
+    ipcRenderer.invoke('app:downloadFile', fileId, suggestedName),
   getPdfPreloadPath: () => ipcRenderer.invoke('app:getPdfPreloadPath'),
 })
 
