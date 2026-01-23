@@ -93,6 +93,7 @@ contextBridge.exposeInMainWorld('settings', {
 // System helpers
 contextBridge.exposeInMainWorld('system', {
   openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
+  getPdfPreloadPath: () => ipcRenderer.invoke('app:getPdfPreloadPath'),
 })
 
 // AI Helpers

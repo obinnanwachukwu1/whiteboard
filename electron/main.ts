@@ -109,6 +109,19 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
+// Register custom schemes before app is ready
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'pdf-viewer',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
+])
+
 let win: BrowserWindow | null
 let tray: Tray | null = null
 let isQuitting = false
@@ -464,6 +477,73 @@ app.whenReady().then(() => {
       })
     }
     
+    return net.fetch(pathToFileURL(resolvedPath).toString())
+  })
+  
+  // Register custom protocol for PDF viewer assets
+  // Serves files from public/pdfviewer (dev) or dist/pdfviewer (production)
+  protocol.handle('pdf-viewer', (req) => {
+    const url = req.url.replace(/^pdf-viewer:\/\//, '')
+    let filePath = decodeURIComponent(url)
+    
+    // Normalize: strip trailing slashes
+    filePath = filePath.replace(/\/+$/, '')
+    
+    // Strip pdfviewer.html/ prefix from relative resource paths
+    // (happens because HTML loads from pdf-viewer://pdfViewer.html/ with trailing slash)
+    filePath = filePath.replace(/^pdfviewer\.html\//i, '')
+    
+    // Normalize known files to correct case
+    if (filePath.toLowerCase() === 'pdfviewer.html') {
+      filePath = 'pdfViewer.html'
+    }
+    
+    console.log(`[pdf-viewer] Request: ${url} -> ${filePath}`)
+    
+    // Security: only allow specific file extensions
+    const allowedExtensions = ['.html', '.js', '.css', '.bcmap', '.svg', '.gif', '.png']
+    const ext = path.extname(filePath).toLowerCase()
+    if (!allowedExtensions.includes(ext)) {
+      console.warn(`[pdf-viewer] Blocked disallowed file type: ${filePath}`)
+      return new Response('Forbidden', { status: 403 })
+    }
+    
+    // Determine base path based on dev/production mode
+    let resolvedPath: string
+    if (VITE_DEV_SERVER_URL) {
+      // Development: serve from node_modules and public
+      if (filePath === 'pdfViewer.html' || filePath === 'bridge.js') {
+        resolvedPath = path.join(process.env.APP_ROOT, 'public', 'pdfviewer', filePath)
+      } else if (filePath.startsWith('cmaps/')) {
+        resolvedPath = path.join(process.env.APP_ROOT, 'node_modules', 'pdfjs-dist', filePath)
+      } else if (filePath === 'pdf.js' || filePath === 'pdf.worker.js') {
+        resolvedPath = path.join(process.env.APP_ROOT, 'node_modules', 'pdfjs-dist', 'build', filePath)
+      } else if (filePath === 'pdf_viewer.js' || filePath === 'pdf_viewer.css') {
+        resolvedPath = path.join(process.env.APP_ROOT, 'node_modules', 'pdfjs-dist', 'web', filePath)
+      } else {
+        resolvedPath = path.join(process.env.APP_ROOT, 'public', 'pdfviewer', filePath)
+      }
+    } else {
+      // Production: serve from dist/pdfviewer
+      resolvedPath = path.join(RENDERER_DIST, 'pdfviewer', filePath)
+    }
+    
+    // Security: ensure resolved path is within allowed directory
+    const allowedBase = VITE_DEV_SERVER_URL 
+      ? process.env.APP_ROOT 
+      : RENDERER_DIST
+    if (!resolvedPath.startsWith(allowedBase)) {
+      console.warn(`[pdf-viewer] Blocked request outside allowed dir: ${resolvedPath}`)
+      return new Response('Forbidden', { status: 403 })
+    }
+    
+    // Check if file exists
+    if (!fs.existsSync(resolvedPath)) {
+      console.error(`[pdf-viewer] File not found: ${resolvedPath}`)
+      return new Response('Not Found', { status: 404 })
+    }
+    
+    console.log(`[pdf-viewer] Serving: ${resolvedPath}`)
     return net.fetch(pathToFileURL(resolvedPath).toString())
   })
 
@@ -1024,6 +1104,29 @@ ipcMain.handle('app:openExternal', async (_evt, url: string) => {
     }
     return { ok: false, error: 'Invalid protocol' }
   } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('app:getPdfPreloadPath', async () => {
+  try {
+    // Return the absolute path to the PDF preload script
+    const candidates = [
+      path.join(__dirname, 'pdfPreload.js'),
+      path.join(__dirname, 'pdfPreload.mjs'),
+    ]
+    console.log('[getPdfPreloadPath] Looking for preload in:', __dirname)
+    console.log('[getPdfPreloadPath] Candidates:', candidates)
+    const preloadPath = candidates.find((p) => fs.existsSync(p))
+    if (!preloadPath) {
+      console.error('[getPdfPreloadPath] No preload script found!')
+      return { ok: false, error: 'pdfPreload script not found' }
+    }
+    const fileUrl = pathToFileURL(preloadPath).toString()
+    console.log('[getPdfPreloadPath] Found:', fileUrl)
+    return { ok: true, data: fileUrl }
+  } catch (e: any) {
+    console.error('[getPdfPreloadPath] Error:', e)
     return { ok: false, error: String(e?.message || e) }
   }
 })

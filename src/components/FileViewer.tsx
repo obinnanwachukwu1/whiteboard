@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect, useRef } from 'react'
 import { useFileMeta, useFileBytes } from '../hooks/useCanvasQueries'
-import { PdfViewer } from './PdfViewer'
+import { PdfViewer } from './pdf'
 
 // Lazy load heavy dependencies
 const DocxRenderer = React.lazy(() => import('./viewers/DocxRenderer'))

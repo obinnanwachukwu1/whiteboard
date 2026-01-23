@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF Viewer</title>
+  <link rel="stylesheet" href="./pdf_viewer.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      /* Light mode default - matches bg-gray-100 */
+      background: #f3f4f6;
+    }
+    
+    /* Dark mode via class (set by React) */
+    html.dark, html.dark body {
+      /* Matches dark:bg-neutral-800 */
+      background: #262626;
+    }
+    
+    /* Fallback: system preference if no class set */
+    @media (prefers-color-scheme: dark) {
+      html:not(.light), html:not(.light) body {
+        background: #262626;
+      }
+    }
+    
+    #viewerContainer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      overflow: auto;
+    }
+    
+    #viewer {
+      /* pdf.js viewer container */
+      min-height: 100%;
+    }
+    
+    .pdfViewer .page {
+      margin: 8px auto 24px auto;
+      border: none !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+    
+    html.dark .pdfViewer .page {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+    
+    /* Hide internal loading indicator - React handles loading state */
+    #loadingIndicator {
+      display: none !important;
+    }
+    
+    /* Error display - hidden, React handles errors */
+    #errorMessage {
+      display: none !important;
+    }
+    
+    /* Disable pdf.js loading spinner (the images/loading-icon.gif) */
+    .pdfViewer .page .loadingIcon {
+      display: none !important;
+      background: none !important;
+    }
+    
+    /* Hide pdf.js page number overlay that shows during scroll/zoom */
+    .pdfViewer .page .pageNumber,
+    .pdfViewer .page[data-page-label]::after,
+    #pageNumber,
+    .pageLabel,
+    .toolbarLabel {
+      display: none !important;
+    }
+
+    /* If Chromium PDF viewer's page indicator ever appears, hide it too */
+    viewer-page-indicator,
+    #page-indicator {
+      display: none !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      visibility: hidden !important;
+    }
+    
+    /* 
+     * Text layer: always invisible but selectable (pdf.js standard behavior).
+     * The text layer exists for copy/paste, search, and accessibility,
+     * but should never be visually painted. Mode is indicated by cursor only.
+     * See: https://github.com/mozilla/pdf.js/issues/5323
+     */
+    .pdfViewer .textLayer {
+      opacity: 1; /* layer itself visible so pointer-events work */
+    }
+    
+    /* During active zoom gesture, hide text layer entirely to prevent flashing */
+    .pdfViewer.zooming .textLayer {
+      visibility: hidden !important;
+    }
+    
+    .pdfViewer .textLayer span,
+    .pdfViewer .textLayer br {
+      color: transparent !important;
+    }
+    
+    /* Hide any pseudo-elements on text layer (page number overlays, etc) */
+    .pdfViewer .textLayer span::before,
+    .pdfViewer .textLayer span::after,
+    .pdfViewer .textLayer::before,
+    .pdfViewer .textLayer::after,
+    .pdfViewer .page::before,
+    .pdfViewer .page::after {
+      display: none !important;
+      content: none !important;
+      visibility: hidden !important;
+    }
+    
+    .pdfViewer .textLayer ::selection {
+      background: rgba(0, 100, 255, 0.3);
+    }
+    
+    /* In hand/grab mode: pan cursor, disable text selection */
+    .pdfViewer.grabMode {
+      cursor: grab;
+    }
+    
+    .pdfViewer.grabMode:active {
+      cursor: grabbing;
+    }
+    
+    .pdfViewer.grabMode .textLayer {
+      pointer-events: none;
+    }
+    
+    /* In text selection mode: text cursor, enable selection */
+    .pdfViewer.textSelectionMode .textLayer {
+      pointer-events: auto;
+      cursor: text;
+    }
+    
+    /* Smoother scrolling */
+    #viewerContainer {
+      scroll-behavior: auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="loadingIndicator">Loading PDF...</div>
+  <div id="errorMessage" class="hidden"></div>
+  <div id="viewerContainer">
+    <div id="viewer" class="pdfViewer"></div>
+  </div>
+  
+  <script src="./pdf.js"></script>
+  <script src="./pdf_viewer.js"></script>
+  <script src="./bridge.js"></script>
+</body>
+</html>
