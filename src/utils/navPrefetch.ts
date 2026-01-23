@@ -8,13 +8,15 @@ export async function prefetchNavTab(
   try {
     switch (tab) {
       case 'dashboard':
-        // Dashboard uses variable horizon, but default is often 7 or 14. 
-        // We'll prefetch 14 to be safe, and also the Activity Stream.
+        // Dashboard uses 60 days to catch "also due" items + needs specific flags
+        // We also prefetch assignment groups for the top courses to enable instant priority calculation
+        const dashboardCourses = courses.slice(0, 5)
+        
         await Promise.all([
           queryClient.prefetchQuery({
-            queryKey: ['due-assignments', { days: 14 }],
+            queryKey: ['due-assignments', { days: 60, onlyPublished: true, includeCourseName: true }],
             queryFn: async () => {
-              const res = await window.canvas.listDueAssignments({ days: 14 })
+              const res = await window.canvas.listDueAssignments({ days: 60, onlyPublished: true, includeCourseName: true })
               if (!res?.ok) throw new Error(res?.error || 'Failed')
               return res.data || []
             },
@@ -30,7 +32,19 @@ export async function prefetchNavTab(
               return anns.slice(0, Math.max(1, 20))
             },
             staleTime: 1000 * 60 * 5,
-          })
+          }),
+          // Prefetch weights for priority score calculation
+          ...dashboardCourses.map(c => 
+            queryClient.prefetchQuery({
+              queryKey: ['course-assignment-groups-with-assignments', String(c.id)],
+              queryFn: async () => {
+                const res = await window.canvas.listAssignmentGroups(String(c.id), true)
+                if (!res?.ok) throw new Error(res?.error || 'Failed to load assignment groups')
+                return { courseId: String(c.id), groups: res.data || [] }
+              },
+              staleTime: 1000 * 60 * 30,
+            })
+          )
         ])
         break
 
