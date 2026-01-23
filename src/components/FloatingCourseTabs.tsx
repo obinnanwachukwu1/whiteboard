@@ -9,6 +9,7 @@ type Props = {
   onChange: (tab: CourseTabKey) => void
   anchorId?: string // element whose width/center we align to
   tabs?: TabDesc[]
+  onHover?: (tab: CourseTabKey) => void
 }
 
 const defaultTabs: TabDesc[] = [
@@ -24,12 +25,24 @@ const SIDEBAR_WIDTH = 256
 // Approximate width per tab with label: icon (16px) + gap (8px) + label (~80px) + padding (24px) ≈ 120px
 const LABEL_TAB_WIDTH = 120
 
-export const FloatingCourseTabs: React.FC<Props> = ({ current, onChange, anchorId, tabs }) => {
+export const FloatingCourseTabs: React.FC<Props> = ({ current, onChange, anchorId, tabs, onHover }) => {
   const [left, setLeft] = useState<number | null>(null)
   const [collapsed, setCollapsed] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const hoverTimer = useRef<any>(null)
 
   const tabList = tabs || defaultTabs
+
+  const handleMouseEnter = (key: CourseTabKey) => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+    hoverTimer.current = setTimeout(() => {
+      onHover?.(key)
+    }, 150) // 150ms delay
+  }
+
+  const handleMouseLeave = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+  }
 
   useEffect(() => {
     function compute() {
@@ -83,6 +96,8 @@ export const FloatingCourseTabs: React.FC<Props> = ({ current, onChange, anchorI
               aria-pressed={active}
               aria-label={label}
               title={label}
+              onMouseEnter={() => handleMouseEnter(key)}
+              onMouseLeave={handleMouseLeave}
             >
               <Icon className="w-4 h-4" />
               {!collapsed && <span>{label}</span>}

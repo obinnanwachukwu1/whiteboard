@@ -17,6 +17,7 @@ import { FloatingCourseTabs, type CourseTabKey } from './FloatingCourseTabs'
 import { HtmlContent } from './HtmlContent'
 import { computeResolvedTabs, hasFilesFromTabs } from '../utils/courseTabs'
 import type { ResolvedTab } from '../types/ui'
+import { prefetchCourseTab } from '../utils/coursePrefetch'
 
 
 type Detail = { contentType: 'page' | 'assignment' | 'file' | 'announcement' | 'discussion'; contentId: string; title: string }
@@ -184,6 +185,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
         <FloatingCourseTabs
           current={activeTab}
           onChange={(t) => { onClearDetail(); onChangeTab(t) }}
+          onHover={(t) => prefetchCourseTab(queryClient, courseId, t)}
           anchorId="course-content-anchor"
           tabs={availableTabs.map((t) => ({ key: t.key, label: t.label, Icon: ({
             home: HomeIcon,

@@ -3,7 +3,10 @@ import { useParams, useSearch, useNavigate } from '@tanstack/react-router'
 import { useAppContext } from '../context/AppContext'
 import { CourseView } from '../components/CourseView'
 import { useQueryClient } from '@tanstack/react-query'
-import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
+import { enqueuePrefetch } from '../utils/prefetchQueue'
+import { useTabUsage } from '../hooks/useTabUsage'
+import { prefetchCourseTab } from '../utils/coursePrefetch'
+import { useCourseInfo } from '../hooks/useCanvasQueries'
 
 export default function CoursePage() {
   const ctx = useAppContext()
@@ -11,16 +14,42 @@ export default function CoursePage() {
   const search = useSearch({ from: '/course/$courseId' }) as { tab?: string; type?: string; contentId?: string; title?: string }
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { recordVisit, getSortedTabs } = useTabUsage()
 
-  const [courseTab, setCourseTab] = React.useState<any>(search?.tab || 'announcements')
+  // Use cached course info to detect default view
+  const { data: courseInfo } = useCourseInfo(courseId)
+  
+  // Determine default tab from course info if URL doesn't specify one
+  const defaultTab = React.useMemo(() => {
+    if (search?.tab) return search.tab
+    
+    // Map Canvas default_view to our tab keys
+    const dv = (courseInfo?.default_view || '').toLowerCase()
+    if (dv === 'wiki' || dv === 'pages') return 'home'
+    if (dv === 'modules') return 'modules'
+    if (dv === 'assignments') return 'assignments'
+    if (dv === 'syllabus') return 'syllabus'
+    if (dv === 'feed' || dv === 'announcements') return 'announcements'
+    
+    // Fallback: use announcements
+    return 'announcements'
+  }, [search?.tab, courseInfo])
+
+  const [courseTab, setCourseTab] = React.useState<any>(defaultTab)
   const [courseDetail, setCourseDetail] = React.useState<any | null>(search?.type && search?.contentId ? ({ contentType: search.type, contentId: search.contentId, title: search.title }) : null)
 
+  // Update tab when defaultTab resolves (e.g. after course info loads) or URL changes
   React.useEffect(() => {
-    // reflect URL -> state on param change
-    setCourseTab(search?.tab || 'announcements')
+    setCourseTab(defaultTab)
+    
+    // Record usage when tab changes
+    if (courseId && defaultTab) {
+      recordVisit(courseId, defaultTab)
+    }
+
     if (search?.type && search?.contentId) setCourseDetail({ contentType: search.type, contentId: search.contentId, title: search.title })
     else setCourseDetail(null)
-  }, [search?.tab, search?.type, search?.contentId, search?.title])
+  }, [defaultTab, search?.type, search?.contentId, search?.title, courseId])
 
   const onChangeTab = (t: any) => {
     setCourseTab(t)
@@ -84,117 +113,16 @@ export default function CoursePage() {
 
         if (cancelled) return
 
-        const otherTabs = ['announcements', 'modules', 'files', 'assignments', 'grades', 'home', 'syllabus', 'links', 'people', 'discussions']
-          .filter((t) => t !== (search?.tab || courseTab || 'announcements'))
+        const currentTab = search?.tab || courseTab || 'announcements'
+        const allTabs = ['syllabus', 'announcements', 'modules', 'assignments', 'grades', 'files', 'people', 'discussions', 'links', 'home']
+        
+        // Use smart sorting based on usage stats, but filter out the current tab (no need to prefetch what we are looking at)
+        const sortedTabs = getSortedTabs(courseId, allTabs).filter(t => t !== currentTab)
 
-        // Medium-priority: modules + assignments list
-        if (otherTabs.includes('modules')) enqueuePrefetch(async () => {
-          await queryClient.prefetchQuery({
-            queryKey: ['course-modules', id],
-            queryFn: async () => {
-              const res = await window.canvas.listCourseModulesGql(id, 20, 50)
-              if (!res?.ok) throw new Error(res?.error || 'Failed to load modules')
-              return res.data || []
-            },
-            staleTime: 1000 * 60 * 5,
-          })
-        })
-        if (otherTabs.includes('assignments')) enqueuePrefetch(async () => {
-          await queryClient.prefetchQuery({
-            queryKey: ['course-assignments', id, 200],
-            queryFn: async () => {
-              const res = await window.canvas.listCourseAssignments(id, 200)
-              if (!res?.ok) throw new Error(res?.error || 'Failed to load assignments')
-              return res.data || []
-            },
-            staleTime: 1000 * 60 * 5,
-          })
-        })
-
-        // Announcements + Discussions list
-        if (otherTabs.includes('announcements')) enqueuePrefetch(async () => {
-          await queryClient.prefetchQuery({
-            queryKey: ['course-announcements', id, 50],
-            queryFn: async () => {
-              const res = await window.canvas.listCourseAnnouncements?.(id, 50)
-              if (!res?.ok) throw new Error(res?.error || 'Failed to load announcements')
-              return res.data || []
-            },
-            staleTime: 1000 * 60 * 5,
-          })
-        })
-        if (otherTabs.includes('discussions')) enqueuePrefetch(async () => {
-          await queryClient.prefetchQuery({
-            queryKey: ['course-discussions', id, 50],
-            queryFn: async () => {
-              const res = await window.canvas.listCourseDiscussions?.(id, 50)
-              if (!res?.ok) throw new Error(res?.error || 'Failed to load discussions')
-              return res.data || []
-            },
-            staleTime: 1000 * 60 * 5,
-          })
-        })
-
-        // Idle: gradebook-heavy requests
-        requestIdle(() => {
-          if (otherTabs.includes('grades')) enqueuePrefetch(async () => {
-            await queryClient.prefetchQuery({
-              queryKey: ['course-gradebook', id],
-              queryFn: async () => {
-                const [groupsRes, assignmentsRes] = await Promise.all([
-                  window.canvas.listAssignmentGroups(id, false),
-                  window.canvas.listAssignmentsWithSubmission(id, 100),
-                ])
-                if (!groupsRes?.ok) throw new Error(groupsRes?.error || 'Failed to load assignment groups')
-                if (!assignmentsRes?.ok) throw new Error(assignmentsRes?.error || 'Failed to load gradebook assignments')
-                return { groups: groupsRes.data || [], raw: assignmentsRes.data || [], assignments: [] as any[] }
-              },
-              staleTime: 1000 * 60 * 5,
-            })
-          })
-          // People: prefetch in idle since it's typically less frequently accessed
-          if (otherTabs.includes('people')) enqueuePrefetch(async () => {
-            const canvas = window.canvas as typeof window.canvas & {
-              listCourseUsers?: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
-            }
-            await queryClient.prefetchQuery({
-              queryKey: ['course-users', id, 100],
-              queryFn: async () => {
-                const res = await canvas.listCourseUsers?.(id, 100)
-                if (!res?.ok) throw new Error(res?.error || 'Failed to load course users')
-                return res.data || []
-              },
-              staleTime: 1000 * 60 * 10, // 10 min cache
-            })
-          })
-        })
-
-        // Files: just prefetch top-level folders
-        if (otherTabs.includes('files')) enqueuePrefetch(async () => {
-          await queryClient.prefetchQuery({
-            queryKey: ['course-folders', id, 100],
-            queryFn: async () => {
-              const res = await window.canvas.listCourseFolders?.(id, 100)
-              if (!res?.ok) throw new Error(res?.error || 'Failed to load folders')
-              return res.data || []
-            },
-            staleTime: 1000 * 60 * 5,
-          })
-        })
-
-        // Home/Syllabus
-        if (otherTabs.includes('home')) enqueuePrefetch(async () => {
-          await queryClient.prefetchQuery({
-            queryKey: ['course-front-page', id],
-            queryFn: async () => {
-              const res = await window.canvas.getCourseFrontPage?.(id)
-              if (!res?.ok) throw new Error(res?.error || 'Failed to load front page')
-              return res.data || null
-            },
-            staleTime: 1000 * 60 * 5,
-          })
-        })
-        // syllabus uses course-info already loaded
+        // Queue them up in order
+        for (const t of sortedTabs) {
+          enqueuePrefetch(() => prefetchCourseTab(queryClient, id, t))
+        }
       } catch {}
     }, 250)
     return () => { clearTimeout(timer); cancelled = true }

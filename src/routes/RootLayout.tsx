@@ -17,6 +17,7 @@ import { InboxPanel } from '../components/InboxPanel'
 import { Skeleton, SkeletonList, SkeletonStats } from '../components/Skeleton'
 import { useWindowControlsOverlayInsets } from '../hooks/useWindowControlsOverlayInsets'
 import { NotificationManager } from '../components/NotificationManager'
+import { prefetchNavTab } from '../utils/navPrefetch'
 
 // Context definitions moved to src/context/AppContext.tsx
 
@@ -317,28 +318,79 @@ export function RootLayout() {
 
   const prefetchCourseData = (courseId: string | number) => {
     const id = String(courseId)
+    
     enqueuePrefetch(async () => {
-      await queryClient.prefetchQuery({
-        queryKey: ['course-assignments', id, 200],
+      // 1. Get Course Info to find default_view
+      const info = await queryClient.fetchQuery({
+        queryKey: ['course-info', id],
         queryFn: async () => {
-          const res = await window.canvas.listCourseAssignments(id, 200)
-          if (!res?.ok) throw new Error(res?.error || 'Failed to load assignments')
-          return res.data || []
+          const res = await window.canvas.getCourseInfo?.(id)
+          if (!res?.ok) throw new Error(res?.error || 'Failed to load course info')
+          return res.data || null
         },
         staleTime: 1000 * 60 * 5,
       })
-    })
-    enqueuePrefetch(async () => {
-      await queryClient.prefetchQuery({
-        queryKey: ['course-modules', id],
+
+      const defaultView = (info?.default_view || 'wiki').toLowerCase()
+      const promises = []
+
+      // Always get tabs
+      promises.push(queryClient.prefetchQuery({
+        queryKey: ['course-tabs', id, true],
         queryFn: async () => {
-          const res = await window.canvas.listCourseModulesGql(id, 20, 50)
-          if (!res?.ok) throw new Error(res?.error || 'Failed to load modules')
-          return res.data || []
+          const res = await window.canvas.listCourseTabs?.(id, true)
+          return res?.data || []
         },
         staleTime: 1000 * 60 * 5,
-      })
+      }))
+
+      // 2. Prefetch the specific default view
+      if (defaultView === 'wiki' || defaultView === 'pages') {
+        promises.push(queryClient.prefetchQuery({
+          queryKey: ['course-front-page', id],
+          queryFn: async () => {
+            const res = await window.canvas.getCourseFrontPage?.(id)
+            return res?.data || null
+          },
+          staleTime: 1000 * 60 * 5,
+        }))
+      } else if (defaultView === 'modules') {
+        promises.push(queryClient.prefetchQuery({
+          queryKey: ['course-modules', id],
+          queryFn: async () => {
+            const res = await window.canvas.listCourseModulesGql(id, 20, 50)
+            return res?.data || []
+          },
+          staleTime: 1000 * 60 * 5,
+        }))
+      } else if (defaultView === 'assignments') {
+        promises.push(queryClient.prefetchQuery({
+          queryKey: ['course-assignments', id, 200],
+          queryFn: async () => {
+            const res = await window.canvas.listCourseAssignments(id, 200)
+            return res?.data || []
+          },
+          staleTime: 1000 * 60 * 5,
+        }))
+      } else if (defaultView === 'feed' || defaultView === 'announcements') {
+        promises.push(queryClient.prefetchInfiniteQuery({
+          queryKey: ['course-announcements-infinite', id, 10],
+          queryFn: async ({ pageParam = 1 }) => {
+            const res = await window.canvas.listCourseAnnouncementsPage?.(id, pageParam as number, 10)
+            if (!res?.ok) throw new Error(res?.error || 'Failed to load announcements')
+            return res.data || []
+          },
+          initialPageParam: 1,
+          staleTime: 1000 * 60 * 5,
+        }))
+      } else if (defaultView === 'syllabus') {
+        // Syllabus body is already in course-info, so we are good
+      }
+
+      await Promise.all(promises)
     })
+
+    // Queued low-priority requests
     requestIdle(() => {
       enqueuePrefetch(async () => {
         await queryClient.prefetchQuery({
@@ -354,17 +406,6 @@ export function RootLayout() {
             const raw = (assignmentsRes.data || []) as any[]
             const assignments = toAssignmentInputsFromRest(raw)
             return { groups, assignments, raw }
-          },
-          staleTime: 1000 * 60 * 5,
-        })
-      })
-      enqueuePrefetch(async () => {
-        await queryClient.prefetchQuery({
-          queryKey: ['course-tabs', id, true],
-          queryFn: async () => {
-            const res = await window.canvas.listCourseTabs?.(id, true)
-            if (!res?.ok) throw new Error(res?.error || 'Failed to load course tabs')
-            return res.data || []
           },
           staleTime: 1000 * 60 * 5,
         })
@@ -610,8 +651,7 @@ export function RootLayout() {
               onOpenAllCourses={() => navigate({ to: '/all-courses' })}
               onHideCourse={hideCourse}
               onPrefetchCourse={(id) => { if (prefetchEnabled) prefetchCourseData(id) }}
-              prefetchEnabled={prefetchEnabled}
-              onTogglePrefetch={async (enabled) => { context.setPrefetchEnabled(enabled) }}
+              onPrefetchNav={(tab) => { if (prefetchEnabled) enqueuePrefetch(() => prefetchNavTab(queryClient, tab, context.courses)) }}
               onReorder={async (nextOrder) => { const next: SidebarConfig = { ...sidebarCfg, order: nextOrder }; setSidebarCfg(next); await saveUserSidebar(next) }}
             />
             <main className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-tl-xl">

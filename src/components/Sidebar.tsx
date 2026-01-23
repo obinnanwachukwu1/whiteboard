@@ -27,14 +27,26 @@ type Props = {
   onOpenAllCourses: () => void
   onHideCourse: (courseId: string | number) => void
   onPrefetchCourse?: (courseId: string | number) => void
-  prefetchEnabled?: boolean
-  onTogglePrefetch?: (enabled: boolean) => void
+  onPrefetchNav?: (tab: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions') => void
   onReorder?: (nextOrder: Array<string | number>) => void
 }
 
-export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, current = 'dashboard', onSelectDashboard, onSelectAnnouncements, onSelectAssignments, onSelectGrades, onSelectDiscussions, onSelectCourse, onOpenAllCourses, onHideCourse, onPrefetchCourse, prefetchEnabled: _prefetchEnabled = true, onTogglePrefetch: _onTogglePrefetch, onReorder }) => {
+export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, current = 'dashboard', onSelectDashboard, onSelectAnnouncements, onSelectAssignments, onSelectGrades, onSelectDiscussions, onSelectCourse, onOpenAllCourses, onHideCourse, onPrefetchCourse, onPrefetchNav, onReorder }) => {
   const [menuOpenId, setMenuOpenId] = useState<string | number | null>(null)
   const [, setDragId] = useState<string | number | null>(null)
+  const hoverTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleNavHover = (tab: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions') => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+    hoverTimer.current = setTimeout(() => {
+      onPrefetchNav?.(tab)
+    }, 150)
+  }
+
+  const handleMouseLeave = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+  }
+
   const hidden = useMemo(() => new Set(sidebar?.hiddenCourseIds || []), [sidebar?.hiddenCourseIds])
 
   const orderedVisibleCourses = useMemo(() => {
@@ -103,6 +115,8 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
                 : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
           }`}
             onClick={onSelectDashboard}
+            onMouseEnter={() => handleNavHover('dashboard')}
+            onMouseLeave={handleMouseLeave}
             aria-current={current === 'dashboard' ? 'page' : undefined}
           >
             Dashboard
@@ -114,6 +128,8 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
                 : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectAnnouncements?.()}
+            onMouseEnter={() => handleNavHover('announcements')}
+            onMouseLeave={handleMouseLeave}
             aria-current={current === 'announcements' ? 'page' : undefined}
           >
             Announcements
@@ -125,6 +141,8 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
                 : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectAssignments?.()}
+            onMouseEnter={() => handleNavHover('assignments')}
+            onMouseLeave={handleMouseLeave}
             aria-current={current === 'assignments' ? 'page' : undefined}
           >
             Assignments
@@ -136,6 +154,8 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
                 : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectGrades?.()}
+            onMouseEnter={() => handleNavHover('grades')}
+            onMouseLeave={handleMouseLeave}
             aria-current={current === 'grades' ? 'page' : undefined}
           >
             Grades
@@ -147,6 +167,8 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
                 : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectDiscussions?.()}
+            onMouseEnter={() => handleNavHover('discussions')}
+            onMouseLeave={handleMouseLeave}
             aria-current={current === 'discussions' ? 'page' : undefined}
           >
             Discussions

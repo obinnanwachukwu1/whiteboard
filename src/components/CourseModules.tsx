@@ -7,6 +7,9 @@ import { ListItemRow } from './ui/ListItemRow'
 import { MetadataBadge } from './ui/MetadataBadge'
 import { useAIPanel } from '../context/AIPanelContext'
 import { useAppContext } from '../context/AppContext'
+import { useQueryClient } from '@tanstack/react-query'
+import { enqueuePrefetch } from '../utils/prefetchQueue'
+import { usePrefetchOnHover } from '../hooks/usePrefetchOnHover'
 
 type Props = {
   courseId: string | number
@@ -19,12 +22,159 @@ type Props = {
   }) => void
 }
 
+function useModuleItemPrefetch(courseId: string | number, it: CanvasModuleItem) {
+  const enabled = !!(
+    (it.__typename === 'PageModuleItem' || it.pageUrl) ||
+    (it.__typename === 'AssignmentModuleItem' && it.contentId)
+  )
+
+  const queryKey = React.useMemo(() => {
+    if (it.__typename === 'PageModuleItem' || it.pageUrl) {
+      return ['course-page', String(courseId), it.pageUrl]
+    }
+    if (it.__typename === 'AssignmentModuleItem' && it.contentId) {
+      return ['assignment-rest', String(courseId), String(it.contentId)]
+    }
+    return ['ignore']
+  }, [courseId, it])
+
+  const queryFn = React.useCallback(async () => {
+    if (it.__typename === 'PageModuleItem' || it.pageUrl) {
+      const res = await window.canvas.getCoursePage?.(courseId, it.pageUrl!)
+      if (!res?.ok) throw new Error(res?.error || 'Failed')
+      return res.data
+    }
+    if (it.__typename === 'AssignmentModuleItem' && it.contentId) {
+      const res = await window.canvas.getAssignmentRest?.(courseId, it.contentId)
+      if (!res?.ok) throw new Error(res?.error || 'Failed')
+      return res.data
+    }
+    return null
+  }, [courseId, it])
+
+  return usePrefetchOnHover({
+    queryKey,
+    queryFn,
+    enabled,
+    staleTime: 1000 * 60 * 5
+  })
+}
+
+const ModuleItemRow: React.FC<{
+  it: CanvasModuleItem
+  courseId: string | number
+  icon: React.ReactNode
+  title: string
+  kind: string
+  onClick: () => void
+  isMenuOpen: boolean
+  menuId: string
+  setMenuOpenId: (id: string | null) => void
+  anchorEls: React.MutableRefObject<Map<string, HTMLElement | null>>
+  app: any
+  aiPanel: any
+}> = ({ it, courseId, icon, title, kind, onClick, isMenuOpen, menuId, setMenuOpenId, anchorEls, app, aiPanel }) => {
+  const hoverHandlers = useModuleItemPrefetch(courseId, it)
+
+  return (
+    <ListItemRow
+      {...hoverHandlers}
+      icon={icon}
+      title={title}
+      subtitle={<MetadataBadge>{kind}</MetadataBadge>}
+      menuOpen={isMenuOpen}
+      onClick={onClick}
+      menu={
+        (
+          <>
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : menuId) }}
+              className={`inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ${isMenuOpen ? 'opacity-100' : ''}`}
+              aria-label="More options"
+              ref={(el) => { anchorEls.current.set(menuId, el) }}
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+            <Dropdown open={isMenuOpen} onOpenChange={(o) => setMenuOpenId(o ? menuId : null)} align="right" offsetY={32} anchorEl={anchorEls.current.get(menuId)}>
+              {it.htmlUrl && (
+                <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(it.htmlUrl!) }}>
+                  Open in Browser
+                </button>
+              )}
+              {app.aiEnabled && (
+                <button 
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 text-indigo-600 dark:text-indigo-400"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setMenuOpenId(null)
+                    aiPanel.open(`Explain this module item: "${title}"`, 'ask-ai', true)
+                  }}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Explain
+                </button>
+              )}
+            </Dropdown>
+          </>
+        )
+      }
+    />
+  )
+}
+
 export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpenContent }) => {
   const { data: modules = null, isLoading, error } = useCourseModules(courseId)
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
   const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
   const aiPanel = useAIPanel()
   const app = useAppContext()
+  const queryClient = useQueryClient()
+
+  // Auto-prefetch top 5 relevant module items (pages/assignments only)
+  React.useEffect(() => {
+    if (!modules || modules.length === 0) return
+    let count = 0
+    
+    // Flatten items and find first 5 prefetchable ones
+    for (const m of modules as CanvasModule[]) {
+      if (!m.moduleItemsConnection?.nodes) continue
+      for (const it of m.moduleItemsConnection.nodes) {
+        if (count >= 5) break
+        
+        // Logic to prefetch Pages
+        if (it.__typename === 'PageModuleItem' || it.pageUrl) {
+          enqueuePrefetch(async () => {
+            await queryClient.prefetchQuery({
+              queryKey: ['course-page', String(courseId), it.pageUrl],
+              queryFn: async () => {
+                const res = await window.canvas.getCoursePage?.(courseId, it.pageUrl!)
+                if (!res?.ok) throw new Error(res?.error || 'Failed')
+                return res.data
+              },
+              staleTime: 1000 * 60 * 5
+            })
+          })
+          count++
+        }
+        // Logic to prefetch Assignments
+        else if (it.__typename === 'AssignmentModuleItem' && it.contentId) {
+          enqueuePrefetch(async () => {
+            await queryClient.prefetchQuery({
+              queryKey: ['assignment-rest', String(courseId), String(it.contentId)],
+              queryFn: async () => {
+                const res = await window.canvas.getAssignmentRest?.(courseId, it.contentId!)
+                if (!res?.ok) throw new Error(res?.error || 'Failed')
+                return res.data
+              },
+              staleTime: 1000 * 60 * 5
+            })
+          })
+          count++
+        }
+      }
+      if (count >= 5) break
+    }
+  }, [modules, courseId, queryClient])
 
   async function openItem(it: CanvasModuleItem, title: string) {
     if (it.__typename === 'PageModuleItem' || it.pageUrl) {
@@ -118,46 +268,19 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
                       
                       return (
                         <li key={j}>
-                          <ListItemRow
+                          <ModuleItemRow
+                            it={it}
+                            courseId={courseId}
                             icon={iconFor(it)}
                             title={title}
-                            subtitle={<MetadataBadge>{kind}</MetadataBadge>}
-                            menuOpen={isMenuOpen}
+                            kind={kind}
                             onClick={() => openItem(it, title)}
-                            menu={
-                              (
-                                <>
-                                  <button
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : menuId) }}
-                                    className={`inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ${isMenuOpen ? 'opacity-100' : ''}`}
-                                    aria-label="More options"
-                                    ref={(el) => { anchorEls.current.set(menuId, el) }}
-                                  >
-                                    <MoreVertical className="w-4 h-4" />
-                                  </button>
-                                  <Dropdown open={isMenuOpen} onOpenChange={(o) => setMenuOpenId(o ? menuId : null)} align="right" offsetY={32} anchorEl={anchorEls.current.get(menuId)}>
-                                    {it.htmlUrl && (
-                                      <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(it.htmlUrl!) }}>
-                                        Open in Browser
-                                      </button>
-                                    )}
-                                    {app.aiEnabled && (
-                                      <button 
-                                        className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 text-indigo-600 dark:text-indigo-400"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          setMenuOpenId(null)
-                                          aiPanel.open(`Explain this module item: "${title}"`, 'ask-ai', true)
-                                        }}
-                                      >
-                                        <Sparkles className="w-3 h-3" />
-                                        Explain
-                                      </button>
-                                    )}
-                                  </Dropdown>
-                                </>
-                              )
-                            }
+                            isMenuOpen={isMenuOpen}
+                            menuId={menuId}
+                            setMenuOpenId={setMenuOpenId}
+                            anchorEls={anchorEls}
+                            app={app}
+                            aiPanel={aiPanel}
                           />
                         </li>
                       )
@@ -172,3 +295,4 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
     </div>
   )
 }
+

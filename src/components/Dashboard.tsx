@@ -7,6 +7,9 @@ import { useActivityFeed, type ActivityFeedItem } from '../hooks/useActivityFeed
 import { useDashboardSettings } from '../hooks/useDashboardSettings'
 import { extractAssignmentIdFromUrl, extractCourseIdFromUrl } from '../utils/urlHelpers'
 
+import { enqueuePrefetch } from '../utils/prefetchQueue'
+import { useQueryClient } from '@tanstack/react-query'
+
 // Components
 import { PriorityList } from './dashboard/PriorityList'
 import { ActivityPanel } from './dashboard/ActivityPanel'
@@ -27,6 +30,7 @@ export const Dashboard: React.FC<Props> = ({
   onOpenAnnouncement,
 }) => {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { courseImageUrl } = useCourseImages()
   const { timeHorizon, setTimeHorizon } = useDashboardSettings()
   
@@ -35,6 +39,55 @@ export const Dashboard: React.FC<Props> = ({
   
   // Activity feed data
   const activityData = useActivityFeed()
+
+  // Auto-prefetch top assignments details
+  React.useEffect(() => {
+    if (!priorityData.assignments.length) return
+    const top = priorityData.assignments.slice(0, 5)
+    for (const a of top) {
+      if (a.htmlUrl) {
+        // Just prefetch assignment detail if we can guess the ID
+        // Often assignments list provides enough, but for robust instant open:
+        const extracted = extractAssignmentIdFromUrl(a.htmlUrl) || String(a.id)
+        enqueuePrefetch(async () => {
+          await queryClient.prefetchQuery({
+            queryKey: ['assignment-rest', String(a.courseId), extracted],
+            queryFn: async () => {
+              const res = await window.canvas.getAssignmentRest?.(a.courseId, extracted)
+              if (!res?.ok) throw new Error(res?.error || 'Failed')
+              return res.data
+            },
+            staleTime: 1000 * 60 * 5,
+          })
+        })
+      }
+    }
+  }, [priorityData.assignments, queryClient])
+
+  // Auto-prefetch top announcements
+  React.useEffect(() => {
+    if (!activityData.items.length) return
+    const anns = activityData.items.filter(i => i.type === 'announcement').slice(0, 5)
+    for (const a of anns) {
+      if (a.topicId) {
+        // Extract course ID
+        const cid = extractCourseIdFromUrl(a.htmlUrl || '')
+        if (cid) {
+          enqueuePrefetch(async () => {
+            await queryClient.prefetchQuery({
+              queryKey: ['announcement', cid, a.topicId],
+              queryFn: async () => {
+                const res = await window.canvas.getAnnouncement?.(cid, a.topicId!)
+                if (!res?.ok) throw new Error(res?.error || 'Failed')
+                return res.data
+              },
+              staleTime: 1000 * 60 * 5,
+            })
+          })
+        }
+      }
+    }
+  }, [activityData.items, queryClient])
   
   // Handle assignment click
   const handleAssignmentClick = React.useCallback((assignment: DashboardAssignment) => {

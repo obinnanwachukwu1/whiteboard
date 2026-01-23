@@ -11,7 +11,7 @@ type Props = {
   onKeyDown?: (e: React.KeyboardEvent) => void
   className?: string
   active?: boolean
-}
+} & Omit<React.HTMLAttributes<HTMLDivElement>, 'title'>
 
 export const ListItemRow: React.FC<Props> = ({
   icon,
@@ -24,9 +24,11 @@ export const ListItemRow: React.FC<Props> = ({
   onKeyDown,
   className = '',
   active = false,
+  ...rest
 }) => {
   return (
     <div
+      {...rest}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
