@@ -9,11 +9,10 @@ export async function prefetchNavTab(
     switch (tab) {
       case 'dashboard':
         // Dashboard uses 60 days to catch "also due" items + needs specific flags
-        // We also prefetch assignment groups for the top courses to enable instant priority calculation
-        const dashboardCourses = courses.slice(0, 5)
+        // We use fetchQuery for assignments so we can read the result immediately and prefetch weights
         
         await Promise.all([
-          queryClient.prefetchQuery({
+          queryClient.fetchQuery({
             queryKey: ['due-assignments', { days: 60, onlyPublished: true, includeCourseName: true }],
             queryFn: async () => {
               const res = await window.canvas.listDueAssignments({ days: 60, onlyPublished: true, includeCourseName: true })
@@ -21,7 +20,31 @@ export async function prefetchNavTab(
               return res.data || []
             },
             staleTime: 1000 * 60 * 2,
+          }).then((assignments: any[]) => {
+            // Immediately identify courses that need weights
+            const courseIds = new Set<string>()
+            for (const a of assignments) {
+              if (a.course_id != null) courseIds.add(String(a.course_id))
+            }
+            
+            // Prefetch weights for ALL courses with assignments
+            // We run this as a side effect (not awaited by the outer Promise.all, or maybe we should)
+            // Ideally we want the prefetch to start ASAP.
+            const weightPromises = Array.from(courseIds).map(cid => 
+              queryClient.prefetchQuery({
+                queryKey: ['course-assignment-groups-with-assignments', cid],
+                queryFn: async () => {
+                  const res = await window.canvas.listAssignmentGroups(cid, true)
+                  if (!res?.ok) throw new Error(res?.error || 'Failed to load assignment groups')
+                  return { courseId: cid, groups: res.data || [] }
+                },
+                staleTime: 1000 * 60 * 30,
+              })
+            )
+            // We can await them to ensure "dashboard ready" means "dashboard fully ready"
+            return Promise.all(weightPromises)
           }),
+
           queryClient.prefetchQuery({
             queryKey: ['activity-announcements', { n: 20 }],
             queryFn: async () => {
@@ -32,19 +55,7 @@ export async function prefetchNavTab(
               return anns.slice(0, Math.max(1, 20))
             },
             staleTime: 1000 * 60 * 5,
-          }),
-          // Prefetch weights for priority score calculation
-          ...dashboardCourses.map(c => 
-            queryClient.prefetchQuery({
-              queryKey: ['course-assignment-groups-with-assignments', String(c.id)],
-              queryFn: async () => {
-                const res = await window.canvas.listAssignmentGroups(String(c.id), true)
-                if (!res?.ok) throw new Error(res?.error || 'Failed to load assignment groups')
-                return { courseId: String(c.id), groups: res.data || [] }
-              },
-              staleTime: 1000 * 60 * 30,
-            })
-          )
+          })
         ])
         break
 
