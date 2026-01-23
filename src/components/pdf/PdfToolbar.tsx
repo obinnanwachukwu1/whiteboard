@@ -94,10 +94,8 @@ export const PdfToolbar: React.FC<Props> = ({
   }, [onCommand])
   
   const handleDownload = useCallback(() => {
-    // Note: Download is handled by opening the file URL externally
-    // This could be enhanced to trigger actual download if needed
-    console.log('[PdfToolbar] Download requested')
-  }, [])
+    onCommand({ type: 'DOWNLOAD' })
+  }, [onCommand])
   
   // Format current zoom display
   const getZoomDisplay = (): string => {

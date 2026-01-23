@@ -135,7 +135,12 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
       case 'SELECTION_MODE_CHANGED':
         setViewerState(prev => ({ ...prev, selectionMode: data.mode }))
         break
-        
+
+      case 'DOWNLOAD':
+        // Trigger file download by opening the file URL externally
+        window.open(viewerState.url, '_blank')
+        break
+
       case 'ERROR':
         setViewerState(prev => ({
           ...prev,
