@@ -626,7 +626,18 @@
       case 'SET_THEME':
         setTheme(command.theme);
         break;
-        
+
+      case 'DOWNLOAD':
+        // Trigger download by creating a temporary link
+        const link = document.createElement('a');
+        link.href = currentUrl;
+        link.download = ''; // Let browser determine filename from URL
+        link.target = '_blank'; // Fallback to open in new tab
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        break;
+
       default:
         console.warn('[PDFBridge] Unknown command:', command.type);
     }

@@ -27,6 +27,7 @@ const VALID_COMMANDS = new Set([
   'SET_SELECTION_MODE',
   'GET_STATE',
   'SET_THEME',
+  'DOWNLOAD',
 ])
 
 // Valid event types that can be sent to parent
