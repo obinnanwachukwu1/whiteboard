@@ -157,7 +157,8 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
         // Only treat as file if immediate segment after 'files' is numeric (avoid folder routes)
         if (seg && /^\d+$/.test(seg)) {
           const fid = seg
-          if (withinCurrent) { onChangeTab('files'); onOpenDetail({ contentType: 'file', contentId: String(fid), title: 'File' }) }
+          // Do not switch tab to 'files' for file links
+          if (withinCurrent) { onOpenDetail({ contentType: 'file', contentId: String(fid), title: 'File' }) }
           else if (cid) onNavigateCourse?.(cid, { type: 'file', id: String(fid) })
           return true
         }

@@ -37,6 +37,8 @@ export default function CoursePage() {
 
   const [courseTab, setCourseTab] = React.useState<any>(defaultTab)
   const [courseDetail, setCourseDetail] = React.useState<any | null>(search?.type && search?.contentId ? ({ contentType: search.type, contentId: search.contentId, title: search.title }) : null)
+  // Simple history stack for detail view to support "Back" returning to previous detail
+  const [detailStack, setDetailStack] = React.useState<any[]>([])
 
   // Update tab when defaultTab resolves (e.g. after course info loads) or URL changes
   React.useEffect(() => {
@@ -58,15 +60,38 @@ export default function CoursePage() {
   }
 
   const onClearDetail = () => {
-    setCourseDetail(null)
-    // Update URL to remove detail params, keeping the current tab
-    navigate({ to: '/course/$courseId', params: { courseId }, search: { tab: courseTab } })
+    if (detailStack.length > 0) {
+      // Pop the last item
+      const prev = detailStack[detailStack.length - 1]
+      const newStack = detailStack.slice(0, -1)
+      setDetailStack(newStack)
+      setCourseDetail(prev)
+      
+      // Restore URL state without changing the tab
+      navigate({ 
+        to: '/course/$courseId', 
+        params: { courseId }, 
+        search: { tab: courseTab, type: prev.contentType, contentId: prev.contentId, title: prev.title } 
+      })
+    } else {
+      setCourseDetail(null)
+      // Update URL to remove detail params, keeping the current tab
+      navigate({ to: '/course/$courseId', params: { courseId }, search: { tab: courseTab } })
+    }
   }
 
   const onOpenDetail = (d: { contentType: 'assignment'|'announcement'|'page'|'file'|'discussion'; contentId: string; title: string }) => {
+    if (courseDetail) {
+      setDetailStack(prev => [...prev, courseDetail])
+    }
     setCourseDetail(d)
-    const tabFor: any = d.contentType === 'assignment' ? 'assignments' : d.contentType === 'announcement' ? 'announcements' : d.contentType === 'discussion' ? 'discussions' : d.contentType === 'page' ? 'home' : 'files'
-    setCourseTab(tabFor)
+    
+    // If it's a file, keep the current tab. Otherwise, switch to the target tab.
+    let tabFor = courseTab
+    if (d.contentType !== 'file') {
+      tabFor = d.contentType === 'assignment' ? 'assignments' : d.contentType === 'announcement' ? 'announcements' : d.contentType === 'discussion' ? 'discussions' : d.contentType === 'page' ? 'home' : 'files'
+      setCourseTab(tabFor)
+    }
     navigate({ to: '/course/$courseId', params: { courseId }, search: { tab: tabFor, type: d.contentType, contentId: d.contentId, title: d.title } })
   }
 

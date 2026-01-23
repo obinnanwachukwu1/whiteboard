@@ -81,7 +81,9 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
   const isDoc = ext === 'doc'
   const isXlsx = ext === 'xlsx' || ext === 'xls' || ext === 'csv'
   const isPptx = ext === 'pptx' || ext === 'ppt'
-  const isTextLike = ext === 'txt' || contentType?.startsWith('text/') || ['json','xml','html','md','csv'].includes(ext)
+  // Removed 'txt' and 'text/' start check to prevent .py/.tex from auto-opening
+  const isTextLike = ['json','xml','html','md','csv'].includes(ext)
+  const isSupported = isPdf || isImage || isAudio || isVideo || isDocx || isDoc || isXlsx || isPptx || isTextLike
 
   let body: React.ReactNode = null
 
@@ -157,7 +159,29 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
         <TextRenderer url={localUrl} ext={ext} className={className} isFullscreen={isFullscreen} />
       </Suspense>
     )
+  } else if (!isSupported) {
+    body = (
+      <div className={`flex flex-col items-center justify-center p-8 h-full text-center ${className}`}>
+        <div className="mb-4 text-slate-500 dark:text-neutral-400">
+          <p className="text-lg font-medium mb-2">File preview not available</p>
+          <p className="text-sm opacity-80">
+            This file type (.{ext}) cannot be viewed directly.
+          </p>
+        </div>
+        <button
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm font-medium"
+          onClick={() => window.system.downloadFile(fileId, name)}
+        >
+          Download File
+        </button>
+      </div>
+    )
   } else if (remoteUrl) {
+    // Fallback if local file load fails but remote URL exists AND isSupported is technically true (should be rare)
+    // Or for types we missed in isSupported check but still want to try embedding
+    // Actually, given strict requirements, maybe we should force download even here if !isSupported?
+    // But the above !isSupported block catches everything not whitelisted.
+    // So this block handles supported types that failed local download.
     body = (
       <div className={className} style={{ height: '100%' }}>
         <div className="overflow-hidden border border-gray-200 dark:border-neutral-700 rounded-lg" style={{ height: '100%' }}>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Button } from './ui/Button'
-import { ArrowLeft, RefreshCw, Maximize2, Minimize2, Sparkles, FileText, Info } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Maximize2, Minimize2, Sparkles, FileText, Info, Download } from 'lucide-react'
 import { HtmlContent } from './HtmlContent'
 import { FileViewer } from './FileViewer'
 import { useAssignmentRest, useCoursePage, useAnnouncement } from '../hooks/useCanvasQueries'
@@ -42,8 +42,29 @@ export const CanvasContentView: React.FC<Props> = ({
 
   // Context Menu State
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
+  const [fileDownloadTarget, setFileDownloadTarget] = useState<{ id: string; name: string } | null>(null)
 
   const handleContextMenu = (e: React.MouseEvent) => {
+    // Check for file link under cursor first
+    const target = e.target as HTMLElement
+    const anchor = target.closest('a')
+    const href = anchor?.href || anchor?.getAttribute('href')
+    
+    // Check if it looks like a file link (typical Canvas patterns)
+    const isFileLink = href && (/\/files\/\d+/.test(href) || href.includes('/download'))
+
+    if (isFileLink && href) {
+        e.preventDefault()
+        // Try to extract ID
+        const match = href.match(/\/files\/(\d+)/)
+        if (match && match[1]) {
+            const name = anchor?.innerText || 'File'
+            setFileDownloadTarget({ id: match[1], name })
+            setMenuPos({ x: e.clientX, y: e.clientY })
+            return
+        }
+    }
+
     // Only show context menu if AI is enabled and we have content
     if (!app.aiEnabled) return
     if (loading || error) return
@@ -52,6 +73,7 @@ export const CanvasContentView: React.FC<Props> = ({
     if (contentType === 'file') return
 
     e.preventDefault()
+    setFileDownloadTarget(null)
     setMenuPos({ x: e.clientX, y: e.clientY })
   }
 
@@ -81,7 +103,17 @@ export const CanvasContentView: React.FC<Props> = ({
     aiPanel.open(`Create a checklist of tasks from this ${contentType}: "${title}"\n\n${cleanText}`, 'ask-ai', true)
   }
 
-  const menuItems: ContextMenuItem[] = [
+  const menuItems: ContextMenuItem[] = fileDownloadTarget ? [
+    {
+      label: 'Download File',
+      icon: <Download className="w-4 h-4" />,
+      onClick: () => {
+        if (fileDownloadTarget.id) {
+          window.system.downloadFile(fileDownloadTarget.id, fileDownloadTarget.name)
+        }
+      }
+    }
+  ] : [
     {
       label: 'Summarize',
       icon: <Sparkles className="w-4 h-4" />,
@@ -184,7 +216,7 @@ export const CanvasContentView: React.FC<Props> = ({
       <ContextMenu 
         items={menuItems} 
         position={menuPos} 
-        onClose={() => setMenuPos(null)} 
+        onClose={() => { setMenuPos(null); setFileDownloadTarget(null) }} 
       />
     </div>
   )

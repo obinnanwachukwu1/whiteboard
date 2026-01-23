@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 export interface ContextMenuItem {
@@ -17,9 +17,35 @@ interface ContextMenuProps {
 
 export const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) => {
   const menuRef = useRef<HTMLDivElement>(null)
+  const [mounted, setMounted] = useState(false)
+  const [visible, setVisible] = useState(false)
+  const [coords, setCoords] = useState<{ x: number; y: number } | null>(null)
+  const [cachedItems, setCachedItems] = useState<ContextMenuItem[]>([])
 
   useEffect(() => {
+    if (position) {
+      setCoords(position)
+      setCachedItems(items) // Snapshot items when opening
+      setMounted(true)
+      requestAnimationFrame(() => setVisible(true))
+    } else {
+      setVisible(false)
+      const t = setTimeout(() => setMounted(false), 150)
+      return () => clearTimeout(t)
+    }
+  }, [position, items]) // Re-snapshot if items change while open (optional, but good for dynamic menus)
+
+  // Optimization: If closing (position is null), do NOT update cachedItems even if 'items' prop changes
+  useEffect(() => {
+    if (position && items !== cachedItems) {
+      setCachedItems(items)
+    }
+  }, [items, position])
+
+  useEffect(() => {
+    if (!mounted) return
     const handleClickOutside = (event: MouseEvent) => {
+      // Prevent closing if clicking inside the menu (already handled by stopPropagation but safety net)
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         onClose()
       }
@@ -29,45 +55,45 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClo
       if (e.key === 'Escape') onClose()
     }
 
-    if (position) {
-      document.addEventListener('mousedown', handleClickOutside)
-      document.addEventListener('scroll', handleScroll, true)
-      document.addEventListener('keydown', handleKeyDown)
-    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('scroll', handleScroll, true)
+    document.addEventListener('keydown', handleKeyDown)
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('scroll', handleScroll, true)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [position, onClose])
+  }, [mounted, onClose])
 
-  if (!position) return null
+  if (!mounted || !coords) return null
 
   // Adjust position to keep in viewport
   const style: React.CSSProperties = {
-    top: position.y,
-    left: position.x,
+    top: coords.y,
+    left: coords.x,
   }
 
-  // Simple viewport check (could be more robust)
-  if (position.x + 200 > window.innerWidth) {
+  // Simple viewport check
+  if (coords.x + 200 > window.innerWidth) {
     style.left = undefined
-    style.right = window.innerWidth - position.x
+    style.right = window.innerWidth - coords.x
   }
-  if (position.y + items.length * 36 > window.innerHeight) {
+  if (coords.y + cachedItems.length * 36 > window.innerHeight) {
     style.top = undefined
-    style.bottom = window.innerHeight - position.y
+    style.bottom = window.innerHeight - coords.y
   }
 
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-[9999] min-w-[180px] bg-white dark:bg-neutral-900 rounded-lg shadow-xl ring-1 ring-black/10 dark:ring-white/10 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+      className={`fixed z-[9999] min-w-[180px] bg-white dark:bg-neutral-900 rounded-lg shadow-xl ring-1 ring-black/10 dark:ring-white/10 py-1 overflow-hidden transition-all duration-150 ease-out origin-top-left ${
+        visible ? 'opacity-100 translate-y-0 scale-100 animate-pop' : 'opacity-0 translate-y-1 scale-95'
+      }`}
       style={style}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {items.map((item, i) => (
+      {cachedItems.map((item, i) => (
         <button
           key={i}
           className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors ${
