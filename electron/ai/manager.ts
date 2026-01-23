@@ -20,6 +20,7 @@ export class AIManager {
   private isEnabled = false;
   private restartAttempts = 0;
   private isReady = false;
+  private activeRequests: Map<string, http.ClientRequest> = new Map();
 
   constructor() {
     // Socket path will be initialized in start() once we have app.getPath('temp')
@@ -233,6 +234,10 @@ export class AIManager {
   }
 
   private setupIPC() {
+    ipcMain.on('ai:chat-cancel', (_, { id }) => {
+      this.cancelRequest(id);
+    });
+
     ipcMain.handle('ai:chat', async (_, { messages, max_tokens = 500 }) => {
       // Check if process is running and ready
       if (!this.process || !this.isReady) {
@@ -255,7 +260,7 @@ export class AIManager {
       }
 
       try {
-        await this.streamRequest({
+        await this.streamRequest(id, {
           model: 'ondevice',
           messages,
           max_tokens,
@@ -271,7 +276,16 @@ export class AIManager {
     });
   }
 
-  private streamRequest(payload: any, onChunk: (content: string) => void): Promise<void> {
+  private cancelRequest(requestId: string) {
+    const req = this.activeRequests.get(requestId);
+    if (req) {
+      req.destroy();
+      this.activeRequests.delete(requestId);
+      console.log(`[AI] Cancelled request ${requestId}`);
+    }
+  }
+
+  private streamRequest(requestId: string, payload: any, onChunk: (content: string) => void): Promise<void> {
     return new Promise((resolve, reject) => {
       const postData = JSON.stringify(payload);
 
@@ -321,6 +335,7 @@ export class AIManager {
         });
 
         res.on('end', () => {
+          this.activeRequests.delete(requestId);
           // Process any remaining buffer (unlikely to be valid if it didn't end with newline, but check)
           if (buffer.startsWith('data: ') && buffer !== 'data: [DONE]') {
              try {
@@ -333,12 +348,16 @@ export class AIManager {
         });
       });
 
+      this.activeRequests.set(requestId, req);
+
       req.on('timeout', () => {
+        this.activeRequests.delete(requestId);
         req.destroy();
         reject(new Error('Request timeout'));
       });
 
       req.on('error', (e) => {
+        this.activeRequests.delete(requestId);
         reject(e);
       });
 

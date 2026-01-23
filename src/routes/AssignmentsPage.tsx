@@ -3,7 +3,6 @@ import { useAppContext } from '../context/AppContext'
 import { useDueAssignments } from '../hooks/useCanvasQueries'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
-import { useQueryClient } from '@tanstack/react-query'
 import { CalendarClock } from 'lucide-react'
 import { CourseAvatar } from '../components/CourseAvatar'
 import { useCourseImages } from '../hooks/useCourseImages'
@@ -26,7 +25,6 @@ const LS_KANBAN = 'kanbanStatusByAssignment'
 
 export default function AssignmentsPage() {
   const ctx = useAppContext()
-  const queryClient = useQueryClient()
   const { courseImageUrl, prefetchCourseImage } = useCourseImages()
   const courses = ctx.courses || []
   const sidebar = ctx.sidebar

@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Wand2 } from 'lucide-react'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 type Props = {
   position: { x: number; y: number } | null
@@ -21,6 +23,57 @@ export const SummaryPopover: React.FC<Props> = ({
 }) => {
   const [style, setStyle] = useState<React.CSSProperties>({})
   const [isVisible, setIsVisible] = useState(false)
+  const [renderedHtml, setRenderedHtml] = useState<string>('')
+  
+  // Buffer logic for streaming text
+  const flushTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastRenderedTextLength = useRef<number>(0)
+
+  // Handle markdown rendering with newline buffering
+  useEffect(() => {
+    if (!text) {
+      setRenderedHtml('')
+      lastRenderedTextLength.current = 0
+      return
+    }
+
+    const renderMarkdown = async (markdownToRender: string) => {
+      try {
+        const rawHtml = await marked.parse(markdownToRender, { async: true })
+        const cleanHtml = DOMPurify.sanitize(rawHtml)
+        setRenderedHtml(cleanHtml)
+      } catch (e) {
+        console.error('Markdown rendering error:', e)
+      }
+    }
+
+    // Clear any pending flush
+    if (flushTimeoutRef.current) {
+      clearTimeout(flushTimeoutRef.current)
+    }
+
+    // Find the last newline
+    const lastNewlineIndex = text.lastIndexOf('\n')
+    
+    // If we have a newline we haven't rendered past yet...
+    if (lastNewlineIndex !== -1 && lastNewlineIndex > lastRenderedTextLength.current) {
+      // Render up to the newline
+      const safeText = text.substring(0, lastNewlineIndex + 1)
+      renderMarkdown(safeText)
+      lastRenderedTextLength.current = safeText.length
+    }
+
+    // Always set a debounce flush to render the "rest" (incomplete line)
+    // if the stream pauses or ends.
+    flushTimeoutRef.current = setTimeout(() => {
+      renderMarkdown(text)
+      lastRenderedTextLength.current = text.length
+    }, 150) // 150ms debounce for natural typing feel at end of sentences
+
+    return () => {
+      if (flushTimeoutRef.current) clearTimeout(flushTimeoutRef.current)
+    }
+  }, [text])
   
   // Handle visibility transition
   useEffect(() => {
@@ -106,7 +159,7 @@ export const SummaryPopover: React.FC<Props> = ({
         AI Summary
       </div>
       
-      <div className="min-h-[60px] text-sm text-slate-600 dark:text-neutral-300 leading-relaxed whitespace-pre-line">
+      <div className="min-h-[60px] text-sm text-slate-600 dark:text-neutral-300 leading-relaxed">
         {isLoading && !text ? (
           <div className="flex flex-col gap-2 animate-pulse">
             <div className="h-4 bg-slate-100 dark:bg-neutral-800 rounded w-3/4"></div>
@@ -114,7 +167,18 @@ export const SummaryPopover: React.FC<Props> = ({
             <div className="h-4 bg-slate-100 dark:bg-neutral-800 rounded w-full"></div>
           </div>
         ) : (
-          text
+          <div 
+            className="
+              [&_p]:mb-2 [&_p:last-child]:mb-0 
+              [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-2
+              [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:mb-2
+              [&_li]:mb-1
+              [&_strong]:font-semibold [&_strong]:text-slate-800 dark:[&_strong]:text-slate-200
+              [&_em]:italic
+              [&_a]:text-indigo-500 [&_a]:underline
+            "
+            dangerouslySetInnerHTML={{ __html: renderedHtml }} 
+          />
         )}
       </div>
     </div>,

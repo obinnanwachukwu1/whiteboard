@@ -214,7 +214,7 @@ export const CoursePeople: React.FC<Props> = ({ courseId }) => {
             <UsersRound className="w-4 h-4" />
             My Groups ({myGroups.length})
           </h4>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {myGroups.map(group => (
               <GroupCard 
                 key={group.id} 
@@ -263,7 +263,7 @@ export const CoursePeople: React.FC<Props> = ({ courseId }) => {
       </div>
       
       {/* Content */}
-      <div className="flex-1 overflow-y-auto min-h-0 pb-4">
+      <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
         {isLoading && (
           <div className="flex items-center gap-2 text-slate-500 dark:text-neutral-400 text-sm">
@@ -290,7 +290,7 @@ export const CoursePeople: React.FC<Props> = ({ courseId }) => {
                   <GraduationCap className="w-4 h-4" />
                   Instructors ({processedUsers.instructors.length})
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {processedUsers.instructors.map(user => (
                     <PersonCard key={user.id} user={user} />
                   ))}
@@ -305,7 +305,7 @@ export const CoursePeople: React.FC<Props> = ({ courseId }) => {
                   <BookOpen className="w-4 h-4" />
                   Teaching Assistants ({processedUsers.tas.length})
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {processedUsers.tas.map(user => (
                     <PersonCard key={user.id} user={user} />
                   ))}
@@ -320,7 +320,7 @@ export const CoursePeople: React.FC<Props> = ({ courseId }) => {
                   <UserCog className="w-4 h-4" />
                   Other ({processedUsers.others.length})
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {processedUsers.others.map(user => (
                     <PersonCard key={user.id} user={user} />
                   ))}
@@ -335,7 +335,7 @@ export const CoursePeople: React.FC<Props> = ({ courseId }) => {
                   <User className="w-4 h-4" />
                   Students ({processedUsers.students.length})
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {processedUsers.students.map(user => (
                     <PersonCard key={user.id} user={user} compact />
                   ))}

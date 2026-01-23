@@ -182,6 +182,7 @@ declare global {
     }
     system: {
       openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>
+      downloadFile: (fileId: string | number, suggestedName?: string) => Promise<{ ok: boolean; data?: string; error?: string }>
       getPdfPreloadPath: () => Promise<{ ok: boolean; data?: string; error?: string }>
     }
     electron: {

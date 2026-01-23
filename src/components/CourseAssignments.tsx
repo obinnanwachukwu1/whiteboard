@@ -22,7 +22,7 @@ export const CourseAssignments: React.FC<Props> = ({ courseId, onOpenDetail }) =
         {/* Optional: Add search/sort controls here later */}
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0 pb-4">
+      <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {showLoading && <div className="text-slate-500 dark:text-neutral-400 p-2">Loading…</div>}
         {assignmentsQ.error && <div className="text-red-600 p-2">{String((assignmentsQ.error as any).message || assignmentsQ.error)}</div>}
         
@@ -31,7 +31,7 @@ export const CourseAssignments: React.FC<Props> = ({ courseId, onOpenDetail }) =
         )}
         
         {!showLoading && !assignmentsQ.error && assignments.length > 0 && (
-          <ul className="list-none m-0 p-0 space-y-1 pb-4">
+          <ul className="list-none m-0 p-0 space-y-3 pb-4">
             {assignments.map((a, i) => {
               const dueStr = a.dueAt ? new Date(a.dueAt).toLocaleString() : null
               const restId = String((a._id ?? a.id ?? '') as any)

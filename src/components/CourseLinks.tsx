@@ -21,14 +21,14 @@ export const CourseLinks: React.FC<Props> = ({ courseId }) => {
         <h3 className="m-0 text-slate-900 dark:text-slate-100 text-base font-semibold">Course Links</h3>
       </div>
       
-      <div className="flex-1 overflow-y-auto min-h-0 pb-4">
+      <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
         {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
         {!isLoading && tabs && tabs.length === 0 && (
           <div className="text-slate-500 dark:text-neutral-400 text-sm">No links</div>
         )}
         {!isLoading && tabs && tabs.length > 0 && (
-          <ul className="list-none m-0 p-0 space-y-1">
+          <ul className="list-none m-0 p-0 space-y-3">
             {tabs
               .slice()
               .sort((a: any, b: any) => (Number(a.position || 0) - Number(b.position || 0)))

@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { useFileBytes, useFileMeta } from '../../hooks/useCanvasQueries'
-import { PdfToolbar } from './PdfToolbar'
+import { PdfToolbar } from './PdfToolbar.tsx'
 
 type Props = {
   fileId: string | number
@@ -63,9 +63,14 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
   const isUrlLoading = Boolean(fileUrlQ.isLoading || fileUrlQ.isFetching)
   const url = localUrl || remoteUrl || null
   
+  const systemRef = useRef(window.system as typeof window.system & {
+    getPdfPreloadPath?: () => Promise<{ ok: boolean; data?: string; error?: string }>
+    downloadFile?: (fileId: string | number, suggestedName?: string) => Promise<{ ok: boolean; data?: string; error?: string }>
+  })
+
   // Get the preload path from main process
   useEffect(() => {
-    window.system?.getPdfPreloadPath?.().then((result: { ok: boolean; data?: string; error?: string }) => {
+    systemRef.current.getPdfPreloadPath?.().then((result: { ok: boolean; data?: string; error?: string }) => {
       if (result.ok && result.data) {
         console.log('[PdfViewer] Got preload path:', result.data)
         setPreloadPath(result.data)
@@ -134,11 +139,6 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
         
       case 'SELECTION_MODE_CHANGED':
         setViewerState(prev => ({ ...prev, selectionMode: data.mode }))
-        break
-
-      case 'DOWNLOAD':
-        // Trigger file download by opening the file URL externally
-        window.open(viewerState.url, '_blank')
         break
 
       case 'ERROR':
@@ -231,9 +231,27 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
   }, [viewerState.isReady, sendCommand])
   
   // Toolbar command handler
-  const handleToolbarCommand = useCallback((command: PdfCommand) => {
+  const handleToolbarCommand = useCallback(async (command: PdfCommand) => {
+    if (command.type === 'DOWNLOAD') {
+      const filename =
+        (fileMetaQ.data as any)?.filename ||
+        (fileMetaQ.data as any)?.display_name ||
+        'document.pdf'
+
+      if (!window.system?.downloadFile) {
+        console.warn('[PdfViewer] downloadFile not available (preload not loaded)')
+        return
+      }
+      
+      const res = await window.system.downloadFile(fileId, filename)
+      if (!res?.ok) {
+        console.warn('[PdfViewer] Download failed:', res?.error)
+      }
+      return
+    }
+
     sendCommand(command)
-  }, [sendCommand])
+  }, [sendCommand, fileMetaQ.data, fileId])
   
   // Error state from file loading
   if (fileUrlQ.error) {

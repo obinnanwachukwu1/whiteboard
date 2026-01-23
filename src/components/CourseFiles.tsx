@@ -205,7 +205,7 @@ export const CourseFiles: React.FC<Props> = ({ courseId, currentFolderId, onFold
       </div>
       
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto min-h-0 pb-4">
+      <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
         {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
         
@@ -232,7 +232,7 @@ export const CourseFiles: React.FC<Props> = ({ courseId, currentFolderId, onFold
               <div className="text-slate-500 dark:text-neutral-400 text-sm">No items in this folder</div>
             )}
             {!filesQ.isLoading && combinedItems.length > 0 && (
-              <ul className="list-none m-0 p-0 space-y-1">
+              <ul className="list-none m-0 p-0 space-y-3">
                 {combinedItems.map((item) => {
                   if (item.type === 'folder') {
                     const f = item.data

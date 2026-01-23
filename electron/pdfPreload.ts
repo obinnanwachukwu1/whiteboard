@@ -12,7 +12,7 @@
  */
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { contextBridge, ipcRenderer } = require('electron') as typeof import('electron')
+const { contextBridge: pdfContextBridge, ipcRenderer: pdfIpcRenderer } = require('electron') as typeof import('electron')
 
 // Valid command types that can be received from parent
 const VALID_COMMANDS = new Set([
@@ -46,7 +46,7 @@ const VALID_EVENTS = new Set([
 let commandHandler: ((command: any) => void) | null = null
 
 // Listen for commands from parent renderer via IPC
-ipcRenderer.on('pdf-command', (_event, command) => {
+pdfIpcRenderer.on('pdf-command', (_event, command) => {
   // Validate command has required type
   if (!command || typeof command !== 'object' || !command.type) {
     console.warn('[pdfPreload] Invalid command received:', command)
@@ -66,7 +66,7 @@ ipcRenderer.on('pdf-command', (_event, command) => {
 })
 
 // Expose minimal bridge API to the webview content
-contextBridge.exposeInMainWorld('pdfBridge', {
+pdfContextBridge.exposeInMainWorld('pdfBridge', {
   /**
    * Register a callback to receive commands from parent
    */
@@ -96,7 +96,7 @@ contextBridge.exposeInMainWorld('pdfBridge', {
     const sanitizedEvent = sanitizePayload(event)
     
     // Send to parent via IPC
-    ipcRenderer.sendToHost('pdf-event', sanitizedEvent)
+    pdfIpcRenderer.sendToHost('pdf-event', sanitizedEvent)
   },
 })
 

@@ -91,7 +91,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
         <h3 className="m-0 text-slate-900 dark:text-slate-100 text-base font-semibold">Modules</h3>
       </div>
       
-      <div className="flex-1 overflow-y-auto min-h-0 pb-4">
+      <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
         {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
         {!isLoading && modules && modules.length === 0 && (
@@ -109,7 +109,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
                 
                 {/* Module items as card-style list */}
                 {(m.moduleItemsConnection?.nodes?.length ?? 0) > 0 && (
-                  <ul className="list-none m-0 p-0 space-y-1">
+                  <ul className="list-none m-0 p-0 space-y-3">
                     {m.moduleItemsConnection?.nodes?.map((it: CanvasModuleItem, j: number) => {
                       const title = it.title || 'Item'
                       const kind = labelFor(it)

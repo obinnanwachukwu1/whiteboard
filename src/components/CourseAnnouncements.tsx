@@ -40,14 +40,14 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
         <h3 className="m-0 text-slate-900 dark:text-slate-100 text-base font-semibold">Announcements</h3>
       </div>
       
-      <div className="flex-1 overflow-y-auto min-h-0 pb-4">
+      <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
         {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
         {!isLoading && list && list.length === 0 && (
           <div className="text-slate-500 dark:text-neutral-400 text-sm">No announcements</div>
         )}
         {!isLoading && list && list.length > 0 && (
-          <ul className="list-none m-0 p-0 space-y-1">
+          <ul className="list-none m-0 p-0 space-y-3">
             {list.map((a: any, i: number) => {
               const posted = a?.posted_at ? new Date(a.posted_at).toLocaleString() : ''
               const menuId = String(a.id)

@@ -106,10 +106,17 @@ export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick }) => 
       }, 600) // 600ms delay
     } else {
       setShowPopover(false)
+      // Cancel stream if hovering away
+      if (streamCleanupRef.current) {
+        streamCleanupRef.current()
+        streamCleanupRef.current = null
+      }
+      setStreaming(false)
+      setSummaryText(null)
     }
     
     return () => clearTimeout(timer)
-  }, [isHovered, showAI, summaryText, streaming, item.message, item.title, streamSummarize, showPopover])
+  }, [isHovered, showAI, showPopover, item.message, item.title, streamSummarize])
 
   // Cleanup stream on unmount
   useEffect(() => {

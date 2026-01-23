@@ -1,6 +1,6 @@
 import React from 'react'
 import { useCourses } from '../hooks/useCanvasQueries'
-import { useQueryClient, useQueries } from '@tanstack/react-query'
+import { useQueries } from '@tanstack/react-query'
 import { BookOpen, MessageCircle, Pin, Lock } from 'lucide-react'
 import { useAppContext } from '../context/AppContext'
 import { Badge } from '../components/ui/Badge'
@@ -12,7 +12,6 @@ import { useCourseImages } from '../hooks/useCourseImages'
 
 export default function DiscussionsPage() {
   const ctx = useAppContext()
-  const queryClient = useQueryClient()
   const { courseImageUrl, prefetchCourseImage } = useCourseImages()
   const coursesQ = useCourses()
   const courses = ctx.courses || coursesQ.data || []

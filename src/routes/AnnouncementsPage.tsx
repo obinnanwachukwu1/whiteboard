@@ -1,6 +1,5 @@
 import React from 'react'
 import { useActivityAnnouncements } from '../hooks/useCanvasQueries'
-import { useQueryClient } from '@tanstack/react-query'
 import { BookOpen, Megaphone } from 'lucide-react'
 import { useAppContext } from '../context/AppContext'
 import { Badge } from '../components/ui/Badge'
@@ -23,7 +22,6 @@ function extractIdFromUrl(url?: string, key?: string): string | null {
 
 export default function AnnouncementsPage() {
   const ctx = useAppContext()
-  const queryClient = useQueryClient()
   const { courseImageUrl, prefetchCourseImage } = useCourseImages()
   const courses = ctx.courses || []
   const sidebar = ctx.sidebar

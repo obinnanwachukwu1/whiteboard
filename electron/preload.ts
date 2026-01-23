@@ -117,6 +117,7 @@ contextBridge.exposeInMainWorld('ai', {
     
     return () => {
       ipcRenderer.removeListener('ai:stream:chunk', chunkHandler);
+      ipcRenderer.send('ai:chat-cancel', { id });
     };
   }
 })

@@ -99,7 +99,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto min-h-0 pb-4">
+      <div className="flex-1 overflow-auto min-h-0 p-4">
         {(isLoading || (isFetching && !data)) && (
           <div className="text-slate-500 dark:text-neutral-400">Loading…</div>
         )}
@@ -288,7 +288,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
             </div>
 
             {/* Mobile Card View */}
-            <div className="md:hidden space-y-3">
+            <div className="md:hidden space-y-4">
               {(() => {
                 const groupsById = new Map<string, any>(groups.map((g: any) => [String(g.id), g]))
                 const byGroup: Record<string, any[]> = {}
