@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react'
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ArrowLeftRight } from 'lucide-react'
 import { Button } from './ui/Button'
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
@@ -334,17 +334,41 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) =
   }
 
   return (
-    <div ref={containerRef} className={`flex flex-col h-full ${className}`}>
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-neutral-700 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-sm shrink-0">
-        {/* Page navigation */}
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={goPrev} disabled={currentPage <= 1} title="Previous page">
+    <div ref={containerRef} className={`relative flex flex-col h-full min-h-0 overflow-hidden ${className}`}>
+      {/* PDF Pages Container */}
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 min-h-0 overflow-auto bg-gray-100 dark:bg-neutral-800"
+        style={{ minHeight: fullscreen ? '100%' : undefined }}
+      >
+        <div className="flex flex-col items-center py-8 px-4 gap-4 min-w-fit pb-24">
+          {Array.from({ length: numPages }, (_, i) => (
+            <PageRenderer
+              key={i + 1}
+              pdf={pdf}
+              pageNumber={i + 1}
+              scale={scale}
+              onRef={(el) => {
+                if (el) pageRefs.current.set(i + 1, el)
+                else pageRefs.current.delete(i + 1)
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Floating Toolbar */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md shadow-xl rounded-full border border-gray-200 dark:border-neutral-700 z-10">
+        
+        {/* Page Navigation Group */}
+        <div className="flex items-center gap-1 pr-3 border-r border-gray-200 dark:border-neutral-700">
+          <Button variant="ghost" size="sm" onClick={goPrev} disabled={currentPage <= 1} title="Previous page" className="h-8 w-8 p-0 rounded-full">
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <div className="flex items-center gap-1.5">
+          
+          <div className="flex items-center gap-1 px-1">
             <input
-              className="w-12 px-2 py-1 text-sm text-center rounded border border-gray-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-8 py-0.5 text-sm text-center bg-transparent border-none focus:outline-none focus:ring-0 font-medium"
               value={pageInputValue}
               onFocus={() => setPageInputEditing(true)}
               onChange={(e) => setPageInputValue(e.target.value.replace(/\D/g, ''))}
@@ -360,53 +384,35 @@ export const PdfViewer = React.forwardRef<PdfViewerHandle, Props>((props, ref) =
               }}
               aria-label="Current page"
             />
-            <span className="text-sm text-gray-600 dark:text-gray-400">/ {numPages}</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400 font-normal">/ {numPages}</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={goNext} disabled={currentPage >= numPages} title="Next page">
+
+          <Button variant="ghost" size="sm" onClick={goNext} disabled={currentPage >= numPages} title="Next page" className="h-8 w-8 p-0 rounded-full">
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
 
-        {/* Zoom controls */}
+        {/* Zoom Group */}
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={zoomOut} title="Zoom out (Ctrl+-)">
+          <Button variant="ghost" size="sm" onClick={zoomOut} title="Zoom out (Ctrl+-)" className="h-8 w-8 p-0 rounded-full">
             <ZoomOut className="w-4 h-4" />
           </Button>
-          <span className="w-14 text-center text-sm font-medium text-gray-700 dark:text-gray-300">
+          
+          <button 
+            onClick={resetZoom}
+            className="w-12 text-center text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            title="Reset Zoom"
+          >
             {Math.round(scale * 100)}%
-          </span>
-          <Button variant="ghost" size="sm" onClick={zoomIn} title="Zoom in (Ctrl++)">
+          </button>
+          
+          <Button variant="ghost" size="sm" onClick={zoomIn} title="Zoom in (Ctrl++)" className="h-8 w-8 p-0 rounded-full">
             <ZoomIn className="w-4 h-4" />
           </Button>
-          <div className="w-px h-4 bg-gray-300 dark:bg-neutral-600 mx-1" />
-          <Button variant="ghost" size="sm" onClick={resetZoom} title="Reset zoom (Ctrl+0)">
-            <RotateCcw className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={fitToWidth} title="Fit to width">
-            <Maximize2 className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
 
-      {/* PDF Pages Container */}
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 overflow-auto bg-gray-100 dark:bg-neutral-800"
-        style={{ minHeight: fullscreen ? '100%' : undefined }}
-      >
-        <div className="flex flex-col items-center py-6 px-4 gap-4 min-w-fit">
-          {Array.from({ length: numPages }, (_, i) => (
-            <PageRenderer
-              key={i + 1}
-              pdf={pdf}
-              pageNumber={i + 1}
-              scale={scale}
-              onRef={(el) => {
-                if (el) pageRefs.current.set(i + 1, el)
-                else pageRefs.current.delete(i + 1)
-              }}
-            />
-          ))}
+          <Button variant="ghost" size="sm" onClick={fitToWidth} title="Fit to width" className="h-8 w-8 p-0 rounded-full ml-1">
+            <ArrowLeftRight className="w-4 h-4" />
+          </Button>
         </div>
       </div>
     </div>

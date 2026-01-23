@@ -5,7 +5,6 @@ import { HtmlContent } from './HtmlContent'
 import { FileViewer } from './FileViewer'
 import { useAssignmentRest, useCoursePage, useAnnouncement } from '../hooks/useCanvasQueries'
 import { FullscreenContainer } from './FullscreenContainer'
-import { useQueryClient } from '@tanstack/react-query'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
 import { useAIPanel } from '../context/AIPanelContext'
 import { useAppContext } from '../context/AppContext'
@@ -31,7 +30,6 @@ export const CanvasContentView: React.FC<Props> = ({
   onBack,
   onNavigate,
 }) => {
-  const qc = useQueryClient()
   const app = useAppContext()
   const aiPanel = useAIPanel()
   
@@ -103,37 +101,25 @@ export const CanvasContentView: React.FC<Props> = ({
 
   if (contentType === 'file') {
     return (
-      <div className="flex flex-col min-h-0">
-        {/* Constrain viewer to viewport height so inner content scrolls */}
-        <div className="h-[80vh] min-h-0 overflow-hidden">
-          <FullscreenContainer className="h-full">
+      <div className="flex flex-col min-h-0 h-full overflow-hidden">
+        {/* Constrain viewer to available height so inner content scrolls */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <FullscreenContainer className="flex flex-col min-h-0 h-full">
           {({ isFullscreen, toggle }) => (
-            <div className="flex flex-col h-full min-h-0">
+            <div className="flex flex-col min-h-0 h-full">
               <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60 backdrop-blur">
                 <Button variant="ghost" size="sm" onClick={onBack}>
                   <ArrowLeft className="w-4 h-4 mr-1" /> Back
                 </Button>
                 <div className="text-sm font-medium truncate flex-1">{title}</div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    // Trigger refresh for file by invalidating related queries
-                    qc.invalidateQueries({ queryKey: ['file-meta', contentId] })
-                    qc.invalidateQueries({ queryKey: ['file-bytes', contentId] })
-                  }}
-                  title="Refresh"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </Button>
                 <Button variant="ghost" size="sm" onClick={toggle} title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>
                   {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                 </Button>
               </div>
-              <div className="flex-1 min-h-0 overflow-auto">
+              <div className="flex-1 min-h-0 overflow-hidden">
                 <FileViewer 
                   fileId={contentId} 
-                  className="h-full" 
+                  className="h-full w-full" 
                   isFullscreen={isFullscreen}
                   courseId={courseId}
                   courseName={courseName}
