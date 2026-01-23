@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, Hand, Type } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, Hand } from 'lucide-react'
 
 type PdfCommand = {
   type: string
@@ -200,28 +200,17 @@ export const PdfToolbar: React.FC<Props> = ({
           </button>
         </div>
         
-        {/* Selection Mode */}
+        {/* Hand Mode Toggle */}
         <div className="flex items-center gap-1 pl-3 border-l border-gray-200 dark:border-neutral-700">
           <button
-            onClick={() => handleSelectionModeToggle('hand')}
+            onClick={() => handleSelectionModeToggle(selectionMode === 'hand' ? 'text' : 'hand')}
             className={`p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/10 ${
               selectionMode === 'hand' ? 'bg-black/10 dark:bg-white/20' : ''
             }`}
-            title="Hand tool (drag to pan)"
+            title={selectionMode === 'hand' ? 'Switch to text selection' : 'Switch to hand tool (drag to pan)'}
             type="button"
           >
             <Hand className="w-4 h-4" />
-          </button>
-          
-          <button
-            onClick={() => handleSelectionModeToggle('text')}
-            className={`p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/10 ${
-              selectionMode === 'text' ? 'bg-black/10 dark:bg-white/20' : ''
-            }`}
-            title="Text selection"
-            type="button"
-          >
-            <Type className="w-4 h-4" />
           </button>
         </div>
         

@@ -40,17 +40,33 @@
       right: 0;
       bottom: 0;
       overflow: auto;
+      /* GPU acceleration for smooth scrolling */
+      transform: translateZ(0);
+      -webkit-overflow-scrolling: touch;
     }
     
     #viewer {
       /* pdf.js viewer container */
       min-height: 100%;
+      /* Allow horizontal expansion for scrolling */
+      display: inline-block;
+      min-width: 100%;
     }
     
     .pdfViewer .page {
       margin: 8px auto 24px auto;
       border: none !important;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      /* Force each page onto its own compositor layer */
+      will-change: transform;
+      transform: translateZ(0);
+      backface-visibility: hidden;
+    }
+    
+    .pdfViewer .page canvas {
+      /* GPU-accelerated canvas rendering */
+      will-change: transform;
+      image-rendering: -webkit-optimize-contrast;
     }
     
     html.dark .pdfViewer .page {
@@ -101,8 +117,17 @@
       opacity: 1; /* layer itself visible so pointer-events work */
     }
     
-    /* During active zoom gesture, hide text layer entirely to prevent flashing */
+    /* During active zoom gesture, optimize for performance */
     .pdfViewer.zooming .textLayer {
+      visibility: hidden !important;
+    }
+    
+    .pdfViewer.zooming .page {
+      /* Disable expensive effects during zoom */
+      box-shadow: none !important;
+    }
+    
+    .pdfViewer.zooming .annotationLayer {
       visibility: hidden !important;
     }
     

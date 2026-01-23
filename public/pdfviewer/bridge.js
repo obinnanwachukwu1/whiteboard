@@ -261,6 +261,8 @@
         pinchActive = true;
         pinchStartScale = pdfViewer.currentScale || 1;
         pinchAccumulatedDelta = 0;
+        
+        // Simple anchor: store scroll + cursor offset as content position
         pinchAnchor = {
           contentX: viewerContainer.scrollLeft + viewportX,
           contentY: viewerContainer.scrollTop + viewportY,
@@ -294,10 +296,10 @@
 
         pdfViewer.currentScale = desiredScale;
 
-        // Cursor anchored scroll correction
+        // Simple cursor-anchored zoom
         const ratio = desiredScale / pinchStartScale;
-        viewerContainer.scrollLeft = pinchAnchor.contentX * ratio - pinchAnchor.viewportX;
-        viewerContainer.scrollTop = pinchAnchor.contentY * ratio - pinchAnchor.viewportY;
+        viewerContainer.scrollLeft = Math.max(0, pinchAnchor.contentX * ratio - pinchAnchor.viewportX);
+        viewerContainer.scrollTop = Math.max(0, pinchAnchor.contentY * ratio - pinchAnchor.viewportY);
       });
 
       // Consider the pinch ended after a short pause in wheel events
@@ -471,6 +473,28 @@
   }
   
   /**
+   * Zoom with center anchoring (for button zoom)
+   */
+  function zoomToScale(newScale) {
+    if (!pdfViewer || !viewerContainer) return;
+    
+    const oldScale = pdfViewer.currentScale;
+    const ratio = newScale / oldScale;
+    
+    // Anchor on viewport center
+    const viewportCenterX = viewerContainer.clientWidth / 2;
+    const viewportCenterY = viewerContainer.clientHeight / 2;
+    const contentX = viewerContainer.scrollLeft + viewportCenterX;
+    const contentY = viewerContainer.scrollTop + viewportCenterY;
+    
+    pdfViewer.currentScale = newScale;
+    
+    // Adjust scroll to keep center in place
+    viewerContainer.scrollLeft = Math.max(0, contentX * ratio - viewportCenterX);
+    viewerContainer.scrollTop = Math.max(0, contentY * ratio - viewportCenterY);
+  }
+
+  /**
    * Zoom in to next zoom level
    */
   function zoomIn() {
@@ -481,13 +505,13 @@
     // Find next zoom level
     for (const level of ZOOM_LEVELS) {
       if (level > currentScale + 0.01) {
-        pdfViewer.currentScale = level;
+        zoomToScale(level);
         return;
       }
     }
     
     // If at max, stay there
-    pdfViewer.currentScale = ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+    zoomToScale(ZOOM_LEVELS[ZOOM_LEVELS.length - 1]);
   }
   
   /**
@@ -501,13 +525,13 @@
     // Find previous zoom level
     for (let i = ZOOM_LEVELS.length - 1; i >= 0; i--) {
       if (ZOOM_LEVELS[i] < currentScale - 0.01) {
-        pdfViewer.currentScale = ZOOM_LEVELS[i];
+        zoomToScale(ZOOM_LEVELS[i]);
         return;
       }
     }
     
     // If at min, stay there
-    pdfViewer.currentScale = ZOOM_LEVELS[0];
+    zoomToScale(ZOOM_LEVELS[0]);
   }
   
   /**
