@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'react'
-import { useActivityAnnouncements } from './useCanvasQueries'
+import { useActivityAnnouncements, useCourses } from './useCanvasQueries'
 import {
   getReadAnnouncementIds,
   markAnnouncementRead,
@@ -34,6 +34,18 @@ export function useUnreadAnnouncements(options?: {
   includeRead?: boolean
 }) {
   const { limit = 10, maxAgeHours = 72, includeRead = false } = options ?? {}
+  
+  // Fetch courses to resolve course names
+  const { data: courses } = useCourses()
+  const courseNameMap = useMemo(() => {
+    const map = new Map<string, string>()
+    if (courses) {
+      for (const course of courses) {
+        map.set(String(course.id), course.name)
+      }
+    }
+    return map
+  }, [courses])
   
   // Track read state changes to trigger re-renders
   const [readVersion, setReadVersion] = useState(0)
@@ -96,7 +108,7 @@ export function useUnreadAnnouncements(options?: {
         id: ann.html_url || topicId,
         topicId,
         courseId,
-        courseName: String(courseId),
+        courseName: courseNameMap.get(String(courseId)) || String(courseId),
         title: ann.title || 'Announcement',
         message: ann.message, // Capture message
         postedAt,
@@ -113,7 +125,7 @@ export function useUnreadAnnouncements(options?: {
     })
     
     return normalized.slice(0, limit)
-  }, [query.data, limit, maxAgeHours, includeRead, readVersion])
+  }, [query.data, limit, maxAgeHours, includeRead, readVersion, courseNameMap])
   
   // Methods to mark as read/unread
   const markRead = useCallback((topicId: string) => {

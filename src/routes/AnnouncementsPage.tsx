@@ -7,6 +7,8 @@ import { Badge } from '../components/ui/Badge'
 import { ListItemRow } from '../components/ui/ListItemRow'
 import { formatDateTime } from '../utils/dateFormat'
 import { SkeletonList } from '../components/Skeleton'
+import { CourseAvatar } from '../components/CourseAvatar'
+import { useCourseImages } from '../hooks/useCourseImages'
 
 function extractIdFromUrl(url?: string, key?: string): string | null {
   if (!url || !key) return null
@@ -22,12 +24,11 @@ function extractIdFromUrl(url?: string, key?: string): string | null {
 export default function AnnouncementsPage() {
   const ctx = useAppContext()
   const queryClient = useQueryClient()
+  const { courseImageUrl, prefetchCourseImage } = useCourseImages()
   const courses = ctx.courses || []
   const sidebar = ctx.sidebar
   const annsQ = useActivityAnnouncements(200)
   const [courseFilter, setCourseFilter] = React.useState<string>('all')
-  const [imgStore, setImgStore] = React.useState<Record<string, Record<string, string>>>({})
-  React.useEffect(() => { (async () => { try { const cfg = await window.settings.get?.(); const map = (cfg?.ok ? (cfg.data as any)?.courseImages : undefined) || {}; setImgStore(map) } catch {} })() }, [])
 
   const orderedCourses = React.useMemo(() => {
     const hidden = new Set(sidebar?.hiddenCourseIds || [])
@@ -55,30 +56,14 @@ export default function AnnouncementsPage() {
       .filter((x: any) => (courseFilter === 'all' ? true : String(x.courseId) === courseFilter))
   }, [annsQ.data, orderedCourses, courseFilter, sidebar?.customNames])
 
-  // Visual helpers
-  function hashString(input: string) { let h = 0; for (let i = 0; i < input.length; i++) h = (h << 5) - h + input.charCodeAt(i); return Math.abs(h) }
-  function courseHueFor(id: string | number, fallback: string) { const key = `${id}|${fallback}`; return hashString(key) % 360 }
-  function courseImageUrl(courseId?: string | number | null): string | undefined {
-    if (courseId == null) return undefined
-    const stored = (imgStore?.[ctx.baseUrl] || {})[String(courseId)]
-    if (stored) return stored
-    const info = queryClient.getQueryData<any>(['course-info', String(courseId)]) as any
-    const url = info?.image_download_url || info?.image_url
-    return typeof url === 'string' && url ? url : undefined
-  }
-
   // Prefetch course info for listed announcements (for images)
   React.useEffect(() => {
     const ids = new Set<string>()
     for (const a of list) { if (a.courseId != null) ids.add(String(a.courseId)) }
     ids.forEach((id) => {
-      queryClient.prefetchQuery({
-        queryKey: ['course-info', id],
-        queryFn: async () => { const res = await window.canvas.getCourseInfo?.(id); if (!res?.ok) throw new Error(res?.error || 'Failed to load course info'); return res.data || null },
-        staleTime: 1000 * 60 * 60 * 24 * 7,
-      }).catch(() => {})
+      prefetchCourseImage(id)
     })
-  }, [list, queryClient])
+  }, [list, prefetchCourseImage])
 
   return (
     <div className="space-y-3">
@@ -114,16 +99,16 @@ export default function AnnouncementsPage() {
               else if (cid != null) ctx.onOpenCourse(cid)
             }
             const img = courseImageUrl(a.courseId)
-            const hue = courseHueFor(a.courseId || '', a.courseName || '')
-            const fallback = `linear-gradient(135deg, hsl(${hue} 75% 62%), hsl(${(hue + 24) % 360} 85% 50%))`
             
             return (
               <ListItemRow
                 key={i}
                 icon={
-                  <div
-                    className="w-full h-full rounded-full bg-center bg-cover"
-                    style={img ? { backgroundImage: `url(${img})` } : { background: fallback }}
+                  <CourseAvatar
+                    courseId={a.courseId || ''}
+                    courseName={a.courseName}
+                    src={img}
+                    className="w-full h-full rounded-full"
                   />
                 }
                 title={a.title}

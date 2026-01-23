@@ -3,11 +3,11 @@ import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
 import { CalendarClock } from 'lucide-react'
-import { courseHueFor } from '../../utils/colorHelpers'
 import { extractAssignmentIdFromUrl } from '../../utils/urlHelpers'
 import { formatDateTime } from '../../utils/dateFormat'
 import type { DueItem } from '../../hooks/useDashboardData'
 import { SkeletonList } from '../Skeleton'
+import { CourseAvatar } from '../CourseAvatar'
 
 type Props = {
   due: DueItem[]
@@ -49,8 +49,6 @@ export const AssignmentList: React.FC<Props> = ({ due, loading, onOpenAssignment
               }
               const cid = d.course_id
               const img = courseImageUrl(cid)
-              const hue = courseHueFor(cid, d.course_name || String(cid))
-              const fallback = `linear-gradient(135deg, hsl(${hue} 75% 62%), hsl(${(hue + 24) % 360} 85% 50%))`
               return (
                 <li className="py-1" key={i}>
                   <div
@@ -60,10 +58,15 @@ export const AssignmentList: React.FC<Props> = ({ due, loading, onOpenAssignment
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
                     className="cursor-pointer rounded-md px-2 sm:px-3 py-2 transition-transform duration-200 ease-out hover:scale-[1.02] hover:shadow-sm ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10"
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-full ring-1 ring-black/10 dark:ring-white/10 overflow-hidden bg-center bg-cover flex-shrink-0" style={img ? { backgroundImage: `url(${img})` } : { background: fallback }} />
-                        <div className="min-w-0">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <CourseAvatar
+                            courseId={cid}
+                            courseName={d.course_name}
+                            src={img}
+                            className="w-10 h-10 rounded-full ring-1 ring-black/10 dark:ring-white/10"
+                          />
+                          <div className="min-w-0">
                           <div className="font-medium truncate" title={d.name}>
                             {d.name}
                           </div>

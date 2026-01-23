@@ -4,6 +4,11 @@ import { ipcRenderer, contextBridge } from 'electron'
 contextBridge.exposeInMainWorld('electron', {
   onMainProcessMessage: (callback: (message: string) => void) => {
     return ipcRenderer.on('main-process-message', (_event, message) => callback(message))
+  },
+  onMenuAction: (callback: (action: string) => void) => {
+    const handler = (_event: any, action: string) => callback(action)
+    ipcRenderer.on('menu:action', handler)
+    return () => ipcRenderer.removeListener('menu:action', handler)
   }
 })
 
@@ -26,6 +31,7 @@ contextBridge.exposeInMainWorld('canvas', {
   getFileBytes: async (fileId: string | number) => {
     return ipcRenderer.invoke('canvas:getFileBytes', fileId)
   },
+  cacheCourseImage: (courseId: string | number, url: string) => ipcRenderer.invoke('canvas:cacheCourseImage', courseId, url),
   listAssignmentsWithSubmission: (courseId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listAssignmentsWithSubmission', courseId, perPage),
   listAssignmentGroups: (courseId: string | number, includeAssignments?: boolean) => ipcRenderer.invoke('canvas:listAssignmentGroups', courseId, includeAssignments),
   listMyEnrollmentsForCourse: (courseId: string | number) => ipcRenderer.invoke('canvas:listMyEnrollmentsForCourse', courseId),

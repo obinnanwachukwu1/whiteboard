@@ -148,7 +148,21 @@ export function useDashboardData({ courses, sidebar, due, loading }: UseDashboar
           })
           try {
             const url = (data as any)?.image_download_url || (data as any)?.image_url
-            if (url) await persistImages([[id, url]])
+            if (url) {
+              // Try to cache locally to handle auth headers/CORS
+              try {
+                const canvas = window.canvas as any
+                const res = await canvas.cacheCourseImage?.(id, url)
+                if (res?.ok && res.data) {
+                  await persistImages([[id, res.data]])
+                  return
+                }
+              } catch (err) {
+                console.warn('Failed to cache course image, falling back to remote url', err)
+              }
+              // Fallback
+              await persistImages([[id, url]])
+            }
           } catch {}
         })
       })

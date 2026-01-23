@@ -5,8 +5,11 @@ export function hashString(input: string) {
 }
 
 export function courseHueFor(id: string | number, fallback: string) {
-  const key = `${id}|${fallback}`
-  return hashString(key) % 360
+  // Use the ID if available to ensure consistent colors across views.
+  // Fallback to the name/label only if ID is missing.
+  const key = (id && String(id) !== '') ? String(id) : fallback
+  // Multiply by a prime to scatter the hash values more evenly
+  return (hashString(key) * 137) % 360
 }
 
 export function courseInitials(name?: string, courseCode?: string) {

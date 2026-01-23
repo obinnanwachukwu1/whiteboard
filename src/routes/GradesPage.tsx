@@ -11,6 +11,8 @@ import { PromptModal, ConfirmModal, ActionSheetModal } from '../components/ui/Mo
 import { GpaTrends } from '../components/GpaTrends'
 import { CourseGradeCard, GpaStatsCards, SemesterGoalCard } from '../components/grades'
 import type { DegreeAuditData } from '../utils/degreeAudit'
+import { courseHueFor } from '../utils/colorHelpers'
+import { useCourseImages } from '../hooks/useCourseImages'
 
 type GpaThreshold = { min: number; gpa: number }
 const defaultGpaMap: GpaThreshold[] = [
@@ -33,9 +35,8 @@ export default function GradesPage() {
   const courses = ctx.courses || []
   const sidebar = ctx.sidebar
   const qc = useQueryClient()
+  const { courseImageUrl, prefetchCourseImage } = useCourseImages()
   const [courseFilter, setCourseFilter] = React.useState<string>('all')
-  const [imgStore, setImgStore] = React.useState<Record<string, Record<string, string>>>({})
-  React.useEffect(() => { (async () => { try { const cfg = await window.settings.get?.(); const map = (cfg?.ok ? (cfg.data as any)?.courseImages : undefined) || {}; setImgStore(map) } catch {} })() }, [])
   const [creditsByCourse, setCreditsByCourse] = React.useState<Record<string, number>>({})
   const [targetPctByCourse, setTargetPctByCourse] = React.useState<Record<string, string>>({})
   const [priorTotals, setPriorTotals] = React.useState<{ credits: string; gpa: string }>({ credits: '', gpa: '' })
@@ -239,27 +240,13 @@ export default function GradesPage() {
   }, [rows, creditsByCourse, targetPctByCourse, priorTotals, degreeAudit])
 
   // Image helpers
-  function hashString(input: string) { let h = 0; for (let i = 0; i < input.length; i++) h = (h << 5) - h + input.charCodeAt(i); return Math.abs(h) }
-  function courseHueFor(id: string | number, fallback: string) { const key = `${id}|${fallback}`; return hashString(key) % 360 }
-  function courseImageUrl(courseId?: string | number | null): string | undefined {
-    if (courseId == null) return undefined
-    const stored = (imgStore?.[ctx.baseUrl] || {})[String(courseId)]
-    if (stored) return stored
-    const info = qc.getQueryData<any>(['course-info', String(courseId)]) as any
-    const url = info?.image_download_url || info?.image_url
-    return typeof url === 'string' && url ? url : undefined
-  }
   React.useEffect(() => {
     const ids = new Set<string>()
     for (const r of rows) { if (r.c?.id != null) ids.add(String(r.c.id)) }
     ids.forEach((id) => {
-      qc.prefetchQuery({
-        queryKey: ['course-info', id],
-        queryFn: async () => { const res = await window.canvas.getCourseInfo?.(id); if (!res?.ok) throw new Error(res?.error || 'Failed to load course info'); return res.data || null },
-        staleTime: 1000 * 60 * 60 * 24 * 7,
-      }).catch(() => {})
+      prefetchCourseImage(id)
     })
-  }, [rows, qc])
+  }, [rows, prefetchCourseImage])
 
   const [targetsOpen, setTargetsOpen] = React.useState(false)
   const targetsBtnRef = React.useRef<HTMLButtonElement | null>(null)
@@ -546,7 +533,6 @@ export default function GradesPage() {
                 viewMode={viewMode}
                 planOpen={!!planOpenByCourse[idStr]}
                 imageUrl={courseImageUrl(c.id)}
-                hue={courseHueFor(c.id, c.name || '')}
                 toGpa={toGpa}
                 onNavigate={() => navigate({ to: '/course/$courseId', params: { courseId: idStr }, search: { tab: 'grades' } })}
                 onTogglePlan={() => setPlanOpenByCourse((prev) => ({ ...prev, [idStr]: !prev[idStr] }))}

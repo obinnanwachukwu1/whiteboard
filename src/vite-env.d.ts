@@ -145,6 +145,7 @@ declare global {
       getFile: (fileId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
       // Returns a canvas-file:// URL to the local file
       getFileBytes: (fileId: string | number) => Promise<{ ok: boolean; data?: string; error?: string }>
+      cacheCourseImage: (courseId: string | number, url: string) => Promise<{ ok: boolean; data?: string; error?: string }>
       listAssignmentsWithSubmission: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
       listAssignmentGroups: (courseId: string | number, includeAssignments?: boolean) => Promise<{ ok: boolean; data?: any; error?: string }>
       listMyEnrollmentsForCourse: (courseId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
@@ -183,6 +184,7 @@ declare global {
     }
     electron: {
       onMainProcessMessage: (callback: (message: string) => void) => void
+      onMenuAction: (callback: (action: string) => void) => () => void
     }
   }
 }

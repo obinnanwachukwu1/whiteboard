@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Megaphone, Calendar, Check, Wand2 } from 'lucide-react'
 import type { ActivityFeedItem } from '../../hooks/useActivityFeed'
 import { formatActivityTime } from '../../hooks/useActivityFeed'
+import { cleanCourseName } from '../../utils/courseName'
 import { useAI } from '../../hooks/useAI'
 import { useAppContext } from '../../context/AppContext'
 
@@ -60,7 +61,7 @@ export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick }) => 
           onClick?.()
         }
       }}
-      className="group flex flex-col px-3 py-2 rounded-lg cursor-pointer
+      className="group relative flex flex-col px-3 py-2 rounded-lg cursor-pointer
                  transition-all duration-150 ease-out
                  hover:bg-slate-50 dark:hover:bg-neutral-800/50
                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
@@ -76,10 +77,9 @@ export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick }) => 
           <div className="font-medium text-sm text-slate-900 dark:text-slate-100 truncate group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
             {item.title}
           </div>
-          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-500 dark:text-neutral-400">
-            <span className="truncate max-w-[100px]">{item.courseName}</span>
-            <span className="text-slate-300 dark:text-neutral-600">·</span>
-            <span>{formatActivityTime(item.timestamp)}</span>
+          <div className="flex items-center justify-between mt-0.5 text-xs text-slate-500 dark:text-neutral-400">
+            <span className="truncate pr-2">{cleanCourseName(item.courseName)}</span>
+            <span className="whitespace-nowrap flex-shrink-0">{formatActivityTime(item.timestamp)}</span>
           </div>
           
           {/* AI Summary */}
@@ -97,7 +97,7 @@ export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick }) => 
         </div>
         
         {/* Actions */}
-        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute right-3 top-2 flex items-center bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-md shadow-sm opacity-0 group-hover:opacity-100 transition-opacity px-1">
           {/* AI Summarize Button */}
           {showAI && item.type === 'announcement' && !summary && (
             <button

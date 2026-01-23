@@ -7,25 +7,17 @@ import { Badge } from '../components/ui/Badge'
 import { ListItemRow } from '../components/ui/ListItemRow'
 import { SkeletonList } from '../components/Skeleton'
 import type { DiscussionTopic } from '../types/canvas'
+import { CourseAvatar } from '../components/CourseAvatar'
+import { useCourseImages } from '../hooks/useCourseImages'
 
 export default function DiscussionsPage() {
   const ctx = useAppContext()
   const queryClient = useQueryClient()
+  const { courseImageUrl, prefetchCourseImage } = useCourseImages()
   const coursesQ = useCourses()
   const courses = ctx.courses || coursesQ.data || []
   const sidebar = ctx.sidebar
   const [courseFilter, setCourseFilter] = React.useState<string>('all')
-  const [imgStore, setImgStore] = React.useState<Record<string, Record<string, string>>>({})
-
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const cfg = await window.settings.get?.()
-        const map = (cfg?.ok ? (cfg.data as any)?.courseImages : undefined) || {}
-        setImgStore(map)
-      } catch {}
-    })()
-  }, [])
 
   const orderedCourses = React.useMemo(() => {
     const hidden = new Set(sidebar?.hiddenCourseIds || [])
@@ -83,25 +75,6 @@ export default function DiscussionsPage() {
     return results
   }, [queries, coursesToFetch, orderedCourses])
 
-  // Visual helpers
-  function hashString(input: string) {
-    let h = 0
-    for (let i = 0; i < input.length; i++) h = (h << 5) - h + input.charCodeAt(i)
-    return Math.abs(h)
-  }
-  function courseHueFor(id: string | number, fallback: string) {
-    const key = `${id}|${fallback}`
-    return hashString(key) % 360
-  }
-  function courseImageUrl(courseId?: string | number | null): string | undefined {
-    if (courseId == null) return undefined
-    const stored = (imgStore?.[ctx.baseUrl] || {})[String(courseId)]
-    if (stored) return stored
-    const info = queryClient.getQueryData<any>(['course-info', String(courseId)]) as any
-    const url = info?.image_download_url || info?.image_url
-    return typeof url === 'string' && url ? url : undefined
-  }
-
   const timeAgo = (dateStr?: string) => {
     if (!dateStr) return ''
     const date = new Date(dateStr)
@@ -125,17 +98,9 @@ export default function DiscussionsPage() {
       if (d.courseId != null) ids.add(String(d.courseId))
     }
     ids.forEach((id) => {
-      queryClient.prefetchQuery({
-        queryKey: ['course-info', id],
-        queryFn: async () => {
-          const res = await window.canvas.getCourseInfo?.(id)
-          if (!res?.ok) throw new Error(res?.error || 'Failed to load course info')
-          return res.data || null
-        },
-        staleTime: 1000 * 60 * 60 * 24 * 7,
-      }).catch(() => {})
+      prefetchCourseImage(id)
     })
-  }, [allDiscussions, queryClient])
+  }, [allDiscussions, prefetchCourseImage])
 
   return (
     <div className="space-y-3">
@@ -174,8 +139,6 @@ export default function DiscussionsPage() {
               }
             }
             const img = courseImageUrl(d.courseId)
-            const hue = courseHueFor(d.courseId || '', d.courseName || '')
-            const fallback = `linear-gradient(135deg, hsl(${hue} 75% 62%), hsl(${(hue + 24) % 360} 85% 50%))`
             const lastActivity = d.last_reply_at || d.posted_at
             const replyCount = d.discussion_subentry_count || 0
             const unreadCount = d.unread_count || 0
@@ -184,9 +147,11 @@ export default function DiscussionsPage() {
               <ListItemRow
                 key={`${d.courseId}-${d.id}-${i}`}
                 icon={
-                  <div
-                    className="w-full h-full rounded-full bg-center bg-cover"
-                    style={img ? { backgroundImage: `url(${img})` } : { background: fallback }}
+                  <CourseAvatar
+                    courseId={d.courseId}
+                    courseName={d.courseName}
+                    src={img}
+                    className="w-full h-full rounded-full ring-1 ring-black/10 dark:ring-white/10"
                   />
                 }
                 title={

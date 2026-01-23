@@ -497,15 +497,40 @@ export class CanvasClient {
       return destPath
     }
 
-    const response = await fetch(url)
+    return this.downloadUrlToPath(url, destPath)
+  }
+
+  async downloadCourseImage(courseId: string | number, imageUrl: string): Promise<string> {
+    const tempDir = app.getPath('temp')
+    // Create a stable filename for the course image so we can cache it
+    const ext = path.extname(new URL(imageUrl).pathname) || '.jpg'
+    const destPath = path.join(tempDir, `course-image-${courseId}${ext}`)
+    
+    if (fs.existsSync(destPath)) {
+      return destPath
+    }
+
+    return this.downloadUrlToPath(imageUrl, destPath)
+  }
+
+  private async downloadUrlToPath(url: string, destPath: string): Promise<string> {
+    // Determine if we need auth headers. 
+    // If it's a Canvas API URL, yes. If it's an S3 signed URL (redirect), usually no.
+    // However, Axios follows redirects. 
+    // Safe bet: try fetching. If it's a direct download URL from API, it needs auth.
+    // If it's a public URL, auth won't hurt usually, unless it's S3.
+    // But often image_download_url is just the API endpoint that redirects.
+    
+    // We use fetch here to stream.
+    // We need to pass the Authorization header if it's the API root.
+    const headers: Record<string, string> = {}
+    if (url.startsWith(this.baseUrl)) {
+      headers['Authorization'] = this.axios.defaults.headers['Authorization'] as string
+    }
+
+    const response = await fetch(url, { headers })
     if (!response.ok) throw new Error(`Failed to fetch file: ${response.statusText}`)
     if (!response.body) throw new Error('No response body')
-
-    // Node.js 18+ fetch returns a Web ReadableStream, needing conversion for pipeline if using older Node logic,
-    // but pipeline works with async iterables.
-    // However, explicit cast to NodeJS.ReadableStream might be safer or just use fs.writeFileSync for smaller files? 
-    // No, we want streaming.
-    // Readable.fromWeb(response.body) is available in Node 16+
 
     const fileStream = createWriteStream(destPath)
     await pipeline(Readable.fromWeb(response.body as any), fileStream)
@@ -943,6 +968,10 @@ export async function getFile(fileId: string | number) {
 
 export async function downloadFile(fileId: string | number) {
   return ensureClient().downloadFile(fileId)
+}
+
+export async function downloadCourseImage(courseId: string | number, url: string) {
+  return ensureClient().downloadCourseImage(courseId, url)
 }
 
 export async function getFileBytes(fileId: string | number) {

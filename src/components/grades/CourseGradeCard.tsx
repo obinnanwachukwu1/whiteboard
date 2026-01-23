@@ -1,5 +1,6 @@
 import React from 'react'
 import { Badge } from '../ui/Badge'
+import { CourseAvatar } from '../CourseAvatar'
 
 type Props = {
   course: any
@@ -10,7 +11,6 @@ type Props = {
   viewMode: 'real' | 'whatIf'
   planOpen: boolean
   imageUrl?: string
-  hue: number
   toGpa: (pct: number) => number
   onNavigate: () => void
   onTogglePlan: () => void
@@ -27,15 +27,12 @@ export const CourseGradeCard: React.FC<Props> = ({
   viewMode,
   planOpen,
   imageUrl,
-  hue,
   toGpa,
   onNavigate,
   onTogglePlan,
   onTargetChange,
   onCreditsChange,
 }) => {
-  const fallbackGradient = `linear-gradient(135deg, hsl(${hue} 75% 62%), hsl(${(hue + 24) % 360} 85% 50%))`
-  
   // Parse target
   const targ = targetPercent && targetPercent.trim() !== '' ? parseFloat(targetPercent) : undefined
   const displayPercent = viewMode === 'whatIf' 
@@ -70,7 +67,7 @@ export const CourseGradeCard: React.FC<Props> = ({
       >
         <div className="flex items-center justify-between gap-3 min-w-0">
           {/* Avatar with radial gauge */}
-          <div className="relative w-12 h-12 flex-shrink-0">
+          <div className="relative w-12 h-12 flex-shrink-0 flex items-center justify-center">
             <div 
               className="absolute inset-0 rounded-full" 
               style={{
@@ -79,9 +76,11 @@ export const CourseGradeCard: React.FC<Props> = ({
                   : 'rgba(0,0,0,0.08)'
               }} 
             />
-            <div 
-              className="absolute inset-1 rounded-full ring-1 ring-black/10 dark:ring-white/10 overflow-hidden bg-center bg-cover" 
-              style={imageUrl ? { backgroundImage: `url(${imageUrl})` } : { background: fallbackGradient }} 
+            <CourseAvatar
+              courseId={course.id}
+              courseName={course.name}
+              src={imageUrl}
+              className="relative w-10 h-10 rounded-full ring-1 ring-black/10 dark:ring-white/10"
             />
           </div>
           

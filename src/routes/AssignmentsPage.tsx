@@ -5,6 +5,8 @@ import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { useQueryClient } from '@tanstack/react-query'
 import { CalendarClock } from 'lucide-react'
+import { CourseAvatar } from '../components/CourseAvatar'
+import { useCourseImages } from '../hooks/useCourseImages'
 
 type DueItem = { course_id: string | number; course_name?: string; name: string; dueAt: string; pointsPossible?: number; htmlUrl?: string; assignment_rest_id?: string | number }
 
@@ -25,12 +27,11 @@ const LS_KANBAN = 'kanbanStatusByAssignment'
 export default function AssignmentsPage() {
   const ctx = useAppContext()
   const queryClient = useQueryClient()
+  const { courseImageUrl, prefetchCourseImage } = useCourseImages()
   const courses = ctx.courses || []
   const sidebar = ctx.sidebar
   const [courseFilter, setCourseFilter] = React.useState<string>('all')
   const [view, setView] = React.useState<'table' | 'kanban' | 'calendar'>('table')
-  const [imgStore, setImgStore] = React.useState<Record<string, Record<string, string>>>({})
-  React.useEffect(() => { (async () => { try { const cfg = await window.settings.get?.(); const map = (cfg?.ok ? (cfg.data as any)?.courseImages : undefined) || {}; setImgStore(map) } catch {} })() }, [])
 
   const orderedCourses = React.useMemo(() => {
     const hidden = new Set(sidebar?.hiddenCourseIds || [])
@@ -51,27 +52,13 @@ export default function AssignmentsPage() {
   }, [dueQ.data, courseFilter])
 
   // Image helpers
-  function hashString(input: string) { let h = 0; for (let i = 0; i < input.length; i++) h = (h << 5) - h + input.charCodeAt(i); return Math.abs(h) }
-  function courseHueFor(id: string | number, fallback: string) { const key = `${id}|${fallback}`; return hashString(key) % 360 }
-  function courseImageUrl(courseId?: string | number | null): string | undefined {
-    if (courseId == null) return undefined
-    const stored = (imgStore?.[ctx.baseUrl] || {})[String(courseId)]
-    if (stored) return stored
-    const info = queryClient.getQueryData<any>(['course-info', String(courseId)]) as any
-    const url = info?.image_download_url || info?.image_url
-    return typeof url === 'string' && url ? url : undefined
-  }
   React.useEffect(() => {
     const ids = new Set<string>()
     for (const d of allDue) { if (d.course_id != null) ids.add(String(d.course_id)) }
     ids.forEach((id) => {
-      queryClient.prefetchQuery({
-        queryKey: ['course-info', id],
-        queryFn: async () => { const res = await window.canvas.getCourseInfo?.(id); if (!res?.ok) throw new Error(res?.error || 'Failed to load course info'); return res.data || null },
-        staleTime: 1000 * 60 * 60 * 24 * 7,
-      }).catch(() => {})
+      prefetchCourseImage(id)
     })
-  }, [allDue, queryClient])
+  }, [allDue, prefetchCourseImage])
 
   const [kanban, setKanban] = React.useState<Record<string, KanbanStatus>>(() => {
     try {
@@ -149,13 +136,16 @@ export default function AssignmentsPage() {
                   else ctx.onOpenCourse(d.course_id)
                 }
                 const img = courseImageUrl(d.course_id)
-                const hue = courseHueFor(d.course_id, d.course_name || String(d.course_id))
-                const fallback = `linear-gradient(135deg, hsl(${hue} 75% 62%), hsl(${(hue + 24) % 360} 85% 50%))`
                 const fmt = (iso?: string) => { try { return new Date(iso || '').toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) } catch { return '—' } }
                 return (
                   <div key={id + ':' + i} role="button" tabIndex={0} onClick={open} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }} className="grid grid-cols-[2fr_1fr_1fr_120px] gap-2 px-3 py-2 cursor-pointer transition-transform duration-200 ease-out hover:scale-[1.01] hover:shadow-sm ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10">
                     <div className="min-w-0 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-center bg-cover flex-shrink-0" style={img ? { backgroundImage: `url(${img})` } : { background: fallback }} />
+                      <CourseAvatar
+                        courseId={d.course_id}
+                        courseName={d.course_name || String(d.course_id)}
+                        src={img}
+                        className="w-8 h-8 rounded-full ring-1 ring-black/10 dark:ring-white/10"
+                      />
                       <div className="truncate" title={d.name}>{d.name}</div>
                     </div>
                     <div className="min-w-0 text-sm text-slate-600 dark:text-neutral-300 truncate">
@@ -188,8 +178,6 @@ export default function AssignmentsPage() {
                 else ctx.onOpenCourse(d.course_id)
               }
               const img = courseImageUrl(d.course_id)
-              const hue = courseHueFor(d.course_id, d.course_name || String(d.course_id))
-              const fallback = `linear-gradient(135deg, hsl(${hue} 75% 62%), hsl(${(hue + 24) % 360} 85% 50%))`
               const fmt = (iso?: string) => { try { return new Date(iso || '').toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) } catch { return '—' } }
               return (
                 <div
@@ -201,7 +189,12 @@ export default function AssignmentsPage() {
                   className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-3 cursor-pointer transition-transform duration-200 ease-out hover:scale-[1.01] hover:shadow-sm hover:ring-black/10 dark:hover:ring-white/10"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-center bg-cover flex-shrink-0" style={img ? { backgroundImage: `url(${img})` } : { background: fallback }} />
+                    <CourseAvatar
+                      courseId={d.course_id}
+                      courseName={d.course_name || String(d.course_id)}
+                      src={img}
+                      className="w-10 h-10 rounded-full ring-1 ring-black/10 dark:ring-white/10"
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="font-medium truncate" title={d.name}>{d.name}</div>
                       <div className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 flex flex-wrap items-center gap-1.5">
@@ -254,8 +247,13 @@ export default function AssignmentsPage() {
                     <div key={id + ':' + i} draggable onDragStart={(e) => onDragStart(e, id)} className="rounded-md ring-1 ring-gray-200 dark:ring-neutral-800 bg-white dark:bg-neutral-900 px-2 py-2 transition-transform duration-200 ease-out hover:scale-[1.02] hover:shadow-sm cursor-grab active:cursor-grabbing">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-start gap-2 min-w-0">
-                          {(() => { const img = courseImageUrl(d.course_id); const hue = courseHueFor(d.course_id, d.course_name || String(d.course_id)); const fallback = `linear-gradient(135deg, hsl(${hue} 75% 62%), hsl(${(hue + 24) % 360} 85% 50%))`; return (
-                            <div className="w-8 h-8 rounded-full ring-1 ring-black/10 dark:ring-white/10 overflow-hidden bg-center bg-cover flex-shrink-0" style={img ? { backgroundImage: `url(${img})` } : { background: fallback }} />
+                          {(() => { const img = courseImageUrl(d.course_id); return (
+                            <CourseAvatar
+                              courseId={d.course_id}
+                              courseName={d.course_name || String(d.course_id)}
+                              src={img}
+                              className="w-8 h-8 rounded-full ring-1 ring-black/10 dark:ring-white/10"
+                            />
                           )})()}
                           <div className="min-w-0">
                             <div className="font-medium truncate" title={d.name}>{d.name}</div>

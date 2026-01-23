@@ -76,6 +76,19 @@ export function RootLayout() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // Listen for native menu actions (Settings...)
+  useEffect(() => {
+    // Safety check if we are running in electron
+    if (!window.electron?.onMenuAction) return
+
+    const cleanup = window.electron.onMenuAction((action) => {
+      if (action === 'settings') {
+        navigate({ to: '/settings' })
+      }
+    })
+    return cleanup
+  }, [navigate])
+
   // Queries
   const profileQ = useProfile({ enabled: hasToken === true })
   const coursesQ = useCourses({ enrollment_state: 'active' }, { enabled: hasToken === true })

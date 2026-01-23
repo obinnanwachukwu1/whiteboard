@@ -54,6 +54,7 @@ import {
   getAssignmentRest as svcGetAssignmentRest,
   getFile as svcGetFile,
   downloadFile as svcDownloadFile,
+  downloadCourseImage as svcDownloadCourseImage,
   listAssignmentsWithSubmission as svcListAssignmentsWithSubmission,
   listAssignmentGroups as svcListAssignmentGroups,
   listMyEnrollmentsForCourse as svcListMyEnrollmentsForCourse,
@@ -171,11 +172,6 @@ function createWindow() {
       ? {
           titleBarStyle: 'hiddenInset' as const,
           trafficLightPosition: { x: 20, y: 20 }, // add some padding around the traffic lights
-          titleBarOverlay: {
-            color: '#00000000', // transparent so the Header background shows through
-            symbolColor: isDark ? '#ffffff' : '#000000', // contrast based on theme
-            height: 56, // match Header height (h-14)
-          },
         }
       : {}),
     // Windows: extend content into titlebar while keeping native caption buttons.
@@ -225,6 +221,33 @@ function createWindow() {
       }
     }
     // If isQuitting is true, let the window close normally
+  })
+
+  // WORKAROUND: Force a repaint of native window controls (traffic lights) on blur.
+  // This fixes the issue where traffic lights disappear when the window loses focus
+  // in 'hiddenInset' mode.
+  win.on('blur', () => {
+    if (process.platform === 'darwin') {
+      try {
+        // Toggle visibility to force a redraw
+        win?.setWindowButtonVisibility(false)
+        // Immediate timeout to bring them back
+        setTimeout(() => {
+          try {
+            win?.setWindowButtonVisibility(true)
+          } catch {}
+        }, 0)
+      } catch {}
+    }
+  })
+
+  // Ensure they are visible on focus
+  win.on('focus', () => {
+    if (process.platform === 'darwin') {
+      try {
+        win?.setWindowButtonVisibility(true)
+      } catch {}
+    }
   })
 
   try {
@@ -286,7 +309,136 @@ app.on('activate', () => {
   }
 })
 
+// Menu configuration
+function createAppMenu() {
+  const isMac = process.platform === 'darwin'
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    // { role: 'appMenu' }
+    ...(isMac
+      ? [{
+          label: app.name,
+          submenu: [
+            { role: 'about' },
+            { type: 'separator' },
+            { 
+              label: 'Settings...', 
+              accelerator: 'CmdOrCtrl+,', 
+              click: () => {
+                win?.webContents.send('menu:action', 'settings')
+                if (isMac) app.dock.show()
+                win?.show()
+              } 
+            },
+            { type: 'separator' },
+            { role: 'services' },
+            { type: 'separator' },
+            { role: 'hide' },
+            { role: 'hideOthers' },
+            { role: 'unhide' },
+            { type: 'separator' },
+            { 
+              label: 'Quit Whiteboard', 
+              accelerator: 'CmdOrCtrl+Q', 
+              click: () => {
+                isQuitting = true
+                app.quit()
+              } 
+            }
+          ]
+        } as Electron.MenuItemConstructorOptions]
+      : []),
+    // { role: 'fileMenu' }
+    {
+      label: 'File',
+      submenu: [
+        isMac ? { role: 'close' } : { role: 'quit' }
+      ]
+    },
+    // { role: 'editMenu' }
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        ...(isMac
+          ? [
+              { role: 'pasteAndMatchStyle' },
+              { role: 'delete' },
+              { role: 'selectAll' },
+              { type: 'separator' },
+              {
+                label: 'Speech',
+                submenu: [
+                  { role: 'startSpeaking' },
+                  { role: 'stopSpeaking' }
+                ]
+              }
+            ]
+          : [
+              { role: 'delete' },
+              { type: 'separator' },
+              { role: 'selectAll' }
+            ])
+      ] as Electron.MenuItemConstructorOptions[]
+    },
+    // { role: 'viewMenu' } - Custom to remove Reload
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ]
+    },
+    // { role: 'windowMenu' }
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        ...(isMac
+          ? [
+              { type: 'separator' },
+              { role: 'front' },
+              { type: 'separator' },
+              { role: 'window' }
+            ]
+          : [
+              { role: 'close' }
+            ])
+      ] as Electron.MenuItemConstructorOptions[]
+    },
+    {
+      role: 'help',
+      submenu: [
+        {
+          label: 'Learn More',
+          click: async () => {
+            const { shell } = await import('electron')
+            await shell.openExternal('https://github.com/obinnanwachukwu/whiteboard')
+          }
+        }
+      ]
+    }
+  ]
+
+  const menu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(menu)
+}
+
 app.whenReady().then(() => {
+  createAppMenu()
   // load config and create window
   appConfig = loadConfig()
   
@@ -749,6 +901,16 @@ ipcMain.handle('canvas:getFileBytes', async (_evt, fileId: string | number) => {
     // Return path instead of bytes, prefixed with custom protocol
     const path = await svcDownloadFile(fileId)
     // Encode the path for the URL
+    return { ok: true, data: `canvas-file://${encodeURIComponent(path)}` }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:cacheCourseImage', async (_evt, courseId: string | number, url: string) => {
+  try {
+    const path = await svcDownloadCourseImage(courseId, url)
     return { ok: true, data: `canvas-file://${encodeURIComponent(path)}` }
   } catch (e: any) {
     const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
