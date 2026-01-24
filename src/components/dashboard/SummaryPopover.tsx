@@ -9,6 +9,7 @@ type Props = {
   isOpen: boolean
   isLoading: boolean
   text: string | null
+  title?: string
   onMouseEnter: () => void
   onMouseLeave: () => void
 }
@@ -18,6 +19,7 @@ export const SummaryPopover: React.FC<Props> = ({
   isOpen, 
   isLoading, 
   text,
+  title,
   onMouseEnter,
   onMouseLeave
 }) => {
@@ -138,13 +140,13 @@ export const SummaryPopover: React.FC<Props> = ({
 
   if (!isVisible && !isOpen) return null
 
-  return createPortal(
+    return createPortal(
     <div 
       className={`
         bg-white dark:bg-neutral-900 
         rounded-xl shadow-2xl 
         border border-slate-200 dark:border-neutral-800 
-        p-4 
+        p-4 overflow-hidden
         transition-all duration-150 ease-out pointer-events-auto
         ${isOpen ? 'opacity-100 translate-y-0 scale-100 animate-pop' : 'opacity-0 translate-y-1 scale-95 pointer-events-none'}
       `}
@@ -156,7 +158,7 @@ export const SummaryPopover: React.FC<Props> = ({
         <div className="p-1.5 rounded-md bg-indigo-50 dark:bg-indigo-900/20">
             <Wand2 className="w-3.5 h-3.5" />
         </div>
-        AI Summary
+        {title || 'AI Summary'}
       </div>
       
       <div className="min-h-[60px] text-sm text-slate-600 dark:text-neutral-300 leading-relaxed">
@@ -167,17 +169,19 @@ export const SummaryPopover: React.FC<Props> = ({
             <div className="h-4 bg-slate-100 dark:bg-neutral-800 rounded w-full"></div>
           </div>
         ) : (
-          <div 
+          <div
             className="
-              [&_p]:mb-2 [&_p:last-child]:mb-0 
+              break-words [overflow-wrap:anywhere]
+              [&_p]:mb-2 [&_p:last-child]:mb-0
               [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-2
               [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:mb-2
               [&_li]:mb-1
+              [&_p]:break-words [&_li]:break-words [&_code]:break-words
               [&_strong]:font-semibold [&_strong]:text-slate-800 dark:[&_strong]:text-slate-200
               [&_em]:italic
               [&_a]:text-indigo-500 [&_a]:underline
             "
-            dangerouslySetInnerHTML={{ __html: renderedHtml }} 
+            dangerouslySetInnerHTML={{ __html: renderedHtml }}
           />
         )}
       </div>

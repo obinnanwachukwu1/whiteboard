@@ -75,24 +75,104 @@ export const useAI = () => {
     });
   };
 
-  const explainPriority = async (assignmentName: string, dueDate: string, weight: string): Promise<string | null> => {
-    return chat([
-      {
-        role: 'system',
-        content: 'You are a study coach. Explain briefly (1 sentence) why this assignment is prioritized.'
-      },
-      {
-        role: 'user',
-        content: `Assignment: ${assignmentName}\nDue: ${dueDate}\nWeight: ${weight}\n\nWhy should I do this now?`
-      }
-    ], 100);
-  };
+  type PriorityExplainPayload = {
+    assignmentName: string
+    courseName?: string
+    relativeDue: string
+    hoursUntilDue?: number | null
+    urgencyMultiplier?: number | null
+    weightText?: string
+    weightPercent?: number | null
+    pointsPossible?: number | null
+    priorityScore?: number | null
+    rank?: number | null
+    assignmentDescription?: string
+    draftWhy?: string
+    draftNext?: string
+  }
+
+  const buildPriorityMessages = (payload: PriorityExplainPayload): AIMessage[] => {
+    const lines: string[] = []
+    lines.push(`Assignment: ${payload.assignmentName}`)
+    if (payload.courseName) lines.push(`Course: ${payload.courseName}`)
+    if (payload.assignmentDescription) {
+      lines.push(`Description: ${payload.assignmentDescription}`)
+    }
+    lines.push(`Due: ${payload.relativeDue}`)
+    if (payload.weightPercent !== undefined && payload.weightPercent !== null) {
+      lines.push(`WeightPercent: ${payload.weightPercent}`)
+    }
+    if (payload.weightText) lines.push(`WeightLabel: ${payload.weightText}`)
+    if (
+      payload.pointsPossible !== undefined &&
+      payload.pointsPossible !== null &&
+      typeof payload.pointsPossible === 'number' &&
+      payload.pointsPossible > 0
+    ) {
+      lines.push(`PointsPossible: ${payload.pointsPossible}`)
+    }
+    if (payload.rank !== undefined && payload.rank !== null) {
+      lines.push(`RankPosition: ${payload.rank}`)
+    }
+
+    const drafts: string[] = []
+    if (payload.draftWhy) drafts.push(`Why: ${payload.draftWhy}`)
+    if (payload.draftNext) drafts.push(`Next: ${payload.draftNext}`)
+
+    const systemContent = [
+      'You are a concise, practical study coach.',
+      'Write exactly 2 short sentences (no bullets).',
+      'Sentence 1: why this is priority, using the facts.',
+      'Sentence 2: the next action to take now, ideally a task from the description.',
+      'Use plain language. Avoid semicolons and long clauses.',
+      'Avoid these filler phrases: "due to", "in order to", "crucial", "significant", "dedicating", "tackle this", "effectively".',
+      'If mentioning time: use "in N hours" (N < 12) or "in N days". Never use ordinals like "3rd day".',
+      'Prefer active voice and simple verbs (start, outline, pick, draft, submit).',
+      'Use the Draft as raw material, but do NOT copy it verbatim.',
+      'Use only the provided facts. If a fact is unknown, omit it. Do not guess or add new info.',
+      'Never mention internal scoring or implementation details (e.g., "PriorityScore").',
+      'Never invent grades or scores (e.g., "20/20"). Only mention pointsPossible if provided.',
+      'Do not mention 0 points; if points are missing, omit points entirely.',
+      'Keep each sentence <= 18 words. Avoid filler like "foundation", "positive tone", "manage workload".',
+    ].join('\n')
+
+    const userContent = [
+      'Facts:',
+      ...lines.map(l => `- ${l}`),
+      drafts.length ? 'Draft:' : '',
+      ...drafts.map(d => `- ${d}`),
+    ].filter(Boolean).join('\n')
+
+    return [
+      { role: 'system', content: systemContent },
+      { role: 'user', content: userContent },
+    ]
+  }
+
+  const explainPriority = async (payload: PriorityExplainPayload): Promise<string | null> => {
+    const messages = buildPriorityMessages(payload)
+    return chat(messages, 150)
+  }
+
+  const streamExplainPriority = (
+    payload: PriorityExplainPayload,
+    onUpdate: (text: string) => void
+  ): (() => void) => {
+    const messages = buildPriorityMessages(payload)
+    let accumulated = ''
+    // @ts-ignore - Exposed via preload
+    return window.ai.chatStream(messages, (chunk: string) => {
+      accumulated += chunk
+      onUpdate(accumulated)
+    })
+  }
 
   return {
     chat,
     summarize,
     streamSummarize,
     explainPriority,
+    streamExplainPriority,
     loading,
     error
   };

@@ -6,7 +6,7 @@
   align-items: center;
   box-sizing: border-box;
   padding: 32px 0;
-  background: transparent;
+  background: transparent !important;
   min-height: 100%;
 }
 
@@ -46,12 +46,5 @@
 }
 
 .dark .docx {
-  background: #0f172a;
-  color: #e2e8f0;
   box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
-}
-
-.dark .docx table td,
-.dark .docx table th {
-  border-color: #1f2937;
 }

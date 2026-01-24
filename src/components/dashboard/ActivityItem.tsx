@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useRef } from 'react'
 import { Megaphone, Calendar, Check } from 'lucide-react'
 import type { ActivityFeedItem } from '../../hooks/useActivityFeed'
 import { formatActivityTime } from '../../hooks/useActivityFeed'
@@ -6,6 +6,7 @@ import { cleanCourseName } from '../../utils/courseName'
 import { useAI } from '../../hooks/useAI'
 import { useAppContext } from '../../context/AppContext'
 import { SummaryPopover } from './SummaryPopover'
+import { useAIPopover } from '../../hooks/useAIPopover'
 
 type Props = {
   item: ActivityFeedItem
@@ -25,17 +26,22 @@ export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick }) => 
   const { streamSummarize } = useAI()
   const { aiEnabled } = useAppContext()
   
-  const [showPopover, setShowPopover] = useState(false)
-  const [isHovered, setIsHovered] = useState(false)
-  const [cursorPos, setCursorPos] = useState<{x: number, y: number} | null>(null)
-  const [summaryText, setSummaryText] = useState<string | null>(null)
-  const [streaming, setStreaming] = useState(false)
+  const showAI = aiEnabled && item.type === 'announcement'
+  
+  const { triggerProps, popoverProps } = useAIPopover({
+    enabled: showAI,
+    onGenerate: (update) => {
+      const rawText = item.message || item.title
+      const cleanText = stripHtml(rawText || '')
+      
+      if (cleanText.trim()) {
+        return streamSummarize(cleanText, update)
+      }
+      return false
+    }
+  })
   
   const itemRef = useRef<HTMLDivElement>(null)
-  const streamCleanupRef = useRef<(() => void) | null>(null)
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  
-  const showAI = aiEnabled && item.type === 'announcement'
   
   const Icon = item.type === 'announcement' ? Megaphone : Calendar
   const iconColor = item.type === 'announcement' 
@@ -52,80 +58,6 @@ export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick }) => 
     }
   }
 
-  const handleMouseEnter = (e: React.MouseEvent) => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current)
-      hoverTimeoutRef.current = null
-    }
-    setIsHovered(true)
-    if (!showPopover) {
-      setCursorPos({ x: e.clientX, y: e.clientY })
-    }
-  }
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!showPopover) {
-      setCursorPos({ x: e.clientX, y: e.clientY })
-    }
-  }
-
-  const handleMouseLeave = () => {
-    hoverTimeoutRef.current = setTimeout(() => {
-      setIsHovered(false)
-    }, 100)
-  }
-
-  // Hover effect for AI Summary
-  useEffect(() => {
-    let timer: NodeJS.Timeout
-    
-    if (isHovered && showAI) {
-      // If we are hovering, wait 600ms to show
-      // If already shown (e.g. moved from popover back to item), keep shown
-      if (showPopover) return
-
-      timer = setTimeout(() => {
-        if (isHovered) {
-           setShowPopover(true)
-           
-           if (!summaryText && !streaming) {
-             setStreaming(true)
-             const rawText = item.message || item.title
-             const cleanText = stripHtml(rawText || '')
-             
-             if (cleanText.trim()) {
-               const cleanup = streamSummarize(cleanText, (chunkText) => {
-                 setSummaryText(chunkText)
-               })
-               streamCleanupRef.current = cleanup
-             } else {
-                setStreaming(false)
-             }
-           }
-        }
-      }, 600) // 600ms delay
-    } else {
-      setShowPopover(false)
-      // Cancel stream if hovering away
-      if (streamCleanupRef.current) {
-        streamCleanupRef.current()
-        streamCleanupRef.current = null
-      }
-      setStreaming(false)
-      setSummaryText(null)
-    }
-    
-    return () => clearTimeout(timer)
-  }, [isHovered, showAI, showPopover, item.message, item.title, streamSummarize])
-
-  // Cleanup stream on unmount
-  useEffect(() => {
-    return () => {
-      if (streamCleanupRef.current) streamCleanupRef.current()
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current)
-    }
-  }, [])
-  
   return (
     <>
       <div
@@ -133,9 +65,7 @@ export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick }) => 
         role="button"
         tabIndex={0}
         onClick={onClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
+        {...triggerProps}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
@@ -184,17 +114,7 @@ export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick }) => 
         </div>
       </div>
       
-      <SummaryPopover 
-        position={cursorPos}
-        isOpen={showPopover}
-        isLoading={streaming && !summaryText}
-        text={summaryText}
-        onMouseEnter={() => {
-           if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current)
-           setIsHovered(true)
-        }}
-        onMouseLeave={handleMouseLeave}
-      />
+      <SummaryPopover {...popoverProps} />
     </>
   )
 }

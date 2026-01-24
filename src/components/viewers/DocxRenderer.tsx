@@ -91,7 +91,7 @@ const DocxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDo
 
   return (
     <ViewerFrame
-      className={`${className} bg-[#7a7a7a] dark:bg-[#0b1220]`}
+      className={className}
       padding="default"
       contentRef={scrollRef}
       toolbar={
