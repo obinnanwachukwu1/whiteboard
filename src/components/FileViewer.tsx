@@ -116,10 +116,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
             
              {/* Center Loading Indicator */}
             <div className="absolute inset-0 flex items-center justify-center bg-white/40 dark:bg-neutral-900/40 backdrop-blur-[2px]">
-               <div className="flex flex-col items-center gap-3">
-                 <div className="w-8 h-8 rounded-full border-2 border-slate-300 dark:border-neutral-600 border-t-blue-500 animate-spin" />
-                 <span className="text-xs font-medium text-slate-500 dark:text-neutral-400 uppercase tracking-wider">Loading Preview</span>
-               </div>
+               <span className="text-sm font-medium text-slate-500 dark:text-neutral-400">Loading preview...</span>
             </div>
         </div>
       </div>

@@ -274,11 +274,14 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
             So let's mimic the full viewer structure. */}
             
          {/* Toolbar */}
-        <div className="flex items-center justify-between shrink-0 h-10 mx-4 mt-4 bg-white dark:bg-neutral-900 rounded-lg border border-gray-200 dark:border-neutral-800 px-4 shadow-sm">
-           <Skeleton width="w-32" height="h-4" />
-           <div className="flex gap-2">
-             <Skeleton width="w-8" height="h-8" variant="rounded" />
-             <Skeleton width="w-8" height="h-8" variant="rounded" />
+         {/* Mimic PdfToolbar structure: centered rounded pill */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
+           <div className="flex items-center gap-3 px-4 py-2 bg-white/95 dark:bg-neutral-900/95 shadow-xl rounded-full border border-gray-200 dark:border-neutral-700">
+              <Skeleton width="w-20" height="h-6" className="rounded-full" />
+              <div className="w-px h-6 bg-gray-200 dark:bg-neutral-700 mx-1" />
+              <Skeleton width="w-24" height="h-6" className="rounded-full" />
+              <div className="w-px h-6 bg-gray-200 dark:bg-neutral-700 mx-1" />
+              <Skeleton width="w-8" height="h-6" className="rounded-full" />
            </div>
         </div>
 
@@ -300,10 +303,7 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
               
                {/* Center Loading Indicator */}
               <div className="absolute inset-0 flex items-center justify-center bg-white/40 dark:bg-neutral-900/40 backdrop-blur-[2px]">
-                 <div className="flex flex-col items-center gap-3">
-                   <div className="w-8 h-8 rounded-full border-2 border-slate-300 dark:border-neutral-600 border-t-blue-500 animate-spin" />
-                   <span className="text-xs font-medium text-slate-500 dark:text-neutral-400 uppercase tracking-wider">Loading PDF</span>
-                 </div>
+                 <span className="text-sm font-medium text-slate-500 dark:text-neutral-400">Loading PDF...</span>
               </div>
           </div>
         </div>
@@ -335,8 +335,7 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
         {/* Loading overlay */}
         {viewerState.isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50/90 dark:bg-neutral-900/90 z-10">
-             <div className="w-12 h-12 rounded-full border-4 border-slate-300 dark:border-neutral-600 border-t-blue-500 animate-spin mb-4" />
-             <div className="text-sm font-medium text-slate-500 dark:text-neutral-400 uppercase tracking-wide">Rendering PDF</div>
+             <div className="text-sm font-medium text-slate-500 dark:text-neutral-400">Rendering PDF...</div>
           </div>
         )}
         
