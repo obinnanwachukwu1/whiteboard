@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import * as XLSX from 'xlsx'
 import DOMPurify from 'dompurify'
+import ViewerFrame from './ViewerFrame'
+import ViewerToolbar from './ViewerToolbar'
 
 type Props = {
   url: string
   className?: string
+  onDownload?: () => void
 }
 
-const XlsxRenderer: React.FC<Props> = ({ url, className = '' }) => {
+const XlsxRenderer: React.FC<Props> = ({ url, className = '', onDownload }) => {
   const [html, setHtml] = useState<string | null>(null)
 
   useEffect(() => {
@@ -34,9 +37,16 @@ const XlsxRenderer: React.FC<Props> = ({ url, className = '' }) => {
   if (!html) return null
 
   return (
-    <div className={`p-4 overflow-auto ${className}`} style={{ height: '100%' }}>
-      <div dangerouslySetInnerHTML={{ __html: html }} />
-    </div>
+    <ViewerFrame
+      className={className}
+      padding="default"
+      contentClassName="min-w-max"
+      toolbar={
+        <ViewerToolbar onDownload={onDownload} disableDownload={!onDownload} />
+      }
+    >
+      <div className="inline-block" dangerouslySetInnerHTML={{ __html: html }} />
+    </ViewerFrame>
   )
 }
 

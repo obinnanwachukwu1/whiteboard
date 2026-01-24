@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react'
 import JSZip from 'jszip'
+import ViewerFrame from './ViewerFrame'
+import ViewerToolbar from './ViewerToolbar'
 
 type Props = {
   url: string
   className?: string
+  onDownload?: () => void
 }
 
-const PptxRenderer: React.FC<Props> = ({ url, className = '' }) => {
+const PptxRenderer: React.FC<Props> = ({ url, className = '', onDownload }) => {
   const [slides, setSlides] = useState<{ index: number; text: string }[]>([])
 
   useEffect(() => {
@@ -45,14 +48,22 @@ const PptxRenderer: React.FC<Props> = ({ url, className = '' }) => {
   if (!slides.length) return null
 
   return (
-    <div className={`p-4 space-y-4 overflow-auto ${className}`} style={{ height: '100%' }}>
-      {slides.map((s, idx) => (
-        <div key={idx} className="border border-gray-200 dark:border-neutral-700 rounded p-3">
-          <div className="text-xs text-slate-500 dark:text-neutral-400">Slide {s.index}</div>
-          <div className="mt-1 whitespace-pre-wrap">{s.text || '—'}</div>
-        </div>
-      ))}
-    </div>
+    <ViewerFrame
+      className={className}
+      padding="default"
+      toolbar={
+        <ViewerToolbar onDownload={onDownload} disableDownload={!onDownload} />
+      }
+    >
+      <div className="space-y-4">
+        {slides.map((s, idx) => (
+          <div key={idx} className="border border-gray-200 dark:border-neutral-700 rounded p-3 bg-white dark:bg-neutral-900">
+            <div className="text-xs text-slate-500 dark:text-neutral-400">Slide {s.index}</div>
+            <div className="mt-1 whitespace-pre-wrap">{s.text || '—'}</div>
+          </div>
+        ))}
+      </div>
+    </ViewerFrame>
   )
 }
 

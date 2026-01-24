@@ -123,6 +123,15 @@ protocol.registerSchemesAsPrivileged([
       corsEnabled: true,
     },
   },
+  {
+    scheme: 'canvas-file',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
 ])
 
 let win: BrowserWindow | null
@@ -576,23 +585,33 @@ app.whenReady().then(() => {
   // Register custom protocol for secure file serving
   // SECURITY: Only allow access to files in the temp directory
   protocol.handle('canvas-file', (req) => {
-    const url = req.url.replace(/^canvas-file:\/\//, '')
-    // Decode URL-encoded characters (e.g. %20 -> space)
-    const filePath = decodeURIComponent(url)
-    
-    // Security check: resolve to absolute path and verify it's in temp directory
-    const tempDir = app.getPath('temp')
-    const resolvedPath = path.resolve(filePath)
-    
-    if (!resolvedPath.startsWith(tempDir)) {
-      console.warn(`[Security] Blocked access to file outside temp dir: ${resolvedPath}`)
-      return new Response('Forbidden: Access denied to files outside temp directory', { 
-        status: 403,
-        headers: { 'Content-Type': 'text/plain' }
-      })
+    try {
+      // Normalize to ensure we always have canvas-file:///path (no host component)
+      let normalized = req.url
+      if (normalized.startsWith('canvas-file://') && !normalized.startsWith('canvas-file:///')) {
+        normalized = normalized.replace(/^canvas-file:\/\/+/, 'canvas-file:///')
+      }
+
+      const fileUrl = normalized.replace(/^canvas-file:/, 'file:')
+      const filePath = fileURLToPath(fileUrl)
+      
+      // Security check: resolve to absolute path and verify it's in temp directory
+      const tempDir = app.getPath('temp')
+      const resolvedPath = path.resolve(filePath)
+      
+      if (!resolvedPath.startsWith(tempDir)) {
+        console.warn(`[Security] Blocked access to file outside temp dir: ${resolvedPath}`)
+        return new Response('Forbidden: Access denied to files outside temp directory', { 
+          status: 403,
+          headers: { 'Content-Type': 'text/plain' }
+        })
+      }
+      
+      return net.fetch(pathToFileURL(resolvedPath).toString())
+    } catch (e) {
+      console.error(`[canvas-file] Error handling request: ${req.url}`, e)
+      return new Response('Bad Request', { status: 400 })
     }
-    
-    return net.fetch(pathToFileURL(resolvedPath).toString())
   })
   
   // Register custom protocol for PDF viewer assets
@@ -1111,27 +1130,29 @@ ipcMain.handle('canvas:postDiscussionReply', async (_evt, courseId: string | num
   }
 })
 
-ipcMain.handle('canvas:getFileBytes', async (_evt, fileId: string | number) => {
-  try {
-    // Return path instead of bytes, prefixed with custom protocol
-    const path = await svcDownloadFile(fileId)
-    // Encode the path for the URL
-    return { ok: true, data: `canvas-file://${encodeURIComponent(path)}` }
-  } catch (e: any) {
-    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
-    return { ok: false, error: msg }
-  }
-})
+  ipcMain.handle('canvas:getFileBytes', async (_evt, fileId: string | number) => {
+    try {
+      // Return path instead of bytes, prefixed with custom protocol
+      const path = await svcDownloadFile(fileId)
+      // Encode the path for the URL using pathToFileURL to handle special chars and platform specific syntax
+      const url = pathToFileURL(path).toString().replace(/^file:/, 'canvas-file:')
+      return { ok: true, data: url }
+    } catch (e: any) {
+      const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+      return { ok: false, error: msg }
+    }
+  })
 
-ipcMain.handle('canvas:cacheCourseImage', async (_evt, courseId: string | number, url: string) => {
-  try {
-    const path = await svcDownloadCourseImage(courseId, url)
-    return { ok: true, data: `canvas-file://${encodeURIComponent(path)}` }
-  } catch (e: any) {
-    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
-    return { ok: false, error: msg }
-  }
-})
+  ipcMain.handle('canvas:cacheCourseImage', async (_evt, courseId: string | number, url: string) => {
+    try {
+      const path = await svcDownloadCourseImage(courseId, url)
+      const fileUrl = pathToFileURL(path).toString().replace(/^file:/, 'canvas-file:')
+      return { ok: true, data: fileUrl }
+    } catch (e: any) {
+      const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+      return { ok: false, error: msg }
+    }
+  })
 
 // Conversations (Inbox)
 ipcMain.handle('canvas:listConversations', async (_evt, params?: { scope?: 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'; perPage?: number }) => {

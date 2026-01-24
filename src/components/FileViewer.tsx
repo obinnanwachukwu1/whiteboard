@@ -1,7 +1,8 @@
-import React, { Suspense, useEffect, useRef } from 'react'
+import React, { Suspense, useEffect, useRef, useCallback } from 'react'
 import { useFileMeta, useFileBytes } from '../hooks/useCanvasQueries'
 import { PdfViewer } from './pdf'
-import { Skeleton } from './Skeleton'
+import ViewerFrame from './viewers/ViewerFrame'
+import ViewerToolbar from './viewers/ViewerToolbar'
 
 // Lazy load heavy dependencies
 const DocxRenderer = React.lazy(() => import('./viewers/DocxRenderer'))
@@ -86,6 +87,11 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
   const isTextLike = ['json','xml','html','md','csv'].includes(ext)
   const isSupported = isPdf || isImage || isAudio || isVideo || isDocx || isDoc || isXlsx || isPptx || isTextLike
 
+  const handleDownload = useCallback(() => {
+    if (!window.system?.downloadFile) return
+    window.system.downloadFile(fileId, name)
+  }, [fileId, name])
+
   const LoadingSkeleton = () => (
     <div className="flex flex-col h-full w-full bg-gray-50/50 dark:bg-neutral-950/50 items-center justify-center">
       {/* Just text, no fake UI elements as per request */}
@@ -133,8 +139,14 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
     // Fallback to Office Viewer if local download failed or pending
     const viewer = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(remoteUrl)}`
     body = (
-      <div className={className} style={{ height: '100%' }}>
-        <div className="overflow-hidden border border-gray-200 dark:border-neutral-700 rounded-lg" style={{ height: '100%' }}>
+      <ViewerFrame
+        className={className}
+        padding="default"
+        toolbar={
+          <ViewerToolbar onDownload={handleDownload} disableDownload={!window.system?.downloadFile} />
+        }
+      >
+        <div className="overflow-hidden border border-gray-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-900" style={{ height: '100%' }}>
           <iframe
             src={viewer}
             className="w-full h-full"
@@ -143,30 +155,49 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
             title={name || 'Document viewer'}
           />
         </div>
-      </div>
+      </ViewerFrame>
     )
   } else if (isDocx && localUrl) {
     body = (
       <Suspense fallback={<div className="h-full p-4"><LoadingSkeleton /></div>}>
-        <DocxRenderer url={localUrl} className={className} isFullscreen={isFullscreen} />
+        <DocxRenderer
+          url={localUrl}
+          className={className}
+          isFullscreen={isFullscreen}
+          onDownload={handleDownload}
+        />
       </Suspense>
     )
   } else if (isXlsx && localUrl) {
     body = (
       <Suspense fallback={<div className="h-full p-4"><LoadingSkeleton /></div>}>
-        <XlsxRenderer url={localUrl} className={className} />
+        <XlsxRenderer
+          url={localUrl}
+          className={className}
+          onDownload={handleDownload}
+        />
       </Suspense>
     )
   } else if (isPptx && localUrl) {
     body = (
       <Suspense fallback={<div className="h-full p-4"><LoadingSkeleton /></div>}>
-        <PptxRenderer url={localUrl} className={className} />
+        <PptxRenderer
+          url={localUrl}
+          className={className}
+          onDownload={handleDownload}
+        />
       </Suspense>
     )
   } else if (isTextLike && localUrl) {
     body = (
       <Suspense fallback={<div className="h-full p-4"><LoadingSkeleton /></div>}>
-        <TextRenderer url={localUrl} ext={ext} className={className} isFullscreen={isFullscreen} />
+        <TextRenderer
+          url={localUrl}
+          ext={ext}
+          className={className}
+          isFullscreen={isFullscreen}
+          onDownload={handleDownload}
+        />
       </Suspense>
     )
   } else if (!isSupported) {
@@ -193,8 +224,14 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
     // But the above !isSupported block catches everything not whitelisted.
     // So this block handles supported types that failed local download.
     body = (
-      <div className={className} style={{ height: '100%' }}>
-        <div className="overflow-hidden border border-gray-200 dark:border-neutral-700 rounded-lg" style={{ height: '100%' }}>
+      <ViewerFrame
+        className={className}
+        padding="default"
+        toolbar={
+          <ViewerToolbar onDownload={handleDownload} disableDownload={!window.system?.downloadFile} />
+        }
+      >
+        <div className="overflow-hidden border border-gray-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-900" style={{ height: '100%' }}>
           <iframe
             src={remoteUrl}
             className="w-full h-full"
@@ -203,15 +240,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
             title={name || 'File'}
           />
         </div>
-        <div className="p-2 text-right">
-          <button
-            className="px-3 py-1 text-sm bg-slate-100 dark:bg-neutral-800 rounded hover:bg-slate-200 dark:hover:bg-neutral-700"
-            onClick={async () => { (await import('../utils/openExternal')).openExternal(remoteUrl) }}
-          >
-            Open in Browser
-          </button>
-        </div>
-      </div>
+      </ViewerFrame>
     )
   } else {
     body = <div className={`p-8 text-slate-500 dark:text-neutral-400 ${className}`}>No preview available.</div>

@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import ViewerFrame from './ViewerFrame'
+import ViewerToolbar from './ViewerToolbar'
 
 type Props = {
   url: string
   ext: string
   className?: string
   isFullscreen?: boolean
+  onDownload?: () => void
 }
 
-const TextRenderer: React.FC<Props> = ({ url, ext, className = '', isFullscreen }) => {
+const TextRenderer: React.FC<Props> = ({ url, ext, className = '', isFullscreen, onDownload }) => {
   const [content, setContent] = useState<{ type: 'html' | 'text'; data: string } | null>(null)
 
   useEffect(() => {
@@ -45,16 +48,30 @@ const TextRenderer: React.FC<Props> = ({ url, ext, className = '', isFullscreen 
 
   if (content.type === 'html') {
     return (
-      <div className={`p-4 overflow-auto ${className}`} style={{ height: '100%' }}>
+      <ViewerFrame
+        className={className}
+        padding="default"
+        toolbar={
+          <ViewerToolbar onDownload={onDownload} disableDownload={!onDownload} />
+        }
+      >
         <div className="rich-html" dangerouslySetInnerHTML={{ __html: content.data }} />
-      </div>
+      </ViewerFrame>
     )
   }
 
   return (
-    <pre className={`p-4 overflow-auto ${className}`} style={{ maxHeight: isFullscreen ? '100%' : 600 }}>
-      {content.data}
-    </pre>
+    <ViewerFrame
+      className={className}
+      padding="default"
+      toolbar={
+        <ViewerToolbar onDownload={onDownload} disableDownload={!onDownload} />
+      }
+    >
+      <pre className="whitespace-pre-wrap" style={{ maxHeight: isFullscreen ? '100%' : 600 }}>
+        {content.data}
+      </pre>
+    </ViewerFrame>
   )
 }
 

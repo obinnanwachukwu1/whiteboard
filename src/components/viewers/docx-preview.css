@@ -1,0 +1,57 @@
+.docx-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  width: 100%;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 32px 0;
+  background: transparent;
+  min-height: 100%;
+}
+
+.docx {
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: clamp(18px, 4vw, 48px);
+  width: 100%;
+  max-width: 960px;
+  box-sizing: border-box;
+}
+
+.docx img,
+.docx svg,
+.docx canvas,
+.docx video,
+.docx iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+.docx table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.docx * {
+  max-width: 100%;
+}
+
+.docx table td,
+.docx table th {
+  border: 1px solid #e5e7eb;
+  padding: 8px;
+}
+
+.dark .docx {
+  background: #0f172a;
+  color: #e2e8f0;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
+}
+
+.dark .docx table td,
+.dark .docx table th {
+  border-color: #1f2937;
+}
