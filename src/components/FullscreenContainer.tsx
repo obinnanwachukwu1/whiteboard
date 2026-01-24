@@ -7,29 +7,21 @@ type Props = {
 
 export const FullscreenContainer: React.FC<Props> = ({ className = '', children }) => {
   // "Fullscreen" here is an in-app focus mode, not OS / native fullscreen.
-  // On macOS users can still use the green traffic light for native fullscreen.
+  // It overlays the entire window content (z-index 1000) but stays within the window bounds.
   const rootRef = React.useRef<HTMLDivElement | null>(null)
   const [isFullscreen, setIsFullscreen] = React.useState(false)
 
   React.useEffect(() => {
-    const onChange = () => {
-      // Sync state with actual browser fullscreen state
-      const active = !!document.fullscreenElement && document.fullscreenElement === rootRef.current
-      setIsFullscreen(active)
+    if (!isFullscreen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsFullscreen(false)
     }
-    document.addEventListener('fullscreenchange', onChange)
-    return () => document.removeEventListener('fullscreenchange', onChange)
-  }, [])
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [isFullscreen])
 
   const toggle = async () => {
-    try {
-      if (!isFullscreen) await rootRef.current?.requestFullscreen()
-      else await document.exitFullscreen()
-    } catch (e) {
-      console.error('Fullscreen toggle failed', e)
-      // Fallback to CSS-only fullscreen if API fails
-      setIsFullscreen(v => !v)
-    }
+    setIsFullscreen(v => !v)
   }
 
   return (
@@ -43,14 +35,8 @@ export const FullscreenContainer: React.FC<Props> = ({ className = '', children 
     >
       {children({
         isFullscreen,
-        enter: async () => {
-            try { await rootRef.current?.requestFullscreen() } 
-            catch { setIsFullscreen(true) }
-        },
-        exit: async () => {
-            try { await document.exitFullscreen() }
-            catch { setIsFullscreen(false) }
-        },
+        enter: async () => setIsFullscreen(true),
+        exit: async () => setIsFullscreen(false),
         toggle,
         containerRef: rootRef,
       })}
