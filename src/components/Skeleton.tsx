@@ -22,7 +22,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
   variant = 'text',
   animation = 'pulse',
 }) => {
-  const baseClasses = 'bg-gray-200 dark:bg-neutral-800'
+  const baseClasses = 'bg-slate-200/70 dark:bg-neutral-800/70'
   
   const variantClasses = {
     text: 'rounded',
@@ -108,13 +108,15 @@ export const SkeletonCard: React.FC<SkeletonCardProps> = ({
   hasAvatar = false,
 }) => {
   return (
-    <div className={`bg-white dark:bg-neutral-900 rounded-xl border border-gray-200 dark:border-neutral-800 p-4 ${className}`}>
+    <div className={`rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-4 ${className}`}>
       {hasImage && (
         <Skeleton height="h-32" width="w-full" variant="rounded" className="mb-4" />
       )}
       <div className="flex items-start gap-3">
         {hasAvatar && (
-          <Skeleton width="w-10" height="h-10" variant="circular" className="flex-shrink-0" />
+          <div className="w-10 h-10 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-neutral-600/15 flex items-center justify-center shrink-0">
+            <Skeleton width="w-6" height="h-6" variant="circular" />
+          </div>
         )}
         <div className="flex-1 min-w-0">
           <Skeleton height="h-5" width="w-3/4" className="mb-2" />
@@ -159,13 +161,23 @@ export const SkeletonList: React.FC<SkeletonListProps> = ({
     return (
       <div className={`space-y-2 ${className}`}>
         {Array.from({ length: count }).map((_, i) => (
-          <div key={i} className={`flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-neutral-900 ${itemClassName}`}>
-            {hasAvatar && <Skeleton width="w-8" height="h-8" variant="circular" />}
-            <div className="flex-1">
-              <Skeleton height="h-4" width="w-1/2" className="mb-1" />
-              <Skeleton height="h-3" width="w-1/3" />
+          <div
+            key={i}
+            className={`flex items-center justify-between gap-3 rounded-card ring-1 px-3 py-2 bg-white/70 dark:bg-neutral-900/70 ring-gray-200 dark:ring-neutral-800 ${itemClassName}`}
+          >
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-neutral-600/15 flex items-center justify-center shrink-0">
+                <Skeleton width="w-5" height="h-5" variant="circular" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <Skeleton height="h-4" width="w-1/2" className="mb-1" />
+                <div className="flex items-center gap-2">
+                  <Skeleton height="h-3" width="w-16" className="rounded-full" />
+                  <Skeleton height="h-3" width="w-20" className="rounded-full" />
+                </div>
+              </div>
             </div>
-            <Skeleton height="h-4" width="w-16" />
+            {hasAvatar && <Skeleton height="h-4" width="w-12" className="rounded-full" />}
           </div>
         ))}
       </div>

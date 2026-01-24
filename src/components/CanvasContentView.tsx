@@ -8,6 +8,7 @@ import { FullscreenContainer } from './FullscreenContainer'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
 import { useAIPanel } from '../context/AIPanelContext'
 import { useAppContext } from '../context/AppContext'
+import { Skeleton, SkeletonText } from './Skeleton'
 
 type ContentType = 'page' | 'assignment' | 'file' | 'announcement'
 
@@ -134,31 +135,31 @@ export const CanvasContentView: React.FC<Props> = ({
   if (contentType === 'file') {
     return (
       <div className="flex flex-col min-h-0 h-full overflow-hidden">
-        {/* Constrain viewer to available height so inner content scrolls */}
-        <div className="flex-1 min-h-0 overflow-hidden">
+        {/* Constrain viewer to available height so inner content scrolls inside the viewer itself */}
+        <div className="flex-1 min-h-0 flex flex-col">
           <FullscreenContainer className="flex flex-col min-h-0 h-full">
-          {({ isFullscreen, toggle }) => (
-            <div className="flex flex-col min-h-0 h-full">
-              <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60 backdrop-blur">
-                <Button variant="ghost" size="sm" onClick={onBack}>
-                  <ArrowLeft className="w-4 h-4 mr-1" /> Back
-                </Button>
-                <div className="text-sm font-medium truncate flex-1">{title}</div>
-                <Button variant="ghost" size="sm" onClick={toggle} title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>
-                  {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                </Button>
+            {({ isFullscreen, toggle }) => (
+              <div className="flex flex-col min-h-0 h-full">
+                <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/90 dark:bg-neutral-900/90">
+                  <Button variant="ghost" size="sm" onClick={onBack}>
+                    <ArrowLeft className="w-4 h-4 mr-1" /> Back
+                  </Button>
+                  <div className="text-sm font-medium truncate flex-1">{title}</div>
+                  <Button variant="ghost" size="sm" onClick={toggle} title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>
+                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                  </Button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <FileViewer
+                    fileId={contentId}
+                    className="h-full w-full"
+                    isFullscreen={isFullscreen}
+                    courseId={courseId}
+                    courseName={courseName}
+                  />
+                </div>
               </div>
-              <div className="flex-1 min-h-0 overflow-hidden">
-                <FileViewer 
-                  fileId={contentId} 
-                  className="h-full w-full" 
-                  isFullscreen={isFullscreen}
-                  courseId={courseId}
-                  courseName={courseName}
-                />
-              </div>
-            </div>
-          )}
+            )}
           </FullscreenContainer>
         </div>
       </div>
@@ -166,8 +167,8 @@ export const CanvasContentView: React.FC<Props> = ({
   }
 
   return (
-    <div className="flex flex-col h-full relative">
-      <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60 backdrop-blur">
+      <div className="flex flex-col h-full relative">
+       <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/90 dark:bg-neutral-900/90">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="w-4 h-4 mr-1" /> Back
         </Button>
@@ -190,13 +191,16 @@ export const CanvasContentView: React.FC<Props> = ({
         onContextMenu={handleContextMenu}
       >
         <div className="flex-1 overflow-y-auto p-6 h-full">
-          <div className="max-w-4xl mx-auto pb-12">
+            <div className="max-w-4xl mx-auto pb-12">
               {loading && (
-              <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading content...</div>
-            )}
-            {error && (
-              <div className="text-red-600 text-sm mb-4">{error}</div>
-            )}
+                <div className="space-y-4">
+                  <Skeleton height="h-6" width="w-2/3" />
+                  <SkeletonText lines={10} />
+                </div>
+              )}
+              {error && (
+                <div className="text-red-600 text-sm mb-4">{error}</div>
+              )}
             {!loading && !error && contentType === 'page' && pageQ.data?.body && (
               <HtmlContent html={pageQ.data.body} className="rich-html" onNavigate={onNavigate} />
             )}

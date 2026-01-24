@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('canvas', {
   listDueAssignments: (opts?: { days?: number; onlyPublished?: boolean; includeCourseName?: boolean }) => ipcRenderer.invoke('canvas:listDueAssignments', opts),
   listCourseAssignments: (courseId: string | number, first?: number) => ipcRenderer.invoke('canvas:listCourseAssignments', courseId, first),
   listCourseModulesGql: (courseId: string | number, first?: number, itemsFirst?: number) => ipcRenderer.invoke('canvas:listCourseModulesGql', courseId, first, itemsFirst),
+  getCourseModuleItem: (courseId: string | number, itemId: string | number) => ipcRenderer.invoke('canvas:getCourseModuleItem', courseId, itemId),
   listUpcoming: (opts?: { onlyActiveCourses?: boolean }) => ipcRenderer.invoke('canvas:listUpcoming', opts),
   listTodo: () => ipcRenderer.invoke('canvas:listTodo'),
   getMySubmission: (courseId: string | number, assignmentRestId: string | number) => ipcRenderer.invoke('canvas:getMySubmission', courseId, assignmentRestId),
@@ -65,6 +66,7 @@ contextBridge.exposeInMainWorld('canvas', {
   updateConversation: (conversationId: string | number, params: { workflowState?: 'read' | 'unread' | 'archived'; starred?: boolean; subscribed?: boolean }) => ipcRenderer.invoke('canvas:updateConversation', conversationId, params),
   deleteConversation: (conversationId: string | number) => ipcRenderer.invoke('canvas:deleteConversation', conversationId),
   searchRecipients: (params: { search: string; context?: string; type?: 'user' | 'context'; perPage?: number }) => ipcRenderer.invoke('canvas:searchRecipients', params),
+  getRateLimit: () => ipcRenderer.invoke('canvas:getRateLimit'),
 })
 
 contextBridge.exposeInMainWorld('settings', {

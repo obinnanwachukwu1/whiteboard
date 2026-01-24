@@ -102,7 +102,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
 
   return (
     <aside
-      className="w-64 min-w-[16rem] backdrop-blur text-slate-900 dark:text-slate-100 p-4 overflow-y-auto flex flex-col"
+      className="w-64 min-w-[16rem] text-slate-900 dark:text-slate-100 p-4 overflow-y-auto flex flex-col"
       style={{ backgroundColor: 'var(--app-accent-bg)' }}
     >
       <div className="mb-4">

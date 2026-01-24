@@ -107,7 +107,7 @@ export const PdfToolbar: React.FC<Props> = ({
   
   return (
     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
-      <div className="flex items-center gap-3 px-4 py-2 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md shadow-xl rounded-full border border-gray-200 dark:border-neutral-700">
+      <div className="flex items-center gap-3 px-4 py-2 bg-white/95 dark:bg-neutral-900/95 shadow-xl rounded-full border border-gray-200 dark:border-neutral-700">
         {/* Page Navigation */}
         <div className="flex items-center gap-1 pr-3 border-r border-gray-200 dark:border-neutral-700">
           <button

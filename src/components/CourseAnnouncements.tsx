@@ -5,6 +5,7 @@ import { Megaphone, MoreVertical } from 'lucide-react'
 import { Dropdown } from './ui/Dropdown'
 import { useCourseAnnouncementsInfinite } from '../hooks/useCanvasQueries'
 import { ListItemRow } from './ui/ListItemRow'
+import { SkeletonList } from './Skeleton'
 import { MetadataBadge } from './ui/MetadataBadge'
 import { useQueryClient } from '@tanstack/react-query'
 import { enqueuePrefetch } from '../utils/prefetchQueue'
@@ -118,7 +119,7 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
       
       <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
-        {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
+        {isLoading && <SkeletonList count={6} hasAvatar variant="row" />}
         {!isLoading && list && list.length === 0 && (
           <div className="text-slate-500 dark:text-neutral-400 text-sm">No announcements</div>
         )}
@@ -146,4 +147,3 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
     </div>
   )
 }
-

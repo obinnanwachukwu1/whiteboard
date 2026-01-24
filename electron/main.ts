@@ -10,6 +10,7 @@ import {
   listDueAssignments as canvasListDue,
   listCourseAssignments as canvasListCourseAssignments,
   CanvasError,
+  getRateLimitSnapshot as canvasGetRateLimitSnapshot,
 } from './canvasClient'
 import { loadConfig, saveConfig, type AppConfig } from './config'
 import { AIManager } from './ai/manager'
@@ -46,6 +47,7 @@ if (process.platform === 'win32') {
 
 import {
   listCourseModulesGql as svcListCourseModulesGql,
+  getCourseModuleItem as svcGetCourseModuleItem,
   listUpcoming as svcListUpcoming,
   listTodo as svcListTodo,
   getMySubmission as svcGetMySubmission,
@@ -87,6 +89,7 @@ import {
   updateConversation as svcUpdateConversation,
   deleteConversation as svcDeleteConversation,
   searchRecipients as svcSearchRecipients,
+  resolveUrl as svcResolveUrl,
 } from './canvasClient'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -211,6 +214,7 @@ function createWindow() {
             height: 56, // match Header height (h-14)
           },
           autoHideMenuBar: true,
+          backgroundMaterial: 'mica' as const,
         }
       : process.platform !== 'darwin'
         ? { autoHideMenuBar: true }
@@ -658,6 +662,16 @@ ipcMain.handle('canvas:getProfile', async () => {
   }
 })
 
+ipcMain.handle('canvas:getRateLimit', async () => {
+  try {
+    const data = await canvasGetRateLimitSnapshot()
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
 ipcMain.handle('canvas:listCourses', async (_evt, opts?: { enrollment_state?: string }) => {
   try {
     const data = await canvasListCourses(opts)
@@ -691,6 +705,16 @@ ipcMain.handle('canvas:listCourseAssignments', async (_evt, courseId: string | n
 ipcMain.handle('canvas:listCourseModulesGql', async (_evt, courseId: string | number, first = 20, itemsFirst = 50) => {
   try {
     const data = await svcListCourseModulesGql(courseId, first, itemsFirst)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:getCourseModuleItem', async (_evt, courseId: string | number, itemId: string | number) => {
+  try {
+    const data = await svcGetCourseModuleItem(courseId, itemId)
     return { ok: true, data }
   } catch (e: any) {
     const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
@@ -1104,6 +1128,18 @@ ipcMain.handle('canvas:searchRecipients', async (_evt, params: {
   } catch (e: any) {
     const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
     return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:resolveUrl', async (_evt, url: string) => {
+  try {
+    // Security check: only allow base URL or http(s)
+    if (!url.startsWith('http')) return { ok: false, error: 'Invalid URL' }
+    
+    const data = await svcResolveUrl(url)
+    return { ok: true, data }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
   }
 })
 

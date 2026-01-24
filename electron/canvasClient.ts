@@ -24,6 +24,16 @@ const DefaultRetry: RetryConfig = {
   retryStatuses: [429, 500, 502, 503, 504],
 }
 
+function buildUserAgentString() {
+  const appName = app.getName?.() || 'Whiteboard'
+  const appVersion = app.getVersion?.() || '0.0.0'
+  const electron = process.versions.electron || 'unknown'
+  const chrome = process.versions.chrome || 'unknown'
+  const node = process.versions.node || 'unknown'
+  const platform = `${process.platform}; ${process.arch}`
+  return `${appName}/${appVersion} (Electron ${electron}; Chrome ${chrome}; Node ${node}; ${platform})`
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -53,6 +63,7 @@ export class CanvasClient {
   private timeoutMs: number
   private retry: RetryConfig
   private verbose: boolean
+  private lastRateLimit?: { remaining?: number; cost?: number; at: number }
 
   constructor(opts: CanvasClientOptions) {
     this.baseUrl = (opts.baseUrl || DEFAULT_BASE_URL).replace(/\/$/, '')
@@ -64,8 +75,9 @@ export class CanvasClient {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${opts.token}`,
       Accept: 'application/json',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'User-Agent': opts.userAgent || buildUserAgentString(),
     }
-    if (opts.userAgent) headers['User-Agent'] = opts.userAgent
 
     this.axios = axios.create({
       headers,
@@ -88,6 +100,23 @@ export class CanvasClient {
       }
 
       const resp = await this.axios.request<T>(config)
+
+      // Track rate limit hints if provided
+      const costRaw = resp.headers['x-request-cost']
+      const remainingRaw = resp.headers['x-rate-limit-remaining']
+      const cost = typeof costRaw === 'string' ? Number(costRaw) : Array.isArray(costRaw) ? Number(costRaw[0]) : undefined
+      const remaining = typeof remainingRaw === 'string' ? Number(remainingRaw) : Array.isArray(remainingRaw) ? Number(remainingRaw[0]) : undefined
+      if (Number.isFinite(cost) || Number.isFinite(remaining)) {
+        this.lastRateLimit = {
+          cost: Number.isFinite(cost) ? cost : undefined,
+          remaining: Number.isFinite(remaining) ? remaining : undefined,
+          at: Date.now(),
+        }
+        if (this.verbose) {
+          // eslint-disable-next-line no-console
+          console.log('[Canvas rate]', { cost: this.lastRateLimit.cost, remaining: this.lastRateLimit.remaining })
+        }
+      }
       if (this.retry.retryStatuses.includes(resp.status) && attempt <= this.retry.maxRetries) {
         const ra = resp.headers['retry-after']
         const delay = ra ? Math.max(500, Number(ra) * 1000 || 0) : this.retry.backoffFactor * attempt * 1000
@@ -105,6 +134,10 @@ export class CanvasClient {
       }
       return resp
     }
+  }
+
+  getRateLimitSnapshot() {
+    return this.lastRateLimit ? { ...this.lastRateLimit } : null
   }
 
   private url(pathOrUrl: string) {
@@ -328,107 +361,52 @@ export class CanvasClient {
     return nodes
   }
 
-  async listCourseModulesGql(courseRestId: string | number, first = 20, itemsFirst = 50) {
-    try {
-      const query = `
-        query CourseModules($id: ID!, $first: Int = 20, $after: String, $itemsFirst: Int = 50) {
-          course(id: $id) {
-            _id
-            name
-            modulesConnection(first: $first, after: $after) {
-              nodes {
-                id
-                _id
-                name
-                position
-                moduleItemsConnection(first: $itemsFirst) {
-                  nodes {
-                    id
-                    _id
-                    __typename
-                    title
-                  }
-                  pageInfo { endCursor hasNextPage }
-                }
-              }
-              pageInfo { endCursor hasNextPage }
-            }
-          }
-        }
-      `
-      const nodes = await this.graphqlPaginate(
-        query,
-        { id: String(courseRestId), first, itemsFirst },
-        (payload) => {
-          const conn = payload?.data?.course?.modulesConnection
-          return {
-            nodes: conn?.nodes ?? [],
-            endCursor: conn?.pageInfo?.endCursor ?? null,
-            hasNextPage: conn?.pageInfo?.hasNextPage ?? false,
-          }
-        },
-      )
-      // Enrich with REST html_url per module item so items are clickable
-      const enriched = await Promise.all(
-        nodes.map(async (m: any) => {
-          try {
-            const restItems = await this.paginate<any>(
-              `/courses/${courseRestId}/modules/${m._id}/items`,
-              { per_page: 100 },
-            )
-            const byItemId = new Map<string, any>(restItems.map((ri: any) => [String(ri.id), ri]))
-            const items = (m.moduleItemsConnection?.nodes || []).map((it: any) => {
-              const ri = byItemId.get(String(it._id))
-              return {
-                ...it,
-                htmlUrl: ri?.html_url,
-                contentId: ri?.content_id,
-                pageUrl: ri?.page_url,
-              }
-            })
-            return { ...m, moduleItemsConnection: { nodes: items } }
-          } catch {
-            return m
-          }
-        })
-      )
-      return enriched
-    } catch (_e) {
-      // Fallback to REST: include items and content_details
-      const modules = await this.paginate<any>(
-        `/courses/${courseRestId}/modules`,
-        { per_page: 50, 'include[]': ['items', 'content_details'] },
-      )
-      const mapType = (t?: string) => {
-        switch ((t || '').toLowerCase()) {
-          case 'assignment': return 'AssignmentModuleItem'
-          case 'page': return 'PageModuleItem'
-          case 'file': return 'FileModuleItem'
-          case 'discussion': return 'DiscussionModuleItem'
-          case 'externalurl': return 'ExternalUrlModuleItem'
-          case 'quiz': return 'QuizModuleItem'
-          default: return 'ModuleItem'
-        }
+  async listCourseModulesGql(courseRestId: string | number, _first = 20, _itemsFirst = 50) {
+    // REST: include items and content_details. This avoids expensive per-module fan-out.
+    const modules = await this.paginate<any>(
+      `/courses/${courseRestId}/modules`,
+      { per_page: 50, 'include[]': ['items', 'content_details'] },
+    )
+    const mapType = (t?: string) => {
+      switch ((t || '').toLowerCase()) {
+        case 'assignment': return 'AssignmentModuleItem'
+        case 'page': return 'PageModuleItem'
+        case 'file': return 'FileModuleItem'
+        case 'discussion': return 'DiscussionModuleItem'
+        case 'externalurl': return 'ExternalUrlModuleItem'
+        case 'quiz': return 'QuizModuleItem'
+        default: return 'ModuleItem'
       }
-      const normalized = (modules || []).map((m: any) => ({
-        id: m.id,
-        _id: String(m.id),
-        name: m.name,
-        position: m.position,
-        moduleItemsConnection: {
-          nodes: (m.items || []).map((it: any) => ({
-            id: it.id,
-            _id: String(it.id),
-            __typename: mapType(it.type),
-            title: it.title,
-            htmlUrl: it.html_url,
-            contentId: it.content_id,
-            pageUrl: it.page_url,
-          })),
-        },
-      }))
-      return normalized
     }
+    const normalized = (modules || []).map((m: any) => ({
+      id: m.id,
+      _id: String(m.id),
+      name: m.name,
+      position: m.position,
+      moduleItemsConnection: {
+        nodes: (m.items || []).map((it: any) => ({
+          id: it.id,
+          _id: String(it.id),
+          __typename: mapType(it.type),
+          title: it.title,
+          htmlUrl: it.html_url,
+          contentId: it.content_id,
+          pageUrl: it.page_url,
+        })),
+      },
+    }))
+    return normalized
+  }
+
+  async getCourseModuleItem(courseId: string | number, itemId: string | number) {
+    // Canvas REST API requires module_id for direct module item fetch.
+    // Use the sequence endpoint to retrieve the ModuleItem by its id.
+    const seq = await this.get<any>(`/courses/${courseId}/module_item_sequence`, {
+      asset_type: 'ModuleItem',
+      asset_id: itemId,
+    })
+    const node = Array.isArray(seq?.items) ? seq.items[0] : null
+    return node?.current || null
   }
 
   async listUpcoming(opts: { onlyActiveCourses?: boolean } = {}) {
@@ -469,6 +447,21 @@ export class CanvasClient {
   }
   async getCourseFrontPage(courseId: string | number) {
     return this.get(`/courses/${courseId}/front_page`)
+  }
+
+  async resolveModuleItemUrl(url: string): Promise<string> {
+    const target = this.url(url)
+    try {
+      const resp = await this.axios.get(target, { 
+        maxRedirects: 5,
+        validateStatus: (status) => status >= 200 && status < 400 
+      })
+      // In Node.js axios, the final URL is in resp.request.res.responseUrl
+      const finalUrl = (resp.request as any)?.res?.responseUrl
+      return finalUrl || target
+    } catch (e) {
+      return target
+    }
   }
 
   // Assignments (REST detail for description)
@@ -885,6 +878,9 @@ export async function listMyEnrollmentsForCourse(courseId: string | number) {
 export async function listCourseTabs(courseId: string | number, includeExternal = true) {
   return ensureClient().listCourseTabs(courseId, includeExternal)
 }
+export async function getRateLimitSnapshot() {
+  return ensureClient().getRateLimitSnapshot()
+}
 export async function listActivityStream(opts?: { onlyActiveCourses?: boolean; perPage?: number }) {
   return ensureClient().listActivityStream(opts)
 }
@@ -933,6 +929,10 @@ export async function postDiscussionReply(
 
 export async function listCourseModulesGql(courseId: string | number, first = 20, itemsFirst = 50) {
   return ensureClient().listCourseModulesGql(courseId, first, itemsFirst)
+}
+
+export async function getCourseModuleItem(courseId: string | number, itemId: string | number) {
+  return ensureClient().getCourseModuleItem(courseId, itemId)
 }
 
 export async function listUpcoming(opts?: { onlyActiveCourses?: boolean }) {
@@ -1052,4 +1052,8 @@ export async function searchRecipients(params: {
   perPage?: number
 }) {
   return ensureClient().searchRecipients(params)
+}
+
+export async function resolveUrl(url: string) {
+  return ensureClient().resolveModuleItemUrl(url)
 }

@@ -1,6 +1,7 @@
 import React from 'react'
 // no Card wrapper; rendered within page container
 import { Button } from './ui/Button'
+import { SkeletonText } from './Skeleton'
 import { Pencil, RotateCcw } from 'lucide-react'
 import { useCourseGradebook } from '../hooks/useCourseGradebook'
 import { useQueryClient } from '@tanstack/react-query'
@@ -101,7 +102,9 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
 
       <div className="flex-1 overflow-auto min-h-0 p-4">
         {(isLoading || (isFetching && !data)) && (
-          <div className="text-slate-500 dark:text-neutral-400">Loading…</div>
+          <div className="space-y-3">
+            <SkeletonText lines={8} />
+          </div>
         )}
         {error && <div className="text-red-600">{String(error.message || error)}</div>}
 

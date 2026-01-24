@@ -466,12 +466,12 @@ export function useGlobalSearch() {
             if (assignments) courseAssignments.set(courseId, assignments)
             
             // Fetch modules (includes module items)
-            let modules = queryClient.getQueryData(['course-modules', courseId]) as any[] | undefined
+            let modules = queryClient.getQueryData(['course-modules', courseId, 'v2']) as any[] | undefined
             if (!modules) {
               const res = await window.canvas.listCourseModulesGql(courseId, 20, 50)
               if (res?.ok && res.data) {
                 modules = res.data
-                queryClient.setQueryData(['course-modules', courseId], modules)
+                queryClient.setQueryData(['course-modules', courseId, 'v2'], modules)
               }
             }
             if (modules) courseModules.set(courseId, modules)
@@ -611,7 +611,7 @@ export function useGlobalSearch() {
           }
           if (modRes?.ok && modRes.data) {
             courseModules.set(courseId, modRes.data)
-            queryClient.setQueryData(['course-modules', courseId], modRes.data)
+            queryClient.setQueryData(['course-modules', courseId, 'v2'], modRes.data)
           }
           if (annRes?.ok && annRes.data) {
             courseAnnouncements.set(courseId, annRes.data)

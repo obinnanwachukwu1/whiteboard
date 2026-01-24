@@ -18,6 +18,7 @@ import { HtmlContent } from './HtmlContent'
 import { computeResolvedTabs, hasFilesFromTabs } from '../utils/courseTabs'
 import type { ResolvedTab } from '../types/ui'
 import { prefetchCourseTab } from '../utils/coursePrefetch'
+import { Skeleton, SkeletonText } from './Skeleton'
 
 
 type Detail = { contentType: 'page' | 'assignment' | 'file' | 'announcement' | 'discussion'; contentId: string; title: string }
@@ -50,7 +51,13 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
   const hasHome = defaultView === 'wiki'
   const hasFilesViaTabs = hasFilesFromTabs(tabsQ.data as any)
   // Fallback probe: if tabs didn’t reveal Files, try a 1-item files fetch; if it works and returns >0, enable Files tab
-  const filesProbeQ = useCourseFiles(courseId, 1, 'updated_at', 'desc', { enabled: courseId != null && !!tabsQ.data && !hasFilesViaTabs })
+  const filesProbeQ = useCourseFiles(courseId, 1, 'updated_at', 'desc', {
+    enabled: courseId != null && !!tabsQ.data && !hasFilesViaTabs,
+    staleTime: 1000 * 60 * 60 * 24,
+    gcTime: 1000 * 60 * 60 * 24,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  })
   const hasFiles = hasFilesViaTabs || (Array.isArray(filesProbeQ.data) && filesProbeQ.data.length > 0)
   const hasLinks = Array.isArray(tabsQ.data) && (tabsQ.data as any[]).length > 0
 
@@ -167,6 +174,20 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
 
       const isInternal = originMatch || path.startsWith('/courses') || path.startsWith('/files')
       if (!isInternal) { (await import('../utils/openExternal')).openExternal(href); return }
+
+      // Handle module item redirects (e.g. /courses/1/modules/items/2)
+      if (path.includes('/modules/items/')) {
+        try {
+          const res = await (window.canvas as any).resolveUrl(href)
+          if (res.ok && res.data && res.data !== href) {
+            // Recursively handle the resolved URL (e.g. the assignment url)
+            return handleNavigate(res.data)
+          }
+        } catch {
+          // Ignore resolution errors and fall back to external open
+        }
+      }
+
       if (openAssignment()) return
       if (openAnnouncement()) return
       if (openPage()) return
@@ -188,7 +209,19 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
           onChange={(t) => { onClearDetail(); onChangeTab(t) }}
           onHover={(t) => prefetchCourseTab(queryClient, courseId, t)}
           anchorId="course-content-anchor"
-          tabs={availableTabs.map((t) => ({ key: t.key, label: t.label, Icon: ({
+          tabs={availableTabs.map((t) => ({ key: t.key, label: ({
+            home: 'Home',
+            wiki: 'Home',
+            syllabus: 'Syllabus',
+            announcements: 'Announcements',
+            discussions: 'Discussions',
+            files: 'Files',
+            modules: 'Modules',
+            links: 'Links',
+            assignments: 'Assignments',
+            grades: 'Grades',
+            people: 'People',
+          } as const)[t.key] || t.label, Icon: ({
             home: HomeIcon,
             wiki: HomeIcon,
             syllabus: ScrollText,
@@ -248,10 +281,15 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
         </div>
       ) : (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {activeTab === 'home' && (
-            <div className="flex-1 overflow-y-auto">
-              <div className="mt-2">
-                {frontQ.isLoading && <div className="text-slate-500 dark:text-neutral-400">Loading…</div>}
+           {activeTab === 'home' && (
+             <div className="flex-1 overflow-y-auto">
+               <div className="mt-2">
+                {frontQ.isLoading && (
+                  <div className="space-y-4">
+                    <Skeleton height="h-6" width="w-2/3" />
+                    <SkeletonText lines={10} />
+                  </div>
+                )}
                 {frontQ.error && <div className="text-red-600">{String((frontQ.error as any)?.message || frontQ.error)}</div>}
                 {frontQ.data?.body && (
                   <HtmlContent html={frontQ.data.body} className="rich-html" onNavigate={handleNavigate} />
@@ -296,7 +334,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
             <div className="flex-1 flex flex-col overflow-hidden">
               <CourseModules
                 courseId={courseId}
-                onOpenExternal={async (url) => { (await import('../utils/openExternal')).openExternal(url) }}
+                onOpenExternal={handleNavigate}
                 onOpenContent={(c) => onOpenDetail({ contentType: c.contentType, contentId: String(c.contentId), title: c.title })}
               />
             </div>

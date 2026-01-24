@@ -68,10 +68,11 @@ function fixPreloadCjsExport(): Plugin {
       const preloadPath = path.join(outDir, 'preload.cjs')
       if (!fs.existsSync(preloadPath)) return
       const src = fs.readFileSync(preloadPath, 'utf8')
-      if (src.includes('export default require_preload();')) {
+      const exportDefaultRegex = /export default ([a-zA-Z0-9_$]+)\(\);/
+      if (exportDefaultRegex.test(src)) {
         const updated = src.replace(
-          'export default require_preload();',
-          'module.exports = require_preload();',
+          exportDefaultRegex,
+          'module.exports = $1();',
         )
         fs.writeFileSync(preloadPath, updated)
       }

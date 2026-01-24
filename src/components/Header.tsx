@@ -84,7 +84,7 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
 
   return (
     <header
-      className={`h-14 backdrop-blur text-slate-900 dark:text-slate-100 flex items-center justify-between select-none app-drag relative z-[100] ${isWin ? 'flex-row-reverse pl-4 titlebar-right-inset' : 'px-5 titlebar-left-inset'}`}
+      className={`h-14 text-slate-900 dark:text-slate-100 flex items-center justify-between select-none app-drag relative z-[100] ${isWin ? 'flex-row-reverse pl-4 titlebar-right-inset' : 'px-5 titlebar-left-inset'}`}
       style={{
         backgroundColor: 'var(--app-accent-bg)',
       }}

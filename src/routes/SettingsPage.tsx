@@ -543,6 +543,14 @@ export default function SettingsPage() {
           </div>
           <input className="self-start sm:self-auto" type="checkbox" checked={ctx.prefetchEnabled} onChange={(e) => ctx.setPrefetchEnabled(e.target.checked)} />
         </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 w-full max-w-3xl mt-4">
+          <div className="text-sm">
+            <div className="mb-0.5">Verbose Canvas API logs</div>
+            <div className="text-xs text-slate-600 dark:text-neutral-400">Log Canvas request rate headers (helps monitor quota)</div>
+          </div>
+          <input className="self-start sm:self-auto" type="checkbox" checked={ctx.verbose} onChange={(e) => ctx.setVerbose(e.target.checked)} />
+        </div>
         
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 w-full max-w-3xl mt-4 border-t border-gray-100 dark:border-neutral-800 pt-4">
           <div className="text-sm">

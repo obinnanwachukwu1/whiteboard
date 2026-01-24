@@ -20,6 +20,8 @@ export function useWindowControlsOverlayInsets(enabled: boolean = true) {
     const wco = (navigator as unknown as { windowControlsOverlay?: WindowControlsOverlayLike }).windowControlsOverlay
     if (!wco || typeof wco.getTitlebarAreaRect !== 'function') return
 
+    let raf: number | null = null
+
     const apply = () => {
       try {
         if (wco.visible === false) {
@@ -45,7 +47,10 @@ export function useWindowControlsOverlayInsets(enabled: boolean = true) {
 
     apply()
 
-    const onGeom = () => apply()
+    const onGeom = () => {
+      if (raf) cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => apply())
+    }
     // Some implementations require a bound receiver for DOM-style methods.
     wco.addEventListener?.call(wco, 'geometrychange', onGeom)
     window.addEventListener('resize', onGeom)
@@ -53,6 +58,7 @@ export function useWindowControlsOverlayInsets(enabled: boolean = true) {
     return () => {
       wco.removeEventListener?.call(wco, 'geometrychange', onGeom)
       window.removeEventListener('resize', onGeom)
+      if (raf) cancelAnimationFrame(raf)
     }
   }, [enabled])
 }

@@ -56,6 +56,9 @@ export function RootLayout() {
   const [pdfGestureZoomEnabled, setPdfGestureZoomEnabledState] = useState(true)
   const [embeddingsEnabled, setEmbeddingsEnabledState] = useState(true)
   const [aiEnabled, setAiEnabledState] = useState(false)
+  const [verbose, setVerboseState] = useState(false)
+  const coursePrefetchCooldown = React.useRef<Map<string, number>>(new Map())
+  const navPrefetchCooldown = React.useRef<Map<string, number>>(new Map())
   const [cachedCourses, setCachedCourses] = useState<any[] | null>(null)
   const [cachedDue, setCachedDue] = useState<any[] | null>(null)
   const [activeCourseId, setActiveCourseIdState] = useState<string | number | null>(null)
@@ -125,6 +128,7 @@ export function RootLayout() {
        if (typeof data?.pdfGestureZoomEnabled === 'boolean') setPdfGestureZoomEnabledState(!!data.pdfGestureZoomEnabled)
        if (typeof data?.embeddingsEnabled === 'boolean') setEmbeddingsEnabledState(!!data.embeddingsEnabled)
        if (typeof data?.aiEnabled === 'boolean') setAiEnabledState(!!data.aiEnabled)
+       if (typeof data?.verbose === 'boolean') setVerboseState(!!data.verbose)
        if (Array.isArray(data?.cachedCourses)) {
          setCachedCourses(data.cachedCourses || [])
          queryClient.setQueryData(['courses', { enrollment_state: 'active' }], data.cachedCourses || [])
@@ -136,7 +140,7 @@ export function RootLayout() {
 
 
       setLoading(true)
-      const res = await window.canvas.init({ baseUrl: data?.baseUrl || baseUrl })
+      const res = await window.canvas.init({ baseUrl: data?.baseUrl || baseUrl, verbose: !!(data?.verbose ?? verbose) })
       if (!res.ok) {
         setHasToken(false)
         setLoading(false)
@@ -246,6 +250,13 @@ export function RootLayout() {
     await saveUserSettings({ prefetchEnabled: v })
   }, [saveUserSettings])
 
+  const setVerbosePersisted = React.useCallback(async (v: boolean) => {
+    setVerboseState(v)
+    try { await window.settings.set?.({ verbose: v }) } catch {}
+    // Re-init Canvas client with updated verbosity so main can log rate data when desired
+    try { await window.canvas.init({ baseUrl, verbose: v }) } catch {}
+  }, [baseUrl])
+
   const setPdfGestureZoomEnabledPersisted = React.useCallback(async (v: boolean) => {
     setPdfGestureZoomEnabledState(v)
     await saveUserSettings({ pdfGestureZoomEnabled: v })
@@ -316,30 +327,15 @@ export function RootLayout() {
     await saveUserSidebar(next)
   }
 
-  // Proactive prefetch for global nav tabs on idle
-  useEffect(() => {
-    if (!prefetchEnabled || !hasToken || !coursesQ.data?.length) return
+  const coursePrefetchCooldownMs = 10 * 60 * 1000
 
-    const visibleCourses = coursesQ.data.filter(c => {
-      const hidden = new Set(sidebarCfg.hiddenCourseIds || [])
-      return !hidden.has(String(c.id))
-    })
-
-    requestIdle(() => {
-      // Prefetch Dashboard first (highest value)
-      enqueuePrefetch(() => prefetchNavTab(queryClient, 'dashboard', visibleCourses))
-      
-      // Then the rest in sequence
-      enqueuePrefetch(() => prefetchNavTab(queryClient, 'assignments', visibleCourses))
-      enqueuePrefetch(() => prefetchNavTab(queryClient, 'announcements', visibleCourses))
-      enqueuePrefetch(() => prefetchNavTab(queryClient, 'grades', visibleCourses))
-      enqueuePrefetch(() => prefetchNavTab(queryClient, 'discussions', visibleCourses))
-    })
-  }, [prefetchEnabled, hasToken, coursesQ.data, sidebarCfg.hiddenCourseIds, queryClient])
-
-  const prefetchCourseData = (courseId: string | number) => {
+  const prefetchCourseData = (courseId: string | number, opts?: { isActive?: boolean }) => {
     const id = String(courseId)
-    
+
+    const last = coursePrefetchCooldown.current.get(id) || 0
+    if (Date.now() - last < coursePrefetchCooldownMs) return
+    coursePrefetchCooldown.current.set(id, Date.now())
+
     enqueuePrefetch(async () => {
       // 1. Get Course Info to find default_view
       const info = await queryClient.fetchQuery({
@@ -377,7 +373,7 @@ export function RootLayout() {
         }))
       } else if (defaultView === 'modules') {
         promises.push(queryClient.prefetchQuery({
-          queryKey: ['course-modules', id],
+          queryKey: ['course-modules', id, 'v2'],
           queryFn: async () => {
             const res = await window.canvas.listCourseModulesGql(id, 20, 50)
             return res?.data || []
@@ -412,37 +408,39 @@ export function RootLayout() {
     })
 
     // Queued low-priority requests
-    requestIdle(() => {
-      enqueuePrefetch(async () => {
-        await queryClient.prefetchQuery({
-          queryKey: ['course-gradebook', id],
-          queryFn: async () => {
-            const [groupsRes, assignmentsRes] = await Promise.all([
-              window.canvas.listAssignmentGroups(id, false),
-              window.canvas.listAssignmentsWithSubmission(id, 100),
-            ])
-            if (!groupsRes?.ok) throw new Error(groupsRes?.error || 'Failed to load assignment groups')
-            if (!assignmentsRes?.ok) throw new Error(assignmentsRes?.error || 'Failed to load gradebook assignments')
-            const groups = toAssignmentGroupInputsFromRest(groupsRes.data || [])
-            const raw = (assignmentsRes.data || []) as any[]
-            const assignments = toAssignmentInputsFromRest(raw)
-            return { groups, assignments, raw }
-          },
-          staleTime: 1000 * 60 * 5,
+    if (opts?.isActive) {
+      requestIdle(() => {
+        enqueuePrefetch(async () => {
+          await queryClient.prefetchQuery({
+            queryKey: ['course-gradebook', id],
+            queryFn: async () => {
+              const [groupsRes, assignmentsRes] = await Promise.all([
+                window.canvas.listAssignmentGroups(id, false),
+                window.canvas.listAssignmentsWithSubmission(id, 100),
+              ])
+              if (!groupsRes?.ok) throw new Error(groupsRes?.error || 'Failed to load assignment groups')
+              if (!assignmentsRes?.ok) throw new Error(assignmentsRes?.error || 'Failed to load gradebook assignments')
+              const groups = toAssignmentGroupInputsFromRest(groupsRes.data || [])
+              const raw = (assignmentsRes.data || []) as any[]
+              const assignments = toAssignmentInputsFromRest(raw)
+              return { groups, assignments, raw }
+            },
+            staleTime: 1000 * 60 * 5,
+          })
+        })
+        enqueuePrefetch(async () => {
+          await queryClient.prefetchQuery({
+            queryKey: ['course-discussions', id, 50],
+            queryFn: async () => {
+              const res = await window.canvas.listCourseDiscussions?.(id, 50)
+              if (!res?.ok) throw new Error(res?.error || 'Failed to load discussions')
+              return res.data || []
+            },
+            staleTime: 1000 * 60 * 5,
+          })
         })
       })
-      enqueuePrefetch(async () => {
-        await queryClient.prefetchQuery({
-          queryKey: ['course-discussions', id, 50],
-          queryFn: async () => {
-            const res = await window.canvas.listCourseDiscussions?.(id, 50)
-            if (!res?.ok) throw new Error(res?.error || 'Failed to load discussions')
-            return res.data || []
-          },
-          staleTime: 1000 * 60 * 5,
-        })
-      })
-    })
+    }
   }
 
   // Derive current route and active course from pathname
@@ -467,6 +465,38 @@ export function RootLayout() {
     const parts = pathname.split('/')
     return parts[2] ? decodeURIComponent(parts[2]) : null
   }, [pathname])
+
+  const navCooldownMs = 10 * 60 * 1000
+
+  const getPrefetchCourses = React.useCallback(() => {
+    if (!coursesQ.data?.length) return [] as Array<{ id: string | number }>
+    const hidden = new Set(sidebarCfg.hiddenCourseIds || [])
+    const visible = coursesQ.data.filter((c) => !hidden.has(String(c.id)))
+    const targetId = derivedCourseId ?? activeCourseId ?? (visible[0]?.id ?? null)
+    return targetId ? [{ id: targetId }] : []
+  }, [coursesQ.data, sidebarCfg.hiddenCourseIds, derivedCourseId, activeCourseId])
+
+  const handlePrefetchNav = React.useCallback((tab: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions') => {
+    const now = Date.now()
+    const last = navPrefetchCooldown.current.get(tab) || 0
+    if (now - last < navCooldownMs) return
+    const coursesForPrefetch = getPrefetchCourses()
+    if (!coursesForPrefetch.length) return
+    navPrefetchCooldown.current.set(tab, now)
+    enqueuePrefetch(() => prefetchNavTab(queryClient, tab, coursesForPrefetch))
+  }, [getPrefetchCourses, queryClient])
+
+  // Proactive nav prefetch (scoped to one course, with cooldown)
+  useEffect(() => {
+    if (!prefetchEnabled || !hasToken) return
+    requestIdle(() => {
+      handlePrefetchNav('dashboard')
+      handlePrefetchNav('assignments')
+      handlePrefetchNav('announcements')
+      handlePrefetchNav('grades')
+      handlePrefetchNav('discussions')
+    })
+  }, [prefetchEnabled, hasToken, handlePrefetchNav])
 
   const setActiveCourseId = (id: string | number | null) => setActiveCourseIdState(id)
 
@@ -509,6 +539,8 @@ export function RootLayout() {
     setEmbeddingsEnabled: setEmbeddingsEnabledPersisted,
     aiEnabled,
     setAiEnabled: setAiEnabledPersisted,
+    verbose,
+    setVerbose: setVerbosePersisted,
     saveUserSettings,
     onOpenCourse: (id) => { setActiveCourseId(id); navigate({ to: '/course/$courseId', params: { courseId: String(id) } }) },
     onOpenAssignment: (courseId, restId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'assignments', type: 'assignment', contentId: String(restId), title } }) },
@@ -531,7 +563,7 @@ export function RootLayout() {
 
   const init = async () => {
     setLoading(true)
-    const res = await window.canvas.init({ token: token.trim() || undefined, baseUrl })
+    const res = await window.canvas.init({ token: token.trim() || undefined, baseUrl, verbose })
     if (res.ok) {
       setHasToken(true)
       await window.settings.set({ baseUrl })
@@ -555,14 +587,14 @@ export function RootLayout() {
         <div className="absolute inset-x-0 top-0 h-14 app-drag titlebar-left-inset titlebar-right-inset z-50 bg-transparent" aria-hidden />
         
         {/* Skeleton Header */}
-        <div className="h-14 border-b border-gray-200 dark:border-neutral-800 flex items-center justify-end px-4 gap-4">
+        <div className="h-14 flex items-center justify-end px-4 gap-4">
           <Skeleton height="h-4" width="w-32" />
           <Skeleton width="w-8" height="h-8" variant="circular" />
         </div>
 
         <div className="flex flex-1 overflow-hidden">
           {/* Skeleton Sidebar */}
-          <div className="w-64 border-r border-gray-200 dark:border-neutral-800 p-4 space-y-6 hidden md:block">
+          <div className="w-64 p-4 space-y-6 hidden md:block">
             <div className="space-y-3">
               <Skeleton height="h-4" width="w-20" />
               <SkeletonList count={3} variant="row" />
@@ -655,9 +687,9 @@ export function RootLayout() {
       courses={coursesQ.data || cachedCourses || []}
     >
       <AppProvider value={context}>
-        <div className="h-screen flex flex-col">
+        <div className="h-screen flex flex-col" style={{ backgroundColor: 'var(--app-accent-bg)' }}>
           <Header profile={profileQ.data} onOpenSearch={() => setSearchOpen(true)} onOpenInbox={() => setInboxOpen(true)} />
-          <div className="flex flex-1 overflow-hidden">
+          <div className="flex flex-1 overflow-hidden" style={{ backgroundColor: 'var(--app-accent-bg)' }}>
             <Sidebar
               courses={visibleCourses}
               activeCourseId={(currentView === 'course' ? (derivedCourseId ?? activeCourseId) : null)}
@@ -671,14 +703,8 @@ export function RootLayout() {
               onSelectCourse={(id) => context.onOpenCourse(id)}
               onOpenAllCourses={() => navigate({ to: '/all-courses' })}
               onHideCourse={hideCourse}
-              onPrefetchCourse={(id) => { if (prefetchEnabled) prefetchCourseData(id) }}
-              onPrefetchNav={(tab) => { 
-                if (prefetchEnabled) {
-                  const hidden = new Set(sidebarCfg.hiddenCourseIds || [])
-                  const visible = (context.courses || []).filter(c => !hidden.has(String(c.id)))
-                  enqueuePrefetch(() => prefetchNavTab(queryClient, tab, visible)) 
-                }
-              }}
+              onPrefetchCourse={(id) => { if (prefetchEnabled) prefetchCourseData(id, { isActive: String(id) === String(derivedCourseId ?? activeCourseId ?? '') }) }}
+              onPrefetchNav={(tab) => { if (prefetchEnabled) handlePrefetchNav(tab) }}
               onReorder={async (nextOrder) => { const next: SidebarConfig = { ...sidebarCfg, order: nextOrder }; setSidebarCfg(next); await saveUserSidebar(next) }}
             />
             <main className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-tl-xl">

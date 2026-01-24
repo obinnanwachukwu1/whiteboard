@@ -3,6 +3,7 @@ import { MessageCircle, MoreVertical, Pin, Lock } from 'lucide-react'
 import { Dropdown } from './ui/Dropdown'
 import { useCourseDiscussions } from '../hooks/useCanvasQueries'
 import { ListItemRow } from './ui/ListItemRow'
+import { SkeletonList } from './Skeleton'
 import { MetadataBadge } from './ui/MetadataBadge'
 import type { DiscussionTopic } from '../types/canvas'
 import { useQueryClient } from '@tanstack/react-query'
@@ -140,7 +141,7 @@ export const CourseDiscussions: React.FC<Props> = ({ courseId, onOpen }) => {
       
       <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
-        {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
+        {isLoading && <SkeletonList count={6} hasAvatar variant="row" />}
         {!isLoading && list && list.length === 0 && (
           <div className="text-slate-500 dark:text-neutral-400 text-sm">No discussions</div>
         )}
@@ -171,4 +172,3 @@ export const CourseDiscussions: React.FC<Props> = ({ courseId, onOpen }) => {
     </div>
   )
 }
-

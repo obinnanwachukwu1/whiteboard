@@ -30,6 +30,8 @@ export const FloatingCourseTabs: React.FC<Props> = ({ current, onChange, anchorI
   const [collapsed, setCollapsed] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const hoverTimer = useRef<any>(null)
+  const resizeRaf = useRef<number | null>(null)
+  const anchorObserver = useRef<ResizeObserver | null>(null)
 
   const tabList = tabs || defaultTabs
 
@@ -45,31 +47,52 @@ export const FloatingCourseTabs: React.FC<Props> = ({ current, onChange, anchorI
   }
 
   useEffect(() => {
-    function compute() {
-      if (!anchorId) { setLeft(null); return }
-      const el = document.getElementById(anchorId)
-      if (!el) { setLeft(null); return }
-      const rect = el.getBoundingClientRect()
-      setLeft(rect.left + rect.width / 2)
+    const compute = () => {
+      if (resizeRaf.current) cancelAnimationFrame(resizeRaf.current)
+      resizeRaf.current = requestAnimationFrame(() => {
+        if (!anchorId) { setLeft(null); return }
+        const el = document.getElementById(anchorId)
+        if (!el) { setLeft(null); return }
+        const rect = el.getBoundingClientRect()
+        setLeft(rect.left + rect.width / 2)
+      })
     }
+
     compute()
+    const anchorEl = anchorId ? document.getElementById(anchorId) : null
+    if (anchorEl && typeof ResizeObserver !== 'undefined') {
+      anchorObserver.current = new ResizeObserver(() => compute())
+      anchorObserver.current.observe(anchorEl)
+    }
+
     window.addEventListener('resize', compute)
-    return () => window.removeEventListener('resize', compute)
+    return () => {
+      window.removeEventListener('resize', compute)
+      if (resizeRaf.current) cancelAnimationFrame(resizeRaf.current)
+      if (anchorObserver.current && anchorEl) anchorObserver.current.unobserve(anchorEl)
+      anchorObserver.current = null
+    }
   }, [anchorId])
 
   // Check if labels would fit based on tab count and available width
   useEffect(() => {
-    function checkOverflow() {
-      // Available width = viewport - sidebar - padding on both sides
-      const availableWidth = window.innerWidth - SIDEBAR_WIDTH - 80
-      const fullWidthWithLabels = tabList.length * LABEL_TAB_WIDTH
-      
-      setCollapsed(fullWidthWithLabels > availableWidth)
+    const checkOverflow = () => {
+      if (resizeRaf.current) cancelAnimationFrame(resizeRaf.current)
+      resizeRaf.current = requestAnimationFrame(() => {
+        // Available width = viewport - sidebar - padding on both sides
+        const availableWidth = window.innerWidth - SIDEBAR_WIDTH - 80
+        const fullWidthWithLabels = tabList.length * LABEL_TAB_WIDTH
+
+        setCollapsed(fullWidthWithLabels > availableWidth)
+      })
     }
-    
+
     checkOverflow()
     window.addEventListener('resize', checkOverflow)
-    return () => window.removeEventListener('resize', checkOverflow)
+    return () => {
+      window.removeEventListener('resize', checkOverflow)
+      if (resizeRaf.current) cancelAnimationFrame(resizeRaf.current)
+    }
   }, [tabList.length])
 
   return (

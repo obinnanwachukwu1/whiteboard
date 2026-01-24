@@ -1,13 +1,20 @@
 import type { QueryClient } from '@tanstack/react-query'
 
+const tabCooldownMs = 10 * 60 * 1000
+const lastTabPrefetch = new Map<string, number>()
+
 export async function prefetchCourseTab(queryClient: QueryClient, courseId: string | number, tab: string) {
   const id = String(courseId)
-  
+
+  const key = `${id}:${tab}`
+  const last = lastTabPrefetch.get(key) || 0
+  if (Date.now() - last < tabCooldownMs) return
+
   try {
     switch (tab) {
       case 'modules':
         await queryClient.prefetchQuery({
-          queryKey: ['course-modules', id],
+          queryKey: ['course-modules', id, 'v2'],
           queryFn: async () => {
             const res = await window.canvas.listCourseModulesGql(id, 20, 50)
             if (!res?.ok) throw new Error(res?.error || 'Failed to load modules')
@@ -86,45 +93,7 @@ export async function prefetchCourseTab(queryClient: QueryClient, courseId: stri
         break
 
       case 'files':
-        // For files, we prefetch folders + root file list
-        const folders = await queryClient.fetchQuery({
-          queryKey: ['course-folders', id, 100],
-          queryFn: async () => {
-            const res = await window.canvas.listCourseFolders?.(id, 100)
-            if (!res?.ok) throw new Error(res?.error || 'Failed to load folders')
-            return res.data || []
-          },
-          staleTime: 1000 * 60 * 5,
-        })
-
-        // Find root folder to prefetch initial file list
-        let rootId: string | null = null
-        if (Array.isArray(folders)) {
-          for (const f of folders) {
-            const name = String(f?.full_name || f?.name || '').toLowerCase()
-            const isTop = f?.parent_folder_id == null
-            if (isTop && /\bcourse files\b/i.test(name)) {
-              rootId = String(f.id)
-              break
-            }
-          }
-          if (!rootId) {
-            const top = folders.find((f) => f?.parent_folder_id == null)
-            rootId = top ? String(top.id) : null
-          }
-        }
-
-        if (rootId) {
-          await queryClient.prefetchQuery({
-            queryKey: ['folder-files', rootId, 100],
-            queryFn: async () => {
-              const res = await window.canvas.listFolderFiles?.(rootId, 100)
-              if (!res?.ok) throw new Error(res?.error || 'Failed to load root files')
-              return res.data || []
-            },
-            staleTime: 1000 * 60 * 5,
-          })
-        }
+        // Skip prefetching files to reduce API load; load on-demand when tab opens
         break
 
       case 'home':
@@ -139,6 +108,7 @@ export async function prefetchCourseTab(queryClient: QueryClient, courseId: stri
         })
         break
     }
+    lastTabPrefetch.set(key, Date.now())
   } catch (e) {
     console.error(`Failed to prefetch tab ${tab}`, e)
   }

@@ -4,6 +4,7 @@ import { useDiscussion, useDiscussionView } from '../hooks/useCanvasQueries'
 import { usePostDiscussionEntry, usePostDiscussionReply } from '../hooks/useCanvasMutations'
 import { HtmlContent } from './HtmlContent'
 import type { DiscussionEntry, DiscussionParticipant } from '../types/canvas'
+import { SkeletonText } from './Skeleton'
 
 type Props = {
   courseId: string | number
@@ -166,7 +167,7 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, topicId, title, on
       {/* Content */}
       <div className="flex-1 overflow-y-auto min-h-0 pb-4">
         {isLoading && (
-          <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>
+          <SkeletonText lines={10} />
         )}
 
         {!isLoading && topic && (

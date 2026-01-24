@@ -8,8 +8,9 @@ import { MetadataBadge } from './ui/MetadataBadge'
 import { useAIPanel } from '../context/AIPanelContext'
 import { useAppContext } from '../context/AppContext'
 import { useQueryClient } from '@tanstack/react-query'
-import { enqueuePrefetch } from '../utils/prefetchQueue'
 import { usePrefetchOnHover } from '../hooks/usePrefetchOnHover'
+import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
+import { SkeletonList } from './Skeleton'
 
 type Props = {
   courseId: string | number
@@ -24,12 +25,12 @@ type Props = {
 
 function useModuleItemPrefetch(courseId: string | number, it: CanvasModuleItem) {
   const enabled = !!(
-    (it.__typename === 'PageModuleItem' || it.pageUrl) ||
+    (it.__typename === 'PageModuleItem' && it.pageUrl) ||
     (it.__typename === 'AssignmentModuleItem' && it.contentId)
   )
 
   const queryKey = React.useMemo(() => {
-    if (it.__typename === 'PageModuleItem' || it.pageUrl) {
+    if (it.__typename === 'PageModuleItem' && it.pageUrl) {
       return ['course-page', String(courseId), it.pageUrl]
     }
     if (it.__typename === 'AssignmentModuleItem' && it.contentId) {
@@ -39,8 +40,8 @@ function useModuleItemPrefetch(courseId: string | number, it: CanvasModuleItem) 
   }, [courseId, it])
 
   const queryFn = React.useCallback(async () => {
-    if (it.__typename === 'PageModuleItem' || it.pageUrl) {
-      const res = await window.canvas.getCoursePage?.(courseId, it.pageUrl!)
+    if (it.__typename === 'PageModuleItem' && it.pageUrl) {
+      const res = await window.canvas.getCoursePage?.(courseId, it.pageUrl)
       if (!res?.ok) throw new Error(res?.error || 'Failed')
       return res.data
     }
@@ -129,67 +130,75 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
   const aiPanel = useAIPanel()
   const app = useAppContext()
   const queryClient = useQueryClient()
+  const autoPrefetchedRef = React.useRef<string | null>(null)
 
-  // Auto-prefetch top 5 relevant module items (pages/assignments only)
+  // Lightweight proactive prefetch: grab meta + content for a few top items.
+  // Keeps UX snappy (less "Loading…") while avoiding the old module-items fanout.
   React.useEffect(() => {
-    if (!modules || modules.length === 0) return
-    let count = 0
-    
-    // Flatten items and find first 5 prefetchable ones
-    for (const m of modules as CanvasModule[]) {
-      if (!m.moduleItemsConnection?.nodes) continue
-      for (const it of m.moduleItemsConnection.nodes) {
-        if (count >= 5) break
-        
-        // Logic to prefetch Pages
-        if (it.__typename === 'PageModuleItem' || it.pageUrl) {
+    if (!modules || !Array.isArray(modules) || modules.length === 0) return
+    const key = `${courseId}`
+    if (autoPrefetchedRef.current === key) return
+    autoPrefetchedRef.current = key
+
+    requestIdle(() => {
+      let count = 0
+      for (const m of modules as CanvasModule[]) {
+        const nodes = m?.moduleItemsConnection?.nodes || []
+        for (const it of nodes) {
+          if (count >= 3) break
+          const itemId = (it as any)?._id
+          if (!itemId) continue
+
           enqueuePrefetch(async () => {
-            await queryClient.prefetchQuery({
-              queryKey: ['course-page', String(courseId), it.pageUrl],
-              queryFn: async () => {
-                const res = await window.canvas.getCoursePage?.(courseId, it.pageUrl!)
-                if (!res?.ok) throw new Error(res?.error || 'Failed')
-                return res.data
-              },
-              staleTime: 1000 * 60 * 5
-            })
+            if (it.__typename === 'PageModuleItem' && it.pageUrl) {
+              await queryClient.prefetchQuery({
+                queryKey: ['course-page', String(courseId), it.pageUrl],
+                queryFn: async () => {
+                  const res = await window.canvas.getCoursePage?.(courseId, it.pageUrl!)
+                  if (!res?.ok) throw new Error(res?.error || 'Failed')
+                  return res.data
+                },
+                staleTime: 1000 * 60 * 5,
+              })
+              return
+            }
+            if (it.__typename === 'AssignmentModuleItem' && it.contentId) {
+              await queryClient.prefetchQuery({
+                queryKey: ['assignment-rest', String(courseId), String(it.contentId)],
+                queryFn: async () => {
+                  const res = await window.canvas.getAssignmentRest?.(courseId, it.contentId!)
+                  if (!res?.ok) throw new Error(res?.error || 'Failed')
+                  return res.data
+                },
+                staleTime: 1000 * 60 * 5,
+              })
+            }
           })
           count++
         }
-        // Logic to prefetch Assignments
-        else if (it.__typename === 'AssignmentModuleItem' && it.contentId) {
-          enqueuePrefetch(async () => {
-            await queryClient.prefetchQuery({
-              queryKey: ['assignment-rest', String(courseId), String(it.contentId)],
-              queryFn: async () => {
-                const res = await window.canvas.getAssignmentRest?.(courseId, it.contentId!)
-                if (!res?.ok) throw new Error(res?.error || 'Failed')
-                return res.data
-              },
-              staleTime: 1000 * 60 * 5
-            })
-          })
-          count++
-        }
+        if (count >= 3) break
       }
-      if (count >= 5) break
-    }
+    })
   }, [modules, courseId, queryClient])
 
   async function openItem(it: CanvasModuleItem, title: string) {
-    if (it.__typename === 'PageModuleItem' || it.pageUrl) {
-      onOpenContent?.({ courseId, contentType: 'page', contentId: it.pageUrl || '', title })
+    const openExternal = async (url: string) => {
+      try {
+        await (onOpenExternal as any)?.(url)
+      } catch {
+        // ignore
+      }
+    }
+    // Fast path: if we already have enough info, route directly
+    if (it.__typename === 'PageModuleItem' && it.pageUrl) {
+      onOpenContent?.({ courseId, contentType: 'page', contentId: it.pageUrl, title })
       return
     }
     if (it.__typename === 'AssignmentModuleItem' && it.contentId) {
       onOpenContent?.({ courseId, contentType: 'assignment', contentId: String(it.contentId), title })
       return
     }
-    if (it.__typename === 'FileModuleItem' || (it.__typename === 'ModuleItem' && it.contentId && it.title?.match(/\.(pdf|docx?|pptx?|xlsx?|jpe?g|png|gif|mp4|mov|avi)$/i))) {
-      if (!it.contentId) {
-        if (it.htmlUrl) onOpenExternal?.(it.htmlUrl)
-        return
-      }
+    if (it.__typename === 'FileModuleItem' && it.contentId) {
       const res = await window.canvas.getFile?.(it.contentId)
       if (res?.ok) {
         const fileData = res.data as CanvasFile
@@ -201,14 +210,67 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
           onOpenContent?.({ courseId, contentType: 'file', contentId: String(it.contentId), title: fileName })
         } else {
           const url = fileData?.url as string | undefined
-          if (url) onOpenExternal?.(url)
+          if (url) await openExternal(url)
         }
       }
       return
     }
-    if (it.htmlUrl) {
-      onOpenExternal?.(it.htmlUrl)
+
+    // Handle other module item types
+    if (it.__typename === 'DiscussionModuleItem' && it.contentId) {
+      const url = new URL(`/courses/${courseId}/discussion_topics/${it.contentId}`, app.baseUrl).toString()
+      await openExternal(url)
+      return
     }
+    if (it.__typename === 'QuizModuleItem' && it.contentId) {
+      const url = new URL(`/courses/${courseId}/quizzes/${it.contentId}`, app.baseUrl).toString()
+      await openExternal(url)
+      return
+    }
+    if (it.__typename === 'ExternalUrlModuleItem') {
+      if (it.htmlUrl) await openExternal(it.htmlUrl)
+      return
+    }
+
+    // Fallback: fetch the module item info via API sequence endpoint and route from it.
+    const itemId = (it as any)?._id
+    if (itemId) {
+      const canvas = window.canvas as any
+      const res = await canvas.getCourseModuleItem?.(courseId, itemId)
+      if (res?.ok && res.data) {
+        const meta = res.data as any
+        const type = String(meta?.type || '').toLowerCase()
+        if (type === 'page' && meta?.page_url) {
+          onOpenContent?.({ courseId, contentType: 'page', contentId: String(meta.page_url), title })
+          return
+        }
+        if (type === 'assignment' && meta?.content_id != null) {
+          onOpenContent?.({ courseId, contentType: 'assignment', contentId: String(meta.content_id), title })
+          return
+        }
+        if (type === 'file' && meta?.content_id != null) {
+          onOpenContent?.({ courseId, contentType: 'file', contentId: String(meta.content_id), title })
+          return
+        }
+        if (type === 'discussion' && meta?.content_id != null) {
+          const url = new URL(`/courses/${courseId}/discussion_topics/${meta.content_id}`, app.baseUrl).toString()
+          await openExternal(url)
+          return
+        }
+        if (type === 'quiz' && meta?.content_id != null) {
+          const url = new URL(`/courses/${courseId}/quizzes/${meta.content_id}`, app.baseUrl).toString()
+          await openExternal(url)
+          return
+        }
+        const htmlUrl = meta?.html_url || meta?.external_url
+        if (htmlUrl) {
+          await openExternal(htmlUrl)
+          return
+        }
+      }
+    }
+
+    if (it.htmlUrl) await openExternal(it.htmlUrl)
   }
 
   const iconFor = (n: CanvasModuleItem) => {
@@ -243,7 +305,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
       
       <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
-        {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
+        {isLoading && <SkeletonList count={6} hasAvatar variant="row" />}
         {!isLoading && modules && modules.length === 0 && (
           <div className="text-slate-500 dark:text-neutral-400 text-sm">No modules</div>
         )}
@@ -295,4 +357,3 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
     </div>
   )
 }
-

@@ -5,6 +5,7 @@ import { Dropdown } from './ui/Dropdown'
 import { useCourseTabs } from '../hooks/useCanvasQueries'
 import { ListItemRow } from './ui/ListItemRow'
 import { MetadataBadge } from './ui/MetadataBadge'
+import { SkeletonList } from './Skeleton'
 
 type Props = {
   courseId: string | number
@@ -15,6 +16,54 @@ export const CourseLinks: React.FC<Props> = ({ courseId }) => {
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
   const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
 
+  const friendlyLabel = React.useCallback((t: any) => {
+    const raw = t?.label || t?.id || ''
+    const url: string = t?.html_url || ''
+    const type = (t?.type || '').toLowerCase()
+
+    // Canonical names for built-in/internal tabs to avoid localized labels leaking through
+    const typeMap: Record<string, string> = {
+      wiki: 'Home',
+      pages: 'Home',
+      announcements: 'Announcements',
+      modules: 'Modules',
+      files: 'Files',
+      grades: 'Grades',
+      assignments: 'Assignments',
+      discussions: 'Discussions',
+      people: 'People',
+      syllabus: 'Syllabus',
+      quizzes: 'Quizzes',
+      collaborations: 'Collaborations',
+      conferences: 'Conferences',
+      outcomes: 'Outcomes',
+      settings: 'Settings',
+      links: 'Links',
+    }
+
+    // If Canvas provides a known type, force the canonical English label
+    if (typeMap[type]) return typeMap[type]
+
+    // Infer internal destinations by path even if type is external/external_tool (Canvas sometimes marks internal links that way)
+    try {
+      const path = new URL(url, 'https://placeholder.local').pathname
+      if (/\/announcements/.test(path)) return 'Announcements'
+      if (/\/modules/.test(path)) return 'Modules'
+      if (/\/files/.test(path)) return 'Files'
+      if (/^\/courses\/\d+\/?$/.test(path)) return 'Home'
+      if (/\/pages/.test(path)) return 'Home'
+      if (/\/grades/.test(path)) return 'Grades'
+      if (/\/assignments/.test(path)) return 'Assignments'
+      if (/\/people/.test(path)) return 'People'
+      if (/\/quizzes/.test(path)) return 'Quizzes'
+      if (/\/syllabus/.test(path)) return 'Syllabus'
+      if (/\/discussions/.test(path)) return 'Discussions'
+    } catch {}
+
+    // External or unknown: show the raw label
+    return raw
+  }, [])
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-3 shrink-0">
@@ -23,7 +72,7 @@ export const CourseLinks: React.FC<Props> = ({ courseId }) => {
       
       <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
-        {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
+        {isLoading && <SkeletonList count={6} hasAvatar variant="row" />}
         {!isLoading && tabs && tabs.length === 0 && (
           <div className="text-slate-500 dark:text-neutral-400 text-sm">No links</div>
         )}
@@ -47,7 +96,7 @@ export const CourseLinks: React.FC<Props> = ({ courseId }) => {
                   <li key={i}>
                     <ListItemRow
                       icon={<LinkIcon className="w-4 h-4" />}
-                      title={t.label || t.id}
+                      title={friendlyLabel(t)}
                       subtitle={
                         <>
                           {type && <MetadataBadge>{type}</MetadataBadge>}

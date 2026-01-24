@@ -3,6 +3,7 @@ import { Card } from './ui/Card'
 import { ExternalLink, CalendarCheck, ListChecks } from 'lucide-react'
 import { useTodo, useUpcoming } from '../hooks/useCanvasQueries'
 import { useToast } from './ui/Toaster'
+import { SkeletonList } from './Skeleton'
 
 export const Agenda: React.FC = () => {
   const upcomingQ = useUpcoming()
@@ -26,7 +27,7 @@ export const Agenda: React.FC = () => {
           <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500 dark:text-neutral-400 mb-2">
             <CalendarCheck className="w-3.5 h-3.5" /> Upcoming
           </div>
-          {upcomingQ.isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
+          {upcomingQ.isLoading && <SkeletonList count={4} hasAvatar={false} variant="simple" />}
           {!upcomingQ.isLoading && (upcomingQ.data || []).length === 0 && (
             <div className="text-slate-500 dark:text-neutral-400 text-sm">Nothing upcoming</div>
           )}
@@ -60,7 +61,7 @@ export const Agenda: React.FC = () => {
           <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500 dark:text-neutral-400 mb-2">
             <ListChecks className="w-3.5 h-3.5" /> To‑Do
           </div>
-          {todoQ.isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
+          {todoQ.isLoading && <SkeletonList count={4} hasAvatar={false} variant="simple" />}
           {!todoQ.isLoading && (todoQ.data || []).length === 0 && (
             <div className="text-slate-500 dark:text-neutral-400 text-sm">All caught up</div>
           )}

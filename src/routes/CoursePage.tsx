@@ -85,14 +85,10 @@ export default function CoursePage() {
       setDetailStack(prev => [...prev, courseDetail])
     }
     setCourseDetail(d)
-    
-    // If it's a file, keep the current tab. Otherwise, switch to the target tab.
-    let tabFor = courseTab
-    if (d.contentType !== 'file') {
-      tabFor = d.contentType === 'assignment' ? 'assignments' : d.contentType === 'announcement' ? 'announcements' : d.contentType === 'discussion' ? 'discussions' : d.contentType === 'page' ? 'home' : 'files'
-      setCourseTab(tabFor)
-    }
-    navigate({ to: '/course/$courseId', params: { courseId }, search: { tab: tabFor, type: d.contentType, contentId: d.contentId, title: d.title } })
+
+    // Keep the current tab as the "source" so Back returns to where you opened it.
+    // (Deep-links already set tab explicitly via the URL.)
+    navigate({ to: '/course/$courseId', params: { courseId }, search: { tab: courseTab, type: d.contentType, contentId: d.contentId, title: d.title } })
   }
 
   const onNavigateCourse = (cid: string | number, init?: { type: 'assignment'|'announcement'|'page'|'file'|'discussion'; id: string; title?: string }) => {
@@ -109,6 +105,7 @@ export default function CoursePage() {
 
   // Warm other tabs in the background once the course is mounted
   React.useEffect(() => {
+    if (!ctx.prefetchEnabled) return
     let cancelled = false
     const id = String(courseId)
     // Small delay to avoid competing with initial render
@@ -144,14 +141,16 @@ export default function CoursePage() {
         // Use smart sorting based on usage stats, but filter out the current tab (no need to prefetch what we are looking at)
         const sortedTabs = getSortedTabs(courseId, allTabs).filter(t => t !== currentTab)
 
-        // Queue them up in order
-        for (const t of sortedTabs) {
+        // Queue a small number of highest-likelihood tabs. The prefetch queue
+        // has its own rate guard/backoff.
+        const maxWarm = 4
+        for (const t of sortedTabs.slice(0, maxWarm)) {
           enqueuePrefetch(() => prefetchCourseTab(queryClient, id, t))
         }
       } catch {}
     }, 250)
     return () => { clearTimeout(timer); cancelled = true }
-  }, [courseId])
+  }, [courseId, ctx.prefetchEnabled])
 
   return (
     <>

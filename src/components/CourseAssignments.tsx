@@ -4,6 +4,7 @@ import { useCourseAssignments } from '../hooks/useCanvasQueries'
 import type { CanvasAssignment } from '../types/canvas'
 import { ListItemRow } from './ui/ListItemRow'
 import { MetadataBadge } from './ui/MetadataBadge'
+import { SkeletonList } from './Skeleton'
 
 type Props = {
   courseId: string | number
@@ -23,7 +24,7 @@ export const CourseAssignments: React.FC<Props> = ({ courseId, onOpenDetail }) =
       </div>
 
       <div className="flex-1 overflow-y-auto min-h-0 p-4">
-        {showLoading && <div className="text-slate-500 dark:text-neutral-400 p-2">Loading…</div>}
+        {showLoading && <SkeletonList count={8} hasAvatar variant="row" />}
         {assignmentsQ.error && <div className="text-red-600 p-2">{String((assignmentsQ.error as any).message || assignmentsQ.error)}</div>}
         
         {!showLoading && !assignmentsQ.error && assignments.length === 0 && (

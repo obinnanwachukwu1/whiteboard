@@ -65,7 +65,10 @@ export function useCourseAssignments(courseId: string | number | undefined, firs
       return ensureOk(await window.canvas.listCourseAssignments(String(courseId), first))
     },
     enabled: courseId != null && (options?.enabled ?? true),
-    staleTime: 1000 * 60 * 5, // keep warm for faster tab switches
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 60 * 2,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     refetchOnMount: false,
     ...options,
   })
@@ -73,13 +76,16 @@ export function useCourseAssignments(courseId: string | number | undefined, firs
 
 export function useCourseModules(courseId: string | number | undefined, options?: Partial<UseQueryOptions<CanvasModule[], Error, CanvasModule[]>>) {
   return useQuery<CanvasModule[], Error, CanvasModule[]>({
-    queryKey: ['course-modules', courseId != null ? String(courseId) : courseId],
+    queryKey: ['course-modules', courseId != null ? String(courseId) : courseId, 'v2'],
     queryFn: async () => {
       if (courseId == null) return []
       return ensureOk(await window.canvas.listCourseModulesGql(String(courseId), 20, 50))
     },
     enabled: courseId != null && (options?.enabled ?? true),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 60 * 2,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     refetchOnMount: false,
     ...options,
   })
@@ -127,6 +133,11 @@ export function useCoursePage(courseId: string | number | undefined, slugOrUrl: 
       return ensureOk(await window.canvas.getCoursePage?.(courseId, slugOrUrl))
     },
     enabled: courseId != null && !!slugOrUrl && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 60 * 2,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     ...options,
   })
 }
@@ -139,6 +150,11 @@ export function useAssignmentRest(courseId: string | number | undefined, assignm
       return ensureOk(await window.canvas.getAssignmentRest?.(courseId, assignmentRestId))
     },
     enabled: courseId != null && assignmentRestId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 60 * 2,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     ...options,
   })
 }
@@ -185,9 +201,10 @@ export function useCourseTabs(courseId: string | number | undefined, includeExte
       return ensureOk(await window.canvas.listCourseTabs?.(courseId, includeExternal))
     },
     enabled: courseId != null && (options?.enabled ?? true),
-    // Tabs rarely change; keep them warm and cached for a long time
-    staleTime: 1000 * 60 * 60 * 24, // 24h
-    gcTime: 1000 * 60 * 60 * 24, // keep in cache for 24h
+    // Tabs rarely change, but refetch periodically to avoid stale localization issues
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 60, // keep in cache for 1h
+    refetchOnWindowFocus: false,
     ...options,
   })
 }
@@ -233,6 +250,11 @@ export function useAnnouncement(courseId: string | number | undefined, topicId: 
       return ensureOk(await window.canvas.getAnnouncement?.(courseId, topicId)) as AnnouncementDetail
     },
     enabled: courseId != null && topicId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 60 * 2,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     ...options,
   })
 }
@@ -250,7 +272,11 @@ export function useCourseDiscussions(
       return ensureOk(await window.canvas.listCourseDiscussions?.(courseId, perPage)) as DiscussionTopic[]
     },
     enabled: courseId != null && (options?.enabled ?? true),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 60 * 2,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     ...options,
   })
 }
@@ -267,6 +293,11 @@ export function useDiscussion(
       return ensureOk(await window.canvas.getDiscussion?.(courseId, topicId)) as DiscussionTopic
     },
     enabled: courseId != null && topicId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 60 * 2,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     ...options,
   })
 }
@@ -283,6 +314,11 @@ export function useDiscussionView(
       return ensureOk(await window.canvas.getDiscussionView?.(courseId, topicId)) as DiscussionView
     },
     enabled: courseId != null && topicId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 60,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     ...options,
   })
 }
@@ -310,7 +346,11 @@ export function useCourseFrontPage(courseId: string | number | undefined, option
       return ensureOk(await window.canvas.getCourseFrontPage?.(courseId)) as CourseFrontPage
     },
     enabled: courseId != null && (options?.enabled ?? true),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 60 * 2,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     ...options,
   })
 }
@@ -325,7 +365,11 @@ export function useCourseFiles(courseId: string | number | undefined, perPage = 
       return res.data || []
     },
     enabled: courseId != null && (options?.enabled ?? true),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 60 * 2,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     ...options,
   })
 }
@@ -339,7 +383,11 @@ export function useCourseFolders(courseId: string | number | undefined, perPage 
       return res.data || []
     },
     enabled: courseId != null && (options?.enabled ?? true),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 60 * 2,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     ...options,
   })
 }
@@ -354,7 +402,11 @@ export function useFolderFiles(folderId: string | number | undefined, perPage = 
       return res.data || []
     },
     enabled: folderId != null && (options?.enabled ?? true),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 60 * 2,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     ...options,
   })
 }

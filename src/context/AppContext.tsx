@@ -19,6 +19,8 @@ export type AppContextValue = {
   setEmbeddingsEnabled: (v: boolean) => Promise<void>
   aiEnabled: boolean
   setAiEnabled: (v: boolean) => Promise<void>
+  verbose: boolean
+  setVerbose: (v: boolean) => Promise<void>
   saveUserSettings: (partial: Record<string, any>) => Promise<void>
   onOpenCourse: (id: string | number) => void
   onOpenAssignment: (courseId: string | number, restId: string | number, title?: string) => void

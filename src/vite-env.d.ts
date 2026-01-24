@@ -137,6 +137,7 @@ declare global {
       listDueAssignments: (opts?: { days?: number; onlyPublished?: boolean; includeCourseName?: boolean }) => Promise<{ ok: boolean; data?: any; error?: string }>
       listCourseAssignments: (courseId: string | number, first?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
       listCourseModulesGql: (courseId: string | number, first?: number, itemsFirst?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
+      getCourseModuleItem: (courseId: string | number, itemId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
       listUpcoming: (opts?: { onlyActiveCourses?: boolean }) => Promise<{ ok: boolean; data?: any; error?: string }>
       listTodo: () => Promise<{ ok: boolean; data?: any; error?: string }>
       getMySubmission: (courseId: string | number, assignmentRestId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
@@ -179,6 +180,8 @@ declare global {
       updateConversation: (conversationId: string | number, params: { workflowState?: 'read' | 'unread' | 'archived'; starred?: boolean; subscribed?: boolean }) => Promise<{ ok: boolean; data?: any; error?: string }>
       deleteConversation: (conversationId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
       searchRecipients: (params: { search: string; context?: string; type?: 'user' | 'context'; perPage?: number }) => Promise<{ ok: boolean; data?: any; error?: string }>
+      resolveUrl: (url: string) => Promise<{ ok: boolean; data?: string; error?: string }>
+      getRateLimit: () => Promise<{ ok: boolean; data?: { remaining?: number; cost?: number; at: number } | null; error?: string }>
     }
     system: {
       openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>

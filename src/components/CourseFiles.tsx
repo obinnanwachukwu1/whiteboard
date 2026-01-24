@@ -6,6 +6,7 @@ import type { CanvasFolder, CanvasFile } from '../types/canvas'
 import { Dropdown } from './ui/Dropdown'
 import { ListItemRow } from './ui/ListItemRow'
 import { MetadataBadge } from './ui/MetadataBadge'
+import { SkeletonList } from './Skeleton'
 
 type Props = {
   courseId: string | number
@@ -207,7 +208,7 @@ export const CourseFiles: React.FC<Props> = ({ courseId, currentFolderId, onFold
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
-        {isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading…</div>}
+        {isLoading && <SkeletonList count={8} hasAvatar variant="row" />}
         
         {/* Breadcrumb */}
         <div className="text-sm text-slate-600 dark:text-neutral-300 mb-2 flex items-center gap-1 overflow-x-auto whitespace-nowrap">
