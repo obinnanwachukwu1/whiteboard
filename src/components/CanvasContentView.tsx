@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { Button } from './ui/Button'
-import { ArrowLeft, RefreshCw, Maximize2, Minimize2, Sparkles, FileText, Info, Download } from 'lucide-react'
+import { ArrowLeft, Maximize2, Minimize2, MoreHorizontal, ExternalLink, SquareArrowOutUpRight, Sparkles, FileText, Info, Download } from 'lucide-react'
 import { HtmlContent } from './HtmlContent'
 import { FileViewer } from './FileViewer'
 import { useAssignmentRest, useCoursePage, useAnnouncement } from '../hooks/useCanvasQueries'
@@ -9,6 +9,9 @@ import { ContextMenu, ContextMenuItem } from './ContextMenu'
 import { useAIPanel } from '../context/AIPanelContext'
 import { useAppContext } from '../context/AppContext'
 import { Skeleton, SkeletonText } from './Skeleton'
+import { Dropdown } from './ui/Dropdown'
+import { openExternal } from '../utils/openExternal'
+import { canvasContentUrl } from '../utils/canvasContentUrl'
 
 type ContentType = 'page' | 'assignment' | 'file' | 'announcement'
 
@@ -20,6 +23,8 @@ type Props = {
   title: string
   onBack: () => void
   onNavigate?: (href: string) => void
+  isEmbedded?: boolean
+  canGoBack?: boolean
 }
 
 export const CanvasContentView: React.FC<Props> = ({
@@ -30,9 +35,13 @@ export const CanvasContentView: React.FC<Props> = ({
   title,
   onBack,
   onNavigate,
+  isEmbedded,
+  canGoBack,
 }) => {
   const app = useAppContext()
   const aiPanel = useAIPanel()
+  const moreBtnRef = useRef<HTMLButtonElement>(null)
+  const [moreOpen, setMoreOpen] = useState(false)
   
   const pageQ = useCoursePage(contentType === 'page' ? courseId : undefined, contentType === 'page' ? contentId : undefined, { enabled: contentType === 'page' })
   const assignQ = useAssignmentRest(contentType === 'assignment' ? courseId : undefined, contentType === 'assignment' ? contentId : undefined, { enabled: contentType === 'assignment' })
@@ -132,96 +141,172 @@ export const CanvasContentView: React.FC<Props> = ({
     }] : [])
   ]
 
-  if (contentType === 'file') {
+  const openInCanvasUrl = useMemo(() => {
+    const baseUrl = app.baseUrl
+    if (!baseUrl) return null
+    if (contentType === 'file') {
+      return canvasContentUrl({ baseUrl, courseId, type: 'file', contentId })
+    }
+    if (contentType === 'assignment') {
+      return canvasContentUrl({ baseUrl, courseId, type: 'assignment', contentId })
+    }
+    if (contentType === 'announcement') {
+      return canvasContentUrl({ baseUrl, courseId, type: 'announcement', contentId })
+    }
+    if (contentType === 'page') {
+      return canvasContentUrl({ baseUrl, courseId, type: 'page', contentId })
+    }
+    return null
+  }, [app.baseUrl, courseId, contentId, contentType])
+
+  const openInNewWindow = async () => {
+    try {
+      await window.system?.openContentWindow?.({
+        courseId: String(courseId),
+        courseName: courseName || undefined,
+        type: contentType,
+        contentId: String(contentId),
+        title,
+      })
+    } catch {}
+  }
+
+  const openInCanvas = async () => {
+    try {
+      await openExternal(openInCanvasUrl)
+    } catch {}
+  }
+
+  const isMac = typeof window !== 'undefined' && (window as any).platform?.isMac
+
+  const header = (ctx: { isFullscreen: boolean; toggle: () => Promise<void> }) => {
+    if (isEmbedded) {
+      // Single-row titlebar for embedded windows (No actions, just drag area + title)
+      return (
+        <>
+          <div
+            className={`flex items-center h-10 ${canGoBack ? '' : 'border-b border-gray-200 dark:border-neutral-700'} bg-white/95 dark:bg-neutral-900/95 app-drag titlebar-right-inset`}
+            style={{ paddingLeft: isMac ? '80px' : '1rem' }}
+          >
+            <div className="text-xs font-semibold text-slate-500 dark:text-neutral-400 uppercase tracking-wider flex-1 truncate text-center pr-20">
+              {title}
+            </div>
+          </div>
+          {/* Secondary Toolbar for Navigation */}
+          {canGoBack && (
+            <div className="flex items-center px-4 py-2 border-b border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+              <Button variant="ghost" size="sm" onClick={onBack} className="w-8 h-8 p-0 justify-center rounded-full" title="Back">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            </div>
+          )}
+        </>
+      )
+    }
+
+    // Standard single-row layout for main app
     return (
-      <div className="flex flex-col min-h-0 h-full overflow-hidden">
-        {/* Constrain viewer to available height so inner content scrolls inside the viewer itself */}
-        <div className="flex-1 min-h-0 flex flex-col">
-          <FullscreenContainer className="flex flex-col min-h-0 h-full">
-            {({ isFullscreen, toggle }) => (
-              <div className="flex flex-col min-h-0 h-full">
-                <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/90 dark:bg-neutral-900/90">
-                  <Button variant="ghost" size="sm" onClick={onBack}>
-                    <ArrowLeft className="w-4 h-4 mr-1" /> Back
-                  </Button>
-                  <div className="text-sm font-medium truncate flex-1">{title}</div>
-                  <Button variant="ghost" size="sm" onClick={toggle} title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>
-                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                  </Button>
-                </div>
-                <div className="flex-1 min-h-0 overflow-hidden">
-                  <FileViewer
-                    fileId={contentId}
-                    className="h-full w-full"
-                    isFullscreen={isFullscreen}
-                    courseId={courseId}
-                    courseName={courseName}
-                  />
-                </div>
-              </div>
-            )}
-          </FullscreenContainer>
-        </div>
+      <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/90 dark:bg-neutral-900/90">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ArrowLeft className="w-4 h-4 mr-1" /> Back
+        </Button>
+        <div className="text-sm font-medium truncate flex-1">{title}</div>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={ctx.toggle}
+          title={ctx.isFullscreen ? 'Exit Focus Mode' : 'Enter Focus Mode'}
+        >
+          {ctx.isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+        </Button>
+
+        <Button
+          ref={moreBtnRef}
+          variant="ghost"
+          size="sm"
+          onClick={() => setMoreOpen((v) => !v)}
+          title="More"
+        >
+          <MoreHorizontal className="w-4 h-4" />
+        </Button>
+
+        <Dropdown open={moreOpen} onOpenChange={setMoreOpen} anchorRef={moreBtnRef as any}>
+          <button
+            type="button"
+            className="w-full px-3 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2"
+            onClick={async () => { setMoreOpen(false); await openInCanvas() }}
+            disabled={!openInCanvasUrl}
+          >
+            <ExternalLink className="w-4 h-4" />
+            Open in Canvas
+          </button>
+          <button
+            type="button"
+            className="w-full px-3 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2"
+            onClick={async () => { setMoreOpen(false); await openInNewWindow() }}
+          >
+            <SquareArrowOutUpRight className="w-4 h-4" />
+            Open in New Window
+          </button>
+        </Dropdown>
       </div>
     )
   }
 
   return (
-      <div className="flex flex-col h-full relative">
-       <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/90 dark:bg-neutral-900/90">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back
-        </Button>
-        <div className="text-sm font-medium truncate flex-1">{title}</div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            if (contentType === 'page') pageQ.refetch()
-            if (contentType === 'assignment') assignQ.refetch()
-            if (contentType === 'announcement') annQ.refetch()
-          }}
-          title="Refresh"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </Button>
-      </div>
-      <div 
-        className="flex-1 overflow-hidden" 
-        onContextMenu={handleContextMenu}
-      >
-        <div className="flex-1 overflow-y-auto p-6 h-full">
-            <div className="max-w-4xl mx-auto pb-12">
-              {loading && (
-                <div className="space-y-4">
-                  <Skeleton height="h-6" width="w-2/3" />
-                  <SkeletonText lines={10} />
-                </div>
-              )}
-              {error && (
-                <div className="text-red-600 text-sm mb-4">{error}</div>
-              )}
-            {!loading && !error && contentType === 'page' && pageQ.data?.body && (
-              <HtmlContent html={pageQ.data.body} className="rich-html" onNavigate={onNavigate} />
-            )}
-            {!loading && !error && contentType === 'assignment' && assignQ.data?.description && (
-              <HtmlContent html={assignQ.data.description} className="rich-html" onNavigate={onNavigate} />
-            )}
-            {!loading && !error && contentType === 'announcement' && annQ.data?.message && (
-              <HtmlContent html={annQ.data.message} className="rich-html" onNavigate={onNavigate} />
-            )}
-            {!loading && !error && ((contentType === 'page' && !pageQ.data?.body) || (contentType === 'assignment' && !assignQ.data?.description)) && (
-              <div className="text-slate-500 dark:text-neutral-400 text-sm">No content available</div>
-            )}
-          </div>
-        </div>
-      </div>
+    <FullscreenContainer className="flex flex-col h-full relative">
+      {({ isFullscreen, toggle }) => (
+        <div className="flex flex-col h-full relative">
+          {header({ isFullscreen, toggle })}
 
-      <ContextMenu 
-        items={menuItems} 
-        position={menuPos} 
-        onClose={() => { setMenuPos(null); setFileDownloadTarget(null) }} 
-      />
-    </div>
+          {contentType === 'file' ? (
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <FileViewer
+                fileId={contentId}
+                className="h-full w-full"
+                isFullscreen={isFullscreen}
+                courseId={courseId}
+                courseName={courseName}
+              />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-hidden" onContextMenu={handleContextMenu}>
+              <div className="flex-1 overflow-y-auto p-6 h-full">
+                <div className="max-w-4xl mx-auto pb-12">
+                  {loading && (
+                    <div className="space-y-4">
+                      <Skeleton height="h-6" width="w-2/3" />
+                      <SkeletonText lines={10} />
+                    </div>
+                  )}
+                  {error && (
+                    <div className="text-red-600 text-sm mb-4">{error}</div>
+                  )}
+                  {!loading && !error && contentType === 'page' && pageQ.data?.body && (
+                    <HtmlContent html={pageQ.data.body} className="rich-html" onNavigate={onNavigate} />
+                  )}
+                  {!loading && !error && contentType === 'assignment' && assignQ.data?.description && (
+                    <HtmlContent html={assignQ.data.description} className="rich-html" onNavigate={onNavigate} />
+                  )}
+                  {!loading && !error && contentType === 'announcement' && annQ.data?.message && (
+                    <HtmlContent html={annQ.data.message} className="rich-html" onNavigate={onNavigate} />
+                  )}
+                  {!loading && !error && ((contentType === 'page' && !pageQ.data?.body) || (contentType === 'assignment' && !assignQ.data?.description)) && (
+                    <div className="text-slate-500 dark:text-neutral-400 text-sm">No content available</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <ContextMenu
+            items={menuItems}
+            position={menuPos}
+            onClose={() => { setMenuPos(null); setFileDownloadTarget(null) }}
+          />
+        </div>
+      )}
+    </FullscreenContainer>
   )
 }

@@ -5,12 +5,12 @@ import { RootLayout } from './routes/RootLayout'
 import DashboardPage from './routes/DashboardPage'
 import AllCoursesPage from './routes/AllCoursesPage'
 import CoursePage from './routes/CoursePage'
+import ContentPage from './routes/ContentPage'
 import SettingsPage from './routes/SettingsPage'
 import AnnouncementsPage from './routes/AnnouncementsPage'
 import AssignmentsPage from './routes/AssignmentsPage'
 import GradesPage from './routes/GradesPage'
 import DiscussionsPage from './routes/DiscussionsPage'
-import { shouldUseHashHistory } from './utils/history'
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -38,6 +38,12 @@ const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings',
   component: SettingsPage,
+})
+
+const contentRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/content',
+  component: ContentPage,
 })
 
 const announcementsRoute = createRoute({
@@ -82,6 +88,7 @@ const routeTree = rootRoute.addChildren([
   dashboardRoute,
   allCoursesRoute,
   courseRoute,
+  contentRoute,
   settingsRoute,
   announcementsRoute,
   assignmentsRoute,
@@ -89,13 +96,11 @@ const routeTree = rootRoute.addChildren([
   discussionsRoute,
 ])
 
-const history = typeof window !== 'undefined' && shouldUseHashHistory(window.location?.protocol)
-  ? createHashHistory()
-  : undefined
+const history = createHashHistory()
 
 export const router = createRouter({
   routeTree,
-  ...(history ? { history } : {}),
+  history,
   defaultPreload: 'intent',
   defaultStaleTime: 1000 * 60,
 })

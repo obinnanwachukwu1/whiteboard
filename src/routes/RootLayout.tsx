@@ -67,6 +67,15 @@ export function RootLayout() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [inboxOpen, setInboxOpen] = useState(false)
 
+  // Embed windows ("Open in New Window") should not trigger global app fetches.
+  // They still initialize Canvas and fetch the requested content, but avoid
+  // loading dashboard-level data like courses/due/profile.
+  const embedBoot = React.useMemo(() => {
+    if (typeof window === 'undefined') return false
+    const h = String(window.location.hash || '')
+    return h.startsWith('#/content') && h.includes('embed=1')
+  }, [])
+
   // Global Cmd+K / Ctrl+K keyboard shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -94,9 +103,9 @@ export function RootLayout() {
   }, [navigate])
 
   // Queries
-  const profileQ = useProfile({ enabled: hasToken === true })
-  const coursesQ = useCourses({ enrollment_state: 'active' }, { enabled: hasToken === true })
-  const dueQ = useDueAssignments({ days: 7 }, { enabled: hasToken === true })
+  const profileQ = useProfile({ enabled: hasToken === true && !embedBoot })
+  const coursesQ = useCourses({ enrollment_state: 'active' }, { enabled: hasToken === true && !embedBoot })
+  const dueQ = useDueAssignments({ days: 7 }, { enabled: hasToken === true && !embedBoot })
   const userKey = React.useMemo(() => {
     const uid = (profileQ.data as any)?.id
     return hasToken && uid ? `${baseUrl}|${uid}` : null
@@ -146,12 +155,14 @@ export function RootLayout() {
         setLoading(false)
         return
       }
-      setHasToken(true)
-      queryClient.invalidateQueries({ queryKey: ['profile'] })
-      queryClient.invalidateQueries({ queryKey: ['courses'] })
-      queryClient.invalidateQueries({ queryKey: ['due-assignments'] })
-      setLoading(false)
-    })()
+       setHasToken(true)
+       if (!embedBoot) {
+         queryClient.invalidateQueries({ queryKey: ['profile'] })
+         queryClient.invalidateQueries({ queryKey: ['courses'] })
+         queryClient.invalidateQueries({ queryKey: ['due-assignments'] })
+       }
+       setLoading(false)
+     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -445,6 +456,23 @@ export function RootLayout() {
 
   // Derive current route and active course from pathname
   const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const rawSearch = useRouterState({ select: (s) => (s.location as any).searchStr ?? (s.location as any).search ?? '' }) as any
+  const searchStr = React.useMemo(() => {
+    if (typeof rawSearch === 'string') return rawSearch
+    try {
+      return new URLSearchParams(rawSearch as any).toString()
+    } catch {
+      return ''
+    }
+  }, [rawSearch])
+  const isEmbeddedContent = React.useMemo(() => {
+    if (!pathname.startsWith('/content')) return false
+    try {
+      return new URLSearchParams(searchStr || '').get('embed') === '1'
+    } catch {
+      return false
+    }
+  }, [pathname, searchStr])
   const currentView: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions' | 'course' | 'allCourses' | 'settings' = pathname.startsWith('/course/')
     ? 'course'
     : pathname.startsWith('/announcements')
@@ -523,10 +551,12 @@ export function RootLayout() {
 
   const context: AppContextValue = {
     baseUrl,
-    courses: (coursesQ.data || cachedCourses || []),
-    due: (dueQ.data || cachedDue || []),
-    profile: profileQ.data,
-    loading: loading || profileQ.isLoading || (coursesQ.isLoading && !(cachedCourses && cachedCourses.length)) || (dueQ.isLoading && !(cachedDue && cachedDue.length)),
+    courses: embedBoot ? [] : (coursesQ.data || cachedCourses || []),
+    due: embedBoot ? [] : (dueQ.data || cachedDue || []),
+    profile: embedBoot ? null : profileQ.data,
+    loading: embedBoot
+      ? loading
+      : (loading || profileQ.isLoading || (coursesQ.isLoading && !(cachedCourses && cachedCourses.length)) || (dueQ.isLoading && !(cachedDue && cachedDue.length))),
     sidebar: sidebarCfg,
     setSidebar: onSidebarConfigChange,
     courseImages,
@@ -683,43 +713,55 @@ export function RootLayout() {
     <AIPanelProvider 
       embeddingsEnabled={embeddingsEnabled}
       aiEnabled={aiEnabled} 
-      dueAssignments={dueQ.data || cachedDue || []}
-      courses={coursesQ.data || cachedCourses || []}
+      dueAssignments={embedBoot ? [] : (dueQ.data || cachedDue || [])}
+      courses={embedBoot ? [] : (coursesQ.data || cachedCourses || [])}
     >
       <AppProvider value={context}>
-        <div className="h-screen flex flex-col" style={{ backgroundColor: 'var(--app-accent-bg)' }}>
-          <Header profile={profileQ.data} onOpenSearch={() => setSearchOpen(true)} onOpenInbox={() => setInboxOpen(true)} />
-          <div className="flex flex-1 overflow-hidden" style={{ backgroundColor: 'var(--app-accent-bg)' }}>
-            <Sidebar
-              courses={visibleCourses}
-              activeCourseId={(currentView === 'course' ? (derivedCourseId ?? activeCourseId) : null)}
-              sidebar={sidebarCfg}
-              current={currentView}
-              onSelectDashboard={() => { setActiveCourseId(null); navigate({ to: '/dashboard' }) }}
-              onSelectAnnouncements={() => { setActiveCourseId(null); navigate({ to: '/announcements' }) }}
-              onSelectAssignments={() => { setActiveCourseId(null); navigate({ to: '/assignments' }) }}
-              onSelectGrades={() => { setActiveCourseId(null); navigate({ to: '/grades' }) }}
-              onSelectDiscussions={() => { setActiveCourseId(null); navigate({ to: '/discussions' }) }}
-              onSelectCourse={(id) => context.onOpenCourse(id)}
-              onOpenAllCourses={() => navigate({ to: '/all-courses' })}
-              onHideCourse={hideCourse}
-              onPrefetchCourse={(id) => { if (prefetchEnabled) prefetchCourseData(id, { isActive: String(id) === String(derivedCourseId ?? activeCourseId ?? '') }) }}
-              onPrefetchNav={(tab) => { if (prefetchEnabled) handlePrefetchNav(tab) }}
-              onReorder={async (nextOrder) => { const next: SidebarConfig = { ...sidebarCfg, order: nextOrder }; setSidebarCfg(next); await saveUserSidebar(next) }}
-            />
-            <main className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-tl-xl">
-              <div className={`flex-1 flex flex-col min-h-0 p-6 ${currentView === 'course' ? 'pt-24 overflow-hidden' : 'overflow-y-auto'}`}>
-                <div className={`max-w-6xl w-full mx-auto ${currentView === 'course' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
-                  <Outlet />
-                </div>
+        {isEmbeddedContent ? (
+          <div className="h-screen w-screen bg-gray-50 dark:bg-neutral-950">
+            <main className="h-full w-full overflow-hidden">
+              <div className="h-full w-full">
+                <Outlet />
               </div>
             </main>
           </div>
-        </div>
-        <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
-        <InboxPanel isOpen={inboxOpen} onClose={() => setInboxOpen(false)} />
-        <AIPanelKeyboardHandler />
-        <NotificationManager />
+        ) : (
+          <>
+            <div className="h-screen flex flex-col" style={{ backgroundColor: 'var(--app-accent-bg)' }}>
+              <Header profile={profileQ.data} onOpenSearch={() => setSearchOpen(true)} onOpenInbox={() => setInboxOpen(true)} />
+              <div className="flex flex-1 overflow-hidden" style={{ backgroundColor: 'var(--app-accent-bg)' }}>
+                <Sidebar
+                  courses={visibleCourses}
+                  activeCourseId={(currentView === 'course' ? (derivedCourseId ?? activeCourseId) : null)}
+                  sidebar={sidebarCfg}
+                  current={currentView}
+                  onSelectDashboard={() => { setActiveCourseId(null); navigate({ to: '/dashboard' }) }}
+                  onSelectAnnouncements={() => { setActiveCourseId(null); navigate({ to: '/announcements' }) }}
+                  onSelectAssignments={() => { setActiveCourseId(null); navigate({ to: '/assignments' }) }}
+                  onSelectGrades={() => { setActiveCourseId(null); navigate({ to: '/grades' }) }}
+                  onSelectDiscussions={() => { setActiveCourseId(null); navigate({ to: '/discussions' }) }}
+                  onSelectCourse={(id) => context.onOpenCourse(id)}
+                  onOpenAllCourses={() => navigate({ to: '/all-courses' })}
+                  onHideCourse={hideCourse}
+                  onPrefetchCourse={(id) => { if (prefetchEnabled) prefetchCourseData(id, { isActive: String(id) === String(derivedCourseId ?? activeCourseId ?? '') }) }}
+                  onPrefetchNav={(tab) => { if (prefetchEnabled) handlePrefetchNav(tab) }}
+                  onReorder={async (nextOrder) => { const next: SidebarConfig = { ...sidebarCfg, order: nextOrder }; setSidebarCfg(next); await saveUserSidebar(next) }}
+                />
+                <main className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-tl-xl">
+                  <div className={`flex-1 flex flex-col min-h-0 p-6 ${currentView === 'course' ? 'pt-24 overflow-hidden' : 'overflow-y-auto'}`}>
+                    <div className={`max-w-6xl w-full mx-auto ${currentView === 'course' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
+                      <Outlet />
+                    </div>
+                  </div>
+                </main>
+              </div>
+            </div>
+            <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
+            <InboxPanel isOpen={inboxOpen} onClose={() => setInboxOpen(false)} />
+            <AIPanelKeyboardHandler />
+            <NotificationManager />
+          </>
+        )}
       </AppProvider>
     </AIPanelProvider>
   )

@@ -130,6 +130,104 @@ let tray: Tray | null = null
 let isQuitting = false
 let appConfig: AppConfig = loadConfig()
 
+function safeContentType(t: any): 'page' | 'assignment' | 'announcement' | 'discussion' | 'file' | null {
+  if (t === 'page' || t === 'assignment' || t === 'announcement' || t === 'discussion' || t === 'file') return t
+  return null
+}
+
+function buildContentHash(params: {
+  courseId: string
+  type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file'
+  contentId: string
+  title?: string
+  embed?: boolean
+}): string {
+  const q = new URLSearchParams()
+  q.set('courseId', params.courseId)
+  q.set('type', params.type)
+  q.set('contentId', params.contentId)
+  if (params.title) q.set('title', params.title)
+  if (params.embed) q.set('embed', '1')
+  // IMPORTANT: use a literal hash fragment ("#/...") when loading a file:// URL.
+  // BrowserWindow.loadFile() can URL-encode the hash, which breaks hash routing.
+  return `#/content?${q.toString()}`
+}
+
+function createContentWindow(params: {
+  courseId: string
+  type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file'
+  contentId: string
+  title?: string
+}) {
+  const icon = getIconPath()
+  const savedTheme = appConfig?.theme
+  const isDark = savedTheme === 'dark' || (!savedTheme && process.platform === 'darwin')
+  const bgColor = isDark ? '#020617' : '#ffffff'
+
+  const child = new BrowserWindow({
+    ...(icon ? { icon } : {}),
+    show: false,
+    backgroundColor: bgColor,
+    width: 980,
+    height: 720,
+    ...(process.platform === 'darwin'
+      ? {
+          titleBarStyle: 'hiddenInset' as const,
+          trafficLightPosition: { x: 20, y: 13 }, // Vertically center in h-10 (40px) header
+        }
+      : {}),
+    ...(process.platform === 'win32'
+      ? {
+          titleBarStyle: 'hidden' as const,
+          titleBarOverlay: {
+            color: '#00000000',
+            symbolColor: isDark ? '#ffffff' : '#000000',
+            height: 56,
+          },
+          autoHideMenuBar: true,
+          backgroundMaterial: 'mica' as const,
+        }
+      : process.platform !== 'darwin'
+        ? { autoHideMenuBar: true }
+        : {}),
+    webPreferences: {
+      preload: getPreloadPath(),
+      webviewTag: true,
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+    },
+  })
+
+  child.once('ready-to-show', () => child.show())
+
+  child.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https:') || url.startsWith('http:')) {
+      shell.openExternal(url)
+    }
+    return { action: 'deny' }
+  })
+
+  const hash = buildContentHash({
+    courseId: params.courseId,
+    type: params.type,
+    contentId: params.contentId,
+    title: params.title,
+    embed: true,
+  })
+
+  if (VITE_DEV_SERVER_URL) {
+    // VITE_DEV_SERVER_URL already includes the origin; append hash fragment directly.
+    child.loadURL(`${VITE_DEV_SERVER_URL}${hash}`)
+  } else {
+    // Use loadURL with an explicit file:// URL so the hash stays unencoded.
+    const fileUrl = pathToFileURL(path.join(RENDERER_DIST, 'index.html')).toString()
+    child.loadURL(`${fileUrl}${hash}`)
+  }
+
+  return child
+}
+
 function getIconPath(): string | undefined {
   const pub = process.env.VITE_PUBLIC || RENDERER_DIST
   const candidates = [
@@ -1152,6 +1250,22 @@ ipcMain.handle('app:openExternal', async (_evt, url: string) => {
       return { ok: true }
     }
     return { ok: false, error: 'Invalid protocol' }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('app:openContentWindow', async (_evt, raw: { courseId?: string; type?: string; contentId?: string; title?: string }) => {
+  try {
+    const courseId = String(raw?.courseId || '').trim()
+    const contentId = String(raw?.contentId || '').trim()
+    const type = safeContentType(raw?.type)
+    const title = raw?.title ? String(raw.title) : undefined
+
+    if (!courseId || !contentId || !type) return { ok: false, error: 'Invalid params' }
+
+    createContentWindow({ courseId, contentId, type, title })
+    return { ok: true }
   } catch (e: any) {
     return { ok: false, error: String(e?.message || e) }
   }

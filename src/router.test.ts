@@ -6,15 +6,15 @@ describe('shouldUseHashHistory', () => {
     expect(shouldUseHashHistory('file:')).toBe(true)
   })
 
-  it('does not use hash history for http protocol', () => {
-    expect(shouldUseHashHistory('http:')).toBe(false)
+  it('uses hash history for http protocol', () => {
+    expect(shouldUseHashHistory('http:')).toBe(true)
   })
 
-  it('does not use hash history for https protocol', () => {
-    expect(shouldUseHashHistory('https:')).toBe(false)
+  it('uses hash history for https protocol', () => {
+    expect(shouldUseHashHistory('https:')).toBe(true)
   })
 
-  it('returns false when protocol is undefined', () => {
-    expect(shouldUseHashHistory(undefined)).toBe(false)
+  it('returns true when protocol is undefined', () => {
+    expect(shouldUseHashHistory(undefined)).toBe(true)
   })
 })

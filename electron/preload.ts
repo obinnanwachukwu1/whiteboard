@@ -96,6 +96,8 @@ contextBridge.exposeInMainWorld('settings', {
 // System helpers
 contextBridge.exposeInMainWorld('system', {
   openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
+  openContentWindow: (params: { courseId: string; type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file'; contentId: string; title?: string; courseName?: string }) =>
+    ipcRenderer.invoke('app:openContentWindow', params),
   downloadFile: (fileId: string | number, suggestedName?: string) =>
     ipcRenderer.invoke('app:downloadFile', fileId, suggestedName),
   getPdfPreloadPath: () => ipcRenderer.invoke('app:getPdfPreloadPath'),

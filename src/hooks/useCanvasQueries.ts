@@ -135,9 +135,10 @@ export function useCoursePage(courseId: string | number | undefined, slugOrUrl: 
     enabled: courseId != null && !!slugOrUrl && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 60 * 2,
+    // Detail views: show cached instantly, but always revalidate when opened.
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    refetchOnMount: false,
+    refetchOnMount: 'always',
     ...options,
   })
 }
@@ -152,9 +153,10 @@ export function useAssignmentRest(courseId: string | number | undefined, assignm
     enabled: courseId != null && assignmentRestId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 60 * 2,
+    // Detail views: show cached instantly, but always revalidate when opened.
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    refetchOnMount: false,
+    refetchOnMount: 'always',
     ...options,
   })
 }
@@ -252,9 +254,10 @@ export function useAnnouncement(courseId: string | number | undefined, topicId: 
     enabled: courseId != null && topicId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 60 * 2,
+    // Detail views: show cached instantly, but always revalidate when opened.
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    refetchOnMount: false,
+    refetchOnMount: 'always',
     ...options,
   })
 }
