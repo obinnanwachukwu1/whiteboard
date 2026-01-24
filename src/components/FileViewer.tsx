@@ -88,14 +88,8 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
 
   const LoadingSkeleton = () => (
     <div className="flex flex-col h-full w-full bg-gray-50/50 dark:bg-neutral-950/50">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between shrink-0 h-10 mx-4 mt-4 bg-white dark:bg-neutral-900 rounded-lg border border-gray-200 dark:border-neutral-800 px-4 shadow-sm">
-         <Skeleton width="w-32" height="h-4" />
-         <div className="flex gap-2">
-           <Skeleton width="w-8" height="h-8" variant="rounded" />
-           <Skeleton width="w-8" height="h-8" variant="rounded" />
-         </div>
-      </div>
+      {/* No top toolbar in skeleton to avoid flash of wrong UI for PDFs. 
+          The content area skeleton is enough to indicate loading. */}
       
       {/* Document Area */}
       <div className="flex-1 flex justify-center p-4 overflow-hidden">

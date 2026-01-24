@@ -130,7 +130,9 @@ export const PdfToolbar: React.FC<Props> = ({
               aria-label="Current page"
             />
             <span className="text-gray-400 dark:text-neutral-500">/</span>
-            <span className="text-gray-600 dark:text-neutral-400">{totalPages}</span>
+            <span className="text-gray-600 dark:text-neutral-400 min-w-[1ch] text-center inline-block">
+              {totalPages > 0 ? totalPages : '–'}
+            </span>
           </form>
           
           <button
