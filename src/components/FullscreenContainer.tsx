@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { useRef, useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 type Props = {
   className?: string
@@ -7,11 +8,12 @@ type Props = {
 
 export const FullscreenContainer: React.FC<Props> = ({ className = '', children }) => {
   // "Fullscreen" here is an in-app focus mode, not OS / native fullscreen.
-  // It overlays the entire window content (z-index 1000) but stays within the window bounds.
-  const rootRef = React.useRef<HTMLDivElement | null>(null)
-  const [isFullscreen, setIsFullscreen] = React.useState(false)
+  // We use a React Portal to ensure the content overlays the *entire* window (including sidebar/header)
+  // regardless of where this component is deeply nested in the DOM tree.
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isFullscreen) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setIsFullscreen(false)
@@ -24,22 +26,35 @@ export const FullscreenContainer: React.FC<Props> = ({ className = '', children 
     setIsFullscreen(v => !v)
   }
 
+  const content = children({
+    isFullscreen,
+    enter: async () => setIsFullscreen(true),
+    exit: async () => setIsFullscreen(false),
+    toggle,
+    containerRef: rootRef,
+  })
+
+  // When active, portal the content to document.body to break out of all containers
+  if (isFullscreen) {
+    if (typeof document === 'undefined') return null // Safety for SSR if needed
+    
+    return createPortal(
+      <div
+        ref={rootRef}
+        className={`fixed inset-0 z-[9999] bg-white dark:bg-neutral-900 ${className}`}
+      >
+        {content}
+      </div>,
+      document.body
+    )
+  }
+
   return (
     <div
       ref={rootRef}
-      className={
-        isFullscreen
-          ? `fixed inset-0 z-[1000] bg-white dark:bg-neutral-900 ${className}`
-          : `relative w-full h-full ${className}`
-      }
+      className={`relative w-full h-full ${className}`}
     >
-      {children({
-        isFullscreen,
-        enter: async () => setIsFullscreen(true),
-        exit: async () => setIsFullscreen(false),
-        toggle,
-        containerRef: rootRef,
-      })}
+      {content}
     </div>
   )
 }
