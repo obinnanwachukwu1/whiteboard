@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { useFileBytes, useFileMeta } from '../../hooks/useCanvasQueries'
 import { PdfToolbar } from './PdfToolbar.tsx'
+import { Skeleton } from '../Skeleton'
 
 type Props = {
   fileId: string | number
@@ -267,8 +268,45 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
   // Loading state while fetching URL or preload path
   if (isUrlLoading || !preloadPath) {
     return (
-      <div className={`flex items-center justify-center p-8 ${className}`}>
-        <div className="text-slate-500 dark:text-slate-400">Loading PDF...</div>
+      <div className={`flex flex-col h-full w-full bg-gray-50/50 dark:bg-neutral-950/50 ${className}`}>
+        {/* Main content skeleton - No toolbar here because PdfViewer manages its own toolbar space usually, 
+            but strictly speaking PdfViewer includes PdfToolbar. 
+            So let's mimic the full viewer structure. */}
+            
+         {/* Toolbar */}
+        <div className="flex items-center justify-between shrink-0 h-10 mx-4 mt-4 bg-white dark:bg-neutral-900 rounded-lg border border-gray-200 dark:border-neutral-800 px-4 shadow-sm">
+           <Skeleton width="w-32" height="h-4" />
+           <div className="flex gap-2">
+             <Skeleton width="w-8" height="h-8" variant="rounded" />
+             <Skeleton width="w-8" height="h-8" variant="rounded" />
+           </div>
+        </div>
+
+        {/* Document Area */}
+        <div className="flex-1 flex justify-center p-4 overflow-hidden">
+          <div className="w-full max-w-3xl h-full bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-800 p-12 space-y-8 relative overflow-hidden">
+              <Skeleton height="h-10" width="w-2/3" className="mb-8" />
+              <div className="space-y-4">
+                <Skeleton height="h-4" width="w-full" />
+                <Skeleton height="h-4" width="w-full" />
+                <Skeleton height="h-4" width="w-5/6" />
+              </div>
+              <div className="space-y-4 pt-4">
+                <Skeleton height="h-4" width="w-full" />
+                <Skeleton height="h-4" width="w-11/12" />
+                <Skeleton height="h-4" width="w-full" />
+                <Skeleton height="h-4" width="w-4/5" />
+              </div>
+              
+               {/* Center Loading Indicator */}
+              <div className="absolute inset-0 flex items-center justify-center bg-white/40 dark:bg-neutral-900/40 backdrop-blur-[2px]">
+                 <div className="flex flex-col items-center gap-3">
+                   <div className="w-8 h-8 rounded-full border-2 border-slate-300 dark:border-neutral-600 border-t-blue-500 animate-spin" />
+                   <span className="text-xs font-medium text-slate-500 dark:text-neutral-400 uppercase tracking-wider">Loading PDF</span>
+                 </div>
+              </div>
+          </div>
+        </div>
       </div>
     )
   }
@@ -296,8 +334,9 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
         
         {/* Loading overlay */}
         {viewerState.isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100/80 dark:bg-neutral-800/80">
-            <div className="text-slate-500 dark:text-slate-400">Loading PDF...</div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50/90 dark:bg-neutral-900/90 z-10">
+             <div className="w-12 h-12 rounded-full border-4 border-slate-300 dark:border-neutral-600 border-t-blue-500 animate-spin mb-4" />
+             <div className="text-sm font-medium text-slate-500 dark:text-neutral-400 uppercase tracking-wide">Rendering PDF</div>
           </div>
         )}
         

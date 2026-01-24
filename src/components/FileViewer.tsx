@@ -1,6 +1,7 @@
 import React, { Suspense, useEffect, useRef } from 'react'
 import { useFileMeta, useFileBytes } from '../hooks/useCanvasQueries'
 import { PdfViewer } from './pdf'
+import { Skeleton } from './Skeleton'
 
 // Lazy load heavy dependencies
 const DocxRenderer = React.lazy(() => import('./viewers/DocxRenderer'))
@@ -85,10 +86,50 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
   const isTextLike = ['json','xml','html','md','csv'].includes(ext)
   const isSupported = isPdf || isImage || isAudio || isVideo || isDocx || isDoc || isXlsx || isPptx || isTextLike
 
+  const LoadingSkeleton = () => (
+    <div className="flex flex-col h-full w-full bg-gray-50/50 dark:bg-neutral-950/50">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between shrink-0 h-10 mx-4 mt-4 bg-white dark:bg-neutral-900 rounded-lg border border-gray-200 dark:border-neutral-800 px-4 shadow-sm">
+         <Skeleton width="w-32" height="h-4" />
+         <div className="flex gap-2">
+           <Skeleton width="w-8" height="h-8" variant="rounded" />
+           <Skeleton width="w-8" height="h-8" variant="rounded" />
+         </div>
+      </div>
+      
+      {/* Document Area */}
+      <div className="flex-1 flex justify-center p-4 overflow-hidden">
+        {/* Paper Page */}
+        <div className="w-full max-w-3xl h-full bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-800 p-12 space-y-8 relative overflow-hidden">
+            <Skeleton height="h-10" width="w-2/3" className="mb-8" />
+            <div className="space-y-4">
+              <Skeleton height="h-4" width="w-full" />
+              <Skeleton height="h-4" width="w-full" />
+              <Skeleton height="h-4" width="w-5/6" />
+            </div>
+            <div className="space-y-4 pt-4">
+              <Skeleton height="h-4" width="w-full" />
+              <Skeleton height="h-4" width="w-11/12" />
+              <Skeleton height="h-4" width="w-full" />
+              <Skeleton height="h-4" width="w-4/5" />
+            </div>
+            
+             {/* Center Loading Indicator */}
+            <div className="absolute inset-0 flex items-center justify-center bg-white/40 dark:bg-neutral-900/40 backdrop-blur-[2px]">
+               <div className="flex flex-col items-center gap-3">
+                 <div className="w-8 h-8 rounded-full border-2 border-slate-300 dark:border-neutral-600 border-t-blue-500 animate-spin" />
+                 <span className="text-xs font-medium text-slate-500 dark:text-neutral-400 uppercase tracking-wider">Loading Preview</span>
+               </div>
+            </div>
+        </div>
+      </div>
+    </div>
+  )
+
   let body: React.ReactNode = null
 
   if (metaQ.isLoading || fileUrlQ.isLoading) {
-    body = <div className={`p-8 text-slate-500 dark:text-slate-400 ${className}`}>Loading file…</div>
+    body = <LoadingSkeleton />
   } else if (!metaQ.data) {
     body = <div className={`p-8 text-slate-500 dark:text-slate-400 ${className}`}>Unable to load file metadata.</div>
   } else if (isPdf) {
@@ -137,25 +178,25 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
     )
   } else if (isDocx && localUrl) {
     body = (
-      <Suspense fallback={<div className="p-4">Loading viewer...</div>}>
+      <Suspense fallback={<div className="h-full p-4"><LoadingSkeleton /></div>}>
         <DocxRenderer url={localUrl} className={className} isFullscreen={isFullscreen} />
       </Suspense>
     )
   } else if (isXlsx && localUrl) {
     body = (
-      <Suspense fallback={<div className="p-4">Loading viewer...</div>}>
+      <Suspense fallback={<div className="h-full p-4"><LoadingSkeleton /></div>}>
         <XlsxRenderer url={localUrl} className={className} />
       </Suspense>
     )
   } else if (isPptx && localUrl) {
     body = (
-      <Suspense fallback={<div className="p-4">Loading viewer...</div>}>
+      <Suspense fallback={<div className="h-full p-4"><LoadingSkeleton /></div>}>
         <PptxRenderer url={localUrl} className={className} />
       </Suspense>
     )
   } else if (isTextLike && localUrl) {
     body = (
-      <Suspense fallback={<div className="p-4">Loading viewer...</div>}>
+      <Suspense fallback={<div className="h-full p-4"><LoadingSkeleton /></div>}>
         <TextRenderer url={localUrl} ext={ext} className={className} isFullscreen={isFullscreen} />
       </Suspense>
     )
