@@ -12,16 +12,24 @@ export const FullscreenContainer: React.FC<Props> = ({ className = '', children 
   const [isFullscreen, setIsFullscreen] = React.useState(false)
 
   React.useEffect(() => {
-    if (!isFullscreen) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsFullscreen(false)
+    const onChange = () => {
+      // Sync state with actual browser fullscreen state
+      const active = !!document.fullscreenElement && document.fullscreenElement === rootRef.current
+      setIsFullscreen(active)
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [isFullscreen])
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
 
   const toggle = async () => {
-    setIsFullscreen((v) => !v)
+    try {
+      if (!isFullscreen) await rootRef.current?.requestFullscreen()
+      else await document.exitFullscreen()
+    } catch (e) {
+      console.error('Fullscreen toggle failed', e)
+      // Fallback to CSS-only fullscreen if API fails
+      setIsFullscreen(v => !v)
+    }
   }
 
   return (
@@ -35,8 +43,14 @@ export const FullscreenContainer: React.FC<Props> = ({ className = '', children 
     >
       {children({
         isFullscreen,
-        enter: async () => setIsFullscreen(true),
-        exit: async () => setIsFullscreen(false),
+        enter: async () => {
+            try { await rootRef.current?.requestFullscreen() } 
+            catch { setIsFullscreen(true) }
+        },
+        exit: async () => {
+            try { await document.exitFullscreen() }
+            catch { setIsFullscreen(false) }
+        },
         toggle,
         containerRef: rootRef,
       })}
