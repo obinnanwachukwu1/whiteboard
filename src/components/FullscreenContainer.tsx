@@ -41,7 +41,8 @@ export const FullscreenContainer: React.FC<Props> = ({ className = '', children 
     return createPortal(
       <div
         ref={rootRef}
-        className={`fixed inset-0 z-[9999] bg-white dark:bg-neutral-900 ${className}`}
+        className={`fixed top-0 left-0 w-screen h-screen m-0 p-0 bg-white dark:bg-neutral-950 ${className}`}
+        style={{ zIndex: 2147483647 }} // Max z-index to ensure it covers everything (Sidebar, Header, etc.)
       >
         {content}
       </div>,
