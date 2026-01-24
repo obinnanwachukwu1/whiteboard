@@ -268,13 +268,8 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
   // Loading state while fetching URL or preload path
   if (isUrlLoading || !preloadPath) {
     return (
-      <div className={`flex flex-col h-full w-full bg-gray-50/50 dark:bg-neutral-950/50 ${className}`}>
-        {/* Main content skeleton - No toolbar here because PdfViewer manages its own toolbar space usually, 
-            but strictly speaking PdfViewer includes PdfToolbar. 
-            So let's mimic the full viewer structure. */}
-            
-         {/* Toolbar */}
-         {/* Mimic PdfToolbar structure: centered rounded pill */}
+      <div className={`flex flex-col h-full w-full bg-gray-50/50 dark:bg-neutral-950/50 items-center justify-center ${className}`}>
+         {/* Toolbar Skeleton (matches bottom pill) */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
            <div className="flex items-center gap-3 px-4 py-2 bg-white/95 dark:bg-neutral-900/95 shadow-xl rounded-full border border-gray-200 dark:border-neutral-700">
               <Skeleton width="w-20" height="h-6" className="rounded-full" />
@@ -285,28 +280,9 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
            </div>
         </div>
 
-        {/* Document Area */}
-        <div className="flex-1 flex justify-center p-4 overflow-hidden">
-          <div className="w-full max-w-3xl h-full bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-800 p-12 space-y-8 relative overflow-hidden">
-              <Skeleton height="h-10" width="w-2/3" className="mb-8" />
-              <div className="space-y-4">
-                <Skeleton height="h-4" width="w-full" />
-                <Skeleton height="h-4" width="w-full" />
-                <Skeleton height="h-4" width="w-5/6" />
-              </div>
-              <div className="space-y-4 pt-4">
-                <Skeleton height="h-4" width="w-full" />
-                <Skeleton height="h-4" width="w-11/12" />
-                <Skeleton height="h-4" width="w-full" />
-                <Skeleton height="h-4" width="w-4/5" />
-              </div>
-              
-               {/* Center Loading Indicator */}
-              <div className="absolute inset-0 flex items-center justify-center bg-white/40 dark:bg-neutral-900/40 backdrop-blur-[2px]">
-                 <span className="text-sm font-medium text-slate-500 dark:text-neutral-400">Loading PDF...</span>
-              </div>
-          </div>
-        </div>
+        <span className="text-sm font-medium text-slate-500 dark:text-neutral-400 animate-pulse">
+          Loading PDF...
+        </span>
       </div>
     )
   }

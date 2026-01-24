@@ -87,33 +87,11 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
   const isSupported = isPdf || isImage || isAudio || isVideo || isDocx || isDoc || isXlsx || isPptx || isTextLike
 
   const LoadingSkeleton = () => (
-    <div className="flex flex-col h-full w-full bg-gray-50/50 dark:bg-neutral-950/50">
-      {/* No top toolbar in skeleton to avoid flash of wrong UI for PDFs. 
-          The content area skeleton is enough to indicate loading. */}
-      
-      {/* Document Area */}
-      <div className="flex-1 flex justify-center p-4 overflow-hidden">
-        {/* Paper Page */}
-        <div className="w-full max-w-3xl h-full bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-800 p-12 space-y-8 relative overflow-hidden">
-            <Skeleton height="h-10" width="w-2/3" className="mb-8" />
-            <div className="space-y-4">
-              <Skeleton height="h-4" width="w-full" />
-              <Skeleton height="h-4" width="w-full" />
-              <Skeleton height="h-4" width="w-5/6" />
-            </div>
-            <div className="space-y-4 pt-4">
-              <Skeleton height="h-4" width="w-full" />
-              <Skeleton height="h-4" width="w-11/12" />
-              <Skeleton height="h-4" width="w-full" />
-              <Skeleton height="h-4" width="w-4/5" />
-            </div>
-            
-             {/* Center Loading Indicator */}
-            <div className="absolute inset-0 flex items-center justify-center bg-white/40 dark:bg-neutral-900/40 backdrop-blur-[2px]">
-               <span className="text-sm font-medium text-slate-500 dark:text-neutral-400">Loading preview...</span>
-            </div>
-        </div>
-      </div>
+    <div className="flex flex-col h-full w-full bg-gray-50/50 dark:bg-neutral-950/50 items-center justify-center">
+      {/* Just text, no fake UI elements as per request */}
+      <span className="text-sm font-medium text-slate-500 dark:text-neutral-400 animate-pulse">
+        Loading preview...
+      </span>
     </div>
   )
 
