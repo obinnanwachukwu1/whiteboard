@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Dropdown } from './ui/Dropdown'
-import { useNavigate } from '@tanstack/react-router'
 // removed theme toggle button
 import { applyThemeAndAccent, type Accent } from '../utils/theme'
 import { useAppContext } from '../context/AppContext'
@@ -14,7 +13,6 @@ type Props = {
 }
 
 export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) => {
-  const navigate = useNavigate()
   const app = useAppContext()
   const name = profile?.short_name || profile?.name || 'Whiteboard'
   const avatar = profile?.avatar_url
@@ -156,7 +154,7 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
             Signed in as
             <div className="truncate text-slate-800 dark:text-slate-200 text-[11px]">{profile?.primary_email || name}</div>
           </div>
-          <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" onClick={() => { setMenuOpen(false); navigate({ to: '/settings' }) }}>
+          <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" onClick={() => { setMenuOpen(false); app.onOpenSettings() }}>
             Settings
           </button>
           <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50" onClick={onCopyEmail} disabled={!profile?.primary_email}>

@@ -6,7 +6,6 @@ import DashboardPage from './routes/DashboardPage'
 import AllCoursesPage from './routes/AllCoursesPage'
 import CoursePage from './routes/CoursePage'
 import ContentPage from './routes/ContentPage'
-import SettingsPage from './routes/SettingsPage'
 import AnnouncementsPage from './routes/AnnouncementsPage'
 import AssignmentsPage from './routes/AssignmentsPage'
 import GradesPage from './routes/GradesPage'
@@ -32,12 +31,6 @@ const courseRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/course/$courseId',
   component: CoursePage,
-})
-
-const settingsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/settings',
-  component: SettingsPage,
 })
 
 const contentRoute = createRoute({
@@ -89,7 +82,6 @@ const routeTree = rootRoute.addChildren([
   allCoursesRoute,
   courseRoute,
   contentRoute,
-  settingsRoute,
   announcementsRoute,
   assignmentsRoute,
   gradesRoute,

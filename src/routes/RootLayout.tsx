@@ -18,6 +18,7 @@ import { Skeleton, SkeletonList, SkeletonStats } from '../components/Skeleton'
 import { useWindowControlsOverlayInsets } from '../hooks/useWindowControlsOverlayInsets'
 import { NotificationManager } from '../components/NotificationManager'
 import { prefetchNavTab } from '../utils/navPrefetch'
+import { SettingsModal } from '../components/SettingsModal'
 
 // Context definitions moved to src/context/AppContext.tsx
 
@@ -66,6 +67,7 @@ export function RootLayout() {
   const [courseImages, setCourseImagesState] = useState<Record<string, string>>({})
   const [searchOpen, setSearchOpen] = useState(false)
   const [inboxOpen, setInboxOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Embed windows ("Open in New Window") should not trigger global app fetches.
   // They still initialize Canvas and fetch the requested content, but avoid
@@ -96,7 +98,7 @@ export function RootLayout() {
 
     const cleanup = window.electron.onMenuAction((action) => {
       if (action === 'settings') {
-        navigate({ to: '/settings' })
+        setSettingsOpen(true)
       }
     })
     return cleanup
@@ -473,7 +475,7 @@ export function RootLayout() {
       return false
     }
   }, [pathname, searchStr])
-  const currentView: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions' | 'course' | 'allCourses' | 'settings' = pathname.startsWith('/course/')
+  const currentView: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions' | 'course' | 'allCourses' = pathname.startsWith('/course/')
     ? 'course'
     : pathname.startsWith('/announcements')
     ? 'announcements'
@@ -485,8 +487,6 @@ export function RootLayout() {
     ? 'discussions'
     : pathname.startsWith('/all-courses')
     ? 'allCourses'
-    : pathname.startsWith('/settings')
-    ? 'settings'
     : 'dashboard'
   const derivedCourseId = React.useMemo(() => {
     if (!pathname.startsWith('/course/')) return null
@@ -580,6 +580,7 @@ export function RootLayout() {
     onOpenFile: (courseId, fileId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'files', type: 'file', contentId: String(fileId), title } }) },
     onOpenModules: (courseId) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'modules' } }) },
     onSignOut,
+    onOpenSettings: () => setSettingsOpen(true),
   }
 
   const visibleCourses = useMemo(() => {
@@ -757,6 +758,7 @@ export function RootLayout() {
               </div>
             </div>
             <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
+            <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
             <InboxPanel isOpen={inboxOpen} onClose={() => setInboxOpen(false)} />
             <AIPanelKeyboardHandler />
             <NotificationManager />

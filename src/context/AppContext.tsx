@@ -30,6 +30,7 @@ export type AppContextValue = {
   onOpenFile: (courseId: string | number, fileId: string | number, title?: string) => void
   onOpenModules: (courseId: string | number) => void
   onSignOut: () => Promise<void>
+  onOpenSettings: () => void
 }
 
 export const AppContext = React.createContext<AppContextValue | null>(null)

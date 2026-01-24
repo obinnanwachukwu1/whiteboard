@@ -28,6 +28,23 @@ export const Modal: React.FC<ModalProps> = ({
   showCloseButton = true,
   closeOnBackdrop = true,
 }) => {
+  const [isVisible, setIsVisible] = React.useState(open)
+  const [isClosing, setIsClosing] = React.useState(false)
+
+  React.useEffect(() => {
+    if (open) {
+      setIsVisible(true)
+      setIsClosing(false)
+    } else if (isVisible) {
+      setIsClosing(true)
+      const t = setTimeout(() => {
+        setIsVisible(false)
+        setIsClosing(false)
+      }, 150) // Match CSS animation duration
+      return () => clearTimeout(t)
+    }
+  }, [open, isVisible])
+
   // Close on Escape key
   React.useEffect(() => {
     if (!open) return
@@ -38,34 +55,34 @@ export const Modal: React.FC<ModalProps> = ({
     return () => document.removeEventListener('keydown', handleEsc)
   }, [open, onClose])
 
-  // Prevent body scroll when open
+  // Prevent body scroll when visible
   React.useEffect(() => {
-    if (open) {
+    if (isVisible) {
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = ''
     }
     return () => { document.body.style.overflow = '' }
-  }, [open])
+  }, [isVisible])
 
-  if (!open) return null
+  if (!isVisible && !open) return null
 
   return createPortal(
     <div 
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[150] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? 'modal-title' : undefined}
     >
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in"
+        className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
         onClick={closeOnBackdrop ? onClose : undefined}
         aria-hidden
       />
       
       {/* Modal content */}
-      <div className={`relative ${width} w-full bg-white dark:bg-neutral-900 rounded-xl shadow-2xl ring-1 ring-black/10 dark:ring-white/10 animate-modal-in`}>
+      <div className={`relative ${width} w-full bg-white dark:bg-neutral-900 rounded-xl shadow-2xl ring-1 ring-black/10 dark:ring-white/10 ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}>
         {/* Header */}
         {(title || showCloseButton) && (
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-neutral-800">

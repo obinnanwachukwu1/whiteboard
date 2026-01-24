@@ -17,7 +17,7 @@ type Props = {
   courses: Course[]
   activeCourseId?: string | number | null
   sidebar?: SidebarConfig
-  current?: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions' | 'course' | 'allCourses' | 'settings'
+  current?: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions' | 'course' | 'allCourses'
   onSelectDashboard: () => void
   onSelectAnnouncements?: () => void
   onSelectAssignments?: () => void
