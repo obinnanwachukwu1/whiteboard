@@ -180,17 +180,35 @@ export const CanvasContentView: React.FC<Props> = ({
   const isMac = typeof window !== 'undefined' && (window as any).platform?.isMac
 
   const header = (ctx: { isFullscreen: boolean; toggle: () => Promise<void> }) => {
-    if (isEmbedded) {
-      // Single-row titlebar for embedded windows (No actions, just drag area + title)
+    if (isEmbedded || ctx.isFullscreen) {
+      // Single-row titlebar for embedded windows or focus mode
       return (
         <>
           <div
-            className={`flex items-center h-10 ${canGoBack ? '' : 'border-b border-gray-200 dark:border-neutral-700'} bg-white/95 dark:bg-neutral-900/95 app-drag titlebar-right-inset`}
-            style={{ paddingLeft: isMac ? '80px' : '1rem' }}
+            className={`flex items-center h-10 ${canGoBack ? '' : 'border-b border-gray-200 dark:border-neutral-700'} bg-white/95 dark:bg-neutral-900/95 ${isEmbedded ? 'app-drag titlebar-right-inset' : ''} px-4`}
+            style={{ paddingLeft: isEmbedded && isMac ? '80px' : undefined }}
           >
-            <div className="text-xs font-semibold text-slate-500 dark:text-neutral-400 uppercase tracking-wider flex-1 truncate text-center pr-20">
+            {/* Left Spacer for centering (flex-1) */}
+            <div className="flex-1" />
+
+            <div className="text-xs font-semibold text-slate-500 dark:text-neutral-400 uppercase tracking-wider truncate text-center">
               {title}
             </div>
+
+             {/* Right Side: Exit Focus Button or Spacer */}
+             <div className="flex-1 flex justify-end">
+              {!isEmbedded && ctx.isFullscreen && (
+                 <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={ctx.toggle}
+                  className="w-8 h-8 p-0 justify-center rounded-full"
+                  title="Exit Focus Mode"
+                >
+                  <Minimize2 className="w-4 h-4" />
+                </Button>
+              )}
+             </div>
           </div>
           {/* Secondary Toolbar for Navigation */}
           {canGoBack && (
