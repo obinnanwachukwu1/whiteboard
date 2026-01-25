@@ -252,13 +252,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
 
       {content ? (
         <div className="flex-1 -m-5 flex flex-col overflow-hidden">
-          <div
-            className={
-              content.contentType === 'file'
-                ? 'flex-1 flex flex-col min-h-0 overflow-hidden p-5'
-                : 'flex-1 overflow-y-auto p-5'
-            }
-          >
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-5">
             {content.contentType === 'discussion' ? (
               <DiscussionDetail
                 courseId={courseId}

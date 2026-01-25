@@ -225,8 +225,8 @@ export const CanvasContentView: React.FC<Props> = ({
     // Standard single-row layout for main app
     return (
       <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/90 dark:bg-neutral-900/90">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back
+        <Button variant="ghost" size="sm" onClick={onBack} title="Back">
+          <ArrowLeft className="w-4 h-4" />
         </Button>
         <div className="text-sm font-medium truncate flex-1">{title}</div>
 

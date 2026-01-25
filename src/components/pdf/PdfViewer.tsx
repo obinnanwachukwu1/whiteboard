@@ -288,7 +288,7 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
   }
   
   return (
-    <div className={`relative flex flex-col h-full min-h-0 overflow-hidden ${className}`}>
+    <div className={`relative flex flex-col h-full min-h-0 overflow-hidden pdf-overlay ${className}`}>
       {/* PDF Webview */}
       <div
         className="flex-1 min-h-0 overflow-hidden bg-gray-100 dark:bg-neutral-800"
