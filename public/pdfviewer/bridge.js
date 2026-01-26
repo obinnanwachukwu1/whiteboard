@@ -61,6 +61,65 @@
   let handDragging = false;
   let handStart = null; // { x, y, scrollLeft, scrollTop }
 
+  // Map viewport coordinates to a stable anchor inside a page.
+  // This avoids drift on deep pages where inter-page margins do not scale.
+  function getPageAnchor(viewportX, viewportY) {
+    if (!viewerContainer) return null;
+    try {
+      const rect = viewerContainer.getBoundingClientRect();
+      const clientX = rect.left + viewportX;
+      const clientY = rect.top + viewportY;
+      const el = document.elementFromPoint(clientX, clientY);
+      if (!el || !el.closest) return null;
+
+      const pageEl = el.closest('.page');
+      if (!pageEl) return null;
+
+      const nAttr = pageEl.getAttribute('data-page-number') || (pageEl.dataset ? pageEl.dataset.pageNumber : null);
+      const pageNumber = Number(nAttr);
+      if (!Number.isFinite(pageNumber) || pageNumber <= 0) return null;
+
+      const pageRect = pageEl.getBoundingClientRect();
+      return {
+        pageNumber,
+        withinX: clientX - pageRect.left,
+        withinY: clientY - pageRect.top,
+        viewportX,
+        viewportY,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function findPageEl(pageNumber) {
+    try {
+      return (
+        document.querySelector(`.page[data-page-number="${pageNumber}"]`) ||
+        document.getElementById(`pageContainer${pageNumber}`)
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  function applyPageAnchor(anchor, ratio) {
+    if (!viewerContainer || !anchor) return false;
+    const pageEl = findPageEl(anchor.pageNumber);
+    if (!pageEl) return false;
+
+    const viewportX = anchor.viewportX;
+    const viewportY = anchor.viewportY;
+
+    // offsetTop/Left are in the scroll content coordinate space of viewerContainer.
+    const nextLeft = Math.max(0, pageEl.offsetLeft + anchor.withinX * ratio - viewportX);
+    const nextTop = Math.max(0, pageEl.offsetTop + anchor.withinY * ratio - viewportY);
+
+    viewerContainer.scrollLeft = nextLeft;
+    viewerContainer.scrollTop = nextTop;
+    return true;
+  }
+
   // Hide Chromium-style page indicator overlays if present
   const PAGE_INDICATOR_RE = /^\s*\d+\s*\/\s*\d+\s*$/;
   function hidePageIndicatorOverlays() {
@@ -86,6 +145,17 @@
       el.style.display = 'none';
     }
   }
+
+  function updatePageGaps(scale) {
+    try {
+      const s = typeof scale === 'number' && isFinite(scale) ? scale : (pdfViewer?.currentScale || 1);
+      // Keep visual page gaps roughly proportional to zoom.
+      const top = Math.round(clamp(4, 10, 8 * s));
+      const bottom = Math.round(clamp(8, 28, 24 * s));
+      document.documentElement.style.setProperty('--page-gap-top', `${top}px`);
+      document.documentElement.style.setProperty('--page-gap-bottom', `${bottom}px`);
+    } catch {}
+  }
   
   // Standard zoom values for zoom in/out
   const ZOOM_LEVELS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0];
@@ -96,6 +166,148 @@
   const viewer = document.getElementById('viewer');
   const loadingIndicator = document.getElementById('loadingIndicator');
   const errorMessage = document.getElementById('errorMessage');
+
+  // Toolbar DOM
+  const wbToolbar = document.getElementById('wbToolbar');
+  const wbPrev = document.getElementById('wbPrev');
+  const wbNext = document.getElementById('wbNext');
+  const wbPageForm = document.getElementById('wbPageForm');
+  const wbPageInput = document.getElementById('wbPageInput');
+  const wbPageTotal = document.getElementById('wbPageTotal');
+  const wbZoomOut = document.getElementById('wbZoomOut');
+  const wbZoomIn = document.getElementById('wbZoomIn');
+  const wbZoomLabel = document.getElementById('wbZoomLabel');
+  const wbZoomMenu = document.getElementById('wbZoomMenu');
+  const wbHand = document.getElementById('wbHand');
+  const wbDownload = document.getElementById('wbDownload');
+
+  const ZOOM_PRESETS = [
+    { label: 'Auto', value: 'auto' },
+    { label: 'Page Fit', value: 'page-fit' },
+    { label: 'Page Width', value: 'page-width' },
+    { label: '50%', value: 0.5 },
+    { label: '75%', value: 0.75 },
+    { label: '100%', value: 1.0 },
+    { label: '125%', value: 1.25 },
+    { label: '150%', value: 1.5 },
+    { label: '200%', value: 2.0 },
+    { label: '300%', value: 3.0 },
+  ];
+
+  let zoomMenuOpen = false;
+
+  function getZoomDisplay(scale, scaleMode) {
+    if (scaleMode === 'page-width') return 'Width';
+    if (scaleMode === 'page-fit') return 'Fit';
+    if (scaleMode === 'auto') return 'Auto';
+    const s = typeof scale === 'number' && isFinite(scale) ? scale : (pdfViewer?.currentScale || 1);
+    return `${Math.round(s * 100)}%`;
+  }
+
+  function closeZoomMenu() {
+    if (!wbZoomMenu || !wbZoomLabel) return;
+    zoomMenuOpen = false;
+    wbZoomMenu.classList.add('hidden');
+    wbZoomLabel.setAttribute('aria-expanded', 'false');
+  }
+
+  function openZoomMenu() {
+    if (!wbZoomMenu || !wbZoomLabel) return;
+    zoomMenuOpen = true;
+    wbZoomMenu.classList.remove('hidden');
+    wbZoomLabel.setAttribute('aria-expanded', 'true');
+  }
+
+  function toggleZoomMenu() {
+    if (zoomMenuOpen) closeZoomMenu();
+    else openZoomMenu();
+  }
+
+  function updateToolbar() {
+    if (!wbToolbar) return;
+    const st = getState();
+    if (wbPageInput && document.activeElement !== wbPageInput) {
+      wbPageInput.value = st.page ? String(st.page) : '';
+    }
+    if (wbPageTotal) {
+      wbPageTotal.textContent = st.pageCount > 0 ? String(st.pageCount) : '–';
+    }
+    if (wbPrev) wbPrev.disabled = !(st.page > 1);
+    if (wbNext) wbNext.disabled = !(st.pageCount > 0 && st.page < st.pageCount);
+    if (wbZoomLabel) wbZoomLabel.textContent = getZoomDisplay(st.scale, st.scaleMode);
+    if (wbHand) {
+      const active = st.selectionMode === 'hand';
+      wbHand.classList.toggle('wb-active', active);
+    }
+  }
+
+  function installToolbar() {
+    if (!wbToolbar) return;
+
+    // Zoom menu items
+    if (wbZoomMenu) {
+      wbZoomMenu.innerHTML = '';
+      for (const preset of ZOOM_PRESETS) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'wb-menu-item';
+        btn.textContent = preset.label;
+        btn.addEventListener('click', () => {
+          closeZoomMenu();
+          if (typeof preset.value === 'string') setScaleMode(preset.value);
+          else setScale(preset.value);
+        });
+        wbZoomMenu.appendChild(btn);
+      }
+    }
+
+    if (wbPrev) wbPrev.addEventListener('click', () => prevPage());
+    if (wbNext) wbNext.addEventListener('click', () => nextPage());
+    if (wbZoomOut) wbZoomOut.addEventListener('click', () => zoomOut());
+    if (wbZoomIn) wbZoomIn.addEventListener('click', () => zoomIn());
+    if (wbZoomLabel) wbZoomLabel.addEventListener('click', () => toggleZoomMenu());
+
+    if (wbPageForm && wbPageInput) {
+      const submit = () => {
+        const st = getState();
+        const n = parseInt(String(wbPageInput.value || '').trim(), 10);
+        if (!isNaN(n) && n >= 1 && n <= (st.pageCount || n)) {
+          goToPage(n);
+        } else {
+          wbPageInput.value = st.page ? String(st.page) : '';
+        }
+      };
+      wbPageForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        submit();
+      });
+      wbPageInput.addEventListener('blur', () => submit());
+    }
+
+    if (wbHand) {
+      wbHand.addEventListener('click', () => {
+        setSelectionMode(selectionMode === 'hand' ? 'text' : 'hand');
+      });
+    }
+
+    if (wbDownload) {
+      wbDownload.addEventListener('click', () => {
+        sendToParent('DOWNLOAD_REQUESTED', {});
+      });
+    }
+
+    // Dismiss zoom menu on outside click
+    document.addEventListener('pointerdown', (e) => {
+      if (!zoomMenuOpen) return;
+      const t = e.target;
+      if (!t) return;
+      if (wbZoomMenu && (wbZoomMenu === t || wbZoomMenu.contains(t))) return;
+      if (wbZoomLabel && (wbZoomLabel === t || wbZoomLabel.contains(t))) return;
+      closeZoomMenu();
+    }, { capture: true });
+
+    updateToolbar();
+  }
   
   /**
    * Send event to parent window via the preload bridge
@@ -171,6 +383,8 @@
       eventBus.on('pagesinit', function() {
         // Set default scale after pages are initialized
         pdfViewer.currentScaleValue = DEFAULT_SCALE;
+        updatePageGaps(pdfViewer.currentScale);
+        updateToolbar();
         hideLoading();
         
         sendToParent('DOC_LOADED', {
@@ -185,6 +399,7 @@
           page: evt.pageNumber,
           previous: evt.previous
         });
+        updateToolbar();
       });
     
       eventBus.on('scalechanging', function(evt) {
@@ -192,8 +407,10 @@
           scale: evt.scale,
           presetValue: evt.presetValue
         });
+        updatePageGaps(evt.scale);
         // Some pdf.js builds show a small "page/total" overlay during zoom; hide it.
         hidePageIndicatorOverlays();
+        updateToolbar();
       });
 
     
@@ -213,6 +430,7 @@
       // - Trackpad pinch zoom (ctrl/meta wheel) with cursor anchoring
       // - Hand-tool drag panning (when selectionMode === 'hand')
       installInputHandlers();
+      installToolbar();
       // Also keep page-indicator overlays hidden if they appear later.
       try {
         const mo = new MutationObserver(() => hidePageIndicatorOverlays());
@@ -287,9 +505,9 @@
         pinchActive = true;
         pinchStartScale = pdfViewer.currentScale || 1;
         pinchAccumulatedDelta = 0;
-        
-        // Simple anchor: store scroll + cursor offset as content position
-        pinchAnchor = {
+
+        // Anchor inside the page under the cursor (stable across margins).
+        pinchAnchor = getPageAnchor(viewportX, viewportY) || {
           contentX: viewerContainer.scrollLeft + viewportX,
           contentY: viewerContainer.scrollTop + viewportY,
           viewportX,
@@ -322,10 +540,15 @@
 
         pdfViewer.currentScale = desiredScale;
 
-        // Simple cursor-anchored zoom
         const ratio = desiredScale / pinchStartScale;
-        viewerContainer.scrollLeft = Math.max(0, pinchAnchor.contentX * ratio - pinchAnchor.viewportX);
-        viewerContainer.scrollTop = Math.max(0, pinchAnchor.contentY * ratio - pinchAnchor.viewportY);
+
+        // Cursor-anchored zoom, stable across page margins.
+        if (pinchAnchor.pageNumber) {
+          applyPageAnchor(pinchAnchor, ratio);
+        } else {
+          viewerContainer.scrollLeft = Math.max(0, pinchAnchor.contentX * ratio - pinchAnchor.viewportX);
+          viewerContainer.scrollTop = Math.max(0, pinchAnchor.contentY * ratio - pinchAnchor.viewportY);
+        }
       });
 
       // Consider the pinch ended after a short pause in wheel events
@@ -482,7 +705,8 @@
     
     // Clamp scale to valid range
     const clampedScale = Math.max(0.1, Math.min(10, scale));
-    pdfViewer.currentScale = clampedScale;
+    // Use anchored zoom so the viewport doesn't jump.
+    zoomToScale(clampedScale);
   }
   
   /**
@@ -503,21 +727,42 @@
    */
   function zoomToScale(newScale) {
     if (!pdfViewer || !viewerContainer) return;
-    
+
     const oldScale = pdfViewer.currentScale;
     const ratio = newScale / oldScale;
-    
-    // Anchor on viewport center
+
+    // Anchor on viewport center.
     const viewportCenterX = viewerContainer.clientWidth / 2;
     const viewportCenterY = viewerContainer.clientHeight / 2;
+    const anchor = getPageAnchor(viewportCenterX, viewportCenterY);
     const contentX = viewerContainer.scrollLeft + viewportCenterX;
     const contentY = viewerContainer.scrollTop + viewportCenterY;
     
+    // Apply scale first; pdf.js may adjust scroll during layout.
     pdfViewer.currentScale = newScale;
-    
-    // Adjust scroll to keep center in place
-    viewerContainer.scrollLeft = Math.max(0, contentX * ratio - viewportCenterX);
-    viewerContainer.scrollTop = Math.max(0, contentY * ratio - viewportCenterY);
+
+    // Adjust scroll on the next frame so it wins over pdf.js internal updates.
+    requestAnimationFrame(() => {
+      try {
+        if (anchor && anchor.pageNumber) {
+          applyPageAnchor(anchor, ratio);
+        } else {
+          viewerContainer.scrollLeft = Math.max(0, contentX * ratio - viewportCenterX);
+          viewerContainer.scrollTop = Math.max(0, contentY * ratio - viewportCenterY);
+        }
+      } catch {}
+      // One more time shortly after (pdf.js sometimes applies another clamp/layout pass).
+      setTimeout(() => {
+        try {
+          if (anchor && anchor.pageNumber) {
+            applyPageAnchor(anchor, ratio);
+          } else {
+            viewerContainer.scrollLeft = Math.max(0, contentX * ratio - viewportCenterX);
+            viewerContainer.scrollTop = Math.max(0, contentY * ratio - viewportCenterY);
+          }
+        } catch {}
+      }, 0);
+    });
   }
 
   /**
@@ -577,6 +822,7 @@
     }
     
     sendToParent('SELECTION_MODE_CHANGED', { mode });
+    updateToolbar();
   }
   
   /**
@@ -651,6 +897,14 @@
         
       case 'SET_THEME':
         setTheme(command.theme);
+        break;
+
+      case 'SET_APP_STYLE':
+        try {
+          if (command.fontFamily && typeof command.fontFamily === 'string') {
+            document.documentElement.style.setProperty('--wb-font', command.fontFamily);
+          }
+        } catch {}
         break;
 
       case 'DOWNLOAD':

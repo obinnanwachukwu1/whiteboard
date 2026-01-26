@@ -18,6 +18,20 @@
       overflow: hidden;
       /* Light mode default - matches bg-gray-100 */
       background: #f3f4f6;
+      font-family: var(--wb-font, Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif);
+    }
+
+    /* Ensure form controls use the same font as the app */
+    button, input, select, textarea {
+      font: inherit;
+      letter-spacing: inherit;
+    }
+
+    .hidden { display: none !important; }
+
+    :root {
+      --page-gap-top: 8px;
+      --page-gap-bottom: 24px;
     }
     
     /* Dark mode via class (set by React) */
@@ -40,9 +54,20 @@
       right: 0;
       bottom: 0;
       overflow: auto;
+      background: #f3f4f6;
       /* GPU acceleration for smooth scrolling */
       transform: translateZ(0);
       -webkit-overflow-scrolling: touch;
+    }
+
+    html.dark #viewerContainer {
+      background: #262626;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      html:not(.light) #viewerContainer {
+        background: #262626;
+      }
     }
     
     #viewer {
@@ -54,7 +79,7 @@
     }
     
     .pdfViewer .page {
-      margin: 8px auto 24px auto;
+      margin: var(--page-gap-top) auto var(--page-gap-bottom) auto;
       border: none !important;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
       /* Force each page onto its own compositor layer */
@@ -73,14 +98,221 @@
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
     }
     
-    /* Hide internal loading indicator - React handles loading state */
-    #loadingIndicator {
-      display: none !important;
-    }
-    
-    /* Error display - hidden, React handles errors */
+    /* In-view status overlays (used for native WebContentsView + as fallback) */
+    #loadingIndicator,
     #errorMessage {
-      display: none !important;
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 50;
+      pointer-events: none;
+      text-align: center;
+      color: #64748b;
+      background: rgba(243, 244, 246, 0.82);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    html.dark #loadingIndicator,
+    html.dark #errorMessage {
+      color: #cbd5e1;
+      background: rgba(23, 23, 23, 0.75);
+    }
+
+    #errorMessage {
+      color: #dc2626;
+      font-weight: 600;
+    }
+
+    html.dark #errorMessage {
+      color: #f87171;
+    }
+
+    /* Floating toolbar inside the viewer */
+    #wbToolbar {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+      padding: 8px 14px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(229, 231, 235, 1);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.14);
+      color: #0f172a;
+      user-select: none;
+      -webkit-user-select: none;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      font: 400 13px/18px var(--wb-font, Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif);
+    }
+
+    #wbToolbar * {
+      box-sizing: border-box;
+    }
+
+    .wb-nav,
+    .wb-zoom {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    html.dark #wbToolbar {
+      background: rgba(23, 23, 23, 0.92);
+      border-color: rgba(64, 64, 64, 1);
+      color: #f8fafc;
+    }
+
+    .wb-divider {
+      width: 1px;
+      height: 24px;
+      background: rgba(229, 231, 235, 1);
+      margin: 0 2px;
+    }
+
+    html.dark .wb-divider {
+      background: rgba(64, 64, 64, 1);
+    }
+
+    .wb-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .wb-btn:hover {
+      background: rgba(0,0,0,0.05);
+    }
+
+    html.dark .wb-btn:hover {
+      background: rgba(255,255,255,0.10);
+    }
+
+    .wb-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .wb-btn.wb-active {
+      background: rgba(0,0,0,0.10);
+    }
+
+    html.dark .wb-btn.wb-active {
+      background: rgba(255,255,255,0.18);
+    }
+
+    .wb-icon {
+      width: 16px;
+      height: 16px;
+      display: block;
+    }
+
+    .wb-page {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: rgba(100, 116, 139, 1);
+      line-height: 18px;
+    }
+
+    html.dark .wb-page {
+      color: rgba(163, 163, 163, 1);
+    }
+
+    #wbPageInput {
+      width: 42px;
+      padding: 2px 6px;
+      text-align: center;
+      font-size: 13px;
+      border-radius: 8px;
+      border: 1px solid rgba(209, 213, 219, 1);
+      background: transparent;
+      color: inherit;
+      outline: none;
+      user-select: text;
+      -webkit-user-select: text;
+      line-height: 18px;
+      font: inherit;
+    }
+
+    html.dark #wbPageInput {
+      border-color: rgba(82, 82, 82, 1);
+    }
+
+    #wbZoomLabel {
+      min-width: 60px;
+      padding: 4px 10px;
+      font-size: 13px;
+      border-radius: 10px;
+    }
+
+    /* Keep the zoom label aligned with icon buttons */
+    #wbZoomLabel.wb-btn {
+      padding: 6px 10px;
+    }
+
+    #wbZoomWrap { position: relative; }
+
+    #wbZoomMenu {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 10px);
+      transform: translateX(-50%);
+      min-width: 140px;
+      border-radius: 12px;
+      border: 1px solid rgba(229, 231, 235, 1);
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.18);
+      padding: 6px;
+      z-index: 70;
+      font: inherit;
+    }
+
+    html.dark #wbZoomMenu {
+      border-color: rgba(64, 64, 64, 1);
+      background: rgba(30, 30, 30, 0.98);
+    }
+
+    .wb-menu-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 8px 10px;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font-size: 13px;
+      font: inherit;
+    }
+
+    .wb-menu-item:hover {
+      background: rgba(0,0,0,0.05);
+    }
+
+    html.dark .wb-menu-item:hover {
+      background: rgba(255,255,255,0.10);
     }
     
     /* Disable pdf.js loading spinner (the images/loading-icon.gif) */
@@ -120,11 +352,6 @@
     /* During active zoom gesture, optimize for performance */
     .pdfViewer.zooming .textLayer {
       visibility: hidden !important;
-    }
-    
-    .pdfViewer.zooming .page {
-      /* Disable expensive effects during zoom */
-      box-shadow: none !important;
     }
     
     .pdfViewer.zooming .annotationLayer {
@@ -178,10 +405,57 @@
   </style>
 </head>
 <body>
-  <div id="loadingIndicator">Loading PDF...</div>
+  <div id="loadingIndicator" class="hidden">Loading PDF...</div>
   <div id="errorMessage" class="hidden"></div>
   <div id="viewerContainer">
     <div id="viewer" class="pdfViewer"></div>
+  </div>
+
+  <div id="wbToolbar" aria-label="PDF controls">
+    <div class="wb-nav">
+      <button class="wb-btn" id="wbPrev" type="button" title="Previous page" aria-label="Previous page">
+        <svg class="wb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+
+      <form id="wbPageForm" class="wb-page" autocomplete="off">
+        <input id="wbPageInput" type="text" inputmode="numeric" aria-label="Current page" />
+        <span>/</span>
+        <span id="wbPageTotal">–</span>
+      </form>
+
+      <button class="wb-btn" id="wbNext" type="button" title="Next page" aria-label="Next page">
+        <svg class="wb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+
+    <div class="wb-divider" aria-hidden="true"></div>
+
+    <div id="wbZoom" class="wb-zoom">
+      <button class="wb-btn" id="wbZoomOut" type="button" title="Zoom out" aria-label="Zoom out">
+        <svg class="wb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/><line x1="8" x2="14" y1="11" y2="11"/></svg>
+      </button>
+
+      <div id="wbZoomWrap">
+        <button class="wb-btn" id="wbZoomLabel" type="button" aria-label="Zoom level">100%</button>
+        <div id="wbZoomMenu" class="hidden" role="menu" aria-label="Zoom presets"></div>
+      </div>
+
+      <button class="wb-btn" id="wbZoomIn" type="button" title="Zoom in" aria-label="Zoom in">
+        <svg class="wb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/><line x1="11" x2="11" y1="8" y2="14"/><line x1="8" x2="14" y1="11" y2="11"/></svg>
+      </button>
+    </div>
+
+    <div class="wb-divider" aria-hidden="true"></div>
+
+    <button class="wb-btn" id="wbHand" type="button" title="Hand tool" aria-label="Hand tool">
+      <svg class="wb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+    </button>
+
+    <div class="wb-divider" aria-hidden="true"></div>
+
+    <button class="wb-btn" id="wbDownload" type="button" title="Download" aria-label="Download">
+      <svg class="wb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>
+    </button>
   </div>
   
   <script src="./pdf.js"></script>

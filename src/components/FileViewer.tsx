@@ -130,8 +130,14 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
   } else if (isVideo) {
     if (localUrl) {
       body = (
-        <div className={`p-4 ${className}`} style={{ height: '100%' }}>
-          <video src={localUrl} controls style={{ width: '100%', maxHeight: isFullscreen ? '100%' : 600 }} />
+        <div className={`h-full w-full ${className} bg-black flex items-center justify-center`}>
+          <video
+            src={localUrl}
+            controls
+            preload="metadata"
+            playsInline
+            style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+          />
         </div>
       )
     }

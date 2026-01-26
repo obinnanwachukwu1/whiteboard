@@ -1,13 +1,12 @@
 /**
  * PDF Viewer Preload Script (CommonJS)
  *
- * IMPORTANT: `<webview preload="...">` preloads are loaded as classic scripts
- * (not ES modules), so this file must not use `import` syntax.
+ * IMPORTANT: Electron preloads are loaded as classic scripts (not ES modules),
+ * so this file must not use `import` syntax.
  *
  * Security considerations:
  * - No Node.js APIs exposed
- * - No direct IPC to main process
- * - Only message passing to/from parent webContents
+ * - IPC only to main process (no sendToHost)
  * - Validates message payloads
  */
 
@@ -27,6 +26,7 @@ const VALID_COMMANDS = new Set([
   'SET_SELECTION_MODE',
   'GET_STATE',
   'SET_THEME',
+  'SET_APP_STYLE',
   'DOWNLOAD',
 ])
 
@@ -41,13 +41,14 @@ const VALID_EVENTS = new Set([
   'ERROR',
   'LOADING_STARTED',
   'COPY',
+  'DOWNLOAD_REQUESTED',
 ])
 
 // Store command handler callback
 let commandHandler: ((command: any) => void) | null = null
 
-// Listen for commands from parent renderer via IPC
-pdfIpcRenderer.on('pdf-command', (_event, command) => {
+// Listen for commands from owner window via IPC
+pdfIpcRenderer.on('viewer-command', (_event, command) => {
   // Validate command has required type
   if (!command || typeof command !== 'object' || !command.type) {
     console.warn('[pdfPreload] Invalid command received:', command)
@@ -96,8 +97,10 @@ pdfContextBridge.exposeInMainWorld('pdfBridge', {
     // Sanitize payload - only allow primitive values and simple objects
     const sanitizedEvent = sanitizePayload(event)
     
-    // Send to parent via IPC
-    pdfIpcRenderer.sendToHost('pdf-event', sanitizedEvent)
+    // Main process routes to owning window.
+    try {
+      pdfIpcRenderer.send('viewer:event', sanitizedEvent)
+    } catch {}
   },
 })
 

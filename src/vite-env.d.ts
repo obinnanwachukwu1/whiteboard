@@ -190,7 +190,15 @@ declare global {
       openContentWindow: (params: { courseId: string; type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file'; contentId: string; title?: string; courseName?: string }) => Promise<{ ok: boolean; error?: string }>
       pickFiles: (opts?: { multiple?: boolean }) => Promise<{ ok: boolean; data?: Array<{ path: string; name: string; size: number }>; error?: string }>
       downloadFile: (fileId: string | number, suggestedName?: string) => Promise<{ ok: boolean; data?: string; error?: string }>
-      getPdfPreloadPath: () => Promise<{ ok: boolean; data?: string; error?: string }>
+    }
+    viewer: {
+      create: (params: { kind: 'pdf' }) => Promise<{ ok: boolean; data?: { id: string }; error?: string }>
+      setBounds: (id: string, bounds: { x: number; y: number; width: number; height: number }) => Promise<{ ok: boolean; error?: string }>
+      command: (id: string, command: any) => Promise<{ ok: boolean; error?: string }>
+      destroy: (id: string) => Promise<{ ok: boolean; error?: string }>
+      list: () => Promise<{ ok: boolean; data?: Array<{ id: string; kind: 'pdf' }>; error?: string }>
+      openDevTools: (id: string) => Promise<{ ok: boolean; error?: string }>
+      onEvent: (callback: (data: { id: string; event: any }) => void) => () => void
     }
     electron: {
       onMainProcessMessage: (callback: (message: string) => void) => void

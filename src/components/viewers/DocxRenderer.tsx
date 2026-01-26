@@ -31,6 +31,8 @@ const DocxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDo
         containerRef.current.innerHTML = ''
         await renderDocx(blob, containerRef.current, undefined, {
           inWrapper: true,
+          breakPages: true,
+          ignoreLastRenderedPageBreak: false,
         })
 
         // Detect pages

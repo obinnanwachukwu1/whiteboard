@@ -4,6 +4,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
 import { randomUUID } from 'node:crypto'
+import { Readable } from 'node:stream'
+
+import { ViewHost } from './viewHost'
 
 import {
   initCanvas,
@@ -84,37 +87,6 @@ app.on('web-contents-created', (_event, contents) => {
     }
   })
 
-  // 3. Harden Webviews
-  contents.on('will-attach-webview', (event, webPreferences, params) => {
-    // Only allow our internal PDF viewer
-    // Use URL parsing for robustness
-    let isPdfViewer = false
-    try {
-      if (params.src && new URL(params.src).protocol === 'pdf-viewer:') {
-        isPdfViewer = true
-      }
-    } catch {}
-
-    if (isPdfViewer) {
-      // Ensure strict isolation
-      const prefs = webPreferences as any
-      delete prefs.preloadURL // Strip URL-based preload if any
-      delete prefs.preload    // Strip any requested preload
-
-      // Force our known-safe preload
-      if (PDF_PRELOAD_PATH) {
-        prefs.preload = PDF_PRELOAD_PATH
-      }
-
-      webPreferences.nodeIntegration = false
-      webPreferences.contextIsolation = true
-      webPreferences.sandbox = true
-      prefs.enableRemoteModule = false
-    } else {
-      console.warn(`[Security] Blocked unauthorized webview: ${params.src}`)
-      event.preventDefault()
-    }
-  })
 })
 
 // Set application name for dev mode
@@ -188,6 +160,8 @@ function resolvePdfPreloadPath(): string | undefined {
 }
 
 const PDF_PRELOAD_PATH = resolvePdfPreloadPath()
+
+const viewHost = new ViewHost()
 
 // The built directory structure
 //
@@ -296,11 +270,28 @@ function createContentWindow(params: {
         : {}),
     webPreferences: {
       preload: getPreloadPath(),
-      webviewTag: true,
+      webviewTag: false,
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
     },
+  })
+
+  // If the renderer reloads/navigates, native views must be torn down or they
+  // will remain visually "stuck" over the refreshed DOM.
+  child.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
+    if (!isMainFrame) return
+    if (isInPlace) return
+    try {
+      viewHost.destroyAllForWindow(child.id)
+    } catch {}
+  })
+
+  // Ensure we don't leak embedded views when window closes
+  child.on('closed', () => {
+    try {
+      viewHost.destroyAllForWindow(child.id)
+    } catch {}
   })
 
   child.once('ready-to-show', () => child.show())
@@ -423,11 +414,29 @@ function createWindow() {
         : {}),
     webPreferences: {
       preload: getPreloadPath(),
-      webviewTag: true,
+      webviewTag: false,
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
     },
+  })
+
+  // If the renderer reloads/navigates, native views must be torn down or they
+  // will remain visually "stuck" over the refreshed DOM.
+  win.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
+    if (!isMainFrame) return
+    if (isInPlace) return
+    try {
+      viewHost.destroyAllForWindow(win!.id)
+    } catch {}
+  })
+
+  // Ensure we don't leak embedded views when window closes
+  const mainWindowId = win.id
+  win.on('closed', () => {
+    try {
+      viewHost.destroyAllForWindow(mainWindowId)
+    } catch {}
   })
   
   // Show window once content is ready (prevents white flash)
@@ -756,7 +765,77 @@ app.whenReady().then(() => {
         })
       }
       
-      return net.fetch(pathToFileURL(resolvedPath).toString())
+      // Support Range requests (required for video/audio streaming + seeking, and for PDF.js range reads)
+      const stat = await fs.promises.stat(resolvedPath)
+      const size = stat.size
+
+      const ext = path.extname(resolvedPath).toLowerCase()
+      const contentType = (() => {
+        switch (ext) {
+          case '.pdf': return 'application/pdf'
+          case '.mp4': return 'video/mp4'
+          case '.m4v': return 'video/x-m4v'
+          case '.mov': return 'video/quicktime'
+          case '.webm': return 'video/webm'
+          case '.ogv':
+          case '.ogg': return 'video/ogg'
+          case '.mp3': return 'audio/mpeg'
+          case '.m4a': return 'audio/mp4'
+          case '.aac': return 'audio/aac'
+          case '.wav': return 'audio/wav'
+          case '.png': return 'image/png'
+          case '.jpg':
+          case '.jpeg': return 'image/jpeg'
+          case '.gif': return 'image/gif'
+          case '.webp': return 'image/webp'
+          case '.svg': return 'image/svg+xml'
+          case '.txt': return 'text/plain; charset=utf-8'
+          case '.html': return 'text/html; charset=utf-8'
+          case '.json': return 'application/json; charset=utf-8'
+          default: return 'application/octet-stream'
+        }
+      })()
+
+      const headers = new Headers()
+      headers.set('Accept-Ranges', 'bytes')
+      headers.set('Content-Type', contentType)
+      headers.set('Cache-Control', 'no-store')
+
+      const range = req.headers.get('range')
+      const method = (req.method || 'GET').toUpperCase()
+
+      if (range) {
+        const m = /^bytes=(\d+)-(\d+)?$/i.exec(range)
+        if (!m) {
+          headers.set('Content-Range', `bytes */${size}`)
+          return new Response('Invalid Range', { status: 416, headers })
+        }
+        const start = Number(m[1])
+        const end = m[2] != null ? Math.min(Number(m[2]), size - 1) : size - 1
+        if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start || start >= size) {
+          headers.set('Content-Range', `bytes */${size}`)
+          return new Response('Range Not Satisfiable', { status: 416, headers })
+        }
+
+        headers.set('Content-Range', `bytes ${start}-${end}/${size}`)
+        headers.set('Content-Length', String(end - start + 1))
+
+        if (method === 'HEAD') {
+          return new Response(null, { status: 206, headers })
+        }
+
+        const stream = fs.createReadStream(resolvedPath, { start, end })
+        return new Response(Readable.toWeb(stream) as any, { status: 206, headers })
+      }
+
+      headers.set('Content-Length', String(size))
+
+      if (method === 'HEAD') {
+        return new Response(null, { status: 200, headers })
+      }
+
+      const stream = fs.createReadStream(resolvedPath)
+      return new Response(Readable.toWeb(stream) as any, { status: 200, headers })
     } catch (e) {
       console.error(`[canvas-file] Error handling request: ${req.url}`, e)
       return new Response('Bad Request', { status: 400 })
@@ -1550,26 +1629,144 @@ ipcMain.handle('app:copyText', async (_evt, text: string) => {
   }
 })
 
-ipcMain.handle('app:getPdfPreloadPath', async () => {
+// ============ Native Viewer Host (WebContentsView) ============
+
+ipcMain.handle('viewer:create', async (evt, params: { kind: 'pdf' }) => {
   try {
-    // Return the absolute path to the PDF preload script
-    const candidates = [
-      path.join(__dirname, 'pdfPreload.js'),
-      path.join(__dirname, 'pdfPreload.mjs'),
-    ]
-    console.log('[getPdfPreloadPath] Looking for preload in:', __dirname)
-    console.log('[getPdfPreloadPath] Candidates:', candidates)
-    const preloadPath = candidates.find((p) => fs.existsSync(p))
-    if (!preloadPath) {
-      console.error('[getPdfPreloadPath] No preload script found!')
-      return { ok: false, error: 'pdfPreload script not found' }
+    const win = BrowserWindow.fromWebContents(evt.sender)
+    if (!win) return { ok: false, error: 'no_window' }
+
+    const kind = params?.kind
+
+    const VIEWERS: Record<string, { entryUrl: string; preloadPath?: string; allowedProtocols?: string[] }> = {
+      pdf: {
+        entryUrl: 'pdf-viewer://pdfViewer.html',
+        preloadPath: PDF_PRELOAD_PATH,
+        allowedProtocols: ['pdf-viewer:'],
+      },
     }
-    const fileUrl = pathToFileURL(preloadPath).toString()
-    console.log('[getPdfPreloadPath] Found:', fileUrl)
-    return { ok: true, data: fileUrl }
+
+    const cfg = kind ? VIEWERS[kind] : undefined
+    if (!cfg) return { ok: false, error: 'unsupported_kind' }
+    if (!cfg.preloadPath) return { ok: false, error: 'preload_missing' }
+
+    const devOrigin = (() => {
+      if (!VITE_DEV_SERVER_URL) return undefined
+      try {
+        return new URL(VITE_DEV_SERVER_URL).origin
+      } catch {
+        return undefined
+      }
+    })()
+
+    const id = viewHost.create(win, {
+      kind,
+      entryUrl: cfg.entryUrl,
+      preloadPath: cfg.preloadPath,
+      devOrigin,
+      allowedProtocols: cfg.allowedProtocols,
+    })
+
+    return { ok: true, data: { id } }
   } catch (e: any) {
-    console.error('[getPdfPreloadPath] Error:', e)
     return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('viewer:setBounds', async (_evt, id: string, bounds: { x: number; y: number; width: number; height: number }) => {
+  try {
+    if (typeof id !== 'string' || !id) return { ok: false, error: 'invalid_id' }
+    if (!bounds || typeof bounds !== 'object') return { ok: false, error: 'invalid_bounds' }
+    viewHost.setBounds(id, bounds)
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('viewer:command', async (_evt, id: string, command: any) => {
+  try {
+    if (typeof id !== 'string' || !id) return { ok: false, error: 'invalid_id' }
+    if (!command || typeof command !== 'object' || typeof command.type !== 'string') {
+      return { ok: false, error: 'invalid_command' }
+    }
+    const VALID_PDF_COMMANDS = new Set([
+      'LOAD_PDF',
+      'GO_TO_PAGE',
+      'NEXT_PAGE',
+      'PREV_PAGE',
+      'SET_SCALE',
+      'SET_SCALE_MODE',
+      'ZOOM_IN',
+      'ZOOM_OUT',
+      'SET_SELECTION_MODE',
+      'GET_STATE',
+      'SET_THEME',
+      'SET_APP_STYLE',
+      'DOWNLOAD',
+    ])
+    if (!VALID_PDF_COMMANDS.has(command.type)) return { ok: false, error: 'unknown_command' }
+
+    // Viewer preloads listen on this channel.
+    viewHost.send(id, 'viewer-command', command)
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('viewer:destroy', async (_evt, id: string) => {
+  try {
+    if (typeof id !== 'string' || !id) return { ok: false, error: 'invalid_id' }
+    viewHost.destroy(id)
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('viewer:list', async (evt) => {
+  try {
+    const win = BrowserWindow.fromWebContents(evt.sender)
+    if (!win) return { ok: false, error: 'no_window' }
+    return { ok: true, data: viewHost.listForWindow(win.id) }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('viewer:openDevTools', async (_evt, id: string) => {
+  try {
+    if (typeof id !== 'string' || !id) return { ok: false, error: 'invalid_id' }
+    viewHost.openDevTools(id)
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.on('viewer:event', (evt, payload: any) => {
+  try {
+    const viewId = viewHost.getIdForSender(evt.sender)
+    if (!viewId) return
+    const ownerWindowId = viewHost.getOwnerWindowId(viewId)
+    if (!ownerWindowId) return
+    const win = BrowserWindow.fromId(ownerWindowId)
+    if (!win) return
+
+    win.webContents.send('viewer:event', { id: viewId, event: payload })
+  } catch {
+    // ignore
+  }
+})
+
+ipcMain.on('viewer:destroyAll', (evt) => {
+  try {
+    const w = BrowserWindow.fromWebContents(evt.sender)
+    if (!w) return
+    viewHost.destroyAllForWindow(w.id)
+  } catch {
+    // ignore
   }
 })
 
