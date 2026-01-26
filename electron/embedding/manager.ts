@@ -157,9 +157,9 @@ export class EmbeddingManager extends EventEmitter {
       
       const tokenIds: number[] = [clsTokenId]
       
-      for (const word of words) {
+        for (const word of words) {
         // Try to find the word in vocab
-        if (vocab[word] !== undefined) {
+        if (typeof vocab[word] === 'number') {
           tokenIds.push(vocab[word])
         } else {
           // Try word-piece: split into subwords
@@ -168,7 +168,7 @@ export class EmbeddingManager extends EventEmitter {
             let found = false
             for (let end = remaining.length; end > 0; end--) {
               const piece = tokenIds.length > 1 ? '##' + remaining.substring(0, end) : remaining.substring(0, end)
-              if (vocab[piece] !== undefined) {
+              if (typeof vocab[piece] === 'number') {
                 tokenIds.push(vocab[piece])
                 remaining = remaining.substring(end)
                 found = true
@@ -180,6 +180,11 @@ export class EmbeddingManager extends EventEmitter {
               tokenIds.push(unkTokenId)
               break
             }
+            
+            // Immediate length check inside subword loop
+            if (tokenIds.length >= MAX_SEQ_LENGTH - 1) {
+              break
+            }
           }
         }
         
@@ -187,6 +192,11 @@ export class EmbeddingManager extends EventEmitter {
         if (tokenIds.length >= MAX_SEQ_LENGTH - 1) {
           break
         }
+      }
+
+      // Hard truncation to ensure we never exceed limit even if the loop logic slipped
+      if (tokenIds.length > MAX_SEQ_LENGTH - 1) {
+        tokenIds.length = MAX_SEQ_LENGTH - 1
       }
 
       tokenIds.push(sepTokenId)
