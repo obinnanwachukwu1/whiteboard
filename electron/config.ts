@@ -1,5 +1,6 @@
 
-import { app, safeStorage } from 'electron'
+import { app } from 'electron'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -29,7 +30,7 @@ export type AppConfig = {
   aiEnabled?: boolean
 }
 
-const DEFAULT_CONFIG: AppConfig = {
+export const DEFAULT_CONFIG: AppConfig = {
   baseUrl: 'https://gatech.instructure.com',
   verbose: false,
   theme: 'light',
@@ -51,91 +52,96 @@ const DEFAULT_CONFIG: AppConfig = {
   pdfZoom: {},
 }
 
-function configPath() {
-  const dir = app.getPath('userData')
-  // Use encrypted path if available, otherwise legacy
-  if (safeStorage.isEncryptionAvailable()) {
-    return path.join(dir, 'canvas-desk.enc')
+const CONFIG_FILE = 'canvas-desk.v2.enc'
+const MASTER_KEY_SERVICE = 'whiteboard'
+const MASTER_KEY_ACCOUNT = 'config-master-key-v1'
+
+let _keytar: any | null = null
+async function getKeytar(): Promise<any> {
+  if (_keytar) return _keytar
+  const mod: any = await import('keytar')
+  _keytar = mod.default ?? mod
+  return _keytar
+}
+
+let cachedMasterKey: Buffer | null = null
+async function getOrCreateMasterKey(): Promise<Buffer> {
+  if (cachedMasterKey) return cachedMasterKey
+  const keytar = await getKeytar()
+  const existing = await keytar.getPassword(MASTER_KEY_SERVICE, MASTER_KEY_ACCOUNT)
+  if (typeof existing === 'string' && existing.length > 0) {
+    const buf = Buffer.from(existing, 'base64')
+    if (buf.length === 32) {
+      cachedMasterKey = buf
+      return buf
+    }
   }
-  return path.join(dir, 'canvas-desk.json')
+
+  const created = crypto.randomBytes(32)
+  await keytar.setPassword(MASTER_KEY_SERVICE, MASTER_KEY_ACCOUNT, created.toString('base64'))
+  cachedMasterKey = created
+  return created
 }
 
-function legacyConfigPath() {
+function configPathV2() {
   const dir = app.getPath('userData')
-  return path.join(dir, 'canvas-desk.json')
+  return path.join(dir, CONFIG_FILE)
 }
 
-export function loadConfig(): AppConfig {
-  try {
-    // 1. Migration: If encryption is available, check for legacy plaintext file
-    if (safeStorage.isEncryptionAvailable()) {
-      const legacy = legacyConfigPath()
-      if (fs.existsSync(legacy)) {
-        try {
-          console.log('[Config] Migrating plaintext config to encrypted storage...')
-          const raw = fs.readFileSync(legacy, 'utf-8')
-          const parsed = JSON.parse(raw)
-          
-          // Encrypt and save to new path
-          const encPath = configPath() // returns .enc
-          const encrypted = safeStorage.encryptString(raw)
-          fs.writeFileSync(encPath, encrypted)
-          
-          // Delete legacy
-          fs.unlinkSync(legacy)
-          console.log('[Config] Migration complete.')
-          
-          return { ...DEFAULT_CONFIG, ...parsed }
-        } catch (e) {
-          console.error('[Config] Migration failed, keeping legacy file:', e)
-          // Fallback to reading legacy file directly this time
-          const raw = fs.readFileSync(legacy, 'utf-8')
-          return { ...DEFAULT_CONFIG, ...JSON.parse(raw) }
-        }
-      }
-    }
+const MAGIC = Buffer.from('WBX1', 'ascii')
+function encryptString(key: Buffer, plaintext: string): Buffer {
+  const iv = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv)
+  const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
+  const tag = cipher.getAuthTag()
+  return Buffer.concat([MAGIC, iv, tag, ciphertext])
+}
 
-    const p = configPath()
+function decryptToString(key: Buffer, blob: Buffer): string {
+  if (blob.length < MAGIC.length + 12 + 16) {
+    throw new Error('Encrypted config is too small')
+  }
+  const magic = blob.subarray(0, MAGIC.length)
+  if (!magic.equals(MAGIC)) {
+    throw new Error('Encrypted config has invalid header')
+  }
+  const ivStart = MAGIC.length
+  const tagStart = ivStart + 12
+  const dataStart = tagStart + 16
+  const iv = blob.subarray(ivStart, tagStart)
+  const tag = blob.subarray(tagStart, dataStart)
+  const ciphertext = blob.subarray(dataStart)
+
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv)
+  decipher.setAuthTag(tag)
+  const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()])
+  return plaintext.toString('utf8')
+}
+
+export async function loadConfig(): Promise<AppConfig> {
+  const p = configPathV2()
+  try {
     if (!fs.existsSync(p)) return { ...DEFAULT_CONFIG }
-    
-    if (safeStorage.isEncryptionAvailable()) {
-      try {
-        const buffer = fs.readFileSync(p)
-        const decrypted = safeStorage.decryptString(buffer)
-        return { ...DEFAULT_CONFIG, ...JSON.parse(decrypted) }
-      } catch (e) {
-        console.error('[Config] Failed to decrypt config:', e)
-        // If decryption fails, maybe it wasn't encrypted? Or key changed?
-        // Fallback or return default?
-        return { ...DEFAULT_CONFIG }
-      }
-    } else {
-      const raw = fs.readFileSync(p, 'utf-8')
-      return { ...DEFAULT_CONFIG, ...JSON.parse(raw) }
-    }
+    const buffer = fs.readFileSync(p)
+    const key = await getOrCreateMasterKey()
+    const decrypted = decryptToString(key, buffer)
+    return { ...DEFAULT_CONFIG, ...JSON.parse(decrypted) }
   } catch (e) {
     console.error('[Config] Failed to load config:', e)
     return { ...DEFAULT_CONFIG }
   }
 }
 
-export function saveConfig(partial: Partial<AppConfig>): AppConfig {
-  const current = loadConfig()
+export async function saveConfig(partial: Partial<AppConfig>): Promise<AppConfig> {
+  const current = await loadConfig()
   const next = { ...current, ...partial }
-  
-  // Ensure we use the correct path logic
-  const p = configPath()
-  
+  const p = configPathV2()
   try {
     fs.mkdirSync(path.dirname(p), { recursive: true })
     const json = JSON.stringify(next, null, 2)
-    
-    if (safeStorage.isEncryptionAvailable()) {
-      const encrypted = safeStorage.encryptString(json)
-      fs.writeFileSync(p, encrypted)
-    } else {
-      fs.writeFileSync(p, json)
-    }
+    const key = await getOrCreateMasterKey()
+    const encrypted = encryptString(key, json)
+    fs.writeFileSync(p, encrypted)
   } catch (e) {
     console.error('[Config] Failed to save config:', e)
   }

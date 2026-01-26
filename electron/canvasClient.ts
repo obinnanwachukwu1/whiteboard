@@ -1,6 +1,6 @@
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
-import { app, safeStorage } from 'electron'
+import { app } from 'electron'
 import fs from 'node:fs'
 
 import path from 'node:path'
@@ -904,77 +904,9 @@ async function getKeytar(): Promise<any> {
   }
 }
 
-// Encrypted file-based fallback when keytar isn't available
-function tokenFilePath() {
-  const dir = app.getPath('userData')
-  return path.join(dir, 'canvas-tokens.enc')
-}
-
-// Legacy path for migration
-function legacyTokenFilePath() {
-  const dir = app.getPath('userData')
-  return path.join(dir, 'canvas-desk-tokens.json')
-}
-
-function readEncryptedTokens(): Record<string, string> {
-  // Check for legacy file first and migrate
-  const legacy = legacyTokenFilePath()
-  if (fs.existsSync(legacy)) {
-    try {
-      console.log('[Auth] Migrating legacy tokens to encrypted storage...')
-      const data = fs.readFileSync(legacy, 'utf-8')
-      const parsed = JSON.parse(data)
-      
-      // Attempt to save encrypted
-      if (safeStorage.isEncryptionAvailable()) {
-        writeEncryptedTokens(parsed)
-        // Only delete legacy if encryption succeeded
-        fs.unlinkSync(legacy)
-        console.log('[Auth] Legacy tokens migrated and deleted.')
-      } else {
-        console.warn('[Auth] Encryption unavailable, keeping legacy tokens in memory but NOT deleting file yet (risk).')
-        // Actually, plan says remove plaintext fallback.
-        // We should delete it? Or keep it?
-        // If we delete it and can't encrypt, user loses login.
-        // If we keep it, it's insecure.
-        // Let's delete it to enforce security, user can login again.
-        fs.unlinkSync(legacy)
-      }
-      return parsed
-    } catch (e) {
-      console.error('[Auth] Migration failed:', e)
-    }
-  }
-
-  try {
-    const p = tokenFilePath()
-    if (!fs.existsSync(p)) return {}
-    
-    if (!safeStorage.isEncryptionAvailable()) {
-      return {}
-    }
-    
-    const buffer = fs.readFileSync(p)
-    const decrypted = safeStorage.decryptString(buffer)
-    return JSON.parse(decrypted) || {}
-  } catch (e) {
-    console.error('[Auth] Failed to read tokens:', e)
-    return {}
-  }
-}
-
-function writeEncryptedTokens(map: Record<string, string>) {
-  if (!safeStorage.isEncryptionAvailable()) return
-  
-  try {
-    const p = tokenFilePath()
-    const encrypted = safeStorage.encryptString(JSON.stringify(map, null, 2))
-    fs.mkdirSync(path.dirname(p), { recursive: true })
-    fs.writeFileSync(p, encrypted)
-  } catch (e) {
-    console.error('[Auth] Failed to write tokens:', e)
-  }
-}
+// In-memory fallback if keytar is unavailable.
+// We deliberately do NOT write tokens to disk without keytar.
+const memoryTokens = new Map<string, string>()
 
 async function setToken(baseUrl: string, token: string): Promise<{ insecure: boolean }> {
   try {
@@ -982,14 +914,7 @@ async function setToken(baseUrl: string, token: string): Promise<{ insecure: boo
     await keytar.setPassword(SERVICE_NAME, baseUrl, token)
     return { insecure: false }
   } catch {
-    // Fallback to safeStorage
-    if (safeStorage.isEncryptionAvailable()) {
-      const map = readEncryptedTokens()
-      map[baseUrl] = token
-      writeEncryptedTokens(map)
-      return { insecure: false }
-    }
-    // No secure storage available - memory only
+    memoryTokens.set(baseUrl, token)
     return { insecure: true }
   }
 }
@@ -1000,12 +925,8 @@ async function getToken(baseUrl: string): Promise<{ token: string | null; insecu
     const t = await keytar.getPassword(SERVICE_NAME, baseUrl)
     return { token: t || null, insecure: false }
   } catch {
-    const map = readEncryptedTokens()
-    const t = map[baseUrl] || null
-    // If we got it from encrypted store, it's secure. 
-    // If not found, t is null.
-    // If safeStorage unavailable, readEncryptedTokens returns {}.
-    return { token: t, insecure: false }
+    const t = memoryTokens.get(baseUrl) || null
+    return { token: t, insecure: true }
   }
 }
 
@@ -1015,12 +936,7 @@ async function deleteToken(baseUrl: string): Promise<{ insecure: boolean }> {
     await keytar.deletePassword(SERVICE_NAME, baseUrl)
     return { insecure: false }
   } catch {
-    if (safeStorage.isEncryptionAvailable()) {
-      const map = readEncryptedTokens()
-      delete map[baseUrl]
-      writeEncryptedTokens(map)
-      return { insecure: false }
-    }
+    memoryTokens.delete(baseUrl)
     return { insecure: true }
   }
 }

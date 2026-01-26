@@ -17,7 +17,7 @@ import {
   CanvasError,
   getRateLimitSnapshot as canvasGetRateLimitSnapshot,
 } from './canvasClient'
-import { loadConfig, saveConfig, type AppConfig } from './config'
+import { loadConfig, saveConfig, DEFAULT_CONFIG, type AppConfig } from './config'
 import { AIManager } from './ai/manager'
 import { EmbeddingManager, IndexableItem, EmbeddingStatus } from './embedding/manager'
 import type { SearchResult } from './embedding/vectorStore'
@@ -194,7 +194,7 @@ protocol.registerSchemesAsPrivileged([
 let win: BrowserWindow | null
 let tray: Tray | null = null
 let isQuitting = false
-let appConfig: AppConfig = loadConfig()
+let appConfig: AppConfig = { ...DEFAULT_CONFIG }
 
 function safeContentType(t: any): 'page' | 'assignment' | 'announcement' | 'discussion' | 'file' | null {
   if (t === 'page' || t === 'assignment' || t === 'announcement' || t === 'discussion' || t === 'file') return t
@@ -674,7 +674,7 @@ function createAppMenu() {
   Menu.setApplicationMenu(menu)
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // SECURITY: Deny all permission requests (camera, mic, notifications, etc.)
   // Unless we specifically add an allowlist later.
   session.defaultSession.setPermissionRequestHandler((_webContents: any, _permission: any, callback: any) => {
@@ -689,7 +689,7 @@ app.whenReady().then(() => {
   createAppMenu()
 
   // load config and create window
-  appConfig = loadConfig()
+  appConfig = await loadConfig()
   
   // Initialize AI Manager
   aiManager.start(!!appConfig.aiEnabled)
@@ -868,7 +868,14 @@ app.whenReady().then(() => {
 
   // Set dock icon on macOS during dev so it shows immediately
   if (process.platform === 'darwin') {
-    const iconPath = getIconPath() || path.join(process.env.APP_ROOT, 'build', 'icons', 'mac', 'icon.icns')
+    // Prefer .icns for macOS Dock to ensure correct sizing/padding
+    const pub = process.env.VITE_PUBLIC || RENDERER_DIST
+    let iconPath = path.join(pub, 'icon.icns')
+    
+    if (!fs.existsSync(iconPath)) {
+      iconPath = getIconPath() || path.join(process.env.APP_ROOT, 'build', 'icons', 'mac', 'icon.icns')
+    }
+
     try {
       if (iconPath) app.dock.setIcon(nativeImage.createFromPath(iconPath))
     } catch {
@@ -936,7 +943,7 @@ ipcMain.handle('canvas:init', async (_evt, cfg: { token?: string; baseUrl?: stri
   const verbose = cfg?.verbose ?? appConfig.verbose
   const res = await initCanvas({ token: cfg?.token, baseUrl, verbose })
   // persist baseUrl / verbose if provided
-  appConfig = saveConfig({ baseUrl, verbose })
+  appConfig = await saveConfig({ baseUrl, verbose })
     return { ok: true, insecure: !!res?.insecure }
   } catch (e: any) {
     const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
@@ -1589,7 +1596,7 @@ ipcMain.handle('app:copyText', async (_evt, text: string) => {
 // Config IPC
 ipcMain.handle('config:get', async () => {
   try {
-    appConfig = loadConfig()
+    appConfig = await loadConfig()
     return { ok: true, data: appConfig }
   } catch (e: any) {
     return { ok: false, error: String(e?.message || e) }
@@ -1599,7 +1606,7 @@ ipcMain.handle('config:get', async () => {
 ipcMain.handle('config:set', async (_evt, partial: Partial<AppConfig>) => {
   try {
     const oldConfig = appConfig
-    appConfig = saveConfig(partial)
+    appConfig = await saveConfig(partial)
 
     // Handle AI toggle
     if (partial.aiEnabled !== undefined && partial.aiEnabled !== oldConfig.aiEnabled) {
