@@ -153,6 +153,32 @@ export const PdfViewer: React.FC<Props> = ({ fileId, className = '', fullscreen 
       case 'LOADING_STARTED':
         setViewerState(prev => ({ ...prev, isLoading: true, error: null }))
         break
+
+      case 'COPY':
+        if (data.text) {
+          const copyViaSystem = async () => {
+            try {
+              // Prefer main-process clipboard (works even if webview isn't focused)
+              const sys = (window as any).system
+              if (sys?.copyText) {
+                const res = await sys.copyText(data.text)
+                if (res?.ok) return
+              }
+            } catch (err) {
+              console.error('[PdfViewer] Failed to copy via system:', err)
+            }
+
+            // Fallback to renderer clipboard (requires focus)
+            try {
+              await navigator.clipboard.writeText(data.text)
+            } catch (err) {
+              console.error('[PdfViewer] Failed to copy text:', err)
+            }
+          }
+
+          copyViaSystem()
+        }
+        break
     }
   }, [url, sendCommand, onPageChange])
   

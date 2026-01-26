@@ -6,6 +6,10 @@ import { pipeline } from 'node:stream/promises'
 import { createWriteStream } from 'node:fs'
 import { Readable } from 'node:stream'
 
+// Uploads: use node-friendly multipart form
+// (Types provided via a local d.ts in electron/form-data.d.ts)
+import type FormDataType from 'form-data'
+
 const DEFAULT_BASE_URL = 'https://gatech.instructure.com'
 const API_PREFIX = '/api/v1'
 const GQL_PATH = '/api/graphql'
@@ -418,8 +422,136 @@ export class CanvasClient {
     return this.get('/users/self/todo')
   }
 
-  async getMySubmission(courseId: string | number, assignmentRestId: string | number) {
-    return this.get(`/courses/${courseId}/assignments/${assignmentRestId}/submissions/self`)
+  async getMySubmission(courseId: string | number, assignmentRestId: string | number, include: string[] = []) {
+    const p: Record<string, any> = {}
+    if (include.length) p['include[]'] = include
+    return this.get(`/courses/${courseId}/assignments/${assignmentRestId}/submissions/self`, p)
+  }
+
+  // Submissions (REST)
+  async submitAssignment(
+    courseId: string | number,
+    assignmentRestId: string | number,
+    params: {
+      submissionType: 'online_text_entry' | 'online_url' | 'online_upload'
+      body?: string
+      url?: string
+      fileIds?: Array<string | number>
+    }
+  ) {
+    const form = new URLSearchParams()
+    form.set('submission[submission_type]', params.submissionType)
+    if (typeof params.body === 'string') form.set('submission[body]', params.body)
+    if (typeof params.url === 'string') form.set('submission[url]', params.url)
+    if (Array.isArray(params.fileIds)) {
+      for (const id of params.fileIds) form.append('submission[file_ids][]', String(id))
+    }
+    return this.post(`/courses/${courseId}/assignments/${assignmentRestId}/submissions`, form)
+  }
+
+  async startSubmissionFileUpload(
+    courseId: string | number,
+    assignmentRestId: string | number,
+    file: { name: string; size: number; contentType?: string }
+  ) {
+    const form = new URLSearchParams()
+    form.set('name', file.name)
+    form.set('size', String(Math.max(0, Math.floor(file.size))))
+    if (file.contentType) form.set('content_type', file.contentType)
+    form.set('on_duplicate', 'rename')
+    return this.post(`/courses/${courseId}/assignments/${assignmentRestId}/submissions/self/files`, form)
+  }
+
+  private guessContentType(filename: string): string {
+    const ext = path.extname(filename || '').toLowerCase()
+    switch (ext) {
+      case '.pdf': return 'application/pdf'
+      case '.doc': return 'application/msword'
+      case '.docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      case '.ppt': return 'application/vnd.ms-powerpoint'
+      case '.pptx': return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      case '.xls': return 'application/vnd.ms-excel'
+      case '.xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      case '.txt': return 'text/plain'
+      case '.csv': return 'text/csv'
+      case '.png': return 'image/png'
+      case '.jpg':
+      case '.jpeg': return 'image/jpeg'
+      case '.gif': return 'image/gif'
+      case '.zip': return 'application/zip'
+      default: return 'application/octet-stream'
+    }
+  }
+
+  private async uploadMultipartFile(uploadUrl: string, uploadParams: Record<string, any>, filePath: string) {
+    const mod = await import('form-data') as any as { default: new () => FormDataType }
+    const FormData = mod.default as any
+    const form = new FormData()
+
+    for (const [k, v] of Object.entries(uploadParams || {})) {
+      if (v == null) continue
+      form.append(k, String(v))
+    }
+
+    const filename = path.basename(filePath)
+    const contentType = this.guessContentType(filename)
+    form.append('file', fs.createReadStream(filePath), { filename, contentType })
+
+    const resp = await axios.request({
+      method: 'POST',
+      url: uploadUrl,
+      data: form,
+      headers: {
+        ...(typeof (form as any).getHeaders === 'function' ? (form as any).getHeaders() : {}),
+        Accept: 'application/json',
+      },
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
+      validateStatus: () => true,
+    })
+
+    if (resp.status >= 400) {
+      throw new CanvasError(`Upload failed (HTTP ${resp.status}): ${JSON.stringify(resp.data, null, 2)}`)
+    }
+    return resp.data
+  }
+
+  async submitAssignmentUpload(
+    courseId: string | number,
+    assignmentRestId: string | number,
+    filePaths: string[],
+  ) {
+    const paths = (Array.isArray(filePaths) ? filePaths : []).filter(Boolean)
+    if (!paths.length) throw new CanvasError('No files selected')
+
+    const fileIds: Array<string | number> = []
+    for (const fp of paths) {
+      const st = await fs.promises.stat(fp)
+      const name = path.basename(fp)
+      const init = await this.startSubmissionFileUpload(courseId, assignmentRestId, {
+        name,
+        size: st.size,
+        contentType: this.guessContentType(name),
+      })
+
+      const uploadUrl = init?.upload_url
+      const uploadParams = init?.upload_params
+      if (!uploadUrl || !uploadParams) {
+        throw new CanvasError(`Upload init failed: ${JSON.stringify(init, null, 2)}`)
+      }
+
+      const uploaded = await this.uploadMultipartFile(String(uploadUrl), uploadParams as any, fp)
+      const id = uploaded?.id || uploaded?.attachment?.id || uploaded?.file?.id
+      if (id == null) {
+        throw new CanvasError(`Upload did not return file id: ${JSON.stringify(uploaded, null, 2)}`)
+      }
+      fileIds.push(id)
+    }
+
+    return this.submitAssignment(courseId, assignmentRestId, {
+      submissionType: 'online_upload',
+      fileIds,
+    })
   }
 
   // Pages (REST)
@@ -943,8 +1075,29 @@ export async function listTodo() {
   return ensureClient().listTodo()
 }
 
-export async function getMySubmission(courseId: string | number, assignmentRestId: string | number) {
-  return ensureClient().getMySubmission(courseId, assignmentRestId)
+export async function getMySubmission(courseId: string | number, assignmentRestId: string | number, include?: string[]) {
+  return ensureClient().getMySubmission(courseId, assignmentRestId, include || [])
+}
+
+export async function submitAssignment(
+  courseId: string | number,
+  assignmentRestId: string | number,
+  params: {
+    submissionType: 'online_text_entry' | 'online_url' | 'online_upload'
+    body?: string
+    url?: string
+    fileIds?: Array<string | number>
+  }
+) {
+  return ensureClient().submitAssignment(courseId, assignmentRestId, params)
+}
+
+export async function submitAssignmentUpload(
+  courseId: string | number,
+  assignmentRestId: string | number,
+  filePaths: string[],
+) {
+  return ensureClient().submitAssignmentUpload(courseId, assignmentRestId, filePaths)
 }
 
 export async function listCoursePages(courseId: string | number, perPage = 100) {

@@ -40,6 +40,7 @@ const VALID_EVENTS = new Set([
   'STATE',
   'ERROR',
   'LOADING_STARTED',
+  'COPY',
 ])
 
 // Store command handler callback

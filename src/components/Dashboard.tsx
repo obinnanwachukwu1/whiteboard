@@ -1,8 +1,8 @@
 import React from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { type DueItem } from '../hooks/useDashboardData'
+import { useDashboardData, type DueItem, type FeedbackItem } from '../hooks/useDashboardData'
 import { useCourseImages } from '../hooks/useCourseImages'
-import { usePriorityAssignments, type DashboardAssignment } from '../hooks/usePriorityAssignments'
+import { usePriorityAssignments } from '../hooks/usePriorityAssignments'
 import { useActivityFeed, type ActivityFeedItem } from '../hooks/useActivityFeed'
 import { useDashboardSettings } from '../hooks/useDashboardSettings'
 import { extractAssignmentIdFromUrl, extractCourseIdFromUrl } from '../utils/urlHelpers'
@@ -13,10 +13,13 @@ import { useQueryClient } from '@tanstack/react-query'
 // Components
 import { PriorityList } from './dashboard/PriorityList'
 import { ActivityPanel } from './dashboard/ActivityPanel'
+import { RecentFeedback } from './dashboard/RecentFeedback'
+import { QuickNotes } from './dashboard/QuickNotes'
 
 type Props = {
   due: DueItem[]
   loading: boolean
+  recentFeedback?: FeedbackItem[]
   courses?: Array<{ id: string | number; name: string; course_code?: string }>
   sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> }
   onOpenCourse?: (courseId: string | number) => void
@@ -28,11 +31,30 @@ export const Dashboard: React.FC<Props> = ({
   onOpenCourse,
   onOpenAssignment,
   onOpenAnnouncement,
+  due,
+  loading,
+  courses,
+  sidebar,
 }) => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { courseImageUrl } = useCourseImages()
-  const { timeHorizon, setTimeHorizon } = useDashboardSettings()
+  const { 
+    timeHorizon, 
+    setTimeHorizon,
+    showGrades,
+    setShowGrades,
+    quickNotes,
+    setQuickNotes
+  } = useDashboardSettings()
+  
+  // Use aggregated dashboard data (includes Recent Feedback derived from gradebook)
+  const { recentFeedback } = useDashboardData({
+    courses: courses || [],
+    sidebar,
+    due,
+    loading
+  })
   
   // Priority assignments data - pass timeHorizon explicitly to ensure reactivity
   const priorityData = usePriorityAssignments({ horizonDays: timeHorizon })
@@ -89,8 +111,8 @@ export const Dashboard: React.FC<Props> = ({
     }
   }, [activityData.items, queryClient])
   
-  // Handle assignment click
-  const handleAssignmentClick = React.useCallback((assignment: DashboardAssignment) => {
+  // Handle assignment click (shared for priority and feedback)
+  const handleAssignmentClick = React.useCallback((assignment: { id: string | number, courseId: string | number, htmlUrl?: string, name: string }) => {
     const assignmentId = String(assignment.id)
     const courseId = assignment.courseId
     
@@ -141,7 +163,7 @@ export const Dashboard: React.FC<Props> = ({
         Dashboard
       </h1>
       
-      {/* Two-column layout: 60% Priority / 40% Activity */}
+      {/* Top Row: Priority & Activity (60/40) */}
       <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-5">
         {/* Left Column: Priority */}
         <PriorityList
@@ -162,6 +184,22 @@ export const Dashboard: React.FC<Props> = ({
           isEmpty={activityData.isEmpty}
           onMarkRead={activityData.markAnnouncementRead}
           onClickItem={handleActivityClick}
+        />
+      </div>
+
+      {/* Bottom Row: Recent Feedback & Quick Notes (60/40) */}
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-5">
+        <RecentFeedback
+          items={recentFeedback}
+          isLoading={false} // Data is derived from already loaded queries, so it's instant once Dashboard mounts
+          showGrades={showGrades}
+          onToggleGrades={setShowGrades}
+          onClickItem={handleAssignmentClick}
+        />
+        
+        <QuickNotes
+          value={quickNotes}
+          onChange={setQuickNotes}
         />
       </div>
     </div>

@@ -107,7 +107,8 @@ export function RootLayout() {
   // Queries
   const profileQ = useProfile({ enabled: hasToken === true && !embedBoot })
   const coursesQ = useCourses({ enrollment_state: 'active' }, { enabled: hasToken === true && !embedBoot })
-  const dueQ = useDueAssignments({ days: 7 }, { enabled: hasToken === true && !embedBoot })
+  // Fetch a single, shared due-assignments cache (student-only; onlyPublished)
+  const dueQ = useDueAssignments({ days: 365, onlyPublished: true, includeCourseName: true }, { enabled: hasToken === true && !embedBoot })
   const userKey = React.useMemo(() => {
     const uid = (profileQ.data as any)?.id
     return hasToken && uid ? `${baseUrl}|${uid}` : null
@@ -144,10 +145,11 @@ export function RootLayout() {
          setCachedCourses(data.cachedCourses || [])
          queryClient.setQueryData(['courses', { enrollment_state: 'active' }], data.cachedCourses || [])
        }
-       if (Array.isArray(data?.cachedDue)) {
-         setCachedDue(data.cachedDue || [])
-         queryClient.setQueryData(['due-assignments', { days: 7 }], data.cachedDue || [])
-       }
+        if (Array.isArray(data?.cachedDue)) {
+          setCachedDue(data.cachedDue || [])
+          // Shared due list cache (filtered client-side by consumers)
+          queryClient.setQueryData(['due-assignments'], data.cachedDue || [])
+        }
 
 
       setLoading(true)
@@ -552,7 +554,8 @@ export function RootLayout() {
   const context: AppContextValue = {
     baseUrl,
     courses: embedBoot ? [] : (coursesQ.data || cachedCourses || []),
-    due: embedBoot ? [] : (dueQ.data || cachedDue || []),
+    // Dashboard expects a short horizon; we keep a larger shared cache and slice for UI.
+    due: embedBoot ? [] : filterDueForDashboard(dueQ.data || cachedDue || []),
     profile: embedBoot ? null : profileQ.data,
     loading: embedBoot
       ? loading
@@ -581,6 +584,18 @@ export function RootLayout() {
     onOpenModules: (courseId) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'modules' } }) },
     onSignOut,
     onOpenSettings: () => setSettingsOpen(true),
+  }
+
+  function filterDueForDashboard(list: any[]) {
+    const now = Date.now()
+    const horizon = now + 7 * 24 * 60 * 60 * 1000
+    return (Array.isArray(list) ? list : []).filter((it: any) => {
+      const raw = it?.dueAt
+      if (!raw) return true
+      const t = Date.parse(String(raw))
+      if (!Number.isFinite(t)) return true
+      return t <= horizon
+    })
   }
 
   const visibleCourses = useMemo(() => {

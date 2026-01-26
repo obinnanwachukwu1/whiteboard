@@ -13,24 +13,27 @@ export async function prefetchNavTab(
         
         await Promise.all([
           queryClient.fetchQuery({
-            queryKey: ['due-assignments', { days: 60, onlyPublished: true, includeCourseName: true }],
+            // Shared due list cache (student-only; onlyPublished)
+            queryKey: ['due-assignments'],
             queryFn: async () => {
-              const res = await window.canvas.listDueAssignments({ days: 60, onlyPublished: true, includeCourseName: true })
+              const res = await window.canvas.listDueAssignments({ days: 365, onlyPublished: true, includeCourseName: true })
               if (!res?.ok) throw new Error(res?.error || 'Failed')
               return res.data || []
             },
-            staleTime: 1000 * 60 * 2,
-          }).then((assignments: any[]) => {
-            // Immediately identify courses that need weights
+            staleTime: 1000 * 60 * 5,
+          }).then((allAssignments: any[]) => {
+            // Identify courses that need weights (limit to near-term assignments to avoid excess)
+            const now = Date.now()
+            const horizon = now + 60 * 24 * 60 * 60 * 1000
             const courseIds = new Set<string>()
-            for (const a of assignments) {
-              if (a.course_id != null) courseIds.add(String(a.course_id))
+            for (const a of (Array.isArray(allAssignments) ? allAssignments : [])) {
+              const raw = (a as any)?.dueAt
+              const t = raw ? Date.parse(String(raw)) : NaN
+              if (Number.isFinite(t) && t > horizon) continue
+              if (a?.course_id != null) courseIds.add(String(a.course_id))
             }
-            
-            // Prefetch weights for ALL courses with assignments
-            // We run this as a side effect (not awaited by the outer Promise.all, or maybe we should)
-            // Ideally we want the prefetch to start ASAP.
-            const weightPromises = Array.from(courseIds).map(cid => 
+
+            const weightPromises = Array.from(courseIds).map((cid) =>
               queryClient.prefetchQuery({
                 queryKey: ['course-assignment-groups-with-assignments', cid],
                 queryFn: async () => {
@@ -41,18 +44,17 @@ export async function prefetchNavTab(
                 staleTime: 1000 * 60 * 30,
               })
             )
-            // We can await them to ensure "dashboard ready" means "dashboard fully ready"
             return Promise.all(weightPromises)
           }),
 
           queryClient.prefetchQuery({
-            queryKey: ['activity-announcements', { n: 20 }],
+            queryKey: ['activity-announcements'],
             queryFn: async () => {
               const res = await window.canvas.listActivityStream?.({ onlyActiveCourses: true, perPage: 100 })
               const list = (res?.ok ? res.data : []) as any[]
               const anns = (Array.isArray(list) ? list : []).filter((x) => (x?.type === 'Announcement'))
               anns.sort((a, b) => new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime())
-              return anns.slice(0, Math.max(1, 20))
+              return anns
             },
             staleTime: 1000 * 60 * 5,
           })
@@ -62,13 +64,13 @@ export async function prefetchNavTab(
       case 'announcements':
         // AnnouncementsPage uses n=200
         await queryClient.prefetchQuery({
-          queryKey: ['activity-announcements', { n: 200 }],
+          queryKey: ['activity-announcements'],
           queryFn: async () => {
             const res = await window.canvas.listActivityStream?.({ onlyActiveCourses: true, perPage: 100 })
             const list = (res?.ok ? res.data : []) as any[]
             const anns = (Array.isArray(list) ? list : []).filter((x) => (x?.type === 'Announcement'))
             anns.sort((a, b) => new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime())
-            return anns.slice(0, Math.max(1, 200))
+            return anns
           },
           staleTime: 1000 * 60 * 5,
         })
@@ -78,13 +80,13 @@ export async function prefetchNavTab(
         // AssignmentsPage uses days=365, includeCourseName=true
         await Promise.all([
           queryClient.prefetchQuery({
-            queryKey: ['due-assignments', { days: 365, includeCourseName: true }],
+            queryKey: ['due-assignments'],
             queryFn: async () => {
-              const res = await window.canvas.listDueAssignments({ days: 365, includeCourseName: true })
+              const res = await window.canvas.listDueAssignments({ days: 365, onlyPublished: true, includeCourseName: true })
               if (!res?.ok) throw new Error(res?.error || 'Failed')
               return res.data || []
             },
-            staleTime: 1000 * 60 * 2,
+            staleTime: 1000 * 60 * 5,
           }),
           queryClient.prefetchQuery({
             queryKey: ['upcoming'],
@@ -115,11 +117,11 @@ export async function prefetchNavTab(
         const gradeCourses = courses.slice(0, 3)
         await Promise.all(gradeCourses.map(c => 
           queryClient.prefetchQuery({
-            queryKey: ['course-gradebook', c.id],
+            queryKey: ['course-gradebook', String(c.id)],
             queryFn: async () => {
               const [groupsRes, assignmentsRes] = await Promise.all([
-                window.canvas.listAssignmentGroups(c.id, false),
-                window.canvas.listAssignmentsWithSubmission(c.id, 100),
+                window.canvas.listAssignmentGroups(String(c.id), false),
+                window.canvas.listAssignmentsWithSubmission(String(c.id), 100),
               ])
               if (!groupsRes?.ok) throw new Error(groupsRes?.error || 'Failed to load assignment groups')
               if (!assignmentsRes?.ok) throw new Error(assignmentsRes?.error || 'Failed to load gradebook assignments')

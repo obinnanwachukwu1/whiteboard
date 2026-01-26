@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, nativeImage, protocol, net, Tray, Menu, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, nativeImage, protocol, net, Tray, Menu, dialog, clipboard } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -51,6 +51,8 @@ import {
   listUpcoming as svcListUpcoming,
   listTodo as svcListTodo,
   getMySubmission as svcGetMySubmission,
+  submitAssignment as svcSubmitAssignment,
+  submitAssignmentUpload as svcSubmitAssignmentUpload,
   listCoursePages as svcListCoursePages,
   getCoursePage as svcGetCoursePage,
   getAssignmentRest as svcGetAssignmentRest,
@@ -859,15 +861,51 @@ ipcMain.handle('canvas:listTodo', async () => {
   }
 })
 
-ipcMain.handle('canvas:getMySubmission', async (_evt, courseId: string | number, assignmentRestId: string | number) => {
+ipcMain.handle('canvas:getMySubmission', async (_evt, courseId: string | number, assignmentRestId: string | number, include?: string[]) => {
   try {
-    const data = await svcGetMySubmission(courseId, assignmentRestId)
+    const data = await svcGetMySubmission(courseId, assignmentRestId, include)
     return { ok: true, data }
   } catch (e: any) {
     const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
     return { ok: false, error: msg }
   }
 })
+
+ipcMain.handle(
+  'canvas:submitAssignment',
+  async (
+    _evt,
+    courseId: string | number,
+    assignmentRestId: string | number,
+    params: { submissionType: 'online_text_entry' | 'online_url' | 'online_upload'; body?: string; url?: string; fileIds?: Array<string | number> },
+  ) => {
+    try {
+      const data = await svcSubmitAssignment(courseId, assignmentRestId, params)
+      return { ok: true, data }
+    } catch (e: any) {
+      const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+      return { ok: false, error: msg }
+    }
+  }
+)
+
+ipcMain.handle(
+  'canvas:submitAssignmentUpload',
+  async (
+    _evt,
+    courseId: string | number,
+    assignmentRestId: string | number,
+    filePaths: string[],
+  ) => {
+    try {
+      const data = await svcSubmitAssignmentUpload(courseId, assignmentRestId, filePaths)
+      return { ok: true, data }
+    } catch (e: any) {
+      const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+      return { ok: false, error: msg }
+    }
+  }
+)
 
 ipcMain.handle('canvas:listCoursePages', async (_evt, courseId: string | number, perPage = 100) => {
   try {
@@ -1292,6 +1330,27 @@ ipcMain.handle('app:openContentWindow', async (_evt, raw: { courseId?: string; t
   }
 })
 
+ipcMain.handle('app:pickFiles', async (_evt, opts?: { multiple?: boolean }) => {
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: [
+        'openFile',
+        ...(opts?.multiple === false ? [] : ['multiSelections' as const]),
+      ],
+    })
+    if (result.canceled) return { ok: true, data: [] }
+    const files = await Promise.all(
+      (result.filePaths || []).map(async (p) => {
+        const st = await fs.promises.stat(p)
+        return { path: p, name: path.basename(p), size: st.size }
+      })
+    )
+    return { ok: true, data: files }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
 ipcMain.handle('app:downloadFile', async (_evt, fileId: string | number, suggestedName?: string) => {
   try {
     const downloadedPath = await svcDownloadFile(fileId)
@@ -1310,6 +1369,19 @@ ipcMain.handle('app:downloadFile', async (_evt, fileId: string | number, suggest
   } catch (e: any) {
     const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
     return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('app:copyText', async (_evt, text: string) => {
+  try {
+    if (typeof text !== 'string') {
+      return { ok: false, error: 'invalid_text' }
+    }
+    clipboard.clear()
+    clipboard.writeText(text)
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
   }
 })
 

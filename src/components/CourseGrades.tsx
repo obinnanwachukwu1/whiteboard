@@ -6,12 +6,14 @@ import { Pencil, RotateCcw } from 'lucide-react'
 import { useCourseGradebook } from '../hooks/useCourseGradebook'
 import { useQueryClient } from '@tanstack/react-query'
 import { calculateCourseGrades } from '../utils/gradeCalc'
+import { useAppContext } from '../context/AppContext'
 
 type Props = {
   courseId: string | number
 }
 
 export const CourseGrades: React.FC<Props> = ({ courseId }) => {
+  const app = useAppContext()
   const queryClient = useQueryClient()
   // Keep raw percent input so users can type decimals naturally
   const [rawWhatIfPct, setRawWhatIfPct] = React.useState<Record<string | number, string>>({})
@@ -89,7 +91,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
             variant="ghost"
             onClick={async () => {
               try {
-                await queryClient.invalidateQueries({ queryKey: ['course-gradebook', courseId] })
+                await queryClient.invalidateQueries({ queryKey: ['course-gradebook', String(courseId)] })
               } catch {}
               await refetch()
             }}
@@ -184,7 +186,15 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                             const showPct = (raw?.trim?.() ? parseFloat(raw) : null) ?? apiPct
                             const display = typeof showPct === 'number' && Number.isFinite(showPct) ? `${Math.round(showPct * 10) / 10}%` : (typeof score === 'string' ? score : '—')
                             return (
-                              <tr key={id} className="border-b border-gray-100 dark:border-neutral-800 hover:bg-[var(--app-accent-bg)]/40 transition-colors">
+                              <tr
+                                key={id}
+                                className="border-b border-gray-100 dark:border-neutral-800 hover:bg-[var(--app-accent-bg)]/40 transition-colors cursor-pointer"
+                                onClick={(e) => {
+                                  const target = e.target as HTMLElement
+                                  if (target.closest('button, input, select, textarea, a')) return
+                                  if (id != null) app.onOpenAssignment(courseId, String(id), a?.name)
+                                }}
+                              >
                                 <td className="py-2 pr-3 pl-3 max-w-0">
                                   <div className="font-medium truncate" title={a?.name}>{a?.name}</div>
                                   <div className="text-xs text-slate-500 whitespace-nowrap">{a?.due_at ? new Date(a?.due_at).toLocaleString() : 'No due date'}</div>
@@ -322,7 +332,15 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                           const display = typeof showPct === 'number' && Number.isFinite(showPct) ? `${Math.round(showPct * 10) / 10}%` : (typeof score === 'string' ? score : '—')
                           const isEditing = editingId === id
                           return (
-                            <div key={id} className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-3">
+                            <div
+                              key={id}
+                              className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-3 cursor-pointer"
+                              onClick={(e) => {
+                                const target = e.target as HTMLElement
+                                if (target.closest('button, input, select, textarea, a')) return
+                                if (id != null) app.onOpenAssignment(courseId, String(id), a?.name)
+                              }}
+                            >
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
                                   <div className="font-medium truncate" title={a?.name}>{a?.name}</div>

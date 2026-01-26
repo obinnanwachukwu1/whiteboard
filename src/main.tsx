@@ -29,26 +29,14 @@ const queryClient = new QueryClient({
       refetchOnReconnect: true,
       retry: 2,
       staleTime: 1000 * 60, // 1 minute default
+      // Default GC is 5 minutes; in an Electron app this causes unnecessary
+      // re-fetch/popping when navigating back and forth.
+      gcTime: 1000 * 60 * 60, // 1 hour
     },
   },
 })
 
 function useQueryPersistence(client: QueryClient) {
-  // Hydrate once on boot
-  React.useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const cfg = await window.settings.get()
-        const snap = (cfg.ok ? (cfg.data as any)?.queryCache : undefined)
-        if (snap && mounted) {
-          try { hydrate(client, snap as any) } catch (e) { console.warn('Failed to hydrate cache', e) }
-        }
-      } catch {}
-    })()
-    return () => { mounted = false }
-  }, [client])
-
   // Debounced, filtered persistence to reduce disk writes and navigation lag
   React.useEffect(() => {
     let t: any = null
@@ -58,10 +46,18 @@ function useQueryPersistence(client: QueryClient) {
       'due-assignments',
       'course-gradebook',
       'activity-announcements',
+      // Dashboard priority inputs
+      'course-assignment-groups-with-assignments',
+      // Dashboard computed ordering (for stable first paint)
+      'dashboard-priority-order',
       'course-info',
       'upcoming',
       'todo',
-      'course-tabs'
+      'course-tabs',
+      // Inbox (opt-in: stores message previews/threads on disk)
+      'conversations',
+      'conversation',
+      'unread-count'
     ])
     const flush = () => {
       try {
@@ -84,7 +80,25 @@ function useQueryPersistence(client: QueryClient) {
       t = setTimeout(flush, 1500)
     }
     const unsub = client.getQueryCache().subscribe(onChange)
-    return () => { if (t) clearTimeout(t); unsub() }
+
+    // Best-effort flush on window close/background.
+    const onBeforeUnload = () => {
+      try { flush() } catch {}
+    }
+    const onVisibility = () => {
+      try {
+        if (document.visibilityState === 'hidden') flush()
+      } catch {}
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      if (t) clearTimeout(t)
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      document.removeEventListener('visibilitychange', onVisibility)
+      unsub()
+    }
   }, [client])
 }
 
@@ -107,6 +121,20 @@ async function main() {
       console.warn('Failed to bootstrap theme', err)
     }
   }
+
+  // Hydrate query cache before the first render so pages can show cached data
+  // immediately (no initial skeleton/popping).
+  try {
+    const cfg = await window.settings.get()
+    const snap = (cfg.ok ? (cfg.data as any)?.queryCache : undefined)
+    if (snap) {
+      try {
+        hydrate(queryClient, snap as any)
+      } catch (e) {
+        console.warn('Failed to hydrate cache', e)
+      }
+    }
+  } catch {}
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>

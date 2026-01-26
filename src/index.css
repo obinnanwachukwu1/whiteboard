@@ -87,11 +87,23 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 }
 .animate-slide-in-right { animation: slideInRight 0.25s ease-out; }
 
+@keyframes slideOutRight {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(100%); }
+}
+.animate-slide-out-right { animation: slideOutRight 0.25s ease-in forwards; }
+
 @keyframes slideInLeft {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(0); }
 }
 .animate-slide-in-left { animation: slideInLeft 0.25s ease-out; }
+
+@keyframes slideOutLeft {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+.animate-slide-out-left { animation: slideOutLeft 0.25s ease-in forwards; }
 
 /* Modal animations */
 @keyframes fadeIn {

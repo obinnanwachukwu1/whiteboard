@@ -16,6 +16,26 @@ export type DueItem = {
   assignment_rest_id?: number | string
 }
 
+export type Comment = {
+  comment: string
+  author_name: string
+  created_at: string
+  avatar_path?: string
+}
+
+export type FeedbackItem = {
+  id: string | number
+  courseId: string | number
+  courseName: string
+  name: string
+  score: number | null
+  pointsPossible: number | null
+  gradedAt: string
+  htmlUrl?: string
+  latestComment?: Comment
+  commentStatus?: 'loading' | 'ready' | 'none'
+}
+
 type UseDashboardDataProps = {
   courses: Array<{ id: string | number; name: string; course_code?: string }>
   sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> }
@@ -26,6 +46,7 @@ type UseDashboardDataProps = {
 export function useDashboardData({ courses, sidebar, due, loading }: UseDashboardDataProps) {
   const queryClient = useQueryClient()
   const { courseImageUrl, persistImages } = useCourseImages()
+  const lastFeedbackRef = React.useRef<FeedbackItem[]>([])
 
   // 1. Order visible courses
   const hidden = React.useMemo(() => new Set(sidebar?.hiddenCourseIds || []), [sidebar?.hiddenCourseIds])
@@ -46,11 +67,11 @@ export function useDashboardData({ courses, sidebar, due, loading }: UseDashboar
   // 2. Optimized Gradebook Calculation (useQueries + memoized results)
   const gradeQueries = useQueries({
     queries: orderedVisibleCourses.map((c) => ({
-      queryKey: ['course-gradebook', c.id],
+      queryKey: ['course-gradebook', String(c.id)],
       queryFn: async () => {
         const [groupsRes, assignmentsRes] = await Promise.all([
-          window.canvas.listAssignmentGroups(c.id, false),
-          window.canvas.listAssignmentsWithSubmission(c.id, 100),
+          window.canvas.listAssignmentGroups(String(c.id), false),
+          window.canvas.listAssignmentsWithSubmission(String(c.id), 100),
         ])
         if (!groupsRes?.ok) throw new Error(groupsRes?.error || 'Failed to load assignment groups')
         if (!assignmentsRes?.ok) throw new Error(assignmentsRes?.error || 'Failed to load gradebook assignments')
@@ -177,15 +198,107 @@ export function useDashboardData({ courses, sidebar, due, loading }: UseDashboar
     return Math.round(avg * 10) / 10
   }, [gradesMap])
 
-  const dueState = queryClient.getQueryState(['due-assignments', { days: 7 }]) as any
+  const dueState = queryClient.getQueryState(['due-assignments']) as any
   const hasDue = Array.isArray(due) && due.length > 0
   // Only show loading if we are hard-loading (no data yet).
   // If we have data (even empty), don't show loading during background refetches.
   const dueLoading = !hasDue && Boolean(loading || (dueState?.status === 'pending' && dueState?.fetchStatus === 'fetching'))
 
+  // 6. Recent Feedback (Base)
+  const baseFeedback = React.useMemo(() => {
+    const allGraded: FeedbackItem[] = []
+    
+    gradeQueries.forEach((q, i) => {
+      const course = orderedVisibleCourses[i]
+      if (!course || !q.data) return
+      
+      const data = q.data as any
+      const rawAssignments = data.raw || []
+      
+      for (const a of rawAssignments) {
+        if (a.submission?.graded_at) {
+          allGraded.push({
+            id: a.id,
+            courseId: course.id,
+            courseName: labelFor(course),
+            name: a.name,
+            score: a.submission.score,
+            pointsPossible: a.points_possible,
+            gradedAt: a.submission.graded_at,
+            htmlUrl: a.html_url
+          })
+        }
+      }
+    })
+    
+    return allGraded
+      .sort((a, b) => new Date(b.gradedAt).getTime() - new Date(a.gradedAt).getTime())
+      .slice(0, 5)
+  }, [gradeQueries, orderedVisibleCourses, labelFor])
+
+  // 7. Fetch comments for top feedback items
+  const stableBaseFeedback = React.useMemo(() => {
+    const hasAnyGradeData = gradeQueries.some((q) => q.data)
+    if (baseFeedback.length > 0 || hasAnyGradeData) {
+      return baseFeedback
+    }
+    return lastFeedbackRef.current
+  }, [baseFeedback, gradeQueries])
+
+  const feedbackQueries = useQueries({
+    queries: stableBaseFeedback.map((item) => ({
+      queryKey: ['submission-details', String(item.courseId), String(item.id)],
+      queryFn: async () => {
+        const res = await window.canvas.getMySubmission(String(item.courseId), String(item.id), ['submission_comments'])
+        if (!res?.ok) throw new Error(res?.error || 'Failed to load submission details')
+        return res.data
+      },
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 60 * 2,
+      enabled: stableBaseFeedback.length > 0,
+    }))
+  })
+
+  // Merge comments
+  const recentFeedback = React.useMemo(() => {
+    const merged = stableBaseFeedback.map((item, i) => {
+      const q = feedbackQueries[i]
+      const details = q?.data
+      let latestComment: Comment | undefined
+      
+      if (details?.submission_comments && Array.isArray(details.submission_comments)) {
+        // Sort comments by date desc
+        const comments = [...details.submission_comments].sort((a: any, b: any) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+        const top = comments[0]
+        if (top) {
+          latestComment = {
+            comment: top.comment,
+            author_name: top.author_name,
+            created_at: top.created_at,
+            // Try author object first (standard API), fallback to flat property
+            avatar_path: top.author?.avatar_image_url || top.avatar_path
+          }
+        }
+      }
+      
+      const commentStatus: FeedbackItem['commentStatus'] = q?.isLoading || q?.isFetching
+        ? 'loading'
+        : latestComment
+          ? 'ready'
+          : 'none'
+
+      return { ...item, latestComment, commentStatus }
+    })
+    if (merged.length > 0) lastFeedbackRef.current = merged
+    return merged.length > 0 ? merged : lastFeedbackRef.current
+  }, [stableBaseFeedback, feedbackQueries])
+
   return {
     orderedVisibleCourses,
     topAnnouncements,
+    recentFeedback,
     annsLoading: annsQ.isLoading,
     dueLoading,
     hasDue,

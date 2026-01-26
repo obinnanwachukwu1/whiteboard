@@ -48,7 +48,10 @@ export default function DiscussionsPage() {
     }))
   })
 
-  const isLoading = queries.some((q) => q.isLoading)
+  // Show the full-page skeleton only when we have no cached data at all.
+  // Otherwise, render whatever is already cached and let the rest fill in.
+  const isHardLoading = queries.every((q) => q.isLoading && !q.data)
+  const isBackgroundFetching = !isHardLoading && queries.some((q) => q.isFetching && !q.data)
 
   const allDiscussions = React.useMemo(() => {
     const results: Array<DiscussionTopic & { courseId: string; courseName: string }> = []
@@ -122,7 +125,7 @@ export default function DiscussionsPage() {
         </select>
       </div>
 
-      {isLoading ? (
+      {isHardLoading ? (
         <SkeletonList count={5} hasAvatar variant="row" />
       ) : allDiscussions.length === 0 ? (
         <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-4 text-center">
@@ -131,6 +134,9 @@ export default function DiscussionsPage() {
         </div>
       ) : (
         <div className="space-y-2">
+          {isBackgroundFetching && (
+            <div className="text-xs text-slate-500 dark:text-neutral-400 px-1">Loading more courses…</div>
+          )}
           {allDiscussions.map((d, i) => {
             const open = () => {
               if (d.courseId != null) {

@@ -25,7 +25,14 @@ contextBridge.exposeInMainWorld('canvas', {
   getCourseModuleItem: (courseId: string | number, itemId: string | number) => ipcRenderer.invoke('canvas:getCourseModuleItem', courseId, itemId),
   listUpcoming: (opts?: { onlyActiveCourses?: boolean }) => ipcRenderer.invoke('canvas:listUpcoming', opts),
   listTodo: () => ipcRenderer.invoke('canvas:listTodo'),
-  getMySubmission: (courseId: string | number, assignmentRestId: string | number) => ipcRenderer.invoke('canvas:getMySubmission', courseId, assignmentRestId),
+  getMySubmission: (courseId: string | number, assignmentRestId: string | number, include?: string[]) => ipcRenderer.invoke('canvas:getMySubmission', courseId, assignmentRestId, include),
+  submitAssignment: (
+    courseId: string | number,
+    assignmentRestId: string | number,
+    params: { submissionType: 'online_text_entry' | 'online_url' | 'online_upload'; body?: string; url?: string; fileIds?: Array<string | number> },
+  ) => ipcRenderer.invoke('canvas:submitAssignment', courseId, assignmentRestId, params),
+  submitAssignmentUpload: (courseId: string | number, assignmentRestId: string | number, filePaths: string[]) =>
+    ipcRenderer.invoke('canvas:submitAssignmentUpload', courseId, assignmentRestId, filePaths),
   listCoursePages: (courseId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listCoursePages', courseId, perPage),
   getCoursePage: (courseId: string | number, slugOrUrl: string) => ipcRenderer.invoke('canvas:getCoursePage', courseId, slugOrUrl),
   getAssignmentRest: (courseId: string | number, assignmentRestId: string | number) => ipcRenderer.invoke('canvas:getAssignmentRest', courseId, assignmentRestId),
@@ -98,9 +105,12 @@ contextBridge.exposeInMainWorld('system', {
   openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
   openContentWindow: (params: { courseId: string; type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file'; contentId: string; title?: string; courseName?: string }) =>
     ipcRenderer.invoke('app:openContentWindow', params),
+  pickFiles: (opts?: { multiple?: boolean }) => ipcRenderer.invoke('app:pickFiles', opts),
   downloadFile: (fileId: string | number, suggestedName?: string) =>
     ipcRenderer.invoke('app:downloadFile', fileId, suggestedName),
+  writeClipboard: (text: string) => ipcRenderer.invoke('app:writeClipboard', text),
   getPdfPreloadPath: () => ipcRenderer.invoke('app:getPdfPreloadPath'),
+  copyText: (text: string) => ipcRenderer.invoke('app:copyText', text),
 })
 
 // AI Helpers

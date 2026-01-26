@@ -232,6 +232,32 @@
   function installInputHandlers() {
     if (!viewerContainer) return;
 
+    // Ensure webview gets focus on click so keyboard commands work
+    viewerContainer.addEventListener('mousedown', () => {
+      window.focus();
+    });
+
+    // Explicitly handle Copy command (Cmd+C / Ctrl+C)
+    // This fixes issues where the Electron menu "Copy" doesn't reach the webview
+    document.addEventListener('keydown', (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c') {
+        // Only trigger if text is selected
+        const selection = window.getSelection();
+        const text = selection ? selection.toString() : '';
+        
+        if (text.length > 0) {
+          // Send to parent to handle clipboard write
+          sendToParent('COPY', { text });
+          // Also try execCommand as fallback/standard behavior
+          try {
+            document.execCommand('copy');
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+    });
+
     // Trackpad pinch zoom: on macOS and many trackpads, pinch is delivered as ctrl/meta+wheel
     const onWheel = (event) => {
       if (!pdfViewer) return;

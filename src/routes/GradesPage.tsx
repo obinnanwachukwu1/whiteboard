@@ -157,11 +157,11 @@ export default function GradesPage() {
       list.forEach((c: any) => {
         enqueuePrefetch(async () => {
           await qc.prefetchQuery({
-            queryKey: ['course-gradebook', c.id],
+            queryKey: ['course-gradebook', String(c.id)],
             queryFn: async () => {
               const [groupsRes, assignmentsRes] = await Promise.all([
-                window.canvas.listAssignmentGroups(c.id, false),
-                window.canvas.listAssignmentsWithSubmission(c.id, 100),
+                window.canvas.listAssignmentGroups(String(c.id), false),
+                window.canvas.listAssignmentsWithSubmission(String(c.id), 100),
               ])
               if (!groupsRes?.ok) throw new Error(groupsRes?.error || 'Failed to load assignment groups')
               if (!assignmentsRes?.ok) throw new Error(assignmentsRes?.error || 'Failed to load gradebook assignments')
@@ -175,7 +175,7 @@ export default function GradesPage() {
   }, [orderedCourses, qc])
 
   function currentPercent(courseId: string | number): number | null {
-    const data = qc.getQueryData<any>(['course-gradebook', courseId]) as any
+    const data = qc.getQueryData<any>(['course-gradebook', String(courseId)]) as any
     const groups = data?.groups || []
     const raw = data?.raw || []
     if (!groups?.length || !raw?.length) return null

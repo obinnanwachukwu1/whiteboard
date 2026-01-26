@@ -14,13 +14,14 @@ export function useCourseGradebook(
   options?: Partial<UseQueryOptions<{ groups: AssignmentGroupInput[]; assignments: AssignmentInput[]; raw: any[] }, Error, { groups: AssignmentGroupInput[]; assignments: AssignmentInput[]; raw: any[] }>>,
 ) {
   const { perPage = 100 } = opts || {}
+  const cid = courseId == null ? courseId : String(courseId)
   return useQuery<{ groups: AssignmentGroupInput[]; assignments: AssignmentInput[]; raw: any[] }, Error, { groups: AssignmentGroupInput[]; assignments: AssignmentInput[]; raw: any[] }>({
-    queryKey: ['course-gradebook', courseId],
+    queryKey: ['course-gradebook', cid],
     queryFn: async () => {
       if (courseId == null) throw new Error('courseId is required')
       const [groupsRes, assignmentsRes] = await Promise.all([
-        window.canvas.listAssignmentGroups(courseId, false),
-        window.canvas.listAssignmentsWithSubmission(courseId, perPage),
+        window.canvas.listAssignmentGroups(String(courseId), false),
+        window.canvas.listAssignmentsWithSubmission(String(courseId), perPage),
       ])
       const groups = toAssignmentGroupInputsFromRest(ensureOk(groupsRes as any))
       const raw = ensureOk(assignmentsRes as any) as any[]

@@ -16,12 +16,18 @@ export type DashboardSettings = {
   showSubmitted: boolean
   /** Maximum priority items to show */
   maxPriorityItems: number
+  /** Show grades in Recent Feedback */
+  showGrades: boolean
+  /** Quick notes content */
+  quickNotes: string
 }
 
 const DEFAULT_SETTINGS: DashboardSettings = {
   timeHorizon: 7,
   showSubmitted: false,
   maxPriorityItems: 5,
+  showGrades: false,
+  quickNotes: '',
 }
 
 /**
@@ -43,6 +49,12 @@ function loadSettings(): DashboardSettings {
       maxPriorityItems: typeof parsed.maxPriorityItems === 'number' && parsed.maxPriorityItems > 0
         ? parsed.maxPriorityItems
         : DEFAULT_SETTINGS.maxPriorityItems,
+      showGrades: typeof parsed.showGrades === 'boolean'
+        ? parsed.showGrades
+        : DEFAULT_SETTINGS.showGrades,
+      quickNotes: typeof parsed.quickNotes === 'string'
+        ? parsed.quickNotes
+        : DEFAULT_SETTINGS.quickNotes,
     }
   } catch {
     return DEFAULT_SETTINGS
@@ -107,6 +119,14 @@ export function useDashboardSettings() {
   const setMaxPriorityItems = useCallback((max: number) => {
     setSettings({ maxPriorityItems: Math.max(1, Math.min(20, max)) })
   }, [setSettings])
+
+  const setShowGrades = useCallback((show: boolean) => {
+    setSettings({ showGrades: show })
+  }, [setSettings])
+
+  const setQuickNotes = useCallback((notes: string) => {
+    setSettings({ quickNotes: notes })
+  }, [setSettings])
   
   const resetToDefaults = useCallback(() => {
     setSettingsState(DEFAULT_SETTINGS)
@@ -119,12 +139,16 @@ export function useDashboardSettings() {
     setTimeHorizon,
     setShowSubmitted,
     setMaxPriorityItems,
+    setShowGrades,
+    setQuickNotes,
     resetToDefaults,
     
     // Convenience accessors
     timeHorizon: settings.timeHorizon,
     showSubmitted: settings.showSubmitted,
     maxPriorityItems: settings.maxPriorityItems,
+    showGrades: settings.showGrades,
+    quickNotes: settings.quickNotes,
   }
 }
 

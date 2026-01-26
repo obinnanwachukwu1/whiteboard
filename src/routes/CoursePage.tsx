@@ -138,13 +138,14 @@ export default function CoursePage() {
         const currentTab = search?.tab || courseTab || 'announcements'
         const allTabs = ['syllabus', 'announcements', 'modules', 'assignments', 'grades', 'files', 'people', 'discussions', 'links', 'home']
         
-        // Use smart sorting based on usage stats, but filter out the current tab (no need to prefetch what we are looking at)
-        const sortedTabs = getSortedTabs(courseId, allTabs).filter(t => t !== currentTab)
+        // Use smart sorting based on usage stats, but ensure the current tab is warmed too.
+        const sortedTabs = getSortedTabs(courseId, allTabs)
+        const warmOrder = [currentTab, ...sortedTabs.filter((t) => t !== currentTab)]
 
         // Queue a small number of highest-likelihood tabs. The prefetch queue
         // has its own rate guard/backoff.
         const maxWarm = 4
-        for (const t of sortedTabs.slice(0, maxWarm)) {
+        for (const t of warmOrder.slice(0, maxWarm)) {
           enqueuePrefetch(() => prefetchCourseTab(queryClient, id, t))
         }
       } catch {}
