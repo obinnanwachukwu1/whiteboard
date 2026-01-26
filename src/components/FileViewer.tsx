@@ -190,6 +190,7 @@ export const FileViewer: React.FC<Props> = ({ fileId, className = '', isFullscre
         <PptxRenderer
           url={localUrl}
           className={className}
+          isFullscreen={isFullscreen}
           onDownload={handleDownload}
         />
       </Suspense>

@@ -3,7 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* App shell heights only; classes applied in index.html */
-html, body, #root { height: 100%; }
+html, body, #root { height: 100%; overflow: hidden; }
 body { background-color: var(--app-accent-root); }
 
 /* App accent colors - can be changed programmatically */

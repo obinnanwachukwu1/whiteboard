@@ -1,69 +1,174 @@
-import React, { useEffect, useState } from 'react'
-import JSZip from 'jszip'
-import ViewerFrame from './ViewerFrame'
-import ViewerToolbar from './ViewerToolbar'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 type Props = {
   url: string
   className?: string
+  isFullscreen?: boolean
   onDownload?: () => void
 }
 
-const PptxRenderer: React.FC<Props> = ({ url, className = '', onDownload }) => {
-  const [slides, setSlides] = useState<{ index: number; text: string }[]>([])
+type ViewerState = {
+  currentSlide: number
+  totalSlides: number
+  scale: number
+  scaleMode: string | null
+  isSlideMode: boolean
+  isReady: boolean
+  isLoading: boolean
+  error: string | null
+}
 
+type PptxEvent = {
+  type: string
+  [key: string]: unknown
+}
+
+const PptxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDownload }) => {
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [viewerState, setViewerState] = useState<ViewerState>({
+    currentSlide: 1,
+    totalSlides: 0,
+    scale: 1,
+    scaleMode: 'fit-width',
+    isSlideMode: false,
+    isReady: false,
+    isLoading: true,
+    error: null,
+  })
+  const lastLoadedUrlRef = useRef<string | null>(null)
+
+  /**
+   * Send a command to the iframe viewer
+   */
+  const sendCommand = useCallback((command: { type: string; [key: string]: unknown }) => {
+    const iframe = iframeRef.current
+    if (!iframe?.contentWindow) return
+    iframe.contentWindow.postMessage(command, '*')
+  }, [])
+
+  /**
+   * Handle messages from the iframe
+   */
   useEffect(() => {
-    let cancelled = false
-    async function run() {
-      try {
-        const resp = await fetch(url)
-        if (!resp.ok) throw new Error('Failed')
-        const buf = await resp.arrayBuffer()
-        if (cancelled) return
+    const handleMessage = (event: MessageEvent) => {
+      // Only accept messages from our iframe
+      if (iframeRef.current && event.source !== iframeRef.current.contentWindow) return
 
-        const zip = new JSZip()
-        const z = await zip.loadAsync(buf)
-        const files = Object.keys(z.files).filter((p) => p.startsWith('ppt/slides/slide') && p.endsWith('.xml'))
-        files.sort((a,b) => {
-          const pa = parseInt(a.match(/slide(\d+)\.xml/)?.[1] || '0', 10)
-          const pb = parseInt(b.match(/slide(\d+)\.xml/)?.[1] || '0', 10)
-          return pa - pb
-        })
-        const s: { index: number; text: string }[] = []
-        for (const p of files) {
-          const xml = await z.file(p)!.async('text')
-          const dom = new DOMParser().parseFromString(xml, 'application/xml')
-          const texts = Array.from(dom.getElementsByTagName('a:t')).map((t) => t.textContent || '')
-          s.push({ index: s.length + 1, text: texts.join(' ') })
-        }
-        if (!cancelled) setSlides(s)
-      } catch {
-        if (!cancelled) setSlides([])
+      const data = event.data as PptxEvent
+      if (!data || !data.type) return
+
+      switch (data.type) {
+        case 'READY':
+          setViewerState((prev) => ({ ...prev, isReady: true }))
+          // Send theme when ready
+          const isDark = document.documentElement.classList.contains('dark')
+          sendCommand({ type: 'SET_THEME', theme: isDark ? 'dark' : 'light' })
+          // Send font family
+          try {
+            const fontFamily = window.getComputedStyle(document.body).fontFamily
+            sendCommand({ type: 'SET_APP_STYLE', fontFamily })
+          } catch {}
+          // Load the PPTX file
+          if (url && lastLoadedUrlRef.current !== url) {
+            sendCommand({ type: 'LOAD_PPTX', url })
+            lastLoadedUrlRef.current = url
+          }
+          break
+
+        case 'LOADING_STARTED':
+          setViewerState((prev) => ({ ...prev, isLoading: true, error: null }))
+          break
+
+        case 'DOC_LOADED':
+          setViewerState((prev) => ({
+            ...prev,
+            isLoading: false,
+            totalSlides: (data.slideCount as number) || 0,
+            scale: (data.scale as number) || 1,
+            scaleMode: (data.scaleMode as string) || 'fit-width',
+            error: null,
+          }))
+          break
+
+        case 'SLIDE_CHANGED':
+          setViewerState((prev) => ({
+            ...prev,
+            currentSlide: (data.slide as number) || 1,
+            totalSlides: (data.total as number) || prev.totalSlides,
+          }))
+          break
+
+        case 'SCALE_CHANGED':
+          setViewerState((prev) => ({
+            ...prev,
+            scale: (data.scale as number) || 1,
+            scaleMode: (data.scaleMode as string) || null,
+          }))
+          break
+
+        case 'SLIDE_MODE_CHANGED':
+          setViewerState((prev) => ({
+            ...prev,
+            isSlideMode: (data.slideMode as boolean) || false,
+          }))
+          break
+
+        case 'ERROR':
+          setViewerState((prev) => ({
+            ...prev,
+            isLoading: false,
+            error: (data.message as string) || 'Unknown error',
+          }))
+          break
+
+        case 'DOWNLOAD_REQUESTED':
+          onDownload?.()
+          break
       }
     }
-    run()
-    return () => { cancelled = true }
-  }, [url])
 
-  if (!slides.length) return null
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [url, sendCommand, onDownload])
+
+  /**
+   * Load PPTX when URL changes and viewer is ready
+   */
+  useEffect(() => {
+    if (!viewerState.isReady || !url) return
+    if (lastLoadedUrlRef.current === url) return
+
+    setViewerState((prev) => ({ ...prev, isLoading: true, error: null }))
+    sendCommand({ type: 'LOAD_PPTX', url })
+    lastLoadedUrlRef.current = url
+  }, [viewerState.isReady, url, sendCommand])
+
+  /**
+   * Watch for theme changes and update viewer
+   */
+  useEffect(() => {
+    if (!viewerState.isReady) return
+
+    const observer = new MutationObserver(() => {
+      const isDark = document.documentElement.classList.contains('dark')
+      sendCommand({ type: 'SET_THEME', theme: isDark ? 'dark' : 'light' })
+    })
+
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [viewerState.isReady, sendCommand])
 
   return (
-    <ViewerFrame
-      className={className}
-      padding="default"
-      toolbar={
-        <ViewerToolbar onDownload={onDownload} disableDownload={!onDownload} />
-      }
-    >
-      <div className="space-y-4">
-        {slides.map((s, idx) => (
-          <div key={idx} className="border border-gray-200 dark:border-neutral-700 rounded p-3 bg-white dark:bg-neutral-900">
-            <div className="text-xs text-slate-500 dark:text-neutral-400">Slide {s.index}</div>
-            <div className="mt-1 whitespace-pre-wrap">{s.text || '—'}</div>
-          </div>
-        ))}
-      </div>
-    </ViewerFrame>
+    <div className={`relative flex flex-col h-full min-h-0 overflow-hidden ${className}`}>
+      <iframe
+        ref={iframeRef}
+        src="/pptxviewer/pptxViewer.html"
+        className="flex-1 min-h-0 w-full border-0 bg-gray-100 dark:bg-neutral-800"
+        style={{ minHeight: isFullscreen ? '100%' : undefined }}
+        title="PowerPoint Viewer"
+        sandbox="allow-scripts allow-same-origin"
+      />
+    </div>
   )
 }
 
