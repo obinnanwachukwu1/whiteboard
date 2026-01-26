@@ -316,7 +316,14 @@
     if (window.pdfBridge && window.pdfBridge.sendToParent) {
       window.pdfBridge.sendToParent({ type, ...payload });
     } else {
-      // Fallback for development without preload
+      // Fallback for iframe + postMessage (and dev without preload)
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type, ...payload }, '*');
+          return;
+        }
+      } catch {}
+
       console.log('[PDFBridge] Event:', type, payload);
     }
   }

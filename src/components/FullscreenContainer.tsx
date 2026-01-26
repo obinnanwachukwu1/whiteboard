@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 
 type Props = {
   className?: string
@@ -7,9 +8,60 @@ type Props = {
 
 export const FullscreenContainer: React.FC<Props> = ({ className = '', children }) => {
   // "Fullscreen" here is an in-app focus mode, not OS / native fullscreen.
-  // This just expands the container to fill the window viewport.
-  const rootRef = React.useRef<HTMLDivElement | null>(null)
+  // Render via a portal so focus mode can cover the entire window (header/sidebar
+  // included) and isn't constrained by parent overflow/stacking contexts.
+  //
+  // To avoid remounting heavy viewers (native PDF view, etc.), we always render
+  // the children in the portal and simply resize/reposition the portal wrapper.
+  const placeholderRef = React.useRef<HTMLDivElement | null>(null)
+  const portalRef = React.useRef<HTMLDivElement | null>(null)
   const [isFullscreen, setIsFullscreen] = React.useState(false)
+  const [bounds, setBounds] = React.useState<{ top: number; left: number; width: number; height: number } | null>(null)
+
+  const measure = React.useCallback(() => {
+    const el = placeholderRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    setBounds((prev) => {
+      const next = { top: r.top, left: r.left, width: r.width, height: r.height }
+      const changed =
+        !prev ||
+        Math.abs(prev.top - next.top) > 0.5 ||
+        Math.abs(prev.left - next.left) > 0.5 ||
+        Math.abs(prev.width - next.width) > 0.5 ||
+        Math.abs(prev.height - next.height) > 0.5
+      return changed ? next : prev
+    })
+  }, [])
+
+  React.useLayoutEffect(() => {
+    measure()
+  }, [measure])
+
+  React.useLayoutEffect(() => {
+    const el = placeholderRef.current
+    if (!el) return
+
+    let raf = 0
+    const onChange = () => {
+      if (raf) cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(measure)
+    }
+
+    const ro = new ResizeObserver(onChange)
+    ro.observe(el)
+
+    window.addEventListener('resize', onChange)
+    // Capture phase so we catch scroll in nested containers too.
+    window.addEventListener('scroll', onChange, true)
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf)
+      ro.disconnect()
+      window.removeEventListener('resize', onChange)
+      window.removeEventListener('scroll', onChange, true)
+    }
+  }, [measure])
 
   React.useEffect(() => {
     if (!isFullscreen) return
@@ -24,22 +76,59 @@ export const FullscreenContainer: React.FC<Props> = ({ className = '', children 
     setIsFullscreen((v) => !v)
   }
 
-  return (
-    <div
-      ref={rootRef}
-      className={
-        isFullscreen
-          ? `fixed inset-0 z-[1000] bg-white dark:bg-neutral-900 ${className}`
-          : `relative w-full h-full ${className}`
+  const portalStyle: React.CSSProperties = isFullscreen
+    ? {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 1000,
       }
-    >
-      {children({
-        isFullscreen,
-        enter: async () => setIsFullscreen(true),
-        exit: async () => setIsFullscreen(false),
-        toggle,
-        containerRef: rootRef,
-      })}
-    </div>
+    : bounds
+      ? {
+          position: 'fixed',
+          top: bounds.top,
+          left: bounds.left,
+          width: bounds.width,
+          height: bounds.height,
+          zIndex: 1,
+        }
+      : {
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: 0,
+          height: 0,
+          zIndex: 1,
+          pointerEvents: 'none',
+        }
+
+  return (
+    <>
+      <div ref={placeholderRef} className={`relative w-full h-full ${className}`} aria-hidden="true" />
+      {typeof document === 'undefined'
+        ? null
+        : createPortal(
+            <div
+              ref={portalRef}
+              className={
+                isFullscreen
+                  ? `bg-white dark:bg-neutral-900 ${className}`
+                  : className
+              }
+              style={portalStyle}
+            >
+              {children({
+                isFullscreen,
+                enter: async () => setIsFullscreen(true),
+                exit: async () => setIsFullscreen(false),
+                toggle,
+                containerRef: portalRef,
+              })}
+            </div>,
+            document.body
+          )}
+    </>
   )
 }

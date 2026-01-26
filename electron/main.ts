@@ -6,7 +6,6 @@ import fs from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { Readable } from 'node:stream'
 
-import { ViewHost } from './viewHost'
 
 import {
   initCanvas,
@@ -150,18 +149,7 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// Helper to find the absolute path to the PDF preload script
-function resolvePdfPreloadPath(): string | undefined {
-  const candidates = [
-    path.join(__dirname, 'pdfPreload.js'),
-    path.join(__dirname, 'pdfPreload.mjs'),
-  ]
-  return candidates.find((p) => fs.existsSync(p))
-}
-
-const PDF_PRELOAD_PATH = resolvePdfPreloadPath()
-
-const viewHost = new ViewHost()
+// (PDF viewer is now an iframe + postMessage; no WebContentsView host.)
 
 // The built directory structure
 //
@@ -251,7 +239,7 @@ function createContentWindow(params: {
     ...(process.platform === 'darwin'
       ? {
           titleBarStyle: 'hiddenInset' as const,
-          trafficLightPosition: { x: 20, y: 13 }, // Vertically center in h-10 (40px) header
+          trafficLightPosition: { x: 20, y: 20 }, // Match h-14 (56px) embedded header
         }
       : {}),
     ...(process.platform === 'win32'
@@ -277,22 +265,7 @@ function createContentWindow(params: {
     },
   })
 
-  // If the renderer reloads/navigates, native views must be torn down or they
-  // will remain visually "stuck" over the refreshed DOM.
-  child.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
-    if (!isMainFrame) return
-    if (isInPlace) return
-    try {
-      viewHost.destroyAllForWindow(child.id)
-    } catch {}
-  })
-
-  // Ensure we don't leak embedded views when window closes
-  child.on('closed', () => {
-    try {
-      viewHost.destroyAllForWindow(child.id)
-    } catch {}
-  })
+  // (No native embedded views to clean up.)
 
   child.once('ready-to-show', () => child.show())
 
@@ -421,23 +394,7 @@ function createWindow() {
     },
   })
 
-  // If the renderer reloads/navigates, native views must be torn down or they
-  // will remain visually "stuck" over the refreshed DOM.
-  win.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
-    if (!isMainFrame) return
-    if (isInPlace) return
-    try {
-      viewHost.destroyAllForWindow(win!.id)
-    } catch {}
-  })
-
-  // Ensure we don't leak embedded views when window closes
-  const mainWindowId = win.id
-  win.on('closed', () => {
-    try {
-      viewHost.destroyAllForWindow(mainWindowId)
-    } catch {}
-  })
+  // (No native embedded views to clean up.)
   
   // Show window once content is ready (prevents white flash)
   win.once('ready-to-show', () => {
@@ -1626,147 +1583,6 @@ ipcMain.handle('app:copyText', async (_evt, text: string) => {
     return { ok: true }
   } catch (e: any) {
     return { ok: false, error: String(e?.message || e) }
-  }
-})
-
-// ============ Native Viewer Host (WebContentsView) ============
-
-ipcMain.handle('viewer:create', async (evt, params: { kind: 'pdf' }) => {
-  try {
-    const win = BrowserWindow.fromWebContents(evt.sender)
-    if (!win) return { ok: false, error: 'no_window' }
-
-    const kind = params?.kind
-
-    const VIEWERS: Record<string, { entryUrl: string; preloadPath?: string; allowedProtocols?: string[] }> = {
-      pdf: {
-        entryUrl: 'pdf-viewer://pdfViewer.html',
-        preloadPath: PDF_PRELOAD_PATH,
-        allowedProtocols: ['pdf-viewer:'],
-      },
-    }
-
-    const cfg = kind ? VIEWERS[kind] : undefined
-    if (!cfg) return { ok: false, error: 'unsupported_kind' }
-    if (!cfg.preloadPath) return { ok: false, error: 'preload_missing' }
-
-    const devOrigin = (() => {
-      if (!VITE_DEV_SERVER_URL) return undefined
-      try {
-        return new URL(VITE_DEV_SERVER_URL).origin
-      } catch {
-        return undefined
-      }
-    })()
-
-    const id = viewHost.create(win, {
-      kind,
-      entryUrl: cfg.entryUrl,
-      preloadPath: cfg.preloadPath,
-      devOrigin,
-      allowedProtocols: cfg.allowedProtocols,
-    })
-
-    return { ok: true, data: { id } }
-  } catch (e: any) {
-    return { ok: false, error: String(e?.message || e) }
-  }
-})
-
-ipcMain.handle('viewer:setBounds', async (_evt, id: string, bounds: { x: number; y: number; width: number; height: number }) => {
-  try {
-    if (typeof id !== 'string' || !id) return { ok: false, error: 'invalid_id' }
-    if (!bounds || typeof bounds !== 'object') return { ok: false, error: 'invalid_bounds' }
-    viewHost.setBounds(id, bounds)
-    return { ok: true }
-  } catch (e: any) {
-    return { ok: false, error: String(e?.message || e) }
-  }
-})
-
-ipcMain.handle('viewer:command', async (_evt, id: string, command: any) => {
-  try {
-    if (typeof id !== 'string' || !id) return { ok: false, error: 'invalid_id' }
-    if (!command || typeof command !== 'object' || typeof command.type !== 'string') {
-      return { ok: false, error: 'invalid_command' }
-    }
-    const VALID_PDF_COMMANDS = new Set([
-      'LOAD_PDF',
-      'GO_TO_PAGE',
-      'NEXT_PAGE',
-      'PREV_PAGE',
-      'SET_SCALE',
-      'SET_SCALE_MODE',
-      'ZOOM_IN',
-      'ZOOM_OUT',
-      'SET_SELECTION_MODE',
-      'GET_STATE',
-      'SET_THEME',
-      'SET_APP_STYLE',
-      'DOWNLOAD',
-    ])
-    if (!VALID_PDF_COMMANDS.has(command.type)) return { ok: false, error: 'unknown_command' }
-
-    // Viewer preloads listen on this channel.
-    viewHost.send(id, 'viewer-command', command)
-    return { ok: true }
-  } catch (e: any) {
-    return { ok: false, error: String(e?.message || e) }
-  }
-})
-
-ipcMain.handle('viewer:destroy', async (_evt, id: string) => {
-  try {
-    if (typeof id !== 'string' || !id) return { ok: false, error: 'invalid_id' }
-    viewHost.destroy(id)
-    return { ok: true }
-  } catch (e: any) {
-    return { ok: false, error: String(e?.message || e) }
-  }
-})
-
-ipcMain.handle('viewer:list', async (evt) => {
-  try {
-    const win = BrowserWindow.fromWebContents(evt.sender)
-    if (!win) return { ok: false, error: 'no_window' }
-    return { ok: true, data: viewHost.listForWindow(win.id) }
-  } catch (e: any) {
-    return { ok: false, error: String(e?.message || e) }
-  }
-})
-
-ipcMain.handle('viewer:openDevTools', async (_evt, id: string) => {
-  try {
-    if (typeof id !== 'string' || !id) return { ok: false, error: 'invalid_id' }
-    viewHost.openDevTools(id)
-    return { ok: true }
-  } catch (e: any) {
-    return { ok: false, error: String(e?.message || e) }
-  }
-})
-
-ipcMain.on('viewer:event', (evt, payload: any) => {
-  try {
-    const viewId = viewHost.getIdForSender(evt.sender)
-    if (!viewId) return
-    const ownerWindowId = viewHost.getOwnerWindowId(viewId)
-    if (!ownerWindowId) return
-    const win = BrowserWindow.fromId(ownerWindowId)
-    if (!win) return
-
-    win.webContents.send('viewer:event', { id: viewId, event: payload })
-  } catch {
-    // ignore
-  }
-})
-
-ipcMain.on('viewer:destroyAll', (evt) => {
-  try {
-    const w = BrowserWindow.fromWebContents(evt.sender)
-    if (!w) return
-    viewHost.destroyAllForWindow(w.id)
-  } catch {
-    // ignore
   }
 })
 

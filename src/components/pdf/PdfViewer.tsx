@@ -1,1 +1,1 @@
-export { PdfViewerNative as PdfViewer } from './PdfViewerNative'
+export { PdfViewerIframe as PdfViewer } from './PdfViewerIframe'

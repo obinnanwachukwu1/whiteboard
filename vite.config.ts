@@ -131,23 +131,6 @@ export default defineConfig(({ command }) => {
             },
           },
         },
-        // PDF viewer preload script
-        {
-          entry: 'electron/pdfPreload.ts',
-          onstart(args) {
-            args.reload()
-          },
-          vite: {
-            build: {
-              rollupOptions: {
-                external: ['keytar'],
-                output: {
-                  format: 'cjs',
-                },
-              },
-            },
-          },
-        },
       ]),
       // Polyfill the Electron and Node.js API for Renderer process
       // See 👉 https://github.com/electron-vite/vite-plugin-electron-renderer

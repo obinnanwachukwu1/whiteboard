@@ -39,6 +39,10 @@ export const CanvasContentView: React.FC<Props> = ({
   isEmbedded,
   canGoBack,
 }) => {
+  const isWin =
+    (typeof navigator !== 'undefined' && /windows/i.test(navigator.userAgent)) ||
+    (typeof navigator !== 'undefined' && typeof (navigator as any).platform === 'string' && /^win/i.test((navigator as any).platform))
+
   const app = useAppContext()
   const aiPanel = useAIPanel()
   const moreBtnRef = useRef<HTMLButtonElement>(null)
@@ -219,43 +223,50 @@ export const CanvasContentView: React.FC<Props> = ({
     } catch {}
   }
 
-  const isMac = typeof window !== 'undefined' && (window as any).platform?.isMac
-
   const header = (ctx: { isFullscreen: boolean; toggle: () => Promise<void> }) => {
     if (isEmbedded || ctx.isFullscreen) {
       // Single-row titlebar for embedded windows or focus mode
       return (
         <>
           <div
-            className={`flex items-center h-10 ${canGoBack ? '' : 'border-b border-gray-200 dark:border-neutral-700'} bg-white/95 dark:bg-neutral-900/95 ${isEmbedded ? 'app-drag titlebar-right-inset' : ''} px-4`}
-            style={{ paddingLeft: isEmbedded && isMac ? '80px' : undefined }}
+            className={`h-14 ${canGoBack ? '' : 'border-b border-gray-200 dark:border-neutral-700'} bg-white/95 dark:bg-neutral-900/95 app-drag titlebar-left-inset titlebar-right-inset px-5 grid grid-cols-[1fr_auto_1fr] items-center`}
           >
-            {/* Left Spacer for centering (flex-1) */}
-            <div className="flex-1" />
-
-            <div className="text-xs font-semibold text-slate-500 dark:text-neutral-400 uppercase tracking-wider truncate text-center">
-              {resolvedTitle}
-            </div>
-
-             {/* Right Side: Exit Focus Button or Spacer */}
-             <div className="flex-1 flex justify-end">
-              {!isEmbedded && ctx.isFullscreen && (
-                 <Button
+            <div className="flex items-center justify-start">
+              {!isEmbedded && ctx.isFullscreen && isWin && (
+                <Button
                   variant="ghost"
                   size="sm"
                   onClick={ctx.toggle}
-                  className="w-8 h-8 p-0 justify-center rounded-full"
+                  className="w-8 h-8 p-0 justify-center rounded-full app-no-drag"
                   title="Exit Focus Mode"
                 >
                   <Minimize2 className="w-4 h-4" />
                 </Button>
               )}
-             </div>
+            </div>
+
+            <div className="text-xs font-semibold text-slate-500 dark:text-neutral-400 uppercase tracking-wider truncate text-center">
+              {resolvedTitle}
+            </div>
+
+            <div className="flex items-center justify-end">
+              {!isEmbedded && ctx.isFullscreen && !isWin && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={ctx.toggle}
+                  className="w-8 h-8 p-0 justify-center rounded-full app-no-drag"
+                  title="Exit Focus Mode"
+                >
+                  <Minimize2 className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
           </div>
           {/* Secondary Toolbar for Navigation */}
           {canGoBack && (
             <div className="flex items-center px-4 py-2 border-b border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
-              <Button variant="ghost" size="sm" onClick={onBack} className="w-8 h-8 p-0 justify-center rounded-full" title="Back">
+              <Button variant="ghost" size="sm" onClick={onBack} className="w-8 h-8 p-0 justify-center rounded-full app-no-drag" title="Back">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             </div>

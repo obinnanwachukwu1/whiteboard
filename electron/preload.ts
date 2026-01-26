@@ -4,14 +4,7 @@ const { ipcRenderer, contextBridge } = require('electron') as typeof import('ele
 // SECURITY: Only expose APIs to the main frame, not iframes
 if (process.isMainFrame) {
 
-// Best-effort cleanup: if the renderer reloads/navigates, tear down native views.
-try {
-  window.addEventListener('beforeunload', () => {
-    try {
-      ipcRenderer.send('viewer:destroyAll')
-    } catch {}
-  })
-} catch {}
+// (No native embedded views to clean up.)
 
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('electron', {
@@ -124,21 +117,7 @@ contextBridge.exposeInMainWorld('system', {
   copyText: (text: string) => ipcRenderer.invoke('app:copyText', text),
 })
 
-// Native embedded viewers (WebContentsView)
-contextBridge.exposeInMainWorld('viewer', {
-  create: (params: { kind: 'pdf' }) => ipcRenderer.invoke('viewer:create', params),
-  setBounds: (id: string, bounds: { x: number; y: number; width: number; height: number }) =>
-    ipcRenderer.invoke('viewer:setBounds', id, bounds),
-  command: (id: string, command: any) => ipcRenderer.invoke('viewer:command', id, command),
-  destroy: (id: string) => ipcRenderer.invoke('viewer:destroy', id),
-  list: () => ipcRenderer.invoke('viewer:list'),
-  openDevTools: (id: string) => ipcRenderer.invoke('viewer:openDevTools', id),
-  onEvent: (callback: (data: { id: string; event: any }) => void) => {
-    const handler = (_event: any, data: any) => callback(data)
-    ipcRenderer.on('viewer:event', handler)
-    return () => ipcRenderer.removeListener('viewer:event', handler)
-  },
-})
+// (PDF/PPTX viewers run in iframes; no viewer bridge exposed.)
 
 // AI Helpers
 contextBridge.exposeInMainWorld('ai', {
