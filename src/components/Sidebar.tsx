@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { MoreVertical, GripVertical } from 'lucide-react'
 import { Dropdown } from './ui/Dropdown'
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core'
+import { restrictToVerticalAxis, restrictToWindowEdges } from '@dnd-kit/modifiers'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
@@ -102,7 +103,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
 
   return (
     <aside
-      className="w-64 min-w-[16rem] text-slate-900 dark:text-slate-100 p-4 overflow-y-auto flex flex-col"
+      className="w-64 min-w-[16rem] text-slate-900 dark:text-slate-100 p-4 overflow-y-auto overflow-x-hidden flex flex-col"
       style={{ backgroundColor: 'var(--app-accent-bg)' }}
     >
       <div className="mb-4">
@@ -178,7 +179,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
 
       <div className="mb-2">
         <div className="font-semibold mb-2 text-[11px] uppercase tracking-wide text-brand/70">Courses</div>
-        <DndContext sensors={useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))} collisionDetection={closestCenter} onDragStart={(e) => setDragId(e?.active?.id ?? null)} onDragEnd={(evt) => {
+        <DndContext modifiers={[restrictToVerticalAxis, restrictToWindowEdges]} sensors={useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))} collisionDetection={closestCenter} onDragStart={(e) => setDragId(e?.active?.id ?? null)} onDragEnd={(evt) => {
           const { active, over } = evt as DragEndEvent
           setDragId(null)
           if (!active?.id || !over?.id || active.id === over.id) return
