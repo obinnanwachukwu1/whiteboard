@@ -31,9 +31,15 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
   })
   React.useEffect(() => {
     // Keep mode valid if assignment types change
-    if (mode === 'upload' && !supportsUpload) setMode(supportsText ? 'text' : 'url')
-    if (mode === 'text' && !supportsText) setMode(supportsUpload ? 'upload' : 'url')
-    if (mode === 'url' && !supportsUrl) setMode(supportsUpload ? 'upload' : 'text')
+    // If there are no in-app submission modes, don't try to coerce mode (it can oscillate).
+    if (!supportsUpload && !supportsText && !supportsUrl) return
+
+    let nextMode = mode
+    if (mode === 'upload' && !supportsUpload) nextMode = supportsText ? 'text' : 'url'
+    else if (mode === 'text' && !supportsText) nextMode = supportsUpload ? 'upload' : 'url'
+    else if (mode === 'url' && !supportsUrl) nextMode = supportsUpload ? 'upload' : 'text'
+
+    if (nextMode !== mode) setMode(nextMode)
   }, [mode, supportsUpload, supportsText, supportsUrl])
 
   const [picked, setPicked] = React.useState<PickedFile[]>([])

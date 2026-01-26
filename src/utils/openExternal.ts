@@ -14,14 +14,25 @@ export async function openExternal(rawUrl: string | undefined | null): Promise<b
         }
       } catch {}
     }
+    // Protocol check
+    try {
+      const u = new URL(href)
+      // Only allow safe protocols
+      if (!['http:', 'https:', 'mailto:'].includes(u.protocol)) {
+        console.warn('[openExternal] Blocked unsafe protocol:', u.protocol)
+        return false
+      }
+    } catch {
+      return false
+    }
+
     // Try Electron bridge first
     try {
       const res = await window.system?.openExternal?.(href)
       if (res && (res as any).ok) return true
     } catch {}
-    // Fallback to window.open (works in dev and some environments)
-    const w = window.open(href, '_blank', 'noopener,noreferrer')
-    return !!w
+    
+    return false
   } catch {
     return false
   }

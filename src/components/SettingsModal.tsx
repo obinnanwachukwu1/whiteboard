@@ -672,6 +672,24 @@ export function SettingsModal({ isOpen, onClose }: Props) {
             <button className="self-start sm:self-auto px-3 py-1.5 rounded text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={onSignOut}>Sign out</button>
           </div>
         </section>
+
+        {/* About & Privacy */}
+        <section className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 p-4 bg-white/60 dark:bg-neutral-900/60 backdrop-blur shadow-card">
+          <h2 className="mt-0 mb-3 text-lg font-semibold">About</h2>
+          <div className="text-sm text-slate-600 dark:text-neutral-400 space-y-2">
+            <p>
+              <strong>Whiteboard</strong> is an open-source Canvas LMS client designed for speed and focus.
+            </p>
+            <p>
+              Your data (tokens, cache, and search index) is stored locally on your device. 
+              {embeddingsEnabled ? ' AI features run entirely on-device (offline).' : ''}
+            </p>
+            <div className="pt-2 flex gap-4 text-xs">
+              <a href="https://github.com/obinnanwachukwu/whiteboard" target="_blank" rel="noreferrer" className="hover:underline text-indigo-600 dark:text-indigo-400">GitHub</a>
+              <a href="https://github.com/obinnanwachukwu/whiteboard/blob/main/LICENSE" target="_blank" rel="noreferrer" className="hover:underline text-indigo-600 dark:text-indigo-400">License (GPLv3)</a>
+            </div>
+          </div>
+        </section>
       </div>
     </Modal>
   )

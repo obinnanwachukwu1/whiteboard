@@ -1,8 +1,48 @@
+
 import React, { useEffect, useMemo, useRef } from 'react'
 import DOMPurify from 'dompurify'
 
+// Configure global DOMPurify hooks for security
+// 1. Enforce strict sandbox on iframes
+DOMPurify.addHook('uponSanitizeElement', (node, data) => {
+  if (data.tagName === 'iframe') {
+    const el = node as Element
+    const src = el.getAttribute('src') || ''
+    // Only allow http/https protocols
+    if (!src.startsWith('http://') && !src.startsWith('https://')) {
+      el.remove()
+      return
+    }
+
+    // Force sandbox with minimal permissions
+    // NO allow-same-origin (prevents accessing parent)
+    // NO allow-top-navigation (prevents redirecting app)
+    // Removed allow-popups-to-escape-sandbox as recommended
+    const sandbox = 'allow-scripts allow-forms allow-downloads allow-modals'
+    el.setAttribute('sandbox', sandbox)
+    
+    // Prevent srcdoc abuse
+    el.removeAttribute('srcdoc')
+    
+    // Security headers for the frame
+    el.setAttribute('loading', 'lazy')
+    el.setAttribute('referrerpolicy', 'no-referrer')
+  }
+})
+
+// 2. Ensure links open safely if they bypass the click handler
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  const el = node as Element
+  if ('target' in el) {
+    el.setAttribute('target', '_blank')
+    el.setAttribute('rel', 'noopener noreferrer')
+  }
+})
+
 type Props = {
+
   html: string
+
   onNavigate?: (url: string, title?: string) => void
   className?: string
 }

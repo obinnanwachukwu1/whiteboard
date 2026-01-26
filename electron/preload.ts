@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 const { ipcRenderer, contextBridge } = require('electron') as typeof import('electron')
 
+// SECURITY: Only expose APIs to the main frame, not iframes
+if (process.isMainFrame) {
+
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('electron', {
   onMainProcessMessage: (callback: (message: string) => void) => {
@@ -187,3 +190,4 @@ try {
     el.classList.add('win')
   }
 } catch {}
+}

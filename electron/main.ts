@@ -1,7 +1,10 @@
-import { app, BrowserWindow, ipcMain, shell, nativeImage, protocol, net, Tray, Menu, dialog, clipboard } from 'electron'
+
+import { app, BrowserWindow, ipcMain, shell, nativeImage, protocol, net, Tray, Menu, dialog, clipboard, session } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
+import { randomUUID } from 'node:crypto'
+
 import {
   initCanvas,
   clearToken,
@@ -24,6 +27,9 @@ const aiManager = new AIManager()
 const embeddingManager = new EmbeddingManager()
 const fileMetaStore = new FileMetaStore()
 
+// Secure file upload handling: Map<handle, absolutePath>
+const uploadFileMap = new Map<string, string>()
+
 // Load file metadata on startup
 app.whenReady().then(() => {
   fileMetaStore.load().catch(console.error)
@@ -34,6 +40,82 @@ app.whenReady().then(() => {
 
 // Register indexing IPC handlers
 registerIndexingIPC()
+
+// SECURITY: Global WebContents hardening
+app.on('web-contents-created', (_event, contents) => {
+  // 1. Deny new windows by default, route to external browser
+  contents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https:') || url.startsWith('http:') || url.startsWith('mailto:')) {
+      shell.openExternal(url)
+    }
+    return { action: 'deny' }
+  })
+
+  // 2. Block navigation to non-app origins (defense in depth)
+  // Note: BrowserWindow instances usually have their own listeners, but this covers webviews too
+  contents.on('will-navigate', (event, url) => {
+    try {
+      const parsed = new URL(url)
+      let isAllowed = false
+
+      if (parsed.protocol === 'pdf-viewer:' || parsed.protocol === 'canvas-file:') {
+        isAllowed = true
+      } else if (parsed.protocol === 'file:') {
+        // Restrict file:// to app bundle
+        // Normalize paths for comparison
+        const targetPath = path.resolve(fileURLToPath(url))
+        if (targetPath.startsWith(RENDERER_DIST)) {
+          isAllowed = true
+        }
+      } else if (VITE_DEV_SERVER_URL) {
+        // Dev server check
+        if (parsed.origin === new URL(VITE_DEV_SERVER_URL).origin) {
+          isAllowed = true
+        }
+      }
+
+      if (!isAllowed) {
+        event.preventDefault()
+        console.warn(`[Security] Blocked navigation in contents: ${url}`)
+        if (url.startsWith('http')) shell.openExternal(url)
+      }
+    } catch {
+      event.preventDefault()
+    }
+  })
+
+  // 3. Harden Webviews
+  contents.on('will-attach-webview', (event, webPreferences, params) => {
+    // Only allow our internal PDF viewer
+    // Use URL parsing for robustness
+    let isPdfViewer = false
+    try {
+      if (params.src && new URL(params.src).protocol === 'pdf-viewer:') {
+        isPdfViewer = true
+      }
+    } catch {}
+
+    if (isPdfViewer) {
+      // Ensure strict isolation
+      const prefs = webPreferences as any
+      delete prefs.preloadURL // Strip URL-based preload if any
+      delete prefs.preload    // Strip any requested preload
+
+      // Force our known-safe preload
+      if (PDF_PRELOAD_PATH) {
+        prefs.preload = PDF_PRELOAD_PATH
+      }
+
+      webPreferences.nodeIntegration = false
+      webPreferences.contextIsolation = true
+      webPreferences.sandbox = true
+      prefs.enableRemoteModule = false
+    } else {
+      console.warn(`[Security] Blocked unauthorized webview: ${params.src}`)
+      event.preventDefault()
+    }
+  })
+})
 
 // Set application name for dev mode
 if (process.env.NODE_ENV === 'development') {
@@ -95,6 +177,17 @@ import {
 } from './canvasClient'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+// Helper to find the absolute path to the PDF preload script
+function resolvePdfPreloadPath(): string | undefined {
+  const candidates = [
+    path.join(__dirname, 'pdfPreload.js'),
+    path.join(__dirname, 'pdfPreload.mjs'),
+  ]
+  return candidates.find((p) => fs.existsSync(p))
+}
+
+const PDF_PRELOAD_PATH = resolvePdfPreloadPath()
 
 // The built directory structure
 //
@@ -397,6 +490,45 @@ function createWindow() {
     win.webContents.setZoomLevel(0)
   } catch {}
 
+  // SECURITY: Block navigation to non-app origins
+  const allowedOrigins = new Set<string>()
+  if (VITE_DEV_SERVER_URL) {
+    try {
+      const devUrl = new URL(VITE_DEV_SERVER_URL)
+      allowedOrigins.add(devUrl.origin)
+    } catch {}
+  }
+  
+  // Helper to check if navigation is allowed
+  const isAllowedNavigation = (url: string) => {
+    try {
+      const parsed = new URL(url)
+      // Allow file:// (production)
+      if (parsed.protocol === 'file:') return true
+      // Allow dev server
+      if (allowedOrigins.has(parsed.origin)) return true
+      // Allow internal schemes
+      if (parsed.protocol === 'pdf-viewer:' || parsed.protocol === 'canvas-file:') return true
+      return false
+    } catch {
+      return false
+    }
+  }
+
+  win.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowedNavigation(url)) {
+      event.preventDefault()
+      console.warn(`[Security] Blocked navigation to ${url}`)
+    }
+  })
+
+  win.webContents.on('will-redirect', (event, url) => {
+    if (!isAllowedNavigation(url)) {
+      event.preventDefault()
+      console.warn(`[Security] Blocked redirect to ${url}`)
+    }
+  })
+
   // Test active push message to Renderer-process.
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', (new Date).toLocaleString())
@@ -577,7 +709,19 @@ function createAppMenu() {
 }
 
 app.whenReady().then(() => {
+  // SECURITY: Deny all permission requests (camera, mic, notifications, etc.)
+  // Unless we specifically add an allowlist later.
+  session.defaultSession.setPermissionRequestHandler((_webContents: any, _permission: any, callback: any) => {
+    callback(false)
+  })
+  
+  // Also deny permission checks (navigator.permissions.query)
+  session.defaultSession.setPermissionCheckHandler((_webContents: any, _permission: any) => {
+    return false
+  })
+
   createAppMenu()
+
   // load config and create window
   appConfig = loadConfig()
   
@@ -586,7 +730,7 @@ app.whenReady().then(() => {
   
   // Register custom protocol for secure file serving
   // SECURITY: Only allow access to files in the temp directory
-  protocol.handle('canvas-file', (req) => {
+  protocol.handle('canvas-file', async (req) => {
     try {
       // Normalize to ensure we always have canvas-file:///path (no host component)
       let normalized = req.url
@@ -598,10 +742,13 @@ app.whenReady().then(() => {
       const filePath = fileURLToPath(fileUrl)
       
       // Security check: resolve to absolute path and verify it's in temp directory
-      const tempDir = app.getPath('temp')
-      const resolvedPath = path.resolve(filePath)
+      const tempDir = await fs.promises.realpath(app.getPath('temp'))
+      const resolvedPath = await fs.promises.realpath(path.resolve(filePath))
       
-      if (!resolvedPath.startsWith(tempDir)) {
+      const rel = path.relative(tempDir, resolvedPath)
+      const isSub = rel && !rel.startsWith('..') && !path.isAbsolute(rel)
+      
+      if (!isSub) {
         console.warn(`[Security] Blocked access to file outside temp dir: ${resolvedPath}`)
         return new Response('Forbidden: Access denied to files outside temp directory', { 
           status: 403,
@@ -895,9 +1042,20 @@ ipcMain.handle(
     _evt,
     courseId: string | number,
     assignmentRestId: string | number,
-    filePaths: string[],
+    fileHandles: string[],
   ) => {
     try {
+      // Resolve handles to paths
+      const filePaths: string[] = []
+      for (const handle of fileHandles) {
+        if (uploadFileMap.has(handle)) {
+          filePaths.push(uploadFileMap.get(handle)!)
+        } else {
+          console.warn(`[Security] Blocked upload of invalid/expired handle: ${handle}`)
+          return { ok: false, error: 'File selection expired. Please pick files again.' }
+        }
+      }
+
       const data = await svcSubmitAssignmentUpload(courseId, assignmentRestId, filePaths)
       return { ok: true, data }
     } catch (e: any) {
@@ -1342,7 +1500,14 @@ ipcMain.handle('app:pickFiles', async (_evt, opts?: { multiple?: boolean }) => {
     const files = await Promise.all(
       (result.filePaths || []).map(async (p) => {
         const st = await fs.promises.stat(p)
-        return { path: p, name: path.basename(p), size: st.size }
+        // Generate secure handle
+        const handle = randomUUID()
+        uploadFileMap.set(handle, p)
+        
+        // Expire handle after 1 hour
+        setTimeout(() => uploadFileMap.delete(handle), 60 * 60 * 1000)
+        
+        return { path: handle, name: path.basename(p), size: st.size }
       })
     )
     return { ok: true, data: files }

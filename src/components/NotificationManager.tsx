@@ -128,7 +128,7 @@ export function NotificationManager() {
               body: `${courseName}: ${item.title || 'Announcement'}\n${snippet}`,
               silent: false,
             })
-            notif.onclick = () => {
+            notif.onclick = async () => {
               window.focus()
               if (item.course_id && item.discussion_topic_id) {
                 navigate({
@@ -142,7 +142,7 @@ export function NotificationManager() {
                   }
                 })
               } else if (item.html_url) {
-                window.open(item.html_url, '_blank')
+                ;(await import('../utils/openExternal')).openExternal(item.html_url)
               }
             }
           } else if (settings.notifyNewGrades && item.type === 'Submission') {
@@ -162,7 +162,7 @@ export function NotificationManager() {
               body: `${courseName}: ${item.title || 'Assignment'}\nCheck your score in the app.`,
               silent: false,
             })
-            notif.onclick = () => {
+            notif.onclick = async () => {
               window.focus()
               // For submissions, we usually go to the grades tab or the assignment details
               // item.assignment_id might be available or we can infer
@@ -189,7 +189,7 @@ export function NotificationManager() {
                   })
                 }
               } else if (item.html_url) {
-                window.open(item.html_url, '_blank')
+                ;(await import('../utils/openExternal')).openExternal(item.html_url)
               }
             }
           }
@@ -252,7 +252,7 @@ export function NotificationManager() {
             body: `${courseName}: ${assign.name}`,
             silent: false,
           })
-          notif.onclick = () => {
+          notif.onclick = async () => {
              window.focus()
              // Use assignment_rest_id or graphql_id. CoursePage expects numeric REST ID usually, or handle both?
              // checking CoursePage... it treats contentId as string.
@@ -269,7 +269,7 @@ export function NotificationManager() {
                   }
                })
              } else if (assign.htmlUrl) {
-                window.open(assign.htmlUrl, '_blank')
+                ;(await import('../utils/openExternal')).openExternal(assign.htmlUrl)
              }
           }
 

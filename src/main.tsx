@@ -145,7 +145,7 @@ async function main() {
               <RouterProvider router={router} />
             </Bootstrap>
           </ErrorBoundary>
-          <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
+          {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />}
         </ToastProvider>
       </QueryClientProvider>
     </React.StrictMode>,

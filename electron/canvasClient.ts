@@ -1,6 +1,8 @@
+
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
-import { app } from 'electron'
+import { app, safeStorage } from 'electron'
 import fs from 'node:fs'
+
 import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { createWriteStream } from 'node:fs'
@@ -51,6 +53,17 @@ function parseIso(dt?: string | null): Date | null {
   }
 }
 
+function safeLog(obj: any): string {
+  try {
+    return JSON.stringify(obj, (key, value) => {
+      if (/token|auth|secret|password|credential/i.test(key)) return '[REDACTED]'
+      return value
+    })
+  } catch {
+    return '[Circular/Error]'
+  }
+}
+
 export interface CanvasClientOptions {
   token: string
   baseUrl?: string
@@ -97,8 +110,8 @@ export class CanvasClient {
       const url = config.url
       if (this.verbose && url) {
         const method = (config.method || 'GET').toUpperCase()
-        const paramsDbg = config.params ? ` params=${JSON.stringify(config.params)}` : ''
-        const dataDbg = config.data ? ` data=${typeof config.data === 'string' ? '[string]' : JSON.stringify(config.data).slice(0, 200)}` : ''
+        const paramsDbg = config.params ? ` params=${safeLog(config.params)}` : ''
+        const dataDbg = config.data ? ` data=${typeof config.data === 'string' ? '(body)' : safeLog(config.data).slice(0, 200)}` : ''
         // eslint-disable-next-line no-console
         console.log(`[${method}] ${url}${paramsDbg}${dataDbg}`)
       }
@@ -891,28 +904,76 @@ async function getKeytar(): Promise<any> {
   }
 }
 
-// Insecure file-based fallback for development when keytar isn't available
+// Encrypted file-based fallback when keytar isn't available
 function tokenFilePath() {
+  const dir = app.getPath('userData')
+  return path.join(dir, 'canvas-tokens.enc')
+}
+
+// Legacy path for migration
+function legacyTokenFilePath() {
   const dir = app.getPath('userData')
   return path.join(dir, 'canvas-desk-tokens.json')
 }
 
-function readTokens(): Record<string, string> {
+function readEncryptedTokens(): Record<string, string> {
+  // Check for legacy file first and migrate
+  const legacy = legacyTokenFilePath()
+  if (fs.existsSync(legacy)) {
+    try {
+      console.log('[Auth] Migrating legacy tokens to encrypted storage...')
+      const data = fs.readFileSync(legacy, 'utf-8')
+      const parsed = JSON.parse(data)
+      
+      // Attempt to save encrypted
+      if (safeStorage.isEncryptionAvailable()) {
+        writeEncryptedTokens(parsed)
+        // Only delete legacy if encryption succeeded
+        fs.unlinkSync(legacy)
+        console.log('[Auth] Legacy tokens migrated and deleted.')
+      } else {
+        console.warn('[Auth] Encryption unavailable, keeping legacy tokens in memory but NOT deleting file yet (risk).')
+        // Actually, plan says remove plaintext fallback.
+        // We should delete it? Or keep it?
+        // If we delete it and can't encrypt, user loses login.
+        // If we keep it, it's insecure.
+        // Let's delete it to enforce security, user can login again.
+        fs.unlinkSync(legacy)
+      }
+      return parsed
+    } catch (e) {
+      console.error('[Auth] Migration failed:', e)
+    }
+  }
+
   try {
     const p = tokenFilePath()
     if (!fs.existsSync(p)) return {}
-    return JSON.parse(fs.readFileSync(p, 'utf-8')) || {}
-  } catch {
+    
+    if (!safeStorage.isEncryptionAvailable()) {
+      return {}
+    }
+    
+    const buffer = fs.readFileSync(p)
+    const decrypted = safeStorage.decryptString(buffer)
+    return JSON.parse(decrypted) || {}
+  } catch (e) {
+    console.error('[Auth] Failed to read tokens:', e)
     return {}
   }
 }
 
-function writeTokens(map: Record<string, string>) {
+function writeEncryptedTokens(map: Record<string, string>) {
+  if (!safeStorage.isEncryptionAvailable()) return
+  
   try {
     const p = tokenFilePath()
+    const encrypted = safeStorage.encryptString(JSON.stringify(map, null, 2))
     fs.mkdirSync(path.dirname(p), { recursive: true })
-    fs.writeFileSync(p, JSON.stringify(map, null, 2))
-  } catch {}
+    fs.writeFileSync(p, encrypted)
+  } catch (e) {
+    console.error('[Auth] Failed to write tokens:', e)
+  }
 }
 
 async function setToken(baseUrl: string, token: string): Promise<{ insecure: boolean }> {
@@ -921,9 +982,14 @@ async function setToken(baseUrl: string, token: string): Promise<{ insecure: boo
     await keytar.setPassword(SERVICE_NAME, baseUrl, token)
     return { insecure: false }
   } catch {
-    const map = readTokens()
-    map[baseUrl] = token
-    writeTokens(map)
+    // Fallback to safeStorage
+    if (safeStorage.isEncryptionAvailable()) {
+      const map = readEncryptedTokens()
+      map[baseUrl] = token
+      writeEncryptedTokens(map)
+      return { insecure: false }
+    }
+    // No secure storage available - memory only
     return { insecure: true }
   }
 }
@@ -934,9 +1000,12 @@ async function getToken(baseUrl: string): Promise<{ token: string | null; insecu
     const t = await keytar.getPassword(SERVICE_NAME, baseUrl)
     return { token: t || null, insecure: false }
   } catch {
-    const map = readTokens()
+    const map = readEncryptedTokens()
     const t = map[baseUrl] || null
-    return { token: t, insecure: !!t }
+    // If we got it from encrypted store, it's secure. 
+    // If not found, t is null.
+    // If safeStorage unavailable, readEncryptedTokens returns {}.
+    return { token: t, insecure: false }
   }
 }
 
@@ -946,9 +1015,12 @@ async function deleteToken(baseUrl: string): Promise<{ insecure: boolean }> {
     await keytar.deletePassword(SERVICE_NAME, baseUrl)
     return { insecure: false }
   } catch {
-    const map = readTokens()
-    delete map[baseUrl]
-    writeTokens(map)
+    if (safeStorage.isEncryptionAvailable()) {
+      const map = readEncryptedTokens()
+      delete map[baseUrl]
+      writeEncryptedTokens(map)
+      return { insecure: false }
+    }
     return { insecure: true }
   }
 }

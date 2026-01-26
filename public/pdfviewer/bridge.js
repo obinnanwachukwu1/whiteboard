@@ -417,7 +417,7 @@
         url: url,
         cMapUrl: './cmaps/',
         cMapPacked: true,
-        enableXfa: true,
+        enableXfa: false,
       });
       
       const doc = await loadingTask.promise;
