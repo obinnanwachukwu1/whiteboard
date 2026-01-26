@@ -24,6 +24,45 @@ export type CanvasAssignment = {
   htmlUrl?: string
 }
 
+export type SubmissionComment = {
+  comment: string
+  author_name?: string
+  created_at?: string
+  author?: {
+    display_name?: string
+    avatar_image_url?: string
+  }
+}
+
+export type SubmissionDetail = {
+  score?: number | null
+  grade?: string | null
+  graded_at?: string | null
+  submitted_at?: string | null
+  workflow_state?: string
+  excused?: boolean
+  late?: boolean
+  missing?: boolean
+  submission_comments?: SubmissionComment[]
+}
+
+export type AssignmentRestDetail = {
+  id?: string | number
+  name?: string
+  description?: string
+  html_url?: string
+  points_possible?: number | null
+  due_at?: string | null
+  submission_types?: string[]
+  allowed_extensions?: string[]
+  external_tool_tag_attributes?: {
+    url?: string
+    new_tab?: boolean
+  }
+  locked_for_user?: boolean
+  lock_explanation?: string
+}
+
 export type CanvasModuleItem = {
   id: string | number
   _id: string
@@ -184,7 +223,19 @@ export type AnnouncementDetail = {
   html_url?: string
 }
 
-export type CourseFrontPage = { body?: string } | null
+export type CanvasPage = {
+  page_id?: string | number
+  url?: string
+  title?: string
+  body?: string
+  created_at?: string
+  updated_at?: string
+  html_url?: string
+  published?: boolean
+  front_page?: boolean
+}
+
+export type CourseFrontPage = CanvasPage | null
 
 export type CanvasEnrollment = {
   type?: string

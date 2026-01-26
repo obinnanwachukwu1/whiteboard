@@ -3,7 +3,7 @@ import { Button } from './ui/Button'
 import { ArrowLeft, Maximize2, Minimize2, MoreHorizontal, ExternalLink, SquareArrowOutUpRight, Sparkles, FileText, Info, Download } from 'lucide-react'
 import { HtmlContent } from './HtmlContent'
 import { FileViewer } from './FileViewer'
-import { useAssignmentRest, useCoursePage, useAnnouncement } from '../hooks/useCanvasQueries'
+import { useAssignmentRest, useCoursePage, useAnnouncement, useMySubmission, useFileMeta } from '../hooks/useCanvasQueries'
 import { FullscreenContainer } from './FullscreenContainer'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
 import { useAIPanel } from '../context/AIPanelContext'
@@ -12,6 +12,7 @@ import { Skeleton, SkeletonText } from './Skeleton'
 import { Dropdown } from './ui/Dropdown'
 import { openExternal } from '../utils/openExternal'
 import { canvasContentUrl } from '../utils/canvasContentUrl'
+import { AssignmentSubmitPanel } from './assignment/AssignmentSubmitPanel'
 
 type ContentType = 'page' | 'assignment' | 'file' | 'announcement'
 
@@ -45,10 +46,51 @@ export const CanvasContentView: React.FC<Props> = ({
   
   const pageQ = useCoursePage(contentType === 'page' ? courseId : undefined, contentType === 'page' ? contentId : undefined, { enabled: contentType === 'page' })
   const assignQ = useAssignmentRest(contentType === 'assignment' ? courseId : undefined, contentType === 'assignment' ? contentId : undefined, { enabled: contentType === 'assignment' })
+  const submissionQ = useMySubmission(
+    contentType === 'assignment' ? courseId : undefined,
+    contentType === 'assignment' ? contentId : undefined,
+    ['submission_comments'],
+    { enabled: contentType === 'assignment' },
+  )
   const annQ = useAnnouncement(contentType === 'announcement' ? courseId : undefined, contentType === 'announcement' ? contentId : undefined, { enabled: contentType === 'announcement' })
+  const fileQ = useFileMeta(contentType === 'file' ? contentId : undefined, { enabled: contentType === 'file' })
   
-  const loading = pageQ.isLoading || assignQ.isLoading || annQ.isLoading
-  const error = pageQ.error?.message || assignQ.error?.message || annQ.error?.message || null
+  const loading = pageQ.isLoading || assignQ.isLoading || annQ.isLoading || fileQ.isLoading
+  const error = pageQ.error?.message || assignQ.error?.message || annQ.error?.message || fileQ.error?.message || null
+
+  const resolvedTitle = useMemo(() => {
+    if (contentType === 'page' && pageQ.data?.title) return pageQ.data.title
+    if (contentType === 'assignment' && assignQ.data?.name) return assignQ.data.name
+    if (contentType === 'announcement' && annQ.data?.title) return annQ.data.title
+    if (contentType === 'file' && fileQ.data) {
+      return fileQ.data.display_name || fileQ.data.filename || title
+    }
+    return title
+  }, [contentType, pageQ.data, assignQ.data, annQ.data, fileQ.data, title])
+
+  const latestSubmissionComment = useMemo(() => {
+    const list = submissionQ.data?.submission_comments
+    if (!Array.isArray(list) || !list.length) return null
+    const sorted = list.slice().sort((a, b) => {
+      const at = a?.created_at ? new Date(a.created_at).getTime() : 0
+      const bt = b?.created_at ? new Date(b.created_at).getTime() : 0
+      return bt - at
+    })
+    return sorted[0] || null
+  }, [submissionQ.data])
+
+  const hasSubmissionInfo = useMemo(() => {
+    const s = submissionQ.data
+    if (!s) return false
+    if (s.excused) return true
+    if (s.submitted_at) return true
+    if (s.graded_at) return true
+    if (s.score != null) return true
+    if (s.grade != null && String(s.grade).trim() !== '') return true
+    if (Array.isArray(s.submission_comments) && s.submission_comments.length > 0) return true
+    if (s.workflow_state && s.workflow_state !== 'unsubmitted') return true
+    return false
+  }, [submissionQ.data])
 
   // Context Menu State
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
@@ -98,19 +140,19 @@ export const CanvasContentView: React.FC<Props> = ({
     const text = getContentText()
     // Strip HTML roughly for prompt efficiency
     const cleanText = text.replace(/<[^>]*>/g, ' ').slice(0, 4000) // Limit length
-    aiPanel.open(`Summarize this ${contentType}: "${title}"\n\n${cleanText}`, 'ask-ai', true)
+    aiPanel.open(`Summarize this ${contentType}: "${resolvedTitle}"\n\n${cleanText}`, 'ask-ai', true)
   }
 
   const handleExplain = () => {
     const text = getContentText()
     const cleanText = text.replace(/<[^>]*>/g, ' ').slice(0, 4000)
-    aiPanel.open(`Explain the key concepts in this ${contentType}: "${title}"\n\n${cleanText}`, 'ask-ai', true)
+    aiPanel.open(`Explain the key concepts in this ${contentType}: "${resolvedTitle}"\n\n${cleanText}`, 'ask-ai', true)
   }
 
   const handleTasks = () => {
     const text = getContentText()
     const cleanText = text.replace(/<[^>]*>/g, ' ').slice(0, 4000)
-    aiPanel.open(`Create a checklist of tasks from this ${contentType}: "${title}"\n\n${cleanText}`, 'ask-ai', true)
+    aiPanel.open(`Create a checklist of tasks from this ${contentType}: "${resolvedTitle}"\n\n${cleanText}`, 'ask-ai', true)
   }
 
   const menuItems: ContextMenuItem[] = fileDownloadTarget ? [
@@ -166,7 +208,7 @@ export const CanvasContentView: React.FC<Props> = ({
         courseName: courseName || undefined,
         type: contentType,
         contentId: String(contentId),
-        title,
+        title: resolvedTitle,
       })
     } catch {}
   }
@@ -192,7 +234,7 @@ export const CanvasContentView: React.FC<Props> = ({
             <div className="flex-1" />
 
             <div className="text-xs font-semibold text-slate-500 dark:text-neutral-400 uppercase tracking-wider truncate text-center">
-              {title}
+              {resolvedTitle}
             </div>
 
              {/* Right Side: Exit Focus Button or Spacer */}
@@ -228,7 +270,7 @@ export const CanvasContentView: React.FC<Props> = ({
         <Button variant="ghost" size="sm" onClick={onBack} title="Back">
           <ArrowLeft className="w-4 h-4" />
         </Button>
-        <div className="text-sm font-medium truncate flex-1">{title}</div>
+        <div className="text-sm font-medium truncate flex-1">{resolvedTitle}</div>
 
         <Button
           variant="ghost"
@@ -303,6 +345,60 @@ export const CanvasContentView: React.FC<Props> = ({
                   )}
                   {!loading && !error && contentType === 'page' && pageQ.data?.body && (
                     <HtmlContent html={pageQ.data.body} className="rich-html" onNavigate={onNavigate} />
+                  )}
+                  {!loading && !error && contentType === 'assignment' && hasSubmissionInfo && (
+                    <div className="mb-5 rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-4">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div>
+                          <div className="text-xs text-slate-500 dark:text-neutral-400">Your submission</div>
+                          <div className="mt-1 text-sm text-slate-900 dark:text-slate-100">
+                            {(() => {
+                              if (submissionQ.error) return <span className="text-slate-600 dark:text-neutral-300">Submission details unavailable</span>
+                              const score = submissionQ.data?.score
+                              const gradedAt = submissionQ.data?.graded_at
+                              const excused = submissionQ.data?.excused
+                              const submittedAt = submissionQ.data?.submitted_at
+                              const pts = assignQ.data?.points_possible
+                              if (excused) return <span className="font-semibold">Excused</span>
+                              if (score == null && !gradedAt && submittedAt) return <span className="text-slate-600 dark:text-neutral-300">Submitted — awaiting grade</span>
+                              if (score == null) return <span className="text-slate-600 dark:text-neutral-300">Graded</span>
+                              return (
+                                <span className="font-semibold tabular-nums">
+                                  {score}
+                                  {typeof pts === 'number' || pts != null ? (
+                                    <span className="text-slate-400 dark:text-neutral-500 font-normal">/{pts}</span>
+                                  ) : null}
+                                </span>
+                              )
+                            })()}
+                          </div>
+                        </div>
+                        {submissionQ.data?.graded_at && (
+                          <div className="text-xs text-slate-500 dark:text-neutral-400">
+                            Graded {new Date(submissionQ.data.graded_at).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+
+                      {latestSubmissionComment?.comment && !submissionQ.error && (
+                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-neutral-800">
+                          <div className="text-xs text-slate-500 dark:text-neutral-400">
+                            Feedback{latestSubmissionComment.author_name ? ` from ${latestSubmissionComment.author_name}` : ''}
+                            {latestSubmissionComment.created_at ? ` · ${new Date(latestSubmissionComment.created_at).toLocaleString()}` : ''}
+                          </div>
+                          <div className="mt-1 text-sm text-slate-800 dark:text-neutral-200 whitespace-pre-wrap">
+                            {latestSubmissionComment.comment}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {!loading && !error && contentType === 'assignment' && assignQ.data && (
+                    <AssignmentSubmitPanel
+                      courseId={courseId}
+                      assignmentRestId={contentId}
+                      assignment={assignQ.data}
+                    />
                   )}
                   {!loading && !error && contentType === 'assignment' && assignQ.data?.description && (
                     <HtmlContent html={assignQ.data.description} className="rich-html" onNavigate={onNavigate} />

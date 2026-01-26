@@ -22,6 +22,9 @@ import type {
   Recipient,
   DiscussionTopic,
   DiscussionView,
+  SubmissionDetail,
+  AssignmentRestDetail,
+  CanvasPage,
 } from '../types/canvas'
 
 type IpcResult<T> = { ok: boolean; data?: T; error?: string }
@@ -125,12 +128,12 @@ export function useActivityAnnouncements(n = 20, options?: Partial<UseQueryOptio
   })
 }
 
-export function useCoursePage(courseId: string | number | undefined, slugOrUrl: string | undefined, options?: Partial<UseQueryOptions<{ body?: string }, Error, { body?: string }>>) {
-  return useQuery<{ body?: string }, Error, { body?: string }>({
+export function useCoursePage(courseId: string | number | undefined, slugOrUrl: string | undefined, options?: Partial<UseQueryOptions<CanvasPage | null, Error, CanvasPage | null>>) {
+  return useQuery<CanvasPage | null, Error, CanvasPage | null>({
     queryKey: ['course-page', courseId, slugOrUrl],
     queryFn: async () => {
       if (courseId == null || !slugOrUrl) return null
-      return ensureOk(await window.canvas.getCoursePage?.(courseId, slugOrUrl))
+      return ensureOk(await window.canvas.getCoursePage?.(courseId, slugOrUrl)) as CanvasPage
     },
     enabled: courseId != null && !!slugOrUrl && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 10,
@@ -143,8 +146,8 @@ export function useCoursePage(courseId: string | number | undefined, slugOrUrl: 
   })
 }
 
-export function useAssignmentRest(courseId: string | number | undefined, assignmentRestId: string | number | undefined, options?: Partial<UseQueryOptions<{ description?: string }, Error, { description?: string }>>) {
-  return useQuery<{ description?: string }, Error, { description?: string }>({
+export function useAssignmentRest(courseId: string | number | undefined, assignmentRestId: string | number | undefined, options?: Partial<UseQueryOptions<AssignmentRestDetail | null, Error, AssignmentRestDetail | null>>) {
+  return useQuery<AssignmentRestDetail | null, Error, AssignmentRestDetail | null>({
     queryKey: ['assignment-rest', courseId, assignmentRestId],
     queryFn: async () => {
       if (courseId == null || assignmentRestId == null) return null
@@ -154,6 +157,30 @@ export function useAssignmentRest(courseId: string | number | undefined, assignm
     staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 60 * 2,
     // Detail views: show cached instantly, but always revalidate when opened.
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: 'always',
+    ...options,
+  })
+}
+
+export function useMySubmission(
+  courseId: string | number | undefined,
+  assignmentRestId: string | number | undefined,
+  include: string[] = [],
+  options?: Partial<UseQueryOptions<SubmissionDetail | null, Error, SubmissionDetail | null>>,
+) {
+  return useQuery<SubmissionDetail | null, Error, SubmissionDetail | null>({
+    queryKey: ['my-submission', courseId, assignmentRestId, include.slice().sort().join(',')],
+    queryFn: async () => {
+      if (courseId == null || assignmentRestId == null) return null
+      const res = await window.canvas.getMySubmission?.(courseId, assignmentRestId, include)
+      if (!res?.ok) throw new Error(res?.error || 'Failed to load submission')
+      return (res.data || null) as SubmissionDetail | null
+    },
+    enabled: courseId != null && assignmentRestId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 30,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: 'always',

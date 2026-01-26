@@ -116,7 +116,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
   // Controlled: default selection and deep-link behavior handled by parent (App)
 
   // Central link handler for rich HTML content
-  const handleNavigate = async (href: string) => {
+  const handleNavigate = async (href: string, linkTitle?: string) => {
     try {
       const u = new URL(href)
       const originMatch = baseUrl ? u.origin === new URL(baseUrl).origin : false
@@ -130,8 +130,8 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
         const idx = parts.indexOf('assignments')
         const id = idx >= 0 ? parts[idx + 1] : null
         if (id) {
-          if (withinCurrent) { onChangeTab('assignments'); onOpenDetail({ contentType: 'assignment', contentId: String(id), title: 'Assignment' }) }
-          else if (cid) onNavigateCourse?.(cid, { type: 'assignment', id: String(id) })
+          if (withinCurrent) { onChangeTab('assignments'); onOpenDetail({ contentType: 'assignment', contentId: String(id), title: linkTitle || 'Assignment' }) }
+          else if (cid) onNavigateCourse?.(cid, { type: 'assignment', id: String(id), title: linkTitle })
           return true
         }
         return false
@@ -142,8 +142,8 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
         const idx = idxD >= 0 ? idxD : idxA
         const id = idx >= 0 ? parts[idx + 1] : null
         if (id) {
-          if (withinCurrent) { onChangeTab('announcements'); onOpenDetail({ contentType: 'announcement', contentId: String(id), title: 'Announcement' }) }
-          else if (cid) onNavigateCourse?.(cid, { type: 'announcement', id: String(id) })
+          if (withinCurrent) { onChangeTab('announcements'); onOpenDetail({ contentType: 'announcement', contentId: String(id), title: linkTitle || 'Announcement' }) }
+          else if (cid) onNavigateCourse?.(cid, { type: 'announcement', id: String(id), title: linkTitle })
           return true
         }
         return false
@@ -152,8 +152,8 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
         const idxP = parts.indexOf('pages')
         const slug = idxP >= 0 ? parts[idxP + 1] : null
         if (slug) {
-          if (withinCurrent) { onChangeTab('home'); onOpenDetail({ contentType: 'page', contentId: String(slug), title: 'Page' }) }
-          else if (cid) onNavigateCourse?.(cid, { type: 'page', id: String(slug) })
+          if (withinCurrent) { onChangeTab('home'); onOpenDetail({ contentType: 'page', contentId: String(slug), title: linkTitle || 'Page' }) }
+          else if (cid) onNavigateCourse?.(cid, { type: 'page', id: String(slug), title: linkTitle })
           return true
         }
         return false
@@ -165,8 +165,8 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
         if (seg && /^\d+$/.test(seg)) {
           const fid = seg
           // Do not switch tab to 'files' for file links
-          if (withinCurrent) { onOpenDetail({ contentType: 'file', contentId: String(fid), title: 'File' }) }
-          else if (cid) onNavigateCourse?.(cid, { type: 'file', id: String(fid) })
+          if (withinCurrent) { onOpenDetail({ contentType: 'file', contentId: String(fid), title: linkTitle || 'File' }) }
+          else if (cid) onNavigateCourse?.(cid, { type: 'file', id: String(fid), title: linkTitle })
           return true
         }
         return false

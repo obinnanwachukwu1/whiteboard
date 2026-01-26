@@ -3,7 +3,7 @@ import DOMPurify from 'dompurify'
 
 type Props = {
   html: string
-  onNavigate?: (url: string) => void
+  onNavigate?: (url: string, title?: string) => void
   className?: string
 }
 
@@ -31,7 +31,8 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
       if (!onNavigate) return
       e.preventDefault()
       const href = a.href || a.getAttribute('href') || ''
-      onNavigate(href)
+      const title = a.innerText || a.textContent || undefined
+      onNavigate(href, title)
     }
     el.addEventListener('click', handler)
     return () => el.removeEventListener('click', handler)
