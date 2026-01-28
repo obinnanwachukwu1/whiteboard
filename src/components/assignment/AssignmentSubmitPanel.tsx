@@ -187,8 +187,18 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
                 {score != null ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
               </div>
               <div>
-                <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                  {excused ? 'Excused' : (score != null ? 'Graded' : 'Submitted')}
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                    {excused ? 'Excused' : (score != null ? 'Graded' : 'Submitted')}
+                  </div>
+                  {!locked && !attempting && (
+                    <button 
+                      onClick={() => setAttempting(true)}
+                      className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      New Attempt
+                    </button>
+                  )}
                 </div>
                 <div className="text-xs text-neutral-500 dark:text-neutral-400">
                   {gradedAt 
@@ -224,15 +234,6 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
             </div>
           )}
         </div>
-        
-        {/* New Attempt Action - Only show if not locked */}
-        {!locked && !attempting && (
-          <div className="bg-white dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-800 p-3 flex justify-end">
-            <Button size="sm" variant="outline" onClick={() => setAttempting(true)}>
-              New Attempt
-            </Button>
-          </div>
-        )}
       </div>
     )
   }
