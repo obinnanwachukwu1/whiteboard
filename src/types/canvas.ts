@@ -105,6 +105,11 @@ export type DueItem = {
   dueAt: string
   pointsPossible?: number
   htmlUrl?: string
+  submission?: {
+    submittedAt?: string
+    state?: string
+    workflowState?: string
+  }
 }
 
 export type CanvasTab = {

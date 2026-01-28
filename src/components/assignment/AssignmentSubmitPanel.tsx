@@ -187,10 +187,8 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
                 {score != null ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                    {excused ? 'Excused' : (score != null ? 'Graded' : 'Submitted')}
-                  </div>
+                <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                  {excused ? 'Excused' : (score != null ? 'Graded' : 'Submitted')}
                 </div>
                 <div className="text-xs text-neutral-500 dark:text-neutral-400">
                   {gradedAt 
@@ -199,7 +197,7 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
                 </div>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-4">
               {score != null && (
                 <div className="text-right">
@@ -210,7 +208,7 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
                   <div className="text-xs text-neutral-500">Score</div>
                 </div>
               )}
-              
+
               {!locked && !attempting && (
                 <Button 
                   size="sm"
@@ -222,86 +220,6 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
                 </Button>
               )}
             </div>
-          </div>
-                </div>
-                <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                  {gradedAt 
-                    ? `Graded ${new Date(gradedAt).toLocaleDateString()}` 
-                    : (submittedAt ? `Submitted ${new Date(submittedAt).toLocaleDateString()}` : 'No date')}
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              {score != null && (
-                <div className="text-right">
-                  <div className="text-lg font-bold text-neutral-900 dark:text-neutral-100 tabular-nums">
-                    {score}
-                    {typeof pts === 'number' && <span className="text-sm text-neutral-500 font-normal ml-0.5">/{pts}</span>}
-                  </div>
-                  <div className="text-xs text-neutral-500">Score</div>
-                </div>
-              )}
-              
-                  {!locked && !attempting && (
-                    <Button 
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setAttempting(true)}
-                      className="h-6 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-700 px-2"
-                    >
-                      New Attempt
-                    </Button>
-                  )}
-                </div>
-                <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                  {gradedAt 
-                    ? `Graded ${new Date(gradedAt).toLocaleDateString()}` 
-                    : (submittedAt ? `Submitted ${new Date(submittedAt).toLocaleDateString()}` : 'No date')}
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              {score != null && (
-                <div className="text-right">
-                  <div className="text-lg font-bold text-neutral-900 dark:text-neutral-100 tabular-nums">
-                    {score}
-                    {typeof pts === 'number' && <span className="text-sm text-neutral-500 font-normal ml-0.5">/{pts}</span>}
-                  </div>
-                  <div className="text-xs text-neutral-500">Score</div>
-                </div>
-              )}
-              
-              {!locked && !attempting && (
-                <Button 
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setAttempting(true)}
-                  className="h-8 px-3 text-xs font-medium bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 shadow-sm"
-                >
-                  New Attempt
-                </Button>
-              )}
-            </div>
-          </div>
-                </div>
-                <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                  {gradedAt 
-                    ? `Graded ${new Date(gradedAt).toLocaleDateString()}` 
-                    : (submittedAt ? `Submitted ${new Date(submittedAt).toLocaleDateString()}` : 'No date')}
-                </div>
-              </div>
-            </div>
-            
-            {score != null && (
-              <div className="text-right">
-                <div className="text-lg font-bold text-neutral-900 dark:text-neutral-100 tabular-nums">
-                  {score}
-                  {typeof pts === 'number' && <span className="text-sm text-neutral-500 font-normal ml-0.5">/{pts}</span>}
-                </div>
-              </div>
-            )}
           </div>
 
           {latestSubmissionComment?.comment && (

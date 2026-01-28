@@ -189,7 +189,7 @@ export function usePriorityAssignments(options?: {
         courseName: item.course_name,
         pointsPossible: item.pointsPossible ?? null,
         effectiveWeight,
-        isSubmitted: false, // TODO: Check submission status if available
+        isSubmitted: Boolean(item.submission?.submittedAt) || item.submission?.workflowState === 'submitted' || item.submission?.workflowState === 'graded',
         htmlUrl: item.htmlUrl,
       }
     })

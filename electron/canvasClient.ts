@@ -370,7 +370,7 @@ export class CanvasClient {
           _id
           name
           assignmentsConnection(first: $first, after: $after) {
-            nodes { id _id name dueAt state pointsPossible submissionTypes htmlUrl }
+            nodes { id _id name dueAt state pointsPossible submissionTypes htmlUrl submission { submittedAt workflowState } }
             pageInfo { endCursor hasNextPage }
           }
         }
@@ -860,21 +860,25 @@ export class CanvasClient {
       const cname = c?.name ?? ''
       if (!cid) return
       try {
-        const nodes = await this.listCourseAssignmentsGql(cid, 200)
+        const nodes = await this.listAssignmentsWithSubmission(cid, 100)
         for (const n of nodes) {
-          if (onlyPublished && n?.state !== 'published') continue
-          const dt = parseIso(n?.dueAt)
+          if (onlyPublished && (n as any).published === false) continue
+          const dt = parseIso(n?.due_at)
           if (!dt) continue
           if (dt >= now && dt <= end) {
             const item: any = {
               course_id: cid,
-              assignment_rest_id: n?._id ? Number(n._id) : null,
-              assignment_graphql_id: n?.id,
+              assignment_rest_id: n?.id,
+              assignment_graphql_id: null,
               name: n?.name,
               dueAt: dt.toISOString(),
-              state: n?.state,
-              pointsPossible: n?.pointsPossible,
-              htmlUrl: n?.htmlUrl,
+              state: n?.workflow_state, // REST uses workflow_state, GQL uses state.
+              pointsPossible: n?.points_possible,
+              htmlUrl: n?.html_url,
+              submission: n?.submission ? {
+                submittedAt: n.submission.submitted_at,
+                workflowState: n.submission.workflow_state,
+              } : undefined,
             }
             if (includeCourseName) item.course_name = cname
             out.push(item)
@@ -882,6 +886,10 @@ export class CanvasClient {
         }
       } catch (_e) {
         // ignore course-level errors to avoid blocking whole dashboard
+        if (this.verbose) {
+          // eslint-disable-next-line no-console
+          console.warn(`[Canvas] Failed to fetch assignments for course ${cid}:`, _e)
+        }
       }
     })
 
@@ -900,7 +908,7 @@ export class CanvasClient {
 }
 
 // A tiny service layer to manage token storage with keytar and provide a singleton client
-const SERVICE_NAME = 'canvas-desk'
+const SERVICE_NAME = 'whiteboard'
 let client: CanvasClient | null = null
 let currentBaseUrl = DEFAULT_BASE_URL
 

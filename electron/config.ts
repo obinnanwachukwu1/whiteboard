@@ -52,7 +52,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   pdfZoom: {},
 }
 
-const CONFIG_FILE = 'canvas-desk.v2.enc'
+const CONFIG_FILE = 'whiteboard.v2.enc'
 const MASTER_KEY_SERVICE = 'whiteboard'
 const MASTER_KEY_ACCOUNT = 'config-master-key-v1'
 
