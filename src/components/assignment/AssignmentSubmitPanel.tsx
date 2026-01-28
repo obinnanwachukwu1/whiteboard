@@ -1,6 +1,6 @@
 import React from 'react'
-import { ExternalLink, Link2, Loader2, Type, UploadCloud, X } from 'lucide-react'
-import type { AssignmentRestDetail } from '../../types/canvas'
+import { ExternalLink, Link2, Loader2, Type, UploadCloud, X, File, CheckCircle2, Clock } from 'lucide-react'
+import type { AssignmentRestDetail, SubmissionDetail } from '../../types/canvas'
 import { Button } from '../ui/Button'
 import { useSubmitAssignment, useSubmitAssignmentUpload } from '../../hooks/useCanvasMutations'
 
@@ -10,9 +10,10 @@ type Props = {
   courseId: string | number
   assignmentRestId: string | number
   assignment: AssignmentRestDetail
+  submission?: SubmissionDetail | null
 }
 
-export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRestId, assignment }) => {
+export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRestId, assignment, submission }) => {
   const submissionTypes = Array.isArray(assignment.submission_types) ? assignment.submission_types : []
   const supportsUpload = submissionTypes.includes('online_upload')
   const supportsText = submissionTypes.includes('online_text_entry')
@@ -29,9 +30,8 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
     if (supportsText) return 'text'
     return 'url'
   })
+  
   React.useEffect(() => {
-    // Keep mode valid if assignment types change
-    // If there are no in-app submission modes, don't try to coerce mode (it can oscillate).
     if (!supportsUpload && !supportsText && !supportsUrl) return
 
     let nextMode = mode
@@ -48,8 +48,36 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
   const [err, setErr] = React.useState<string | null>(null)
 
   const busy = submitText.isPending || submitUpload.isPending
-
   const canSubmitInApp = supportsUpload || supportsText || supportsUrl
+
+  // Parse allowed extensions for display and filtering
+  const allowedExtensions = React.useMemo(() => {
+    if (!assignment.allowed_extensions) return []
+    return assignment.allowed_extensions.map(e => e.trim().toLowerCase().replace(/^\./, '')).filter(Boolean)
+  }, [assignment.allowed_extensions])
+
+  // Get latest comment
+  const latestSubmissionComment = React.useMemo(() => {
+    const list = submission?.submission_comments
+    if (!Array.isArray(list) || !list.length) return null
+    const sorted = list.slice().sort((a, b) => {
+      const at = a?.created_at ? new Date(a.created_at).getTime() : 0
+      const bt = b?.created_at ? new Date(b.created_at).getTime() : 0
+      return bt - at
+    })
+    return sorted[0] || null
+  }, [submission])
+
+  const hasSubmission = React.useMemo(() => {
+    if (!submission) return false
+    if (submission.excused) return true
+    if (submission.submitted_at) return true
+    if (submission.graded_at) return true
+    if (submission.score != null) return true
+    if (submission.grade != null && String(submission.grade).trim() !== '') return true
+    if (submission.workflow_state && submission.workflow_state !== 'unsubmitted') return true
+    return false
+  }, [submission])
 
   const openExternalPortal = async () => {
     const target = assignment.html_url || assignment.external_tool_tag_attributes?.url
@@ -62,7 +90,12 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
   const pickFiles = async () => {
     setErr(null)
     try {
-      const res = await window.system.pickFiles({ multiple: true })
+      // Create filter from allowed extensions
+      const filters = allowedExtensions.length > 0 
+        ? [{ name: 'Allowed Extensions', extensions: allowedExtensions }] 
+        : undefined
+      
+      const res = await window.system.pickFiles({ multiple: true, filters })
       if (!res?.ok) {
         setErr(res?.error || 'Failed to pick files')
         return
@@ -87,7 +120,13 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
           setErr('Pick at least one file to upload.')
           return
         }
-        await submitUpload.mutateAsync({ courseId, assignmentRestId, filePaths: picked.map((p) => p.path) })
+        
+        await submitUpload.mutateAsync({ 
+          courseId, 
+          assignmentRestId, 
+          filePaths: picked.map((p) => p.path),
+          allowedExtensions: allowedExtensions.length > 0 ? allowedExtensions : undefined
+        })
         setPicked([])
         return
       }
@@ -108,7 +147,6 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
           setErr('Enter a URL to submit.')
           return
         }
-        // Basic validation: only allow http(s)
         try {
           const u = new URL(v)
           if (u.protocol !== 'http:' && u.protocol !== 'https:') {
@@ -127,20 +165,78 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
     }
   }
 
-  // External-only assignments: send out to Canvas.
+  const renderSubmissionStatus = () => {
+    if (!hasSubmission) return null
+
+    const score = submission?.score
+    const gradedAt = submission?.graded_at
+    const excused = submission?.excused
+    const submittedAt = submission?.submitted_at
+    const pts = assignment.points_possible
+
+    return (
+      <div className="mb-6 p-4 rounded-xl bg-neutral-100 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-800">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${score != null ? 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'}`}>
+                {score != null ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                  {excused ? 'Excused' : (score != null ? 'Graded' : 'Submitted')}
+                </div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                  {gradedAt 
+                    ? `Graded ${new Date(gradedAt).toLocaleDateString()}` 
+                    : (submittedAt ? `Submitted ${new Date(submittedAt).toLocaleDateString()}` : 'No date')}
+                </div>
+              </div>
+            </div>
+            
+            {score != null && (
+              <div className="text-right">
+                <div className="text-lg font-bold text-neutral-900 dark:text-neutral-100 tabular-nums">
+                  {score}
+                  {typeof pts === 'number' && <span className="text-sm text-neutral-500 font-normal ml-0.5">/{pts}</span>}
+                </div>
+                <div className="text-xs text-neutral-500">Score</div>
+              </div>
+            )}
+          </div>
+
+          {latestSubmissionComment?.comment && (
+            <div className="mt-2 pt-3 border-t border-neutral-200 dark:border-neutral-700/50">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                  {latestSubmissionComment.author_name || 'Instructor Feedback'}
+                </span>
+                <span className="text-[10px] text-neutral-400">
+                  {latestSubmissionComment.created_at && new Date(latestSubmissionComment.created_at).toLocaleDateString()}
+                </span>
+              </div>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed whitespace-pre-wrap">
+                {latestSubmissionComment.comment}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   if (!canSubmitInApp && isExternalTool) {
     return (
-      <div className="mb-5 rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Submission</div>
-            <div className="mt-1 text-sm text-slate-600 dark:text-neutral-300">
-              This assignment uses an external submission portal.
-            </div>
-          </div>
-          <Button size="sm" variant="ghost" onClick={openExternalPortal}>
+      <div className="mb-8">
+        {renderSubmissionStatus()}
+        <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 p-6 text-center">
+          <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">External Submission</h3>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4 max-w-sm mx-auto">
+            This assignment requires submission via an external tool.
+          </p>
+          <Button size="sm" variant="ghost" onClick={openExternalPortal} className="gap-2 border border-neutral-200 dark:border-neutral-700">
             <ExternalLink className="w-4 h-4" />
-            Open portal
+            Launch External Tool
           </Button>
         </div>
       </div>
@@ -150,122 +246,158 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
   if (!canSubmitInApp) return null
 
   return (
-    <div className="mb-5 rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Submit</div>
-          <div className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
-            {locked ? (assignment.lock_explanation || 'This assignment is locked.') : 'Submit directly to Canvas'}
-          </div>
-        </div>
-        {isExternalTool && (
-          <Button size="sm" variant="ghost" onClick={openExternalPortal}>
-            <ExternalLink className="w-4 h-4" />
-            Open portal
-          </Button>
-        )}
-      </div>
-
-      {/* Mode selector */}
-      <div className="mt-3 inline-flex rounded-control ring-1 ring-black/10 dark:ring-white/10 overflow-hidden">
+    <div className="mb-8">
+      {renderSubmissionStatus()}
+      
+      {/* Simplified Tabs */}
+      <div className="flex gap-6 border-b border-neutral-200 dark:border-neutral-800 mb-6">
         {supportsUpload && (
           <button
-            type="button"
             onClick={() => setMode('upload')}
-            className={`px-3 py-1.5 text-xs sm:text-sm inline-flex items-center gap-2 ${mode === 'upload' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white/80 dark:bg-neutral-900/60 text-slate-700 dark:text-neutral-300 hover:bg-slate-100/70 dark:hover:bg-neutral-800/60'}`}
+            className={`pb-3 text-sm font-medium transition-colors relative ${
+              mode === 'upload' 
+                ? 'text-neutral-900 dark:text-neutral-100' 
+                : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300'
+            }`}
           >
-            <UploadCloud className="w-4 h-4" /> Upload
+            File Upload
+            {mode === 'upload' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 dark:bg-neutral-100 rounded-t-full" />
+            )}
           </button>
         )}
         {supportsText && (
           <button
-            type="button"
             onClick={() => setMode('text')}
-            className={`px-3 py-1.5 text-xs sm:text-sm inline-flex items-center gap-2 ${mode === 'text' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white/80 dark:bg-neutral-900/60 text-slate-700 dark:text-neutral-300 hover:bg-slate-100/70 dark:hover:bg-neutral-800/60'}`}
+            className={`pb-3 text-sm font-medium transition-colors relative ${
+              mode === 'text' 
+                ? 'text-neutral-900 dark:text-neutral-100' 
+                : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300'
+            }`}
           >
-            <Type className="w-4 h-4" /> Text
+            Text Entry
+            {mode === 'text' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 dark:bg-neutral-100 rounded-t-full" />
+            )}
           </button>
         )}
         {supportsUrl && (
           <button
-            type="button"
             onClick={() => setMode('url')}
-            className={`px-3 py-1.5 text-xs sm:text-sm inline-flex items-center gap-2 ${mode === 'url' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white/80 dark:bg-neutral-900/60 text-slate-700 dark:text-neutral-300 hover:bg-slate-100/70 dark:hover:bg-neutral-800/60'}`}
+            className={`pb-3 text-sm font-medium transition-colors relative ${
+              mode === 'url' 
+                ? 'text-neutral-900 dark:text-neutral-100' 
+                : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300'
+            }`}
           >
-            <Link2 className="w-4 h-4" /> URL
+            Website URL
+            {mode === 'url' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 dark:bg-neutral-100 rounded-t-full" />
+            )}
           </button>
         )}
       </div>
 
-      {/* Inputs */}
-      {mode === 'upload' && (
-        <div className="mt-3">
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="ghost" onClick={pickFiles} disabled={busy || locked}>
-              Choose files
-            </Button>
-            <div className="text-xs text-slate-500 dark:text-neutral-400">
-              {picked.length ? `${picked.length} selected` : 'No files selected'}
+      <div className="min-h-[200px]">
+        {/* Upload Mode */}
+        {mode === 'upload' && (
+          <div className="space-y-4">
+            <div 
+              onClick={() => !locked && !busy && pickFiles()}
+              className={`
+                group relative border border-dashed rounded-xl p-8 text-center transition-all cursor-pointer
+                ${locked || busy ? 'opacity-50 cursor-not-allowed border-neutral-200 dark:border-neutral-800' : 'border-neutral-300 dark:border-neutral-700 hover:border-neutral-400 dark:hover:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-800/50'}
+              `}
+            >
+              <div className="w-10 h-10 mx-auto rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                <UploadCloud className="w-5 h-5 text-neutral-500 dark:text-neutral-400" />
+              </div>
+              <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                Click to select files
+              </h4>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                {allowedExtensions.length > 0 
+                  ? `Allowed: ${allowedExtensions.join(', ')}`
+                  : 'All file types accepted'
+                }
+              </p>
+            </div>
+
+            {picked.length > 0 && (
+              <div className="space-y-2">
+                {picked.map((f) => (
+                  <div key={f.path} className="flex items-center justify-between p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center shrink-0">
+                        <File className="w-4 h-4 text-neutral-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{f.name}</div>
+                        <div className="text-xs text-neutral-500">{Math.round(f.size / 1024)} KB</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setPicked((prev) => prev.filter((x) => x.path !== f.path))}
+                      className="p-1.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 rounded-md transition-colors"
+                      disabled={busy}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Text Mode */}
+        {mode === 'text' && (
+          <div className="space-y-3">
+            <textarea
+              value={textBody}
+              onChange={(e) => setTextBody(e.target.value)}
+              placeholder="Type your submission here..."
+              className="w-full min-h-[200px] p-4 text-sm rounded-xl border border-neutral-200 dark:border-neutral-800 bg-transparent text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-neutral-100 transition-all resize-y"
+              disabled={busy || locked}
+            />
+          </div>
+        )}
+
+        {/* URL Mode */}
+        {mode === 'url' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">Website URL</label>
+              <div className="relative">
+                <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                <input
+                  value={urlValue}
+                  onChange={(e) => setUrlValue(e.target.value)}
+                  placeholder="https://example.com/project"
+                  className="w-full pl-10 pr-4 py-2.5 text-sm rounded-lg border border-neutral-200 dark:border-neutral-800 bg-transparent text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-neutral-100 transition-all"
+                  disabled={busy || locked}
+                />
+              </div>
             </div>
           </div>
-          {picked.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {picked.map((f) => (
-                <div key={f.path} className="flex items-center justify-between gap-2 text-sm rounded-md bg-slate-50 dark:bg-neutral-800/50 px-2 py-1">
-                  <div className="min-w-0 truncate">{f.name}</div>
-                  <button
-                    type="button"
-                    className="p-1 rounded-md text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-200"
-                    onClick={() => setPicked((prev) => prev.filter((x) => x.path !== f.path))}
-                    aria-label="Remove file"
-                    disabled={busy}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+        )}
+
+        {err && (
+          <div className="mt-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-sm text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30">
+            {err}
+          </div>
+        )}
+
+        <div className="mt-6 flex justify-end">
+          <Button
+            onClick={doSubmit}
+            disabled={busy || locked || (mode === 'upload' && !picked.length) || (mode === 'text' && !textBody.trim()) || (mode === 'url' && !urlValue.trim())}
+            className="w-full sm:w-auto min-w-[120px]"
+          >
+            {busy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {locked ? 'Assignment Locked' : hasSubmission ? 'Re-submit Assignment' : 'Submit Assignment'}
+          </Button>
         </div>
-      )}
-
-      {mode === 'text' && (
-        <div className="mt-3">
-          <textarea
-            value={textBody}
-            onChange={(e) => setTextBody(e.target.value)}
-            placeholder="Write your submission..."
-            className="w-full min-h-[120px] resize-y rounded-card border border-gray-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/60 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand/30"
-            disabled={busy || locked}
-          />
-        </div>
-      )}
-
-      {mode === 'url' && (
-        <div className="mt-3">
-          <input
-            value={urlValue}
-            onChange={(e) => setUrlValue(e.target.value)}
-            placeholder="https://..."
-            className="w-full rounded-control border border-gray-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/60 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand/30"
-            disabled={busy || locked}
-          />
-        </div>
-      )}
-
-      {err && (
-        <div className="mt-3 text-sm text-red-600">{err}</div>
-      )}
-
-      <div className="mt-4 flex items-center justify-end">
-        <Button
-          size="sm"
-          onClick={doSubmit}
-          disabled={busy || locked}
-        >
-          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          Submit
-        </Button>
       </div>
     </div>
   )

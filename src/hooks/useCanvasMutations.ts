@@ -239,8 +239,9 @@ export function useSubmitAssignmentUpload() {
       courseId: string | number
       assignmentRestId: string | number
       filePaths: string[]
+      allowedExtensions?: string[]
     }) => {
-      const res = await window.canvas.submitAssignmentUpload(params.courseId, params.assignmentRestId, params.filePaths)
+      const res = await window.canvas.submitAssignmentUpload(params.courseId, params.assignmentRestId, params.filePaths, params.allowedExtensions)
       return ensureOk(res)
     },
     onSuccess: (_data, vars) => {

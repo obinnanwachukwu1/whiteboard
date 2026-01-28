@@ -72,30 +72,6 @@ export const CanvasContentView: React.FC<Props> = ({
     return title
   }, [contentType, pageQ.data, assignQ.data, annQ.data, fileQ.data, title])
 
-  const latestSubmissionComment = useMemo(() => {
-    const list = submissionQ.data?.submission_comments
-    if (!Array.isArray(list) || !list.length) return null
-    const sorted = list.slice().sort((a, b) => {
-      const at = a?.created_at ? new Date(a.created_at).getTime() : 0
-      const bt = b?.created_at ? new Date(b.created_at).getTime() : 0
-      return bt - at
-    })
-    return sorted[0] || null
-  }, [submissionQ.data])
-
-  const hasSubmissionInfo = useMemo(() => {
-    const s = submissionQ.data
-    if (!s) return false
-    if (s.excused) return true
-    if (s.submitted_at) return true
-    if (s.graded_at) return true
-    if (s.score != null) return true
-    if (s.grade != null && String(s.grade).trim() !== '') return true
-    if (Array.isArray(s.submission_comments) && s.submission_comments.length > 0) return true
-    if (s.workflow_state && s.workflow_state !== 'unsubmitted') return true
-    return false
-  }, [submissionQ.data])
-
   // Context Menu State
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
   const [fileDownloadTarget, setFileDownloadTarget] = useState<{ id: string; name: string } | null>(null)
@@ -357,58 +333,12 @@ export const CanvasContentView: React.FC<Props> = ({
                   {!loading && !error && contentType === 'page' && pageQ.data?.body && (
                     <HtmlContent html={pageQ.data.body} className="rich-html" onNavigate={onNavigate} />
                   )}
-                  {!loading && !error && contentType === 'assignment' && hasSubmissionInfo && (
-                    <div className="mb-5 rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-4">
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                        <div>
-                          <div className="text-xs text-slate-500 dark:text-neutral-400">Your submission</div>
-                          <div className="mt-1 text-sm text-slate-900 dark:text-slate-100">
-                            {(() => {
-                              if (submissionQ.error) return <span className="text-slate-600 dark:text-neutral-300">Submission details unavailable</span>
-                              const score = submissionQ.data?.score
-                              const gradedAt = submissionQ.data?.graded_at
-                              const excused = submissionQ.data?.excused
-                              const submittedAt = submissionQ.data?.submitted_at
-                              const pts = assignQ.data?.points_possible
-                              if (excused) return <span className="font-semibold">Excused</span>
-                              if (score == null && !gradedAt && submittedAt) return <span className="text-slate-600 dark:text-neutral-300">Submitted — awaiting grade</span>
-                              if (score == null) return <span className="text-slate-600 dark:text-neutral-300">Graded</span>
-                              return (
-                                <span className="font-semibold tabular-nums">
-                                  {score}
-                                  {typeof pts === 'number' || pts != null ? (
-                                    <span className="text-slate-400 dark:text-neutral-500 font-normal">/{pts}</span>
-                                  ) : null}
-                                </span>
-                              )
-                            })()}
-                          </div>
-                        </div>
-                        {submissionQ.data?.graded_at && (
-                          <div className="text-xs text-slate-500 dark:text-neutral-400">
-                            Graded {new Date(submissionQ.data.graded_at).toLocaleString()}
-                          </div>
-                        )}
-                      </div>
-
-                      {latestSubmissionComment?.comment && !submissionQ.error && (
-                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-neutral-800">
-                          <div className="text-xs text-slate-500 dark:text-neutral-400">
-                            Feedback{latestSubmissionComment.author_name ? ` from ${latestSubmissionComment.author_name}` : ''}
-                            {latestSubmissionComment.created_at ? ` · ${new Date(latestSubmissionComment.created_at).toLocaleString()}` : ''}
-                          </div>
-                          <div className="mt-1 text-sm text-slate-800 dark:text-neutral-200 whitespace-pre-wrap">
-                            {latestSubmissionComment.comment}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
                   {!loading && !error && contentType === 'assignment' && assignQ.data && (
                     <AssignmentSubmitPanel
                       courseId={courseId}
                       assignmentRestId={contentId}
                       assignment={assignQ.data}
+                      submission={submissionQ.data}
                     />
                   )}
                   {!loading && !error && contentType === 'assignment' && assignQ.data?.description && (

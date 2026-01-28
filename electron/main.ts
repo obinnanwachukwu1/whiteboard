@@ -1093,11 +1093,48 @@ ipcMain.handle(
     fileHandles: string[],
   ) => {
     try {
+      // Security: Fetch assignment details from Canvas to get authoritative allowed_extensions
+      // Do NOT trust the renderer to provide the allowlist.
+      const assignment = await svcGetAssignmentRest(courseId, assignmentRestId)
+      const allowedRaw = assignment?.allowed_extensions || []
+      
+      // Normalize allowed extensions: strip dots, lowercase, trim
+      const allowedSet = new Set<string>()
+      if (Array.isArray(allowedRaw) && allowedRaw.length > 0) {
+        for (const ext of allowedRaw) {
+          if (typeof ext === 'string') {
+            allowedSet.add(ext.trim().toLowerCase().replace(/^\./, ''))
+          }
+        }
+      }
+
       // Resolve handles to paths
       const filePaths: string[] = []
       for (const handle of fileHandles) {
         if (uploadFileMap.has(handle)) {
-          filePaths.push(uploadFileMap.get(handle)!)
+          const p = uploadFileMap.get(handle)!
+          
+          // Enforce allowed extensions if restriction exists
+          if (allowedSet.size > 0) {
+            // Check full extension (e.g. .tar.gz) and simple extension
+            const filename = path.basename(p).toLowerCase()
+            
+            // Check if any allowed extension matches the end of the filename
+            // This handles "tar.gz" vs "gz" ambiguity safely
+            let matched = false
+            for (const allowed of allowedSet) {
+              if (filename.endsWith(`.${allowed}`)) {
+                matched = true
+                break
+              }
+            }
+            
+            if (!matched) {
+              return { ok: false, error: `File type not allowed: ${path.basename(p)}` }
+            }
+          }
+          
+          filePaths.push(p)
         } else {
           console.warn(`[Security] Blocked upload of invalid/expired handle: ${handle}`)
           return { ok: false, error: 'File selection expired. Please pick files again.' }
@@ -1105,6 +1142,12 @@ ipcMain.handle(
       }
 
       const data = await svcSubmitAssignmentUpload(courseId, assignmentRestId, filePaths)
+      
+      // Cleanup handles on success
+      for (const handle of fileHandles) {
+        uploadFileMap.delete(handle)
+      }
+      
       return { ok: true, data }
     } catch (e: any) {
       const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
@@ -1590,13 +1633,14 @@ ipcMain.handle('app:openContentWindow', async (_evt, raw: { courseId?: string; t
   }
 })
 
-ipcMain.handle('app:pickFiles', async (_evt, opts?: { multiple?: boolean }) => {
+ipcMain.handle('app:pickFiles', async (_evt, opts?: { multiple?: boolean; filters?: { name: string; extensions: string[] }[] }) => {
   try {
     const result = await dialog.showOpenDialog({
       properties: [
         'openFile',
         ...(opts?.multiple === false ? [] : ['multiSelections' as const]),
       ],
+      filters: opts?.filters,
     })
     if (result.canceled) return { ok: true, data: [] }
     const files = await Promise.all(

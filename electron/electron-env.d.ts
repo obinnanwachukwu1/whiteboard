@@ -35,9 +35,9 @@ interface Window {
     listUpcoming: (opts?: { onlyActiveCourses?: boolean }) => Promise<{ ok: boolean; data?: any; error?: string }>
     listTodo: () => Promise<{ ok: boolean; data?: any; error?: string }>
     getMySubmission: (courseId: string | number, assignmentRestId: string | number, include?: string[]) => Promise<{ ok: boolean; data?: any; error?: string }>
-    submitAssignment: (courseId: string | number, assignmentRestId: string | number, params: { submissionType: 'online_text_entry' | 'online_url' | 'online_upload'; body?: string; url?: string; fileIds?: Array<string | number> }) => Promise<{ ok: boolean; data?: any; error?: string }>
-    submitAssignmentUpload: (courseId: string | number, assignmentRestId: string | number, filePaths: string[]) => Promise<{ ok: boolean; data?: any; error?: string }>
-    listCoursePages: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
+      submitAssignment: (courseId: string | number, assignmentRestId: string | number, params: { submissionType: 'online_text_entry' | 'online_url' | 'online_upload'; body?: string; url?: string; fileIds?: Array<string | number> }) => Promise<{ ok: boolean; data?: any; error?: string }>
+      submitAssignmentUpload: (courseId: string | number, assignmentRestId: string | number, filePaths: string[]) => Promise<{ ok: boolean; data?: any; error?: string }>
+      listCoursePages: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
     getCoursePage: (courseId: string | number, slugOrUrl: string) => Promise<{ ok: boolean; data?: any; error?: string }>
     getAssignmentRest: (courseId: string | number, assignmentRestId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
     getFile: (fileId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
@@ -171,7 +171,7 @@ interface Window {
   system: {
     openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>
     openContentWindow: (params: { courseId: string; type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file'; contentId: string; title?: string; courseName?: string }) => Promise<{ ok: boolean; error?: string }>
-    pickFiles: (opts?: { multiple?: boolean }) => Promise<{ ok: boolean; data?: Array<{ path: string; name: string; size: number }>; error?: string }>
+    pickFiles: (opts?: { multiple?: boolean; filters?: { name: string; extensions: string[] }[] }) => Promise<{ ok: boolean; data?: Array<{ path: string; name: string; size: number }>; error?: string }>
     downloadFile: (fileId: string | number, suggestedName?: string) => Promise<{ ok: boolean; data?: string; error?: string }>
   }
 }

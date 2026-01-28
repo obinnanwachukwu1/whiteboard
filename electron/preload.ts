@@ -117,7 +117,7 @@ contextBridge.exposeInMainWorld('system', {
   openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
   openContentWindow: (params: { courseId: string; type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file'; contentId: string; title?: string; courseName?: string }) =>
     ipcRenderer.invoke('app:openContentWindow', params),
-  pickFiles: (opts?: { multiple?: boolean }) => ipcRenderer.invoke('app:pickFiles', opts),
+    pickFiles: (opts?: { multiple?: boolean; filters?: { name: string; extensions: string[] }[] }) => ipcRenderer.invoke('app:pickFiles', opts),
   downloadFile: (fileId: string | number, suggestedName?: string) =>
     ipcRenderer.invoke('app:downloadFile', fileId, suggestedName),
   writeClipboard: (text: string) => ipcRenderer.invoke('app:writeClipboard', text),
