@@ -46,6 +46,7 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
   const [textBody, setTextBody] = React.useState('')
   const [urlValue, setUrlValue] = React.useState('')
   const [err, setErr] = React.useState<string | null>(null)
+  const [attempting, setAttempting] = React.useState(false)
 
   const busy = submitText.isPending || submitUpload.isPending
   const canSubmitInApp = supportsUpload || supportsText || supportsUrl
@@ -128,6 +129,7 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
           allowedExtensions: allowedExtensions.length > 0 ? allowedExtensions : undefined
         })
         setPicked([])
+        setAttempting(false)
         return
       }
 
@@ -138,6 +140,7 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
         }
         await submitText.mutateAsync({ courseId, assignmentRestId, submissionType: 'online_text_entry', body: textBody })
         setTextBody('')
+        setAttempting(false)
         return
       }
 
@@ -159,6 +162,7 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
         }
         await submitText.mutateAsync({ courseId, assignmentRestId, submissionType: 'online_url', url: v })
         setUrlValue('')
+        setAttempting(false)
       }
     } catch (e: any) {
       setErr(String(e?.message || e))
@@ -175,11 +179,11 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
     const pts = assignment.points_possible
 
     return (
-      <div className="mb-6 p-4 rounded-xl bg-neutral-100 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-800">
-        <div className="flex flex-col gap-3">
-          <div className="flex items-start justify-between">
+      <div className="mb-6 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 overflow-hidden">
+        <div className="p-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${score != null ? 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'}`}>
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${score != null ? 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'}`}>
                 {score != null ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
               </div>
               <div>
@@ -200,27 +204,35 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
                   {score}
                   {typeof pts === 'number' && <span className="text-sm text-neutral-500 font-normal ml-0.5">/{pts}</span>}
                 </div>
-                <div className="text-xs text-neutral-500">Score</div>
               </div>
             )}
           </div>
 
           {latestSubmissionComment?.comment && (
-            <div className="mt-2 pt-3 border-t border-neutral-200 dark:border-neutral-700/50">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+            <div className="mt-2 pt-3 border-t border-neutral-200 dark:border-neutral-800">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
                   {latestSubmissionComment.author_name || 'Instructor Feedback'}
                 </span>
                 <span className="text-[10px] text-neutral-400">
                   {latestSubmissionComment.created_at && new Date(latestSubmissionComment.created_at).toLocaleDateString()}
                 </span>
               </div>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed whitespace-pre-wrap">
+              <p className="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-wrap">
                 {latestSubmissionComment.comment}
               </p>
             </div>
           )}
         </div>
+        
+        {/* New Attempt Action - Only show if not locked */}
+        {!locked && !attempting && (
+          <div className="bg-white dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-800 p-3 flex justify-end">
+            <Button size="sm" variant="outline" onClick={() => setAttempting(true)}>
+              New Attempt
+            </Button>
+          </div>
+        )}
       </div>
     )
   }
@@ -245,9 +257,25 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
 
   if (!canSubmitInApp) return null
 
+  // If already submitted and not attempting a new one, just show status
+  if (hasSubmission && !attempting) {
+    return (
+      <div className="mb-8">
+        {renderSubmissionStatus()}
+      </div>
+    )
+  }
+
   return (
     <div className="mb-8">
-      {renderSubmissionStatus()}
+      {hasSubmission && (
+        <div className="mb-6 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">New Attempt</h3>
+          <Button size="sm" variant="ghost" onClick={() => setAttempting(false)} className="text-xs h-7">
+            Cancel
+          </Button>
+        </div>
+      )}
       
       {/* Simplified Tabs */}
       <div className="flex gap-6 border-b border-neutral-200 dark:border-neutral-800 mb-6">
