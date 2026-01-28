@@ -317,14 +317,31 @@ export function useAnnouncement(courseId: string | number | undefined, topicId: 
 // Discussions
 export function useCourseDiscussions(
   courseId: string | number | undefined,
-  perPage = 50,
+  params: {
+    perPage?: number
+    searchTerm?: string
+    filterBy?: 'all' | 'unread'
+    scope?: 'locked' | 'unlocked' | 'pinned' | 'unpinned'
+    orderBy?: 'position' | 'recent_activity' | 'title'
+    maxPages?: number
+  } = {},
   options?: Partial<UseQueryOptions<DiscussionTopic[], Error, DiscussionTopic[]>>
 ) {
+  const { perPage = 50, ...restParams } = params
+  
+  // Clean undefined/empty values from restParams to normalize key
+  const cleanParams: Record<string, any> = {}
+  if (restParams.searchTerm?.trim()) cleanParams.searchTerm = restParams.searchTerm.trim()
+  if (restParams.filterBy) cleanParams.filterBy = restParams.filterBy
+  if (restParams.scope) cleanParams.scope = restParams.scope
+  if (restParams.orderBy) cleanParams.orderBy = restParams.orderBy
+  if (restParams.maxPages) cleanParams.maxPages = restParams.maxPages
+
   return useQuery<DiscussionTopic[], Error, DiscussionTopic[]>({
-    queryKey: ['course-discussions', keyId(courseId), perPage],
+    queryKey: ['course-discussions', keyId(courseId), perPage, cleanParams],
     queryFn: async () => {
       if (courseId == null) return []
-      return ensureOk(await window.canvas.listCourseDiscussions?.(String(courseId), perPage)) as DiscussionTopic[]
+      return ensureOk(await window.canvas.listCourseDiscussions?.(String(courseId), { perPage, ...cleanParams })) as DiscussionTopic[]
     },
     enabled: courseId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 10,

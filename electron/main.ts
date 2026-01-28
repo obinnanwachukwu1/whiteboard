@@ -29,6 +29,11 @@ const aiManager = new AIManager()
 const embeddingManager = new EmbeddingManager()
 const fileMetaStore = new FileMetaStore()
 
+// Enable high refresh rate on macOS ProMotion displays
+if (process.platform === 'darwin') {
+  app.commandLine.appendSwitch('disable-frame-rate-limit')
+}
+
 // Secure file upload handling: Map<handle, absolutePath>
 const uploadFileMap = new Map<string, string>()
 
@@ -1319,9 +1324,63 @@ ipcMain.handle('canvas:getAnnouncement', async (_evt, courseId: string | number,
 })
 
 // Discussions
-ipcMain.handle('canvas:listCourseDiscussions', async (_evt, courseId: string | number, perPage?: number) => {
+ipcMain.handle('canvas:listCourseDiscussions', async (_evt, courseId: string | number, params?: {
+  perPage?: number
+  searchTerm?: string
+  filterBy?: 'all' | 'unread'
+  scope?: 'locked' | 'unlocked' | 'pinned' | 'unpinned'
+  orderBy?: 'position' | 'recent_activity' | 'title'
+  maxPages?: number
+}) => {
   try {
-    const data = await svcListCourseDiscussions(courseId, perPage)
+    // Validate inputs
+    const safeParams = { ...params }
+    
+    // Clamp perPage
+    if (safeParams.perPage !== undefined) {
+      const p = Number(safeParams.perPage)
+      if (!Number.isFinite(p) || p < 1 || p > 100) {
+        safeParams.perPage = 50
+      } else {
+        safeParams.perPage = p
+      }
+    }
+    
+    // Validate maxPages
+    if (safeParams.maxPages !== undefined) {
+      const m = Number(safeParams.maxPages)
+      if (!Number.isFinite(m) || m < 1) {
+        delete safeParams.maxPages
+      } else {
+        // Cap maxPages to prevent abuse (e.g. 10 pages max)
+        safeParams.maxPages = Math.min(m, 10)
+      }
+    }
+    
+    // Validate filterBy
+    if (safeParams.filterBy && safeParams.filterBy !== 'all' && safeParams.filterBy !== 'unread') {
+      delete safeParams.filterBy
+    }
+    
+    // Validate scope
+    const allowedScopes = ['locked', 'unlocked', 'pinned', 'unpinned']
+    if (safeParams.scope && !allowedScopes.includes(safeParams.scope)) {
+      delete safeParams.scope
+    }
+    
+    // Validate orderBy
+    const allowedOrder = ['position', 'recent_activity', 'title']
+    if (safeParams.orderBy && !allowedOrder.includes(safeParams.orderBy)) {
+      delete safeParams.orderBy
+    }
+    
+    // Trim searchTerm and treat empty/whitespace as undefined
+    if (safeParams.searchTerm) {
+      safeParams.searchTerm = String(safeParams.searchTerm).trim()
+      if (!safeParams.searchTerm) delete safeParams.searchTerm
+    }
+
+    const data = await svcListCourseDiscussions(courseId, safeParams)
     return { ok: true, data }
   } catch (e: any) {
     const msg = e instanceof CanvasError ? e.message : String(e?.message || e)

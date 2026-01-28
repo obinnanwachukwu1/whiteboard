@@ -1,5 +1,5 @@
-import React from 'react'
-import { MessageCircle, MoreVertical, Pin, Lock } from 'lucide-react'
+import React, { useState } from 'react'
+import { MessageCircle, MoreVertical, Pin, Lock, Search, Filter } from 'lucide-react'
 import { Dropdown } from './ui/Dropdown'
 import { useCourseDiscussions } from '../hooks/useCanvasQueries'
 import { ListItemRow } from './ui/ListItemRow'
@@ -47,11 +47,11 @@ const DiscussionItemRow: React.FC<{
         <span className="flex items-center gap-1.5">
           {d.pinned && <Pin className="w-3 h-3 text-amber-500" />}
           {d.locked && <Lock className="w-3 h-3 text-slate-400" />}
-          <span className={d.read_state === 'unread' ? 'font-semibold' : ''}>
+          <span className={d.read_state === 'unread' ? 'font-semibold text-neutral-900 dark:text-neutral-100' : 'text-neutral-700 dark:text-neutral-300'}>
             {d.title || 'Discussion'}
           </span>
           {unreadCount > 0 && (
-            <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-blue-500 text-white">
+            <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 font-medium">
               {unreadCount}
             </span>
           )}
@@ -60,7 +60,7 @@ const DiscussionItemRow: React.FC<{
       subtitle={
         <span className="flex items-center gap-2">
           <MetadataBadge>{timeAgo(lastActivity)}</MetadataBadge>
-          <span className="text-xs text-slate-400 dark:text-neutral-500">
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">
             {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
           </span>
         </span>
@@ -91,7 +91,21 @@ const DiscussionItemRow: React.FC<{
 }
 
 export const CourseDiscussions: React.FC<Props> = ({ courseId, onOpen }) => {
-  const { data: list, isLoading, error } = useCourseDiscussions(courseId, 50)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm), 300)
+    return () => clearTimeout(t)
+  }, [searchTerm])
+
+  const { data: list, isLoading, error } = useCourseDiscussions(courseId, {
+    perPage: 50,
+    searchTerm: debouncedSearch?.trim() || undefined,
+    filterBy: showUnreadOnly ? 'unread' : undefined
+  })
+  
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
   const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
   const queryClient = useQueryClient()
@@ -135,15 +149,37 @@ export const CourseDiscussions: React.FC<Props> = ({ courseId, onOpen }) => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between mb-3 shrink-0">
+      <div className="flex flex-col gap-2 mb-3 shrink-0 px-4 pt-4">
         <h3 className="m-0 text-slate-900 dark:text-slate-100 text-base font-semibold">Discussions</h3>
+        
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Search topics..." 
+              className="w-full pl-9 pr-3 py-1.5 text-sm bg-neutral-100 dark:bg-neutral-800 border-none rounded-md focus:ring-2 focus:ring-neutral-500 outline-none text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <button
+            onClick={() => setShowUnreadOnly(!showUnreadOnly)}
+            className={`p-1.5 rounded-md transition-colors ${showUnreadOnly ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-700 dark:text-neutral-100' : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}
+            title={showUnreadOnly ? "Showing unread only" : "Filter by unread"}
+          >
+            <Filter className="w-4 h-4" />
+          </button>
+        </div>
       </div>
       
-      <div className="flex-1 overflow-y-auto min-h-0 p-4">
+      <div className="flex-1 overflow-y-auto min-h-0 px-4 pb-4">
         {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
         {isLoading && <SkeletonList count={6} hasAvatar variant="row" />}
         {!isLoading && list && list.length === 0 && (
-          <div className="text-slate-500 dark:text-neutral-400 text-sm">No discussions</div>
+          <div className="text-slate-500 dark:text-neutral-400 text-sm text-center py-4">
+            {debouncedSearch?.trim() || showUnreadOnly ? 'No matching discussions' : 'No discussions'}
+          </div>
         )}
         {!isLoading && list && list.length > 0 && (
           <ul className="list-none m-0 p-0 space-y-3">

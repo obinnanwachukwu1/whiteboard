@@ -179,13 +179,16 @@ export class CanvasClient {
     return resp.data
   }
 
-  async paginate<T = any>(pathOrUrl: string, params?: Record<string, any>): Promise<T[]> {
+  async paginate<T = any>(pathOrUrl: string, params?: Record<string, any>, maxPages?: number): Promise<T[]> {
     const out: T[] = []
     let url: string | null = this.url(pathOrUrl)
     let first = true
+    let pages = 0
     while (url) {
+      if (maxPages && pages >= maxPages) break
       const resp = await this.request<any>({ method: 'GET', url, params: first ? params : undefined })
       first = false
+      pages++
       const data = resp.data
       if (Array.isArray(data)) {
         out.push(...data)
@@ -270,15 +273,25 @@ export class CanvasClient {
   }
 
   // Discussions (NOT announcements)
-  listCourseDiscussions(courseId: string | number, perPage = 50) {
+  listCourseDiscussions(courseId: string | number, params: {
+    perPage?: number
+    searchTerm?: string
+    filterBy?: 'all' | 'unread'
+    scope?: 'locked' | 'unlocked' | 'pinned' | 'unpinned'
+    orderBy?: 'position' | 'recent_activity' | 'title'
+    maxPages?: number
+  } = {}) {
     const p: Record<string, any> = {
-      per_page: Math.min(100, Math.max(1, perPage)),
-      order_by: 'recent_activity',
-      scope: 'unlocked',
+      per_page: Math.min(100, Math.max(1, params.perPage ?? 50)),
+      order_by: params.orderBy ?? 'recent_activity',
+      scope: params.scope ?? 'unlocked',
       exclude_context_module_locked_topics: true,
     }
+    if (params.searchTerm) p.search_term = params.searchTerm
+    if (params.filterBy === 'unread') p.filter_by = 'unread'
+
     // Note: without only_announcements=true, this returns actual discussions
-    return this.paginate<any>(`/courses/${courseId}/discussion_topics`, p)
+    return this.paginate<any>(`/courses/${courseId}/discussion_topics`, p, params.maxPages)
       .then((topics) => topics.filter((t: any) => !t.is_announcement))
   }
 
@@ -1018,8 +1031,14 @@ export async function getAnnouncement(courseId: string | number, topicId: string
 }
 
 // Discussions
-export async function listCourseDiscussions(courseId: string | number, perPage = 50) {
-  return ensureClient().listCourseDiscussions(courseId, perPage)
+export async function listCourseDiscussions(courseId: string | number, params?: {
+  perPage?: number
+  searchTerm?: string
+  filterBy?: 'all' | 'unread'
+  scope?: 'locked' | 'unlocked' | 'pinned' | 'unpinned'
+  orderBy?: 'position' | 'recent_activity' | 'title'
+}) {
+  return ensureClient().listCourseDiscussions(courseId, params)
 }
 
 export async function getDiscussion(courseId: string | number, topicId: string | number) {

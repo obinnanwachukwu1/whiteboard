@@ -161,7 +161,14 @@ declare global {
       getCourseFrontPage: (courseId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
       getAnnouncement: (courseId: string | number, topicId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
       // Discussions
-      listCourseDiscussions: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
+      listCourseDiscussions: (courseId: string | number, params?: {
+        perPage?: number
+        searchTerm?: string
+        filterBy?: 'all' | 'unread'
+        scope?: 'locked' | 'unlocked' | 'pinned' | 'unpinned'
+        orderBy?: 'position' | 'recent_activity' | 'title'
+        maxPages?: number
+      }) => Promise<{ ok: boolean; data?: any; error?: string }>
       getDiscussion: (courseId: string | number, topicId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
       getDiscussionView: (courseId: string | number, topicId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
       postDiscussionEntry: (courseId: string | number, topicId: string | number, message: string) => Promise<{ ok: boolean; data?: any; error?: string }>

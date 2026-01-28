@@ -57,7 +57,14 @@ contextBridge.exposeInMainWorld('canvas', {
   getCourseFrontPage: (courseId: string | number) => ipcRenderer.invoke('canvas:getCourseFrontPage', courseId),
   getAnnouncement: (courseId: string | number, topicId: string | number) => ipcRenderer.invoke('canvas:getAnnouncement', courseId, topicId),
   // Discussions
-  listCourseDiscussions: (courseId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listCourseDiscussions', courseId, perPage),
+  listCourseDiscussions: (courseId: string | number, params?: {
+    perPage?: number
+    searchTerm?: string
+    filterBy?: 'all' | 'unread'
+    scope?: 'locked' | 'unlocked' | 'pinned' | 'unpinned'
+    orderBy?: 'position' | 'recent_activity' | 'title'
+    maxPages?: number
+  }) => ipcRenderer.invoke('canvas:listCourseDiscussions', courseId, params),
   getDiscussion: (courseId: string | number, topicId: string | number) => ipcRenderer.invoke('canvas:getDiscussion', courseId, topicId),
   getDiscussionView: (courseId: string | number, topicId: string | number) => ipcRenderer.invoke('canvas:getDiscussionView', courseId, topicId),
   postDiscussionEntry: (courseId: string | number, topicId: string | number, message: string) => ipcRenderer.invoke('canvas:postDiscussionEntry', courseId, topicId, message),

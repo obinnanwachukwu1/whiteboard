@@ -1,7 +1,7 @@
 import React from 'react'
 import { useCourses } from '../hooks/useCanvasQueries'
 import { useQueries } from '@tanstack/react-query'
-import { BookOpen, MessageCircle, Pin, Lock } from 'lucide-react'
+import { BookOpen, MessageCircle, Pin, Lock, Search } from 'lucide-react'
 import { useAppContext } from '../context/AppContext'
 import { Badge } from '../components/ui/Badge'
 import { ListItemRow } from '../components/ui/ListItemRow'
@@ -17,6 +17,13 @@ export default function DiscussionsPage() {
   const courses = ctx.courses || coursesQ.data || []
   const sidebar = ctx.sidebar
   const [courseFilter, setCourseFilter] = React.useState<string>('all')
+  const [searchTerm, setSearchTerm] = React.useState('')
+  const [debouncedSearch, setDebouncedSearch] = React.useState('')
+
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm), 300)
+    return () => clearTimeout(t)
+  }, [searchTerm])
 
   const orderedCourses = React.useMemo(() => {
     const hidden = new Set(sidebar?.hiddenCourseIds || [])
@@ -36,11 +43,22 @@ export default function DiscussionsPage() {
     ? orderedCourses.map((c: any) => String(c.id))
     : [courseFilter]
 
+  // Construct safe query params matching the hook's normalization logic
+  const queryParams: any = {}
+  if (debouncedSearch?.trim()) queryParams.searchTerm = debouncedSearch.trim()
+  // When showing all courses without search, limit pages to avoid flooding
+  if (courseFilter === 'all' && !queryParams.searchTerm) {
+    queryParams.maxPages = 2 // Fetch recent items only
+  }
+
   const queries = useQueries({
     queries: coursesToFetch.map((courseId) => ({
-      queryKey: ['course-discussions', courseId, 50],
+      queryKey: ['course-discussions', courseId, 50, queryParams],
       queryFn: async () => {
-        const res = await window.canvas.listCourseDiscussions?.(courseId, 50)
+        const res = await window.canvas.listCourseDiscussions?.(courseId, {
+          perPage: 50,
+          ...queryParams
+        })
         if (!res?.ok) throw new Error(res?.error || 'Failed to load discussions')
         return res.data || []
       },
@@ -113,16 +131,28 @@ export default function DiscussionsPage() {
           </span>
           <span>Discussions</span>
         </h1>
-        <select
-          className="rounded-control border px-2 py-1 text-xs sm:text-sm bg-white/90 dark:bg-neutral-900 max-w-[160px] sm:max-w-none"
-          value={courseFilter}
-          onChange={(e) => setCourseFilter(e.target.value)}
-        >
-          <option value="all">All Courses</option>
-          {orderedCourses.map((c: any) => (
-            <option key={String(c.id)} value={String(c.id)}>{labelFor(c)}</option>
-          ))}
-        </select>
+        <div className="flex gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Search all courses..." 
+              className="w-full sm:w-64 pl-9 pr-3 py-1.5 text-xs sm:text-sm bg-slate-100 dark:bg-neutral-800 border-none rounded-md focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-500"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <select
+            className="rounded-control border px-2 py-1 text-xs sm:text-sm bg-white/90 dark:bg-neutral-900 max-w-[160px] sm:max-w-none"
+            value={courseFilter}
+            onChange={(e) => setCourseFilter(e.target.value)}
+          >
+            <option value="all">All Courses</option>
+            {orderedCourses.map((c: any) => (
+              <option key={String(c.id)} value={String(c.id)}>{labelFor(c)}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {isHardLoading ? (
