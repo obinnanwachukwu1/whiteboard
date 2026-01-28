@@ -192,12 +192,14 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
                     {excused ? 'Excused' : (score != null ? 'Graded' : 'Submitted')}
                   </div>
                   {!locked && !attempting && (
-                    <button 
+                    <Button 
+                      size="sm"
+                      variant="ghost"
                       onClick={() => setAttempting(true)}
-                      className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                      className="h-6 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2"
                     >
                       New Attempt
-                    </button>
+                    </Button>
                   )}
                 </div>
                 <div className="text-xs text-neutral-500 dark:text-neutral-400">
