@@ -203,6 +203,30 @@ export function usePostDiscussionReply() {
   })
 }
 
+// Mark discussion entries as read
+export function useMarkDiscussionEntriesRead() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      courseId,
+      topicId,
+      entryIds,
+    }: {
+      courseId: string | number
+      topicId: string | number
+      entryIds: (string | number)[]
+    }) => {
+      const res = await window.canvas.markDiscussionEntriesRead(courseId, topicId, entryIds)
+      return ensureOk(res)
+    },
+    onSuccess: (_data, variables) => {
+      // Invalidate the discussion view to update read state
+      queryClient.invalidateQueries({ queryKey: ['discussion-view', String(variables.courseId), String(variables.topicId)] })
+    },
+  })
+}
+
 // Submissions
 export function useSubmitAssignment() {
   const queryClient = useQueryClient()

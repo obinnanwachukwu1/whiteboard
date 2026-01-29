@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { Button } from './ui/Button'
-import { ArrowLeft, Send, MessageCircle, User, Maximize2, Minimize2, Search } from 'lucide-react'
+import { ArrowLeft, MessageCircle, User, Maximize2, Minimize2, Search } from 'lucide-react'
 import { useDiscussion, useDiscussionView, useProfile } from '../hooks/useCanvasQueries'
-import { usePostDiscussionEntry, usePostDiscussionReply } from '../hooks/useCanvasMutations'
+import { usePostDiscussionEntry, usePostDiscussionReply, useMarkDiscussionEntriesRead } from '../hooks/useCanvasMutations'
 import { HtmlContent } from './HtmlContent'
+import { RichTextEditor } from './RichTextEditor'
 import { FullscreenContainer } from './FullscreenContainer'
 import type { DiscussionEntry, DiscussionParticipant } from '../types/canvas'
 import { SkeletonText } from './Skeleton'
@@ -38,15 +39,34 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, topicId, title, on
   const { data: profile } = useProfile()
   const postEntry = usePostDiscussionEntry()
   const postReply = usePostDiscussionReply()
+  const markEntriesRead = useMarkDiscussionEntriesRead()
 
-  const [replyText, setReplyText] = useState('')
   const [replyingTo, setReplyingTo] = useState<string | number | null>(null)
   const [threadSearch, setThreadSearch] = useState('')
+
+  // Track which entries we've already marked as read to avoid duplicate calls
+  const markedReadRef = useRef<Set<string | number>>(new Set())
 
   const isLoading = topicLoading || viewLoading
   const participants = view?.participants || []
   const rawEntries = view?.view || []
   const myId = profile?.id ? String(profile.id) : null
+  const unreadEntries = view?.unread_entries || []
+
+  // Mark unread entries as read when they're loaded
+  useEffect(() => {
+    if (!unreadEntries.length) return
+
+    // Filter out entries we've already marked
+    const toMark = unreadEntries.filter(id => !markedReadRef.current.has(id))
+    if (!toMark.length) return
+
+    // Add to our tracking set immediately to prevent duplicate calls
+    toMark.forEach(id => markedReadRef.current.add(id))
+
+    // Mark as read (fire and forget - don't block UI)
+    markEntriesRead.mutate({ courseId, topicId, entryIds: toMark })
+  }, [courseId, topicId, unreadEntries])
 
   // Helper: check if entry (or any descendant) matches search
   const matchesSearch = (entry: DiscussionEntry, search: string): boolean => {
@@ -115,16 +135,15 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, topicId, title, on
     return date.toLocaleDateString()
   }
 
-  const handleSubmitReply = async () => {
-    if (!replyText.trim()) return
+  const handleSubmitReply = async (html: string) => {
+    if (!html || html === '<p></p>') return
 
     try {
       if (replyingTo) {
-        await postReply.mutateAsync({ courseId, topicId, entryId: replyingTo, message: replyText })
+        await postReply.mutateAsync({ courseId, topicId, entryId: replyingTo, message: html })
       } else {
-        await postEntry.mutateAsync({ courseId, topicId, message: replyText })
+        await postEntry.mutateAsync({ courseId, topicId, message: html })
       }
-      setReplyText('')
       setReplyingTo(null)
       refetch()
     } catch (err) {
@@ -178,8 +197,8 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, topicId, title, on
           </div>
 
           {/* Message content */}
-          <div className="text-sm text-neutral-800 dark:text-neutral-300 prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-a:text-blue-600 dark:prose-a:text-blue-400">
-            <HtmlContent html={entry.message} onNavigate={onNavigate} />
+          <div className="text-sm text-neutral-800 dark:text-neutral-300 max-w-none">
+            <HtmlContent html={entry.message} className="rich-html" onNavigate={onNavigate} />
           </div>
 
           {/* Reply button */}
@@ -195,28 +214,15 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, topicId, title, on
 
           {/* Inline reply form */}
           {replyingTo === entry.id && (
-            <div className="mt-4 flex gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
-              <input
-                type="text"
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
+            <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <RichTextEditor
                 placeholder="Write a reply..."
-                className="flex-1 px-4 py-2.5 text-sm border border-neutral-300 dark:border-neutral-700 rounded-full bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    handleSubmitReply()
-                  }
-                }}
+                onSubmit={handleSubmitReply}
+                onCancel={() => setReplyingTo(null)}
+                isSubmitting={postReply.isPending}
+                draftKey={`discussion-${courseId}-${topicId}-reply-${entry.id}`}
                 autoFocus
               />
-              <button
-                onClick={handleSubmitReply}
-                disabled={!replyText.trim() || postReply.isPending}
-                className="w-10 h-10 flex items-center justify-center bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 rounded-full hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity shrink-0"
-              >
-                <Send className="w-4 h-4" />
-              </button>
             </div>
           )}
         </div>
@@ -260,8 +266,8 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, topicId, title, on
                 </span>
               </div>
             </div>
-            <div className="text-base text-neutral-900 dark:text-neutral-200 prose prose-neutral dark:prose-invert max-w-none">
-              <HtmlContent html={topic.message} onNavigate={onNavigate} />
+            <div className="text-base text-neutral-900 dark:text-neutral-200 max-w-none">
+              <HtmlContent html={topic.message} className="rich-html" onNavigate={onNavigate} />
             </div>
           </div>
         )}
@@ -298,28 +304,13 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, topicId, title, on
     if (isLoading || !topic || topic.locked || replyingTo !== null) return null
     return (
       <div className="shrink-0 p-4 border-t border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md">
-        <div className="max-w-4xl mx-auto flex gap-3">
-          <input
-            type="text"
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
+        <div className="max-w-4xl mx-auto">
+          <RichTextEditor
             placeholder="Add a reply..."
-            className="flex-1 px-4 py-3 text-sm border border-neutral-300 dark:border-neutral-700 rounded-full bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 shadow-sm"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleSubmitReply()
-              }
-            }}
+            onSubmit={handleSubmitReply}
+            isSubmitting={postEntry.isPending}
+            draftKey={`discussion-${courseId}-${topicId}-entry`}
           />
-          <button
-            onClick={handleSubmitReply}
-            disabled={!replyText.trim() || postEntry.isPending}
-            className="px-5 py-2 bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 rounded-full hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium shadow-sm transition-all"
-          >
-            <Send className="w-4 h-4" />
-            <span className="hidden sm:inline">Reply</span>
-          </button>
         </div>
       </div>
     )

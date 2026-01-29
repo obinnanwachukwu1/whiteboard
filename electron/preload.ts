@@ -69,6 +69,7 @@ contextBridge.exposeInMainWorld('canvas', {
   getDiscussionView: (courseId: string | number, topicId: string | number) => ipcRenderer.invoke('canvas:getDiscussionView', courseId, topicId),
   postDiscussionEntry: (courseId: string | number, topicId: string | number, message: string) => ipcRenderer.invoke('canvas:postDiscussionEntry', courseId, topicId, message),
   postDiscussionReply: (courseId: string | number, topicId: string | number, entryId: string | number, message: string) => ipcRenderer.invoke('canvas:postDiscussionReply', courseId, topicId, entryId, message),
+  markDiscussionEntriesRead: (courseId: string | number, topicId: string | number, entryIds: (string | number)[]) => ipcRenderer.invoke('canvas:markDiscussionEntriesRead', courseId, topicId, entryIds),
   listCourseFiles: (courseId: string | number, perPage?: number, sort?: 'name' | 'size' | 'created_at' | 'updated_at', order?: 'asc' | 'desc') => ipcRenderer.invoke('canvas:listCourseFiles', courseId, perPage, sort, order),
   listCourseFolders: (courseId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listCourseFolders', courseId, perPage),
   listFolderFiles: (folderId: string | number, perPage?: number) => ipcRenderer.invoke('canvas:listFolderFiles', folderId, perPage),

@@ -136,6 +136,7 @@ import {
   getDiscussionView as svcGetDiscussionView,
   postDiscussionEntry as svcPostDiscussionEntry,
   postDiscussionReply as svcPostDiscussionReply,
+  markDiscussionEntriesRead as svcMarkDiscussionEntriesRead,
   getCourseInfo as svcGetCourseInfo,
   getCourseFrontPage as svcGetCourseFrontPage,
   listCourseFiles as svcListCourseFiles,
@@ -1471,6 +1472,16 @@ ipcMain.handle('canvas:postDiscussionEntry', async (_evt, courseId: string | num
 ipcMain.handle('canvas:postDiscussionReply', async (_evt, courseId: string | number, topicId: string | number, entryId: string | number, message: string) => {
   try {
     const data = await svcPostDiscussionReply(courseId, topicId, entryId, message)
+    return { ok: true, data }
+  } catch (e: any) {
+    const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+    return { ok: false, error: msg }
+  }
+})
+
+ipcMain.handle('canvas:markDiscussionEntriesRead', async (_evt, courseId: string | number, topicId: string | number, entryIds: (string | number)[]) => {
+  try {
+    const data = await svcMarkDiscussionEntriesRead(courseId, topicId, entryIds)
     return { ok: true, data }
   } catch (e: any) {
     const msg = e instanceof CanvasError ? e.message : String(e?.message || e)

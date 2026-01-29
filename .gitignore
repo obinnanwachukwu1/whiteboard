@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 .github/
+.env
 
 # Electron build outputs and installers
 release/

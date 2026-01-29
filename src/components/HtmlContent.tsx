@@ -52,7 +52,7 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
   const sanitized = useMemo(() => {
     return DOMPurify.sanitize(html || '', {
       USE_PROFILES: { html: true },
-      ADD_ATTR: ['style', 'target', 'rel', 'class', 'id', 'srcset', 'sizes', 'loading', 'decoding', 'referrerpolicy', 'allow', 'allowfullscreen', 'frameborder'],
+      ADD_ATTR: ['style', 'target', 'rel', 'class', 'id', 'src', 'href', 'alt', 'title', 'width', 'height', 'srcset', 'sizes', 'loading', 'decoding', 'referrerpolicy', 'allow', 'allowfullscreen', 'frameborder', 'data-api-endpoint', 'data-api-returntype'],
       ADD_TAGS: ['img', 'video', 'audio', 'source', 'picture', 'figure', 'figcaption', 'iframe'],
       // Keep links and images functional, but block unknown protocols
       ALLOW_UNKNOWN_PROTOCOLS: false,

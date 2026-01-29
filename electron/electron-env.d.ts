@@ -65,6 +65,7 @@ interface Window {
     getDiscussionView: (courseId: string | number, topicId: string | number) => Promise<{ ok: boolean; data?: any; error?: string }>
     postDiscussionEntry: (courseId: string | number, topicId: string | number, message: string) => Promise<{ ok: boolean; data?: any; error?: string }>
     postDiscussionReply: (courseId: string | number, topicId: string | number, entryId: string | number, message: string) => Promise<{ ok: boolean; data?: any; error?: string }>
+    markDiscussionEntriesRead: (courseId: string | number, topicId: string | number, entryIds: (string | number)[]) => Promise<{ ok: boolean; data?: any; error?: string }>
     listCourseFolders: (courseId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
     listFolderFiles: (folderId: string | number, perPage?: number) => Promise<{ ok: boolean; data?: any; error?: string }>
     listCourseFiles: (courseId: string | number, perPage?: number, sort?: 'name' | 'size' | 'created_at' | 'updated_at', order?: 'asc' | 'desc') => Promise<{ ok: boolean; data?: any; error?: string }>

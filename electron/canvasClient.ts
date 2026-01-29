@@ -323,6 +323,44 @@ export class CanvasClient {
     )
   }
 
+  markDiscussionEntryRead(
+    courseId: string | number,
+    topicId: string | number,
+    entryId: string | number
+  ) {
+    return this.put<void>(
+      `/courses/${courseId}/discussion_topics/${topicId}/entries/${entryId}/read`
+    )
+  }
+
+  async markDiscussionEntriesRead(
+    courseId: string | number,
+    topicId: string | number,
+    entryIds: (string | number)[]
+  ) {
+    // Mark multiple entries as read in parallel (with concurrency limit)
+    const concurrency = 5
+    const results: Array<{ id: string | number; success: boolean }> = []
+
+    for (let i = 0; i < entryIds.length; i += concurrency) {
+      const batch = entryIds.slice(i, i + concurrency)
+      const batchResults = await Promise.allSettled(
+        batch.map(async (entryId) => {
+          try {
+            await this.markDiscussionEntryRead(courseId, topicId, entryId)
+            return { id: entryId, success: true }
+          } catch {
+            return { id: entryId, success: false }
+          }
+        })
+      )
+      for (const r of batchResults) {
+        if (r.status === 'fulfilled') results.push(r.value)
+      }
+    }
+    return results
+  }
+
   listMyEnrollmentsForCourse(courseId: string | number) {
     // Useful for comparing to Canvas-computed current/final grades
     const p: Record<string, any> = { user_id: 'self', 'type[]': ['StudentEnrollment'] }
@@ -1072,6 +1110,22 @@ export async function postDiscussionReply(
   message: string
 ) {
   return ensureClient().postDiscussionReply(courseId, topicId, entryId, message)
+}
+
+export async function markDiscussionEntryRead(
+  courseId: string | number,
+  topicId: string | number,
+  entryId: string | number
+) {
+  return ensureClient().markDiscussionEntryRead(courseId, topicId, entryId)
+}
+
+export async function markDiscussionEntriesRead(
+  courseId: string | number,
+  topicId: string | number,
+  entryIds: (string | number)[]
+) {
+  return ensureClient().markDiscussionEntriesRead(courseId, topicId, entryIds)
 }
 
 export async function listCourseModulesGql(courseId: string | number, first = 20, itemsFirst = 50) {
