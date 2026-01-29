@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { Button } from './ui/Button'
-import { ArrowLeft, Maximize2, Minimize2, MoreHorizontal, ExternalLink, SquareArrowOutUpRight, Sparkles, FileText, Info, Download } from 'lucide-react'
+import { ArrowLeft, Maximize2, Minimize2, MoreHorizontal, ExternalLink, SquareArrowOutUpRight, Sparkles, FileText, Info, Download, Pin } from 'lucide-react'
 import { HtmlContent } from './HtmlContent'
 import { FileViewer } from './FileViewer'
 import { useAssignmentRest, useCoursePage, useAnnouncement, useMySubmission, useFileMeta } from '../hooks/useCanvasQueries'
@@ -199,6 +199,26 @@ export const CanvasContentView: React.FC<Props> = ({
     } catch {}
   }
 
+  const pinId = `${contentType}:${contentId}`
+  const isPinned = useMemo(() => {
+    return app.pinnedItems?.some(i => i.id === pinId)
+  }, [app.pinnedItems, pinId])
+
+  const togglePin = async () => {
+    setMoreOpen(false)
+    if (isPinned) {
+      app.unpinItem(pinId)
+    } else {
+      app.pinItem({
+        id: pinId,
+        type: contentType,
+        title: resolvedTitle,
+        courseId,
+        contentId,
+      })
+    }
+  }
+
   const header = (ctx: { isFullscreen: boolean; toggle: () => Promise<void> }) => {
     if (isEmbedded || ctx.isFullscreen) {
       // Single-row titlebar for embedded windows or focus mode
@@ -279,6 +299,14 @@ export const CanvasContentView: React.FC<Props> = ({
         </Button>
 
         <Dropdown open={moreOpen} onOpenChange={setMoreOpen} anchorRef={moreBtnRef as any}>
+          <button
+            type="button"
+            className="w-full px-3 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2"
+            onClick={togglePin}
+          >
+            <Pin className="w-4 h-4" />
+            {isPinned ? 'Unpin from Dashboard' : 'Pin to Dashboard'}
+          </button>
           <button
             type="button"
             className="w-full px-3 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2"

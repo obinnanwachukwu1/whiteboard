@@ -34,18 +34,34 @@ export const CourseAssignments: React.FC<Props> = ({ courseId, onOpenDetail }) =
         {!showLoading && !assignmentsQ.error && assignments.length > 0 && (
           <ul className="list-none m-0 p-0 space-y-3 pb-4">
             {assignments.map((a, i) => {
-              const dueStr = a.dueAt ? new Date(a.dueAt).toLocaleString() : null
-              const restId = String((a._id ?? a.id ?? '') as any)
+              const dueAt = a.due_at || a.dueAt
+              const points = a.points_possible ?? a.pointsPossible
+              const dueStr = dueAt ? new Date(dueAt).toLocaleString() : null
+              const restId = String((a.id ?? a._id ?? '') as any)
+              
+              const isSubmitted = Boolean(a.submission?.submitted_at) || 
+                                  a.submission?.workflow_state === 'submitted' || 
+                                  a.submission?.workflow_state === 'graded' ||
+                                  a.submission?.workflow_state === 'pending_review'
               
               return (
-                <li key={i}>
+                <li key={restId || i}>
                   <ListItemRow
-                    icon={<FileText className="w-4 h-4" />}
-                    title={a.name || 'Assignment'}
+                    icon={<FileText className={`w-4 h-4 ${isSubmitted ? 'text-green-600 dark:text-green-400' : ''}`} />}
+                    title={
+                      <div className="flex items-center gap-2">
+                        <span>{a.name || 'Assignment'}</span>
+                        {isSubmitted && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                            Done
+                          </span>
+                        )}
+                      </div>
+                    }
                     onClick={() => restId && onOpenDetail({ contentType: 'assignment', contentId: restId, title: a.name || 'Assignment' })}
                     subtitle={
                       <>
-                        <MetadataBadge><Star className="w-3 h-3" /> {typeof a.pointsPossible === 'number' ? `${a.pointsPossible} pts` : '—'}</MetadataBadge>
+                        <MetadataBadge><Star className="w-3 h-3" /> {typeof points === 'number' ? `${points} pts` : '—'}</MetadataBadge>
                         <MetadataBadge><Calendar className="w-3 h-3" /> {dueStr ? `Due ${dueStr}` : 'No due date'}</MetadataBadge>
                       </>
                     }

@@ -14,7 +14,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { PriorityList } from './dashboard/PriorityList'
 import { ActivityPanel } from './dashboard/ActivityPanel'
 import { RecentFeedback } from './dashboard/RecentFeedback'
-import { QuickNotes } from './dashboard/QuickNotes'
+import { PinnedPages } from './dashboard/PinnedPages'
 
 type Props = {
   due: DueItem[]
@@ -44,10 +44,13 @@ export const Dashboard: React.FC<Props> = ({
     setTimeHorizon,
     showGrades,
     setShowGrades,
-    quickNotes,
-    setQuickNotes
+    pinnedItems,
+    setPinnedItems
   } = useDashboardSettings()
   
+  const handleUnpin = React.useCallback((id: string) => {
+    setPinnedItems(pinnedItems.filter(i => i.id !== id))
+  }, [pinnedItems, setPinnedItems])
   // Use aggregated dashboard data (includes Recent Feedback derived from gradebook)
   const { recentFeedback } = useDashboardData({
     courses: courses || [],
@@ -197,9 +200,9 @@ export const Dashboard: React.FC<Props> = ({
           onClickItem={handleAssignmentClick}
         />
         
-        <QuickNotes
-          value={quickNotes}
-          onChange={setQuickNotes}
+        <PinnedPages
+          items={pinnedItems}
+          onUnpin={handleUnpin}
         />
       </div>
     </div>

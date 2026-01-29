@@ -457,7 +457,7 @@ export function useGlobalSearch() {
             // Fetch assignments
             let assignments = queryClient.getQueryData(['course-assignments', courseId, 200]) as any[] | undefined
             if (!assignments) {
-              const res = await window.canvas.listCourseAssignments(courseId, 200)
+              const res = await window.canvas.listAssignmentsWithSubmission(courseId, 200)
               if (res?.ok && res.data) {
                 assignments = res.data
                 queryClient.setQueryData(['course-assignments', courseId, 200], assignments)
@@ -599,7 +599,7 @@ export function useGlobalSearch() {
         try {
           // Force fetch (ignore cache)
           const [assignRes, modRes, annRes, fileRes] = await Promise.all([
-            window.canvas.listCourseAssignments(courseId, 200),
+            window.canvas.listAssignmentsWithSubmission(courseId, 200),
             window.canvas.listCourseModulesGql(courseId, 20, 50),
             window.canvas.listCourseAnnouncements?.(courseId, 50),
             window.canvas.listCourseFiles?.(courseId, 100, 'updated_at', 'desc'),

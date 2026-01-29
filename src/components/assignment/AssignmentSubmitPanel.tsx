@@ -1,5 +1,5 @@
 import React from 'react'
-import { ExternalLink, Link2, Loader2, Type, UploadCloud, X, File, CheckCircle2, Clock } from 'lucide-react'
+import { ExternalLink, Link2, Loader2, UploadCloud, X, File, CheckCircle2, Clock } from 'lucide-react'
 import type { AssignmentRestDetail, SubmissionDetail } from '../../types/canvas'
 import { Button } from '../ui/Button'
 import { useSubmitAssignment, useSubmitAssignmentUpload } from '../../hooks/useCanvasMutations'
@@ -126,7 +126,6 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
           courseId, 
           assignmentRestId, 
           filePaths: picked.map((p) => p.path),
-          allowedExtensions: allowedExtensions.length > 0 ? allowedExtensions : undefined
         })
         setPicked([])
         setAttempting(false)

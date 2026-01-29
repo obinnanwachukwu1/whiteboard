@@ -18,7 +18,17 @@ export type DashboardSettings = {
   maxPriorityItems: number
   /** Show grades in Recent Feedback */
   showGrades: boolean
-  /** Quick notes content */
+  /** Pinned items on dashboard */
+  pinnedItems: Array<{
+    id: string
+    type: 'course' | 'assignment' | 'page' | 'discussion' | 'announcement' | 'file' | 'url'
+    title: string
+    subtitle?: string
+    url?: string // for external links or deep links
+    courseId?: string | number
+    contentId?: string | number
+  }>
+  /** Quick notes content (legacy/optional) */
   quickNotes: string
 }
 
@@ -27,6 +37,7 @@ const DEFAULT_SETTINGS: DashboardSettings = {
   showSubmitted: false,
   maxPriorityItems: 5,
   showGrades: false,
+  pinnedItems: [],
   quickNotes: '',
 }
 
@@ -52,6 +63,9 @@ function loadSettings(): DashboardSettings {
       showGrades: typeof parsed.showGrades === 'boolean'
         ? parsed.showGrades
         : DEFAULT_SETTINGS.showGrades,
+      pinnedItems: Array.isArray(parsed.pinnedItems)
+        ? parsed.pinnedItems
+        : DEFAULT_SETTINGS.pinnedItems,
       quickNotes: typeof parsed.quickNotes === 'string'
         ? parsed.quickNotes
         : DEFAULT_SETTINGS.quickNotes,
@@ -127,6 +141,10 @@ export function useDashboardSettings() {
   const setQuickNotes = useCallback((notes: string) => {
     setSettings({ quickNotes: notes })
   }, [setSettings])
+
+  const setPinnedItems = useCallback((items: DashboardSettings['pinnedItems']) => {
+    setSettings({ pinnedItems: items })
+  }, [setSettings])
   
   const resetToDefaults = useCallback(() => {
     setSettingsState(DEFAULT_SETTINGS)
@@ -141,6 +159,7 @@ export function useDashboardSettings() {
     setMaxPriorityItems,
     setShowGrades,
     setQuickNotes,
+    setPinnedItems,
     resetToDefaults,
     
     // Convenience accessors
@@ -148,6 +167,7 @@ export function useDashboardSettings() {
     showSubmitted: settings.showSubmitted,
     maxPriorityItems: settings.maxPriorityItems,
     showGrades: settings.showGrades,
+    pinnedItems: settings.pinnedItems,
     quickNotes: settings.quickNotes,
   }
 }

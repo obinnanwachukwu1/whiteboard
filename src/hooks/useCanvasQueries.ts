@@ -87,7 +87,8 @@ export function useCourseAssignments(courseId: string | number | undefined, firs
     queryKey: ['course-assignments', courseId != null ? String(courseId) : courseId, first],
     queryFn: async () => {
       if (courseId == null) return []
-      return ensureOk(await window.canvas.listCourseAssignments(String(courseId), first))
+      // Use REST endpoint with submission data included for "Done" status
+      return ensureOk(await window.canvas.listAssignmentsWithSubmission(String(courseId), first))
     },
     enabled: courseId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 10,

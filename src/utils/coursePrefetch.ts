@@ -28,7 +28,7 @@ export async function prefetchCourseTab(queryClient: QueryClient, courseId: stri
         await queryClient.prefetchQuery({
           queryKey: ['course-assignments', id, 200],
           queryFn: async () => {
-            const res = await window.canvas.listCourseAssignments(id, 200)
+            const res = await window.canvas.listAssignmentsWithSubmission(id, 200)
             if (!res?.ok) throw new Error(res?.error || 'Failed to load assignments')
             return res.data || []
           },

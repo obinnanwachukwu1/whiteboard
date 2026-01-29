@@ -31,6 +31,25 @@ export type AppContextValue = {
   onOpenModules: (courseId: string | number) => void
   onSignOut: () => Promise<void>
   onOpenSettings: () => void
+  pinnedItems: Array<{
+    id: string
+    type: 'course' | 'assignment' | 'page' | 'discussion' | 'announcement' | 'file' | 'url'
+    title: string
+    subtitle?: string
+    url?: string
+    courseId?: string | number
+    contentId?: string | number
+  }>
+  pinItem: (item: {
+    id: string
+    type: 'course' | 'assignment' | 'page' | 'discussion' | 'announcement' | 'file' | 'url'
+    title: string
+    subtitle?: string
+    url?: string
+    courseId?: string | number
+    contentId?: string | number
+  }) => void
+  unpinItem: (id: string) => void
 }
 
 export const AppContext = React.createContext<AppContextValue | null>(null)

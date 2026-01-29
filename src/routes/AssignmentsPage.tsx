@@ -6,8 +6,7 @@ import { Button } from '../components/ui/Button'
 import { CalendarClock } from 'lucide-react'
 import { CourseAvatar } from '../components/CourseAvatar'
 import { useCourseImages } from '../hooks/useCourseImages'
-
-type DueItem = { course_id: string | number; course_name?: string; name: string; dueAt: string; pointsPossible?: number; htmlUrl?: string; assignment_rest_id?: string | number }
+import type { DueItem } from '../types/canvas'
 
 function extractIdFromUrl(url?: string, key?: string): string | null {
   if (!url || !key) return null
@@ -70,16 +69,43 @@ export default function AssignmentsPage() {
   const setStatus = (id: string, status: KanbanStatus) => setKanban((prev) => ({ ...prev, [id]: status }))
   const assignId = (d: DueItem) => String(d.assignment_rest_id || extractIdFromUrl(d.htmlUrl, 'assignments') || `${d.course_id}:${d.name}:${d.dueAt}`)
 
+  // Derive effective status, forcing 'done' if Canvas says submitted
+  const effectiveKanban = React.useMemo(() => {
+    const next = { ...kanban }
+    let changed = false
+    for (const d of allDue) {
+      const isSubmitted = Boolean(d.submission?.submittedAt) || 
+                          d.submission?.workflowState === 'submitted' || 
+                          d.submission?.workflowState === 'graded'
+      
+      if (isSubmitted) {
+        const id = assignId(d)
+        if (next[id] !== 'done') {
+          next[id] = 'done'
+          changed = true
+        }
+      }
+    }
+    return { status: next, changed }
+  }, [allDue, kanban])
+
+  // Persist auto-done updates
+  React.useEffect(() => {
+    if (effectiveKanban.changed) {
+      setKanban(effectiveKanban.status)
+    }
+  }, [effectiveKanban])
+
   const columns = React.useMemo(() => {
     const col: Record<KanbanStatus, DueItem[]> = { todo: [], doing: [], done: [] }
     for (const d of allDue) {
       const id = assignId(d)
-      const st = (kanban[id] || 'todo') as KanbanStatus
+      const st = (effectiveKanban.status[id] || 'todo') as KanbanStatus
       col[st].push(d)
     }
     ;(Object.keys(col) as KanbanStatus[]).forEach((k) => col[k].sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt))))
     return col
-  }, [allDue, kanban])
+  }, [allDue, effectiveKanban.status])
 
   const [dragId, setDragId] = React.useState<string | null>(null)
   const onDragStart = (e: React.DragEvent, id: string) => { setDragId(id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id) }
@@ -151,7 +177,7 @@ export default function AssignmentsPage() {
                     </div>
                     <div className="text-sm text-slate-600 dark:text-neutral-300">{fmt(d.dueAt)}</div>
                     <div className="text-sm">
-                      <select value={kanban[id] || 'todo'} onChange={(e) => setStatus(id, e.target.value as KanbanStatus)} onClick={(e) => e.stopPropagation()} className="rounded-control border px-2 py-1 text-xs bg-white/90 dark:bg-neutral-900">
+                      <select value={effectiveKanban.status[id] || 'todo'} onChange={(e) => setStatus(id, e.target.value as KanbanStatus)} onClick={(e) => e.stopPropagation()} className="rounded-control border px-2 py-1 text-xs bg-white/90 dark:bg-neutral-900">
                         <option value="todo">To Do</option>
                         <option value="doing">Doing</option>
                         <option value="done">Done</option>
@@ -204,7 +230,7 @@ export default function AssignmentsPage() {
                   </div>
                   <div className="mt-2 flex justify-end">
                     <select
-                      value={kanban[id] || 'todo'}
+                      value={effectiveKanban.status[id] || 'todo'}
                       onChange={(e) => setStatus(id, e.target.value as KanbanStatus)}
                       onClick={(e) => e.stopPropagation()}
                       className="rounded-control border px-2 py-1 text-xs bg-white/90 dark:bg-neutral-900"
@@ -268,7 +294,7 @@ export default function AssignmentsPage() {
                       <div className="mt-1 text-right">
                         <div className="inline-flex gap-1">
                           {(['todo','doing','done'] as KanbanStatus[]).map((s) => (
-                            <button key={s} className={`px-2 py-0.5 text-[11px] rounded border ${kanban[id] === s ? 'bg-slate-900 text-white border-transparent' : 'bg-transparent border-gray-300 dark:border-neutral-700'}`} onClick={() => setStatus(id, s)}>
+                            <button key={s} className={`px-2 py-0.5 text-[11px] rounded border ${effectiveKanban.status[id] === s ? 'bg-slate-900 text-white border-transparent' : 'bg-transparent border-gray-300 dark:border-neutral-700'}`} onClick={() => setStatus(id, s)}>
                               {s === 'todo' ? 'To Do' : s === 'doing' ? 'Doing' : 'Done'}
                             </button>
                           ))}

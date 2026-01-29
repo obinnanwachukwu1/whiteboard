@@ -19,6 +19,7 @@ import { useWindowControlsOverlayInsets } from '../hooks/useWindowControlsOverla
 import { NotificationManager } from '../components/NotificationManager'
 import { prefetchNavTab } from '../utils/navPrefetch'
 import { SettingsModal } from '../components/SettingsModal'
+import { useDashboardSettings } from '../hooks/useDashboardSettings'
 
 // Context definitions moved to src/context/AppContext.tsx
 
@@ -68,6 +69,8 @@ export function RootLayout() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [inboxOpen, setInboxOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  
+  const { pinnedItems, setPinnedItems } = useDashboardSettings()
 
   // Embed windows ("Open in New Window") should not trigger global app fetches.
   // They still initialize Canvas and fetch the requested content, but avoid
@@ -395,11 +398,11 @@ export function RootLayout() {
           },
           staleTime: 1000 * 60 * 5,
         }))
-      } else if (defaultView === 'assignments') {
+        } else if (defaultView === 'assignments') {
         promises.push(queryClient.prefetchQuery({
           queryKey: ['course-assignments', id, 200],
           queryFn: async () => {
-            const res = await window.canvas.listCourseAssignments(id, 200)
+            const res = await window.canvas.listAssignmentsWithSubmission(id, 200)
             return res?.data || []
           },
           staleTime: 1000 * 60 * 5,
@@ -584,6 +587,15 @@ export function RootLayout() {
     onOpenModules: (courseId) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'modules' } }) },
     onSignOut,
     onOpenSettings: () => setSettingsOpen(true),
+    pinnedItems,
+    pinItem: (item) => {
+      // Avoid duplicates
+      if (pinnedItems.some(i => i.id === item.id)) return
+      setPinnedItems([...pinnedItems, item])
+    },
+    unpinItem: (id) => {
+      setPinnedItems(pinnedItems.filter(i => i.id !== id))
+    }
   }
 
   function filterDueForDashboard(list: any[]) {

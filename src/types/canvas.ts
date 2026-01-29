@@ -15,13 +15,23 @@ export type CanvasCourse = {
 }
 
 export type CanvasAssignment = {
-  id?: string
+  id?: string | number
   _id?: string | number
   name: string
-  dueAt?: string
+  dueAt?: string | null
+  due_at?: string | null
   state?: string
-  pointsPossible?: number
+  pointsPossible?: number | null
+  points_possible?: number | null
   htmlUrl?: string
+  html_url?: string
+  description?: string
+  submission?: {
+    submitted_at?: string | null
+    workflow_state?: string
+    grade?: string
+    score?: number
+  }
 }
 
 export type SubmissionComment = {
@@ -105,6 +115,7 @@ export type DueItem = {
   dueAt: string
   pointsPossible?: number
   htmlUrl?: string
+  assignment_rest_id?: string | number
   submission?: {
     submittedAt?: string
     state?: string
