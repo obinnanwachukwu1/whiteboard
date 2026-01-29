@@ -29,10 +29,15 @@ const aiManager = new AIManager()
 const embeddingManager = new EmbeddingManager()
 const fileMetaStore = new FileMetaStore()
 
-// Enable high refresh rate on macOS ProMotion displays
+// Enable high refresh rate on macOS ProMotion displays (120Hz)
 if (process.platform === 'darwin') {
   app.commandLine.appendSwitch('disable-frame-rate-limit')
+  app.commandLine.appendSwitch('disable-gpu-vsync')
 }
+
+// Disable background throttling globally for smoother animations
+app.commandLine.appendSwitch('disable-background-timer-throttling')
+app.commandLine.appendSwitch('disable-renderer-backgrounding')
 
 // Secure file upload handling: Map<handle, absolutePath>
 const uploadFileMap = new Map<string, string>()
@@ -267,6 +272,7 @@ function createContentWindow(params: {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      backgroundThrottling: false, // Don't throttle when window loses focus (smoother animations)
     },
   })
 
@@ -396,11 +402,12 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      backgroundThrottling: false, // Don't throttle when window loses focus (smoother animations)
     },
   })
 
   // (No native embedded views to clean up.)
-  
+
   // Show window once content is ready (prevents white flash)
   win.once('ready-to-show', () => {
     win?.show()
