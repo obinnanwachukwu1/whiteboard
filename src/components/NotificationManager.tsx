@@ -12,12 +12,13 @@ type NotificationSettings = {
   notifiedAssignmentIds: number[] // List of assignment IDs we already warned about
 }
 
+// Use a date in the past for first-time users so they get notified about recent items
 const DEFAULT_SETTINGS: NotificationSettings = {
   enabled: true,
   notifyDueAssignments: true,
   notifyNewGrades: true,
   notifyNewAnnouncements: true,
-  lastChecked: new Date().toISOString(),
+  lastChecked: '', // Empty means first run - will be set on first check
   notifiedAssignmentIds: [],
 }
 
@@ -76,11 +77,29 @@ export function NotificationManager() {
     queryClient.invalidateQueries({ queryKey: ['app-config'] })
   }
 
+  // Debug: log notification state on mount
+  useEffect(() => {
+    console.log('[Notifications] State:', {
+      enabled: settings.enabled,
+      permission: Notification.permission,
+      notifyDueAssignments: settings.notifyDueAssignments,
+      notifyNewGrades: settings.notifyNewGrades,
+      notifyNewAnnouncements: settings.notifyNewAnnouncements,
+      lastChecked: settings.lastChecked,
+    })
+  }, [settings.enabled, settings.notifyDueAssignments, settings.notifyNewGrades, settings.notifyNewAnnouncements, settings.lastChecked])
+
   // Request permission on mount if enabled
   useEffect(() => {
     if (settings.enabled && !permissionRequested.current && Notification.permission === 'default') {
       permissionRequested.current = true
-      Notification.requestPermission()
+      Notification.requestPermission().then((result) => {
+        if (result === 'granted') {
+          console.log('[Notifications] Permission granted')
+        } else {
+          console.log('[Notifications] Permission denied or dismissed')
+        }
+      })
     }
   }, [settings.enabled])
 
@@ -89,12 +108,16 @@ export function NotificationManager() {
     queryKey: ['notifications', 'activity-stream', courses?.length], // Re-run if courses load
     queryFn: async () => {
       if (!settings.enabled) return null
-      
+      if (Notification.permission !== 'granted') return null
+
       const res = await window.canvas.listActivityStream?.({ onlyActiveCourses: true, perPage: 20 })
       if (!res?.ok) return null
-      
+
       const items = res.data || []
-      const lastChecked = new Date(settings.lastChecked)
+      // Handle first run: use 1 hour ago if no lastChecked saved
+      const lastChecked = settings.lastChecked
+        ? new Date(settings.lastChecked)
+        : new Date(Date.now() - 60 * 60 * 1000) // 1 hour ago
       let maxDate = lastChecked
 
       // Iterate newest first
@@ -211,6 +234,7 @@ export function NotificationManager() {
     queryKey: ['notifications', 'due-assignments'],
     queryFn: async () => {
       if (!settings.enabled || !settings.notifyDueAssignments) return null
+      if (Notification.permission !== 'granted') return null
 
       // Look ahead 24 hours
       const res = await window.canvas.listDueAssignments?.({ days: 1 })

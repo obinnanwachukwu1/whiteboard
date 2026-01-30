@@ -288,6 +288,22 @@ function createContentWindow(params: {
     return { action: 'deny' }
   })
 
+  // Block DevTools keyboard shortcuts in production
+  if (app.isPackaged) {
+    child.webContents.on('before-input-event', (event, input) => {
+      if (input.type === 'keyDown') {
+        const isMac = process.platform === 'darwin'
+        const isDevToolsShortcut =
+          (isMac && input.meta && input.alt && input.key.toLowerCase() === 'i') ||
+          (!isMac && input.control && input.shift && input.key.toLowerCase() === 'i') ||
+          input.key === 'F12'
+        if (isDevToolsShortcut) {
+          event.preventDefault()
+        }
+      }
+    })
+  }
+
   const hash = buildContentHash({
     courseId: params.courseId,
     type: params.type,
@@ -513,6 +529,23 @@ function createWindow() {
     win?.webContents.send('main-process-message', (new Date).toLocaleString())
   })
 
+  // Block DevTools keyboard shortcuts in production
+  if (app.isPackaged) {
+    win.webContents.on('before-input-event', (event, input) => {
+      // Block Cmd+Option+I (Mac) / Ctrl+Shift+I (Windows/Linux)
+      if (input.type === 'keyDown') {
+        const isMac = process.platform === 'darwin'
+        const isDevToolsShortcut =
+          (isMac && input.meta && input.alt && input.key.toLowerCase() === 'i') ||
+          (!isMac && input.control && input.shift && input.key.toLowerCase() === 'i') ||
+          input.key === 'F12'
+        if (isDevToolsShortcut) {
+          event.preventDefault()
+        }
+      }
+    })
+  }
+
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
   } else {
@@ -640,10 +673,15 @@ function createAppMenu() {
     {
       label: 'View',
       submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
+        // Only show dev tools in development
+        ...(!app.isPackaged
+          ? [
+              { role: 'reload' } as Electron.MenuItemConstructorOptions,
+              { role: 'forceReload' } as Electron.MenuItemConstructorOptions,
+              { role: 'toggleDevTools' } as Electron.MenuItemConstructorOptions,
+              { type: 'separator' } as Electron.MenuItemConstructorOptions,
+            ]
+          : []),
         { role: 'resetZoom' },
         { role: 'zoomIn' },
         { role: 'zoomOut' },
@@ -688,14 +726,20 @@ function createAppMenu() {
 }
 
 app.whenReady().then(async () => {
-  // SECURITY: Deny all permission requests (camera, mic, notifications, etc.)
-  // Unless we specifically add an allowlist later.
-  session.defaultSession.setPermissionRequestHandler((_webContents: any, _permission: any, callback: any) => {
-    callback(false)
+  // SECURITY: Deny all permission requests except notifications
+  session.defaultSession.setPermissionRequestHandler((_webContents: any, permission: any, callback: any) => {
+    if (permission === 'notifications') {
+      callback(true)
+    } else {
+      callback(false)
+    }
   })
-  
-  // Also deny permission checks (navigator.permissions.query)
-  session.defaultSession.setPermissionCheckHandler((_webContents: any, _permission: any) => {
+
+  // Also deny permission checks except notifications
+  session.defaultSession.setPermissionCheckHandler((_webContents: any, permission: any) => {
+    if (permission === 'notifications') {
+      return true
+    }
     return false
   })
 
