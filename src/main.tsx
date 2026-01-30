@@ -14,8 +14,12 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
 import { QueryClient, QueryClientProvider, dehydrate, hydrate } from '@tanstack/react-query'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { ToastProvider } from './components/ui/Toaster'
+
+// Lazy load devtools only in development
+const ReactQueryDevtools = React.lazy(() =>
+  import('@tanstack/react-query-devtools').then((m) => ({ default: m.ReactQueryDevtools }))
+)
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { RouterProvider } from '@tanstack/react-router'
 import { router } from './router'
@@ -145,7 +149,11 @@ async function main() {
               <RouterProvider router={router} />
             </Bootstrap>
           </ErrorBoundary>
-          {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />}
+          {import.meta.env.DEV && (
+            <React.Suspense fallback={null}>
+              <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
+            </React.Suspense>
+          )}
         </ToastProvider>
       </QueryClientProvider>
     </React.StrictMode>,

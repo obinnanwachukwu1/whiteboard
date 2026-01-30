@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState, useLayoutEffect } from 'react'
 import { BookOpen, Megaphone, FileText, Percent, Link as LinkIcon } from 'lucide-react'
 
 export type CourseTabKey = 'home' | 'wiki' | 'syllabus' | 'announcements' | 'discussions' | 'files' | 'modules' | 'links' | 'assignments' | 'grades' | 'people'
@@ -27,10 +27,11 @@ const LABEL_TAB_WIDTH = 120
 
 export const FloatingCourseTabs: React.FC<Props> = ({ current, onChange, anchorId, tabs, onHover }) => {
   const [left, setLeft] = useState<number | null>(null)
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
+  const [visible, setVisible] = useState(false)
+  const hasShownRef = useRef(false) // Track if we've already shown once
   const containerRef = useRef<HTMLDivElement>(null)
   const hoverTimer = useRef<any>(null)
-  const resizeRaf = useRef<number | null>(null)
   const anchorObserver = useRef<ResizeObserver | null>(null)
 
   const tabList = tabs || defaultTabs
@@ -39,69 +40,74 @@ export const FloatingCourseTabs: React.FC<Props> = ({ current, onChange, anchorI
     if (hoverTimer.current) clearTimeout(hoverTimer.current)
     hoverTimer.current = setTimeout(() => {
       onHover?.(key)
-    }, 150) // 150ms delay
+    }, 150)
   }
 
   const handleMouseLeave = () => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current)
   }
 
-  useEffect(() => {
+  // Calculate position and collapsed state synchronously before paint
+  useLayoutEffect(() => {
     const compute = () => {
-      if (resizeRaf.current) cancelAnimationFrame(resizeRaf.current)
-      resizeRaf.current = requestAnimationFrame(() => {
-        if (!anchorId) { setLeft(null); return }
-        const el = document.getElementById(anchorId)
-        if (!el) { setLeft(null); return }
-        const rect = el.getBoundingClientRect()
-        setLeft(rect.left + rect.width / 2)
+      // Calculate collapsed state
+      const availableWidth = window.innerWidth - SIDEBAR_WIDTH - 80
+      const fullWidthWithLabels = tabList.length * LABEL_TAB_WIDTH
+      setCollapsed(fullWidthWithLabels > availableWidth)
+
+      // Calculate position
+      if (!anchorId) {
+        setLeft(null)
+        return
+      }
+      const el = document.getElementById(anchorId)
+      if (!el) {
+        setLeft(null)
+        return
+      }
+      const rect = el.getBoundingClientRect()
+      setLeft(rect.left + rect.width / 2)
+    }
+
+    // Compute immediately
+    compute()
+
+    // Only fade in once per mount - subsequent tab list changes shouldn't re-fade
+    let showTimer: number | null = null
+    if (!hasShownRef.current) {
+      showTimer = requestAnimationFrame(() => {
+        hasShownRef.current = true
+        setVisible(true)
       })
     }
 
-    compute()
+    // Set up observers for future changes
     const anchorEl = anchorId ? document.getElementById(anchorId) : null
     if (anchorEl && typeof ResizeObserver !== 'undefined') {
-      anchorObserver.current = new ResizeObserver(() => compute())
+      anchorObserver.current = new ResizeObserver(compute)
       anchorObserver.current.observe(anchorEl)
     }
 
     window.addEventListener('resize', compute)
     return () => {
       window.removeEventListener('resize', compute)
-      if (resizeRaf.current) cancelAnimationFrame(resizeRaf.current)
+      if (showTimer) cancelAnimationFrame(showTimer)
       if (anchorObserver.current && anchorEl) anchorObserver.current.unobserve(anchorEl)
       anchorObserver.current = null
     }
-  }, [anchorId])
-
-  // Check if labels would fit based on tab count and available width
-  useEffect(() => {
-    const checkOverflow = () => {
-      if (resizeRaf.current) cancelAnimationFrame(resizeRaf.current)
-      resizeRaf.current = requestAnimationFrame(() => {
-        // Available width = viewport - sidebar - padding on both sides
-        const availableWidth = window.innerWidth - SIDEBAR_WIDTH - 80
-        const fullWidthWithLabels = tabList.length * LABEL_TAB_WIDTH
-
-        setCollapsed(fullWidthWithLabels > availableWidth)
-      })
-    }
-
-    checkOverflow()
-    window.addEventListener('resize', checkOverflow)
-    return () => {
-      window.removeEventListener('resize', checkOverflow)
-      if (resizeRaf.current) cancelAnimationFrame(resizeRaf.current)
-    }
-  }, [tabList.length])
+  }, [anchorId, tabList.length])
 
   return (
     <div
       ref={containerRef}
-      className="fixed top-20 z-50 px-2 py-2 pointer-events-none"
-      style={{ left: left ?? '50%', transform: 'translateX(-50%)' }}
+      className="fixed top-20 z-50 px-2 py-2 pointer-events-none transition-opacity duration-150"
+      style={{
+        left: left ?? '50%',
+        transform: 'translateX(-50%)',
+        opacity: visible ? 1 : 0,
+      }}
     >
-      <div 
+      <div
         className="pointer-events-auto inline-flex items-center gap-px rounded-full overflow-hidden ring-1 ring-gray-200/80 dark:ring-neutral-800/80 bg-white/60 dark:bg-neutral-900/70 backdrop-blur-md shadow-lg"
       >
         {tabList.map(({ key, label, Icon }) => {

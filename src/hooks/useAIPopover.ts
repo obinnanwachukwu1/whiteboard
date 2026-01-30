@@ -22,6 +22,10 @@ export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverO
   const streamCleanupRef = useRef<(() => void) | null>(null)
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Store onGenerate in a ref so it doesn't reset the hover timer on every render
+  const onGenerateRef = useRef(onGenerate)
+  onGenerateRef.current = onGenerate
+
   const handleMouseEnter = useCallback((e: React.MouseEvent) => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current)
@@ -57,11 +61,11 @@ export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverO
       timer = setTimeout(() => {
         if (isHovered) {
           setShowPopover(true)
-          
+
           // Start generation if not already done/doing
           if (!text && !loading) {
             setLoading(true)
-            const result = onGenerate((newText) => {
+            const result = onGenerateRef.current((newText) => {
               setText(newText)
             })
 
@@ -76,19 +80,19 @@ export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverO
     } else {
       // Not hovered or disabled
       setShowPopover(false)
-      
+
       // Cleanup stream
       if (streamCleanupRef.current) {
         streamCleanupRef.current()
         streamCleanupRef.current = null
       }
-      
+
       setLoading(false)
       setText(null)
     }
-    
+
     return () => clearTimeout(timer)
-  }, [isHovered, enabled, showPopover, text, loading, delay, onGenerate])
+  }, [isHovered, enabled, showPopover, text, loading, delay])
 
   // Cleanup on unmount
   useEffect(() => {

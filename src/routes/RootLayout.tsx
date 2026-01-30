@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { Header } from '../components/Header'
 import { Sidebar, type SidebarConfig } from '../components/Sidebar'
@@ -531,9 +531,9 @@ export function RootLayout() {
     })
   }, [prefetchEnabled, hasToken, handlePrefetchNav])
 
-  const setActiveCourseId = (id: string | number | null) => setActiveCourseIdState(id)
+  const setActiveCourseId = useCallback((id: string | number | null) => setActiveCourseIdState(id), [])
 
-  const saveCourseImages = async (map: Record<string, string>) => {
+  const saveCourseImages = useCallback(async (map: Record<string, string>) => {
     setCourseImagesState(map)
     try {
       const cfg = await window.settings.get?.()
@@ -541,9 +541,9 @@ export function RootLayout() {
       all[baseUrl] = map
       await window.settings.set?.({ courseImages: all })
     } catch {}
-  }
+  }, [baseUrl])
 
-  const onSignOut = async () => {
+  const onSignOut = useCallback(async () => {
     try { await window.canvas.clearToken?.(baseUrl) } catch {}
     try { await window.settings.set?.({ cachedCourses: [], cachedDue: [], queryCache: undefined }) } catch {}
     try { queryClient.clear() } catch {}
@@ -552,17 +552,100 @@ export function RootLayout() {
     setHasToken(false)
     setPdfGestureZoomEnabledState(true)
     navigate({ to: '/dashboard' })
+  }, [baseUrl, queryClient, navigate])
+
+  const onOpenSettings = useCallback(() => setSettingsOpen(true), [])
+
+  const onOpenCourse = useCallback((id: string | number) => {
+    setActiveCourseIdState(id)
+    navigate({ to: '/course/$courseId', params: { courseId: String(id) } })
+  }, [navigate])
+
+  const onOpenAssignment = useCallback((courseId: string | number, restId: string | number, title?: string) => {
+    setActiveCourseIdState(courseId)
+    navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'assignments', type: 'assignment', contentId: String(restId), title } })
+  }, [navigate])
+
+  const onOpenAnnouncement = useCallback((courseId: string | number, topicId: string | number, title?: string) => {
+    setActiveCourseIdState(courseId)
+    navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'announcements', type: 'announcement', contentId: String(topicId), title } })
+  }, [navigate])
+
+  const onOpenDiscussion = useCallback((courseId: string | number, topicId: string | number, title?: string) => {
+    setActiveCourseIdState(courseId)
+    navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'discussions', type: 'discussion', contentId: String(topicId), title } })
+  }, [navigate])
+
+  const onOpenPage = useCallback((courseId: string | number, pageUrlOrSlug: string, title?: string) => {
+    setActiveCourseIdState(courseId)
+    navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'home', type: 'page', contentId: String(pageUrlOrSlug), title } })
+  }, [navigate])
+
+  const onOpenFile = useCallback((courseId: string | number, fileId: string | number, title?: string) => {
+    setActiveCourseIdState(courseId)
+    navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'files', type: 'file', contentId: String(fileId), title } })
+  }, [navigate])
+
+  const onOpenModules = useCallback((courseId: string | number) => {
+    setActiveCourseIdState(courseId)
+    navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'modules' } })
+  }, [navigate])
+
+  type PinnedItemType = {
+    id: string
+    type: 'course' | 'assignment' | 'page' | 'discussion' | 'announcement' | 'file' | 'url'
+    title: string
+    subtitle?: string
+    url?: string
+    courseId?: string | number
+    contentId?: string | number
   }
 
-  const context: AppContextValue = {
+  // Use refs to avoid re-creating callbacks when pinnedItems changes
+  const pinnedItemsRef = useRef(pinnedItems)
+  pinnedItemsRef.current = pinnedItems
+
+  const pinItem = useCallback((item: PinnedItemType) => {
+    const current = pinnedItemsRef.current
+    if (current.some((i) => i.id === item.id)) return
+    setPinnedItems([...current, item])
+  }, [setPinnedItems])
+
+  const unpinItem = useCallback((id: string) => {
+    setPinnedItems(pinnedItemsRef.current.filter((i) => i.id !== id))
+  }, [setPinnedItems])
+
+  // Memoize derived data
+  const courses = useMemo(() => embedBoot ? [] : (coursesQ.data || cachedCourses || []), [embedBoot, coursesQ.data, cachedCourses])
+
+  const due = useMemo(() => {
+    if (embedBoot) return []
+    const list = dueQ.data || cachedDue || []
+    const now = Date.now()
+    const horizon = now + 7 * 24 * 60 * 60 * 1000
+    return (Array.isArray(list) ? list : []).filter((it: any) => {
+      const raw = it?.dueAt
+      if (!raw) return true
+      const t = Date.parse(String(raw))
+      if (!Number.isFinite(t)) return true
+      return t <= horizon
+    })
+  }, [embedBoot, dueQ.data, cachedDue])
+
+  const profile = useMemo(() => embedBoot ? null : profileQ.data, [embedBoot, profileQ.data])
+
+  const isLoading = useMemo(() => embedBoot
+    ? loading
+    : (loading || profileQ.isLoading || (coursesQ.isLoading && !(cachedCourses && cachedCourses.length)) || (dueQ.isLoading && !(cachedDue && cachedDue.length))),
+  [embedBoot, loading, profileQ.isLoading, coursesQ.isLoading, cachedCourses, dueQ.isLoading, cachedDue])
+
+  // Memoize the entire context to prevent unnecessary re-renders of consumers
+  const context: AppContextValue = useMemo(() => ({
     baseUrl,
-    courses: embedBoot ? [] : (coursesQ.data || cachedCourses || []),
-    // Dashboard expects a short horizon; we keep a larger shared cache and slice for UI.
-    due: embedBoot ? [] : filterDueForDashboard(dueQ.data || cachedDue || []),
-    profile: embedBoot ? null : profileQ.data,
-    loading: embedBoot
-      ? loading
-      : (loading || profileQ.isLoading || (coursesQ.isLoading && !(cachedCourses && cachedCourses.length)) || (dueQ.isLoading && !(cachedDue && cachedDue.length))),
+    courses,
+    due,
+    profile,
+    loading: isLoading,
     sidebar: sidebarCfg,
     setSidebar: onSidebarConfigChange,
     courseImages,
@@ -578,46 +661,63 @@ export function RootLayout() {
     verbose,
     setVerbose: setVerbosePersisted,
     saveUserSettings,
-    onOpenCourse: (id) => { setActiveCourseId(id); navigate({ to: '/course/$courseId', params: { courseId: String(id) } }) },
-    onOpenAssignment: (courseId, restId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'assignments', type: 'assignment', contentId: String(restId), title } }) },
-    onOpenAnnouncement: (courseId, topicId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'announcements', type: 'announcement', contentId: String(topicId), title } }) },
-    onOpenDiscussion: (courseId, topicId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'discussions', type: 'discussion', contentId: String(topicId), title } }) },
-    onOpenPage: (courseId, pageUrlOrSlug, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'home', type: 'page', contentId: String(pageUrlOrSlug), title } }) },
-    onOpenFile: (courseId, fileId, title) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'files', type: 'file', contentId: String(fileId), title } }) },
-    onOpenModules: (courseId) => { setActiveCourseId(courseId); navigate({ to: '/course/$courseId', params: { courseId: String(courseId) }, search: { tab: 'modules' } }) },
+    onOpenCourse,
+    onOpenAssignment,
+    onOpenAnnouncement,
+    onOpenDiscussion,
+    onOpenPage,
+    onOpenFile,
+    onOpenModules,
     onSignOut,
-    onOpenSettings: () => setSettingsOpen(true),
+    onOpenSettings,
     pinnedItems,
-    pinItem: (item) => {
-      // Avoid duplicates
-      if (pinnedItems.some(i => i.id === item.id)) return
-      setPinnedItems([...pinnedItems, item])
-    },
-    unpinItem: (id) => {
-      setPinnedItems(pinnedItems.filter(i => i.id !== id))
-    }
-  }
-
-  function filterDueForDashboard(list: any[]) {
-    const now = Date.now()
-    const horizon = now + 7 * 24 * 60 * 60 * 1000
-    return (Array.isArray(list) ? list : []).filter((it: any) => {
-      const raw = it?.dueAt
-      if (!raw) return true
-      const t = Date.parse(String(raw))
-      if (!Number.isFinite(t)) return true
-      return t <= horizon
-    })
-  }
+    pinItem,
+    unpinItem,
+  }), [
+    baseUrl, courses, due, profile, isLoading, sidebarCfg, onSidebarConfigChange,
+    courseImages, saveCourseImages, prefetchEnabled, setPrefetchEnabledPersisted,
+    pdfGestureZoomEnabled, setPdfGestureZoomEnabledPersisted, embeddingsEnabled,
+    setEmbeddingsEnabledPersisted, aiEnabled, setAiEnabledPersisted, verbose,
+    setVerbosePersisted, saveUserSettings, onOpenCourse, onOpenAssignment,
+    onOpenAnnouncement, onOpenDiscussion, onOpenPage, onOpenFile, onOpenModules,
+    onSignOut, onOpenSettings, pinnedItems, pinItem, unpinItem,
+  ])
 
   const visibleCourses = useMemo(() => {
     const hidden = new Set(sidebarCfg.hiddenCourseIds || [])
-    const list = (context.courses as any[]).filter((c) => !hidden.has(c.id))
+    const list = (courses as any[]).filter((c) => !hidden.has(c.id))
     const order = sidebarCfg.order || []
     const orderMap = new Map(order.map((id, i) => [String(id), i]))
     list.sort((a: any, b: any) => (orderMap.get(String(a.id)) ?? 0) - (orderMap.get(String(b.id)) ?? 0))
     return list
-  }, [context.courses, sidebarCfg.hiddenCourseIds, sidebarCfg.order])
+  }, [courses, sidebarCfg.hiddenCourseIds, sidebarCfg.order])
+
+  // Prefetch course tabs for all visible courses so they're instant when opening a course
+  const tabsPrefetchedRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!prefetchEnabled || !hasToken) return
+    if (!visibleCourses?.length) return
+
+    requestIdle(() => {
+      for (const course of visibleCourses) {
+        const id = String(course.id)
+        if (tabsPrefetchedRef.current.has(id)) continue
+        tabsPrefetchedRef.current.add(id)
+
+        enqueuePrefetch(async () => {
+          await queryClient.prefetchQuery({
+            queryKey: ['course-tabs', id, true],
+            queryFn: async () => {
+              const res = await window.canvas.listCourseTabs?.(id, true)
+              if (!res?.ok) throw new Error(res?.error || 'Failed')
+              return res.data || []
+            },
+            staleTime: 1000 * 60 * 60 * 24, // 24 hours - tabs rarely change
+          })
+        })
+      }
+    })
+  }, [prefetchEnabled, hasToken, visibleCourses, queryClient])
 
   const init = async () => {
     setLoading(true)

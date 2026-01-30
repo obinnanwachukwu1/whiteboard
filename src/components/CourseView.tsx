@@ -74,10 +74,13 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
 
   // Reset and seed availableTabs on course change
   React.useEffect(() => {
-    setAvailableTabs(null)
     setCurrentFolderId(null) // Reset folder when switching courses
+    // Try to get cached tabs first - don't set to null to avoid flicker
     const cachedTabs = queryClient.getQueryData<ResolvedTab[]>(['course-resolved-tabs', String(courseId)])
-    if (cachedTabs && cachedTabs.length) setAvailableTabs(cachedTabs)
+    if (cachedTabs && cachedTabs.length) {
+      setAvailableTabs(cachedTabs)
+    }
+    // If no cache, the fallback effect below will provide defaults
   }, [courseId])
 
   // If no cached tabs yet, seed a fast fallback so skeleton is minimal

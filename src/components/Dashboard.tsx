@@ -65,15 +65,20 @@ export const Dashboard: React.FC<Props> = ({
   // Activity feed data
   const activityData = useActivityFeed()
 
+  // Track already-queued prefetches to avoid duplicates
+  const prefetchedAssignments = React.useRef<Set<string>>(new Set())
+  const prefetchedAnnouncements = React.useRef<Set<string>>(new Set())
+
   // Auto-prefetch top assignments details
   React.useEffect(() => {
     if (!priorityData.assignments.length) return
     const top = priorityData.assignments.slice(0, 5)
     for (const a of top) {
       if (a.htmlUrl) {
-        // Just prefetch assignment detail if we can guess the ID
-        // Often assignments list provides enough, but for robust instant open:
         const extracted = extractAssignmentIdFromUrl(a.htmlUrl) || String(a.id)
+        const key = `${a.courseId}-${extracted}`
+        if (prefetchedAssignments.current.has(key)) continue
+        prefetchedAssignments.current.add(key)
         enqueuePrefetch(async () => {
           await queryClient.prefetchQuery({
             queryKey: ['assignment-rest', String(a.courseId), extracted],
@@ -95,9 +100,11 @@ export const Dashboard: React.FC<Props> = ({
     const anns = activityData.items.filter(i => i.type === 'announcement').slice(0, 5)
     for (const a of anns) {
       if (a.topicId) {
-        // Extract course ID
         const cid = extractCourseIdFromUrl(a.htmlUrl || '')
         if (cid) {
+          const key = `${cid}-${a.topicId}`
+          if (prefetchedAnnouncements.current.has(key)) continue
+          prefetchedAnnouncements.current.add(key)
           enqueuePrefetch(async () => {
             await queryClient.prefetchQuery({
               queryKey: ['announcement', cid, a.topicId],

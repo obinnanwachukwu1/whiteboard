@@ -272,12 +272,26 @@ export function usePriorityAssignments(options?: {
 
   // Persist the "best known" order once we have weights so the next app open
   // can render the last rankings immediately.
+  // Only update when IDs actually change to avoid infinite re-render loops.
+  const mainIdsRef = useRef<string>('')
+  const alsoIdsRef = useRef<string>('')
+
   useEffect(() => {
     if (!weightsReady) return
     if (!dueQuery.data) return
 
     const mainIds = rankedAssignments.map((a) => String(a.id))
     const alsoIds = alsoDue.slice(0, 25).map((a) => String(a.id))
+
+    // Only update cache if IDs actually changed
+    const mainKey = mainIds.join(',')
+    const alsoKey = alsoIds.join(',')
+    if (mainKey === mainIdsRef.current && alsoKey === alsoIdsRef.current) {
+      return // No change, skip cache update
+    }
+    mainIdsRef.current = mainKey
+    alsoIdsRef.current = alsoKey
+
     queryClient.setQueryData(orderKey as any, {
       updatedAt: Date.now(),
       mainIds,

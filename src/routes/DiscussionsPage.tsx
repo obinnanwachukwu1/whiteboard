@@ -44,12 +44,16 @@ export default function DiscussionsPage() {
     : [courseFilter]
 
   // Construct safe query params matching the hook's normalization logic
-  const queryParams: any = {}
-  if (debouncedSearch?.trim()) queryParams.searchTerm = debouncedSearch.trim()
-  // When showing all courses without search, limit pages to avoid flooding
-  if (courseFilter === 'all' && !queryParams.searchTerm) {
-    queryParams.maxPages = 2 // Fetch recent items only
-  }
+  // Memoize to prevent new object reference every render (causes query key instability)
+  const queryParams = React.useMemo(() => {
+    const params: any = {}
+    if (debouncedSearch?.trim()) params.searchTerm = debouncedSearch.trim()
+    // When showing all courses without search, limit pages to avoid flooding
+    if (courseFilter === 'all' && !params.searchTerm) {
+      params.maxPages = 2 // Fetch recent items only
+    }
+    return params
+  }, [debouncedSearch, courseFilter])
 
   const queries = useQueries({
     queries: coursesToFetch.map((courseId) => ({

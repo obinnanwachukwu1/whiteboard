@@ -5,9 +5,14 @@ class PrefetchQueue {
   private q: PrefetchTask[] = []
   private running = 0
   private guard: (() => Promise<GuardResult> | GuardResult) | null = null
+  private maxQueueSize = 50 // Prevent unbounded queue growth
   constructor(private concurrency = 2, private minIntervalMs = 250) {}
 
   enqueue(task: PrefetchTask) {
+    // Drop oldest tasks if queue is too large (prevents memory leak)
+    if (this.q.length >= this.maxQueueSize) {
+      this.q.shift()
+    }
     this.q.push(task)
     this.run()
   }
