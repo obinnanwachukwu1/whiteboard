@@ -68,12 +68,25 @@ function fixPreloadCjsExport(): Plugin {
       const preloadPath = path.join(outDir, 'preload.cjs')
       if (!fs.existsSync(preloadPath)) return
       const src = fs.readFileSync(preloadPath, 'utf8')
-      const exportDefaultRegex = /export default ([a-zA-Z0-9_$]+)\(\);/
-      if (exportDefaultRegex.test(src)) {
-        const updated = src.replace(
-          exportDefaultRegex,
-          'module.exports = $1();',
+
+      let updated = src
+
+      // Some builds incorrectly leave ESM import in the CJS preload output.
+      // Electron loads preloads as classic scripts, so this must be `require`.
+      const electronImportRegex = /^import\s+\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s+from\s+['"]electron['"];?\s*$/m
+      if (electronImportRegex.test(updated)) {
+        updated = updated.replace(
+          electronImportRegex,
+          'const { contextBridge, ipcRenderer } = require("electron");',
         )
+      }
+
+      const exportDefaultRegex = /export default ([a-zA-Z0-9_$]+)\(\);/
+      if (exportDefaultRegex.test(updated)) {
+        updated = updated.replace(exportDefaultRegex, 'module.exports = $1();')
+      }
+
+      if (updated !== src) {
         fs.writeFileSync(preloadPath, updated)
       }
     },

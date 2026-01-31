@@ -348,6 +348,14 @@ if (process.isMainFrame) {
     },
   })
 
+  // Degree audit helpers
+  contextBridge.exposeInMainWorld('degreeAudit', {
+    extractPdfText: (
+      pdfBytes: ArrayBuffer,
+      options?: { maxPages?: number; maxFileSizeBytes?: number; maxChars?: number },
+    ) => ipcRenderer.invoke('degreeAudit:extractPdfText', pdfBytes, options),
+  })
+
   // Theme helpers for background image management
   contextBridge.exposeInMainWorld('theme', {
     uploadBackgroundImage: (filePath: string) =>

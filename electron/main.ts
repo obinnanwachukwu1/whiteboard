@@ -1865,6 +1865,29 @@ ipcMain.handle('app:openExternal', async (_evt, url: string) => {
   }
 })
 
+// Degree audit PDF extraction (runs in main process)
+ipcMain.handle(
+  'degreeAudit:extractPdfText',
+  async (
+    _evt,
+    pdfBytes: unknown,
+    options?: { maxPages?: number; maxFileSizeBytes?: number; maxChars?: number },
+  ): Promise<{
+    ok: boolean
+    data?: { text: string; pageCount: number; truncated: boolean; extractedChars: number }
+    error?: string
+  }> => {
+    try {
+      const { extractDegreeAuditPdfTextFromBytes } = await import('./degreeAudit/extractPdfText')
+      const data = await extractDegreeAuditPdfTextFromBytes(pdfBytes, options || {})
+      return { ok: true, data }
+    } catch (e: any) {
+      const msg = e instanceof Error ? e.message : String(e?.message || e)
+      return { ok: false, error: msg }
+    }
+  },
+)
+
 ipcMain.handle(
   'app:openContentWindow',
   async (_evt, raw: { courseId?: string; type?: string; contentId?: string; title?: string }) => {

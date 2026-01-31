@@ -158,6 +158,16 @@ declare global {
         percent: number
       }) => void) => () => void  // Returns cleanup function
     }
+    degreeAudit: {
+      extractPdfText: (
+        pdfBytes: ArrayBuffer,
+        options?: { maxPages?: number; maxFileSizeBytes?: number; maxChars?: number },
+      ) => Promise<{
+        ok: boolean
+        data?: { text: string; pageCount: number; truncated: boolean; extractedChars: number }
+        error?: string
+      }>
+    }
     canvas: {
       init: (cfg: { token?: string; baseUrl?: string; verbose?: boolean }) => Promise<{ ok: boolean; insecure?: boolean; error?: string }>
       clearToken: (baseUrl?: string) => Promise<{ ok: boolean; error?: string }>

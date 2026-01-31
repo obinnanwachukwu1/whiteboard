@@ -42,3 +42,4 @@ dist-electron/
 # Agent Documentation
 AGENTS.md
 PLAN.md
+.claude/

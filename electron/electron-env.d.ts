@@ -170,6 +170,16 @@ interface Window {
         percent: number
       }) => void) => () => void
     }
+    degreeAudit: {
+      extractPdfText: (
+        pdfBytes: ArrayBuffer,
+        options?: { maxPages?: number; maxFileSizeBytes?: number; maxChars?: number },
+      ) => Promise<{
+        ok: boolean
+        data?: { text: string; pageCount: number; truncated: boolean; extractedChars: number }
+        error?: string
+      }>
+    }
   system: {
     openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>
     openContentWindow: (params: { courseId: string; type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file'; contentId: string; title?: string; courseName?: string }) => Promise<{ ok: boolean; error?: string }>

@@ -171,7 +171,8 @@ export const GpaTrends: React.FC<Props> = ({
       onDataChange({ ...parsed, source: 'pdf' })
     } catch (err) {
       console.error('Failed to parse degree audit:', err)
-      setError('Failed to parse PDF. Please try again.')
+      const msg = err instanceof Error ? err.message : 'Failed to parse PDF. Please try again.'
+      setError(msg)
     } finally {
       setIsLoading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
