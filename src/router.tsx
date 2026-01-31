@@ -2,11 +2,14 @@ import { createHashHistory, createRootRoute, createRoute, createRouter, useNavig
 import React from 'react'
 import { RootLayout } from './routes/RootLayout'
 
-// Lazy load route components for code splitting
+import CoursePage from './routes/CoursePage'
+import ContentPage from './routes/ContentPage'
+
+// Keep most routes lazy for code splitting.
+// Course/content routes are eagerly imported so they are ready on launch
+// (including the external content mini-window).
 const DashboardPage = React.lazy(() => import('./routes/DashboardPage'))
 const AllCoursesPage = React.lazy(() => import('./routes/AllCoursesPage'))
-const CoursePage = React.lazy(() => import('./routes/CoursePage'))
-const ContentPage = React.lazy(() => import('./routes/ContentPage'))
 const AnnouncementsPage = React.lazy(() => import('./routes/AnnouncementsPage'))
 const AssignmentsPage = React.lazy(() => import('./routes/AssignmentsPage'))
 const GradesPage = React.lazy(() => import('./routes/GradesPage'))
@@ -72,13 +75,13 @@ const allCoursesRoute = createRoute({
 const courseRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/course/$courseId',
-  component: withSuspense(CoursePage),
+  component: CoursePage,
 })
 
 const contentRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/content',
-  component: withSuspense(ContentPage),
+  component: ContentPage,
 })
 
 const announcementsRoute = createRoute({
