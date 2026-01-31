@@ -1,7 +1,7 @@
 import React from 'react'
 import { useAppContext } from '../context/AppContext'
 import { useDueAssignments } from '../hooks/useCanvasQueries'
-import { CalendarClock, Columns3, Calendar, CircleDot, Check, Clock, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Columns3, Calendar, CircleDot, Check, Clock, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { CourseAvatar } from '../components/CourseAvatar'
 import { useCourseImages } from '../hooks/useCourseImages'
 import { courseHueFor } from '../utils/colorHelpers'
@@ -117,12 +117,7 @@ export default function AssignmentsPage() {
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="mt-0 mb-0 text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-slate-100 dark:bg-neutral-800 grid place-items-center flex-shrink-0">
-            <CalendarClock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-600 dark:text-neutral-300" />
-          </span>
-          <span>Assignments</span>
-        </h1>
+        <h1 className="mt-0 mb-0 text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Assignments</h1>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-control ring-1 ring-black/10 dark:ring-white/10 overflow-hidden flex-shrink-0">
             <button

@@ -50,8 +50,9 @@ export const TimeHorizonDropdown: React.FC<Props> = ({ value, onChange }) => {
         className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md
                    text-slate-600 dark:text-neutral-400
                    hover:bg-slate-100 dark:hover:bg-neutral-800
-                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500
+                   focus-visible:outline-none focus-visible:ring-2
                    transition-colors"
+        style={{ '--tw-ring-color': 'var(--accent-500)' } as React.CSSProperties}
       >
         {currentLabel}
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -73,9 +74,10 @@ export const TimeHorizonDropdown: React.FC<Props> = ({ value, onChange }) => {
               className={`w-full text-left px-3 py-1.5 text-sm transition-colors
                          ${
                            option.value === value
-                             ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 font-medium'
+                             ? 'font-medium'
                              : 'text-slate-700 dark:text-neutral-300 hover:bg-slate-50 dark:hover:bg-neutral-800'
                          }`}
+              style={option.value === value ? { backgroundColor: 'var(--accent-100)', color: 'var(--accent-700)' } : undefined}
             >
               {option.label}
             </button>

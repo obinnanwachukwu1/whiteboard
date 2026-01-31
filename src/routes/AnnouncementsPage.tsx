@@ -1,6 +1,6 @@
 import React from 'react'
 import { useActivityAnnouncements } from '../hooks/useCanvasQueries'
-import { BookOpen, Megaphone } from 'lucide-react'
+import { Megaphone } from 'lucide-react'
 import { useAppContext } from '../context/AppContext'
 import { Badge } from '../components/ui/Badge'
 import { ListItemRow } from '../components/ui/ListItemRow'
@@ -8,6 +8,7 @@ import { formatDateTime } from '../utils/dateFormat'
 import { SkeletonList } from '../components/Skeleton'
 import { CourseAvatar } from '../components/CourseAvatar'
 import { useCourseImages } from '../hooks/useCourseImages'
+import { useCourseAvatarPreloadGate } from '../hooks/useCourseAvatarPreloadGate'
 
 function extractIdFromUrl(url?: string, key?: string): string | null {
   if (!url || !key) return null
@@ -22,7 +23,7 @@ function extractIdFromUrl(url?: string, key?: string): string | null {
 
 export default function AnnouncementsPage() {
   const ctx = useAppContext()
-  const { courseImageUrl, prefetchCourseImage } = useCourseImages()
+  const { courseImageUrl } = useCourseImages()
   const courses = ctx.courses || []
   const sidebar = ctx.sidebar
   const annsQ = useActivityAnnouncements(200)
@@ -54,24 +55,15 @@ export default function AnnouncementsPage() {
       .filter((x: any) => (courseFilter === 'all' ? true : String(x.courseId) === courseFilter))
   }, [annsQ.data, orderedCourses, courseFilter, sidebar?.customNames])
 
-  // Prefetch course info for listed announcements (for images)
-  React.useEffect(() => {
-    const ids = new Set<string>()
-    for (const a of list) { if (a.courseId != null) ids.add(String(a.courseId)) }
-    ids.forEach((id) => {
-      prefetchCourseImage(id)
-    })
-  }, [list, prefetchCourseImage])
+  const imagesReady = useCourseAvatarPreloadGate(
+    list.map((a: any) => a.courseId),
+    { enabled: !annsQ.isLoading && list.length > 0, once: true }
+  )
 
   return (
     <div className="space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <h1 className="mt-0 mb-0 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <span className="w-7 h-7 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-slate-100 dark:bg-neutral-800 grid place-items-center">
-            <BookOpen className="w-4 h-4 text-slate-600 dark:text-neutral-300" />
-          </span>
-          <span>Announcements</span>
-        </h1>
+        <h1 className="mt-0 mb-0 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Announcements</h1>
         <select className="rounded-control border px-2 py-1 text-xs sm:text-sm bg-white/90 dark:bg-neutral-900 max-w-[160px] sm:max-w-none" value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)}>
           <option value="all">All Courses</option>
           {orderedCourses.map((c: any) => (
@@ -80,7 +72,7 @@ export default function AnnouncementsPage() {
         </select>
       </div>
 
-      {annsQ.isLoading ? (
+      {annsQ.isLoading || (!imagesReady && list.length > 0) ? (
         <SkeletonList count={5} hasAvatar variant="row" />
       ) : list.length === 0 ? (
         <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-4 text-center">

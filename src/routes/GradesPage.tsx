@@ -3,7 +3,6 @@ import { useAppContext } from '../context/AppContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { calculateCourseGrades, toAssignmentInputsFromRest } from '../utils/gradeCalc'
 import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
-import { BarChart3 } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { Badge } from '../components/ui/Badge'
 import { Dropdown } from '../components/ui/Dropdown'
@@ -13,6 +12,8 @@ import { CourseGradeCard, GpaStatsCards, SemesterGoalCard } from '../components/
 import type { DegreeAuditData } from '../utils/degreeAudit'
 import { courseHueFor } from '../utils/colorHelpers'
 import { useCourseImages } from '../hooks/useCourseImages'
+import { useCourseAvatarPreloadGate } from '../hooks/useCourseAvatarPreloadGate'
+import { SkeletonCard } from '../components/Skeleton'
 
 type GpaThreshold = { min: number; gpa: number }
 const defaultGpaMap: GpaThreshold[] = [
@@ -35,7 +36,7 @@ export default function GradesPage() {
   const courses = ctx.courses || []
   const sidebar = ctx.sidebar
   const qc = useQueryClient()
-  const { courseImageUrl, prefetchCourseImage } = useCourseImages()
+  const { courseImageUrl } = useCourseImages()
   const [courseFilter, setCourseFilter] = React.useState<string>('all')
   const [creditsByCourse, setCreditsByCourse] = React.useState<Record<string, number>>({})
   const [targetPctByCourse, setTargetPctByCourse] = React.useState<Record<string, string>>({})
@@ -239,14 +240,10 @@ export default function GradesPage() {
     return { current, predicted, semesterCurrent, semesterPredicted, priorCredits: priorC, priorGpa: priorG }
   }, [rows, creditsByCourse, targetPctByCourse, priorTotals, degreeAudit])
 
-  // Image helpers
-  React.useEffect(() => {
-    const ids = new Set<string>()
-    for (const r of rows) { if (r.c?.id != null) ids.add(String(r.c.id)) }
-    ids.forEach((id) => {
-      prefetchCourseImage(id)
-    })
-  }, [rows, prefetchCourseImage])
+  const imagesReady = useCourseAvatarPreloadGate(
+    rows.map((r) => r.c?.id),
+    { enabled: rows.length > 0, once: true }
+  )
 
   const [targetsOpen, setTargetsOpen] = React.useState(false)
   const targetsBtnRef = React.useRef<HTMLButtonElement | null>(null)
@@ -292,12 +289,7 @@ export default function GradesPage() {
     <div className="space-y-4">
       {/* Header - Title and GPA badges */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <h1 className="mt-0 mb-0 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <span className="w-7 h-7 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-slate-100 dark:bg-neutral-800 grid place-items-center">
-            <BarChart3 className="w-4 h-4 text-slate-600 dark:text-neutral-300" />
-          </span>
-          <span>Grades</span>
-        </h1>
+        <h1 className="mt-0 mb-0 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Grades</h1>
         <div className="flex items-center gap-2">
           <Badge className="text-xs sm:text-sm font-semibold text-white" style={{ background: 'var(--app-accent-hover)' }}>
             GPA {overall && overall.current != null ? overall.current.toFixed(2) : '—'}
@@ -518,6 +510,12 @@ export default function GradesPage() {
 
       {rows.length === 0 ? (
         <div className="p-3 text-sm text-slate-500 dark:text-neutral-400">No courses</div>
+      ) : !imagesReady ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {Array.from({ length: Math.min(rows.length, 9) }).map((_, i) => (
+            <SkeletonCard key={i} hasAvatar lines={2} />
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {rows.map(({ c, pct }) => {

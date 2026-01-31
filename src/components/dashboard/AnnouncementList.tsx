@@ -7,6 +7,7 @@ import { extractAnnouncementIdFromUrl, extractCourseIdFromUrl } from '../../util
 import { formatDateTime } from '../../utils/dateFormat'
 import { SkeletonList } from '../Skeleton'
 import { CourseAvatar } from '../CourseAvatar'
+import { ListItemRow } from '../ui/ListItemRow'
 
 type Announcement = {
   courseId?: string | number
@@ -44,8 +45,8 @@ export const AnnouncementList: React.FC<Props> = ({ announcements, loading, onOp
       {!loading && announcements.length === 0 ? (
         <div className="text-slate-500 dark:text-neutral-400 p-4 text-sm">No announcements</div>
       ) : (
-        <ul className="list-none m-0 p-0 divide-y divide-gray-100 dark:divide-neutral-800">
-          {announcements.map((a, i) => {
+        <div className="space-y-2">
+          {announcements.map((a) => {
             const open = () => {
               const tid = a.topicId ?? extractAnnouncementIdFromUrl(a.htmlUrl)
               const cid = a.courseId ?? extractCourseIdFromUrl(a.htmlUrl)
@@ -55,37 +56,29 @@ export const AnnouncementList: React.FC<Props> = ({ announcements, loading, onOp
             const cid = a.courseId ?? extractCourseIdFromUrl(a.htmlUrl)
             const img = courseImageUrl(cid as any)
             return (
-              <li key={i} className="py-1">
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={open}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
-                  className="cursor-pointer rounded-md px-2 sm:px-3 py-2 transition-transform duration-200 ease-out hover:scale-[1.02] hover:shadow-sm ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10"
-                >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <CourseAvatar
-                          courseId={cid || ''}
-                          courseName={a.courseName}
-                          src={img}
-                          className="w-10 h-10 rounded-full ring-1 ring-black/10 dark:ring-white/10"
-                        />
-                        <div className="min-w-0">
-                        <div className="font-medium truncate" title={a.title}>{a.title}</div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                          <Badge tone="brand">{a.courseName}</Badge>
-                          <span className="mx-1">·</span>
-                          <span>{a.postedAt ? formatDateTime(a.postedAt) : '—'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </li>
+              <ListItemRow
+                key={a.topicId ?? a.htmlUrl ?? a.title}
+                icon={
+                  <CourseAvatar
+                    courseId={cid || ''}
+                    courseName={a.courseName}
+                    src={img}
+                    className="w-full h-full rounded-full"
+                  />
+                }
+                title={a.title}
+                subtitle={
+                  <>
+                    <Badge tone="brand">{a.courseName}</Badge>
+                    <span className="mx-1">·</span>
+                    <span>{a.postedAt ? formatDateTime(a.postedAt) : '—'}</span>
+                  </>
+                }
+                onClick={open}
+              />
             )
           })}
-        </ul>
+        </div>
       )}
     </Card>
   )

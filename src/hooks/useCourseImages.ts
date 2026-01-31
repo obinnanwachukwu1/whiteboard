@@ -25,11 +25,11 @@ export function useCourseImages() {
     }
   }, [imgStore, app])
 
-  const prefetchCourseImage = React.useCallback(async (courseId: string | number) => {
+  const prefetchCourseImage = React.useCallback(async (courseId: string | number): Promise<string | undefined> => {
     try {
       const id = String(courseId)
       // Check if we already have it
-      if (imgStore[id]) return
+      if (imgStore[id]) return imgStore[id]
 
       // Fetch info
       const data = await queryClient.fetchQuery({
@@ -51,15 +51,17 @@ export function useCourseImages() {
           const res = await canvas.cacheCourseImage?.(id, url)
           if (res?.ok && res.data) {
             await persistImages([[id, res.data]])
-            return
+            return res.data
           }
         } catch (err) {
           console.warn('Failed to cache course image', err)
         }
         // Fallback
         await persistImages([[id, url]])
+        return url
       }
     } catch {}
+    return undefined
   }, [imgStore, queryClient, persistImages])
 
   const courseImageUrl = React.useCallback((courseId: string | number | undefined | null): string | undefined => {

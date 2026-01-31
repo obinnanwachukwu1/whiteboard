@@ -22,7 +22,7 @@ export const CourseCard: React.FC<Props> = ({ course, label, grade, imgUrl, onCl
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
-      className="cursor-pointer transition-transform duration-200 ease-out hover:scale-[1.02] hover:shadow-lg hover:ring-black/15 dark:hover:ring-white/20"
+      className="cursor-pointer transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-lg hover:ring-[var(--app-accent-hover)] hover:bg-[var(--app-accent-bg)]"
     >
       {/* Banner */}
       <div

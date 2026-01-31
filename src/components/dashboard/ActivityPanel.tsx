@@ -28,20 +28,20 @@ export const ActivityPanel: React.FC<Props> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-slate-100 m-0">
-          <span className="w-7 h-7 rounded-full bg-violet-500/10 dark:bg-violet-400/10 flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+          <span className="w-7 h-7 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--accent-100)' }}>
+            <Sparkles className="w-4 h-4" style={{ color: 'var(--accent-600)' }} />
           </span>
           Activity
         </h2>
       </div>
       
       {/* Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto px-1 pb-1">
         {isLoading ? (
           <SkeletonList count={4} hasAvatar variant="simple" />
         ) : isEmpty ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/10 dark:bg-emerald-400/10 flex items-center justify-center mb-3">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ backgroundColor: 'var(--accent-100)' }}>
               <span className="text-2xl">✨</span>
             </div>
             <p className="text-slate-600 dark:text-neutral-400 font-medium">
@@ -52,7 +52,7 @@ export const ActivityPanel: React.FC<Props> = ({
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-neutral-800">
+          <div className="space-y-2 pt-1">
             {items.map((item) => (
               <ActivityItem
                 key={item.id}

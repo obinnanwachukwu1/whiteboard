@@ -1,5 +1,32 @@
 /// <reference types="vite/client" />
 
+// Theme system types
+type AccentPreset =
+  | 'slate' | 'red' | 'orange' | 'amber' | 'yellow' | 'lime'
+  | 'green' | 'emerald' | 'teal' | 'cyan' | 'sky' | 'blue'
+  | 'indigo' | 'violet' | 'purple' | 'fuchsia' | 'pink' | 'rose'
+
+type BackgroundMode = 'accent' | 'background'
+type BackgroundType = 'solid' | 'pattern' | 'image'
+type PatternId = 'dots' | 'grid' | 'mesh'
+
+interface BackgroundSettings {
+  type: BackgroundType
+  patternId?: PatternId
+  imageUrl?: string
+  blur: number
+  opacity: number
+  overlay: number
+  extractedAccent?: { h: number; s: number; l: number }
+}
+
+interface ThemeConfig {
+  theme: 'light' | 'dark'
+  accentPreset: AccentPreset
+  backgroundMode: BackgroundMode
+  background: BackgroundSettings
+}
+
 declare global {
   interface Window {
     settings: {
@@ -10,6 +37,7 @@ declare global {
           verbose?: boolean
           theme?: 'light' | 'dark'
           accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'
+          themeConfig?: ThemeConfig
           prefetchEnabled?: boolean
           cachedCourses?: any[]
           cachedDue?: any[]
@@ -31,6 +59,7 @@ declare global {
         verbose?: boolean
         theme?: 'light' | 'dark'
         accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'
+        themeConfig?: ThemeConfig
         prefetchEnabled?: boolean
         cachedCourses?: any[]
         cachedDue?: any[]
@@ -201,6 +230,26 @@ declare global {
     electron: {
       onMainProcessMessage: (callback: (message: string) => void) => void
       onMenuAction: (callback: (action: string) => void) => () => void
+    }
+    theme: {
+      pickBackgroundImage: () => Promise<{
+        ok: boolean
+        data?: { path: string; name: string; size: number }
+        error?: string
+      }>
+      uploadBackgroundImage: (filePath: string) => Promise<{
+        ok: boolean
+        data?: { url: string }
+        error?: string
+      }>
+      deleteBackgroundImage: (imageUrl: string) => Promise<{
+        ok: boolean
+        error?: string
+      }>
+    }
+    platform: {
+      isMac: boolean
+      isWindows: boolean
     }
   }
 }

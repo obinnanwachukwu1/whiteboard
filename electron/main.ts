@@ -1954,3 +1954,126 @@ ipcMain.handle('embedding:getStorageStats', async (): Promise<{
     return { ok: false, error: String(e?.message || e) }
   }
 })
+
+// ============ Theme Background Image IPC Handlers ============
+
+const THEME_BACKGROUNDS_DIR = 'theme-backgrounds'
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10MB
+const ALLOWED_IMAGE_TYPES = ['.jpg', '.jpeg', '.png', '.webp']
+
+// Get the theme backgrounds directory (in app temp)
+function getThemeBackgroundsDir(): string {
+  const tempDir = app.getPath('temp')
+  const bgDir = path.join(tempDir, THEME_BACKGROUNDS_DIR)
+  if (!fs.existsSync(bgDir)) {
+    fs.mkdirSync(bgDir, { recursive: true })
+  }
+  return bgDir
+}
+
+ipcMain.handle('theme:pickBackgroundImage', async (): Promise<{
+  ok: boolean
+  data?: { path: string; name: string; size: number }
+  error?: string
+}> => {
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp'] }
+      ],
+    })
+
+    if (result.canceled || !result.filePaths.length) {
+      return { ok: true, data: undefined }
+    }
+
+    const filePath = result.filePaths[0]
+    const stat = await fs.promises.stat(filePath)
+
+    if (stat.size > MAX_IMAGE_SIZE) {
+      return { ok: false, error: 'Image file is too large (max 10MB)' }
+    }
+
+    const ext = path.extname(filePath).toLowerCase()
+    if (!ALLOWED_IMAGE_TYPES.includes(ext)) {
+      return { ok: false, error: 'Invalid image type. Allowed: JPG, PNG, WebP' }
+    }
+
+    return {
+      ok: true,
+      data: {
+        path: filePath,
+        name: path.basename(filePath),
+        size: stat.size,
+      }
+    }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('theme:uploadBackgroundImage', async (_evt, sourcePath: string): Promise<{
+  ok: boolean
+  data?: { url: string }
+  error?: string
+}> => {
+  try {
+    // Validate file exists and size
+    const stat = await fs.promises.stat(sourcePath)
+    if (stat.size > MAX_IMAGE_SIZE) {
+      return { ok: false, error: 'Image file is too large (max 10MB)' }
+    }
+
+    const ext = path.extname(sourcePath).toLowerCase()
+    if (!ALLOWED_IMAGE_TYPES.includes(ext)) {
+      return { ok: false, error: 'Invalid image type. Allowed: JPG, PNG, WebP' }
+    }
+
+    // Generate unique filename
+    const bgDir = getThemeBackgroundsDir()
+    const uniqueName = `bg-${randomUUID()}${ext}`
+    const destPath = path.join(bgDir, uniqueName)
+
+    // Copy file to theme backgrounds directory
+    await fs.promises.copyFile(sourcePath, destPath)
+
+    // Return canvas-file:// URL for serving
+    const url = pathToFileURL(destPath).toString().replace(/^file:/, 'canvas-file:')
+
+    return { ok: true, data: { url } }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('theme:deleteBackgroundImage', async (_evt, imageUrl: string): Promise<{
+  ok: boolean
+  error?: string
+}> => {
+  try {
+    // Convert canvas-file:// URL back to file path
+    if (!imageUrl.startsWith('canvas-file://')) {
+      return { ok: false, error: 'Invalid image URL' }
+    }
+
+    const fileUrl = imageUrl.replace(/^canvas-file:/, 'file:')
+    const filePath = fileURLToPath(fileUrl)
+
+    // Security: ensure file is in theme backgrounds directory
+    const bgDir = getThemeBackgroundsDir()
+    const resolvedPath = path.resolve(filePath)
+    if (!resolvedPath.startsWith(bgDir)) {
+      return { ok: false, error: 'Cannot delete file outside theme backgrounds directory' }
+    }
+
+    // Delete the file
+    if (fs.existsSync(resolvedPath)) {
+      await fs.promises.unlink(resolvedPath)
+    }
+
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})

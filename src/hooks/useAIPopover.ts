@@ -14,7 +14,7 @@ type UseAIPopoverOptions = {
 
 export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverOptions) => {
   const [showPopover, setShowPopover] = useState(false)
-  const [isHovered, setIsHovered] = useState(false)
+  const isHoveredRef = useRef(false)
   const [cursorPos, setCursorPos] = useState<{x: number, y: number} | null>(null)
   const [text, setText] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -26,16 +26,43 @@ export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverO
   const onGenerateRef = useRef(onGenerate)
   onGenerateRef.current = onGenerate
 
+  const startGeneration = useCallback(() => {
+    // Start generation if not already done/doing
+    if (!text && !loading) {
+      setLoading(true)
+      const result = onGenerateRef.current((newText) => {
+        setText(newText)
+      })
+
+      if (result === false) {
+        setLoading(false)
+      } else if (typeof result === 'function') {
+        streamCleanupRef.current = result
+      }
+    }
+  }, [text, loading])
+
   const handleMouseEnter = useCallback((e: React.MouseEvent) => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current)
       hoverTimeoutRef.current = null
     }
-    setIsHovered(true)
+    isHoveredRef.current = true
+    
+    // Only capture position if we are not already showing
     if (!showPopover) {
       setCursorPos({ x: e.clientX, y: e.clientY })
     }
-  }, [showPopover])
+
+    if (enabled) {
+      hoverTimeoutRef.current = setTimeout(() => {
+        if (isHoveredRef.current) {
+          setShowPopover(true)
+          startGeneration()
+        }
+      }, delay)
+    }
+  }, [showPopover, enabled, delay, startGeneration])
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!showPopover) {
@@ -44,55 +71,38 @@ export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverO
   }, [showPopover])
 
   const handleMouseLeave = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current)
+      hoverTimeoutRef.current = null
+    }
+    
+    // Give a small grace period before closing (for moving to popover)
     hoverTimeoutRef.current = setTimeout(() => {
-      setIsHovered(false)
-    }, 100)
-  }, [])
-
-  // Trigger Logic
-  useEffect(() => {
-    let timer: NodeJS.Timeout
-
-    if (isHovered && enabled) {
-      // If we are hovering...
-      if (showPopover) return // Already showing, do nothing
-
-      // Wait for delay
-      timer = setTimeout(() => {
-        if (isHovered) {
-          setShowPopover(true)
-
-          // Start generation if not already done/doing
-          if (!text && !loading) {
-            setLoading(true)
-            const result = onGenerateRef.current((newText) => {
-              setText(newText)
-            })
-
-            if (result === false) {
-              setLoading(false)
-            } else if (typeof result === 'function') {
-              streamCleanupRef.current = result
-            }
-          }
-        }
-      }, delay)
-    } else {
-      // Not hovered or disabled
+      isHoveredRef.current = false
       setShowPopover(false)
-
+      
       // Cleanup stream
       if (streamCleanupRef.current) {
         streamCleanupRef.current()
         streamCleanupRef.current = null
       }
+      setLoading(false)
+      setText(null)
+    }, 100)
+  }, [])
 
+  // Force close if disabled
+  useEffect(() => {
+    if (!enabled && showPopover) {
+      setShowPopover(false)
+      if (streamCleanupRef.current) {
+        streamCleanupRef.current()
+        streamCleanupRef.current = null
+      }
       setLoading(false)
       setText(null)
     }
-
-    return () => clearTimeout(timer)
-  }, [isHovered, enabled, showPopover, text, loading, delay])
+  }, [enabled, showPopover])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -114,11 +124,14 @@ export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverO
       isLoading: loading && !text,
       text,
       onMouseEnter: () => {
-        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current)
-        setIsHovered(true)
+        if (hoverTimeoutRef.current) {
+          clearTimeout(hoverTimeoutRef.current)
+          hoverTimeoutRef.current = null
+        }
+        isHoveredRef.current = true
       },
       onMouseLeave: handleMouseLeave
     },
-    isHovered
+    isHovered: isHoveredRef.current
   }
 }

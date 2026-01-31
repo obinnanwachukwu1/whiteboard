@@ -8,6 +8,7 @@ import { formatDateTime } from '../../utils/dateFormat'
 import type { DueItem } from '../../hooks/useDashboardData'
 import { SkeletonList } from '../Skeleton'
 import { CourseAvatar } from '../CourseAvatar'
+import { ListItemRow } from '../ui/ListItemRow'
 
 type Props = {
   due: DueItem[]
@@ -37,11 +38,11 @@ export const AssignmentList: React.FC<Props> = ({ due, loading, onOpenAssignment
         <div className="text-slate-500 dark:text-neutral-400 p-4 text-sm">No upcoming assignments</div>
       )}
       {!loading && due.length > 0 && (
-        <ul className="list-none m-0 p-0 divide-y divide-gray-100 dark:divide-neutral-800">
+        <div className="space-y-2">
           {due
             .slice()
             .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
-            .map((d, i) => {
+            .map((d) => {
               const open = () => {
                 const rid = String(d.assignment_rest_id || extractAssignmentIdFromUrl(d.htmlUrl) || '')
                 if (rid) onOpenAssignment?.(d.course_id, rid, d.name)
@@ -50,44 +51,29 @@ export const AssignmentList: React.FC<Props> = ({ due, loading, onOpenAssignment
               const cid = d.course_id
               const img = courseImageUrl(cid)
               return (
-                <li className="py-1" key={i}>
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={open}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
-                    className="cursor-pointer rounded-md px-2 sm:px-3 py-2 transition-transform duration-200 ease-out hover:scale-[1.02] hover:shadow-sm ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10"
-                  >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <CourseAvatar
-                            courseId={cid}
-                            courseName={d.course_name}
-                            src={img}
-                            className="w-10 h-10 rounded-full ring-1 ring-black/10 dark:ring-white/10"
-                          />
-                          <div className="min-w-0">
-                          <div className="font-medium truncate" title={d.name}>
-                            {d.name}
-                          </div>
-                          <div className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
-                            {d.course_name && (
-                              <span className="inline-flex items-center gap-1 mr-1.5">
-                              <Badge tone="brand">{d.course_name}</Badge>
-                              <span>·</span>
-                              </span>
-                            )}
-                            Due {formatDateTime(d.dueAt)}
-                            {d.pointsPossible ? ` · ${d.pointsPossible} pts` : ''}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </li>
+                <ListItemRow
+                  key={`${d.course_id}-${d.assignment_rest_id ?? d.htmlUrl ?? d.name}`}
+                  icon={
+                    <CourseAvatar
+                      courseId={cid}
+                      courseName={d.course_name}
+                      src={img}
+                      className="w-full h-full rounded-full"
+                    />
+                  }
+                  title={d.name}
+                  subtitle={
+                    <>
+                      {d.course_name && <Badge tone="brand">{d.course_name}</Badge>}
+                      {d.course_name && <span className="mx-1">·</span>}
+                      <span>Due {formatDateTime(d.dueAt)}{d.pointsPossible ? ` · ${d.pointsPossible} pts` : ''}</span>
+                    </>
+                  }
+                  onClick={open}
+                />
               )
             })}
-        </ul>
+        </div>
       )}
     </Card>
   )

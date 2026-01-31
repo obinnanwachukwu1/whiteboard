@@ -138,9 +138,9 @@ export async function prefetchNavTab(
         const discussionCourses = courses.slice(0, 6)
         await Promise.all(discussionCourses.map(c => 
           queryClient.prefetchQuery({
-            queryKey: ['course-discussions', String(c.id), 50, {}],
+            queryKey: ['course-discussions', String(c.id), 50, { maxPages: 2 }],
             queryFn: async () => {
-              const res = await window.canvas.listCourseDiscussions?.(String(c.id), { perPage: 50 })
+              const res = await window.canvas.listCourseDiscussions?.(String(c.id), { perPage: 50, maxPages: 2 })
               if (!res?.ok) throw new Error(res?.error || 'Failed')
               return res.data || []
             },

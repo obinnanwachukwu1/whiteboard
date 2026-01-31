@@ -51,9 +51,9 @@ export async function prefetchCourseTab(queryClient: QueryClient, courseId: stri
 
       case 'discussions':
         await queryClient.prefetchQuery({
-          queryKey: ['course-discussions', id, 50, {}],
+          queryKey: ['course-discussions', id, 50, { maxPages: 2 }],
           queryFn: async () => {
-            const res = await window.canvas.listCourseDiscussions?.(id, { perPage: 50 })
+            const res = await window.canvas.listCourseDiscussions?.(id, { perPage: 50, maxPages: 2 })
             if (!res?.ok) throw new Error(res?.error || 'Failed to load discussions')
             return res.data || []
           },

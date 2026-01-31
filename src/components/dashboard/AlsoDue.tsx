@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, CalendarClock } from 'lucide-react'
 import type { DashboardAssignment } from '../../hooks/usePriorityAssignments'
+import { ListItemRow } from '../ui/ListItemRow'
 
 type Props = {
   assignments: DashboardAssignment[]
@@ -36,22 +37,17 @@ export const AlsoDue: React.FC<Props> = ({ assignments, count, onClickAssignment
       </button>
       
       {expanded && (
-        <div className="mt-1 pl-6 space-y-1 animate-fade-in">
+        <div className="mt-2 pl-6 space-y-2">
           {assignments.map((a) => (
-            <button
+            <ListItemRow
               key={String(a.id)}
-              type="button"
+              density="compact"
               onClick={() => onClickAssignment?.(a)}
-              className="flex items-center justify-between w-full text-left px-2 py-1 rounded
-                         text-sm text-slate-600 dark:text-neutral-400
-                         hover:bg-slate-50 dark:hover:bg-neutral-800/50
-                         transition-colors"
-            >
-              <span className="truncate">{a.name}</span>
-              <span className="text-xs text-slate-400 dark:text-neutral-500 ml-2 flex-shrink-0">
-                {a.relativeTime}
-              </span>
-            </button>
+              icon={<CalendarClock className="w-4 h-4" />}
+              title={a.name}
+              trailing={<span className="text-xs text-slate-400 dark:text-neutral-500">{a.relativeTime}</span>}
+              className="text-sm text-slate-600 dark:text-neutral-400"
+            />
           ))}
         </div>
       )}

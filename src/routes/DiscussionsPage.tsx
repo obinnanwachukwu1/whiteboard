@@ -1,7 +1,7 @@
 import React from 'react'
 import { useCourses } from '../hooks/useCanvasQueries'
 import { useQueries } from '@tanstack/react-query'
-import { BookOpen, MessageCircle, Pin, Lock, Search } from 'lucide-react'
+import { MessageCircle, Pin, Lock, Search } from 'lucide-react'
 import { useAppContext } from '../context/AppContext'
 import { Badge } from '../components/ui/Badge'
 import { ListItemRow } from '../components/ui/ListItemRow'
@@ -9,10 +9,11 @@ import { SkeletonList } from '../components/Skeleton'
 import type { DiscussionTopic } from '../types/canvas'
 import { CourseAvatar } from '../components/CourseAvatar'
 import { useCourseImages } from '../hooks/useCourseImages'
+import { useCourseAvatarPreloadGate } from '../hooks/useCourseAvatarPreloadGate'
 
 export default function DiscussionsPage() {
   const ctx = useAppContext()
-  const { courseImageUrl, prefetchCourseImage } = useCourseImages()
+  const { courseImageUrl } = useCourseImages()
   const coursesQ = useCourses()
   const courses = ctx.courses || coursesQ.data || []
   const sidebar = ctx.sidebar
@@ -67,6 +68,8 @@ export default function DiscussionsPage() {
         return res.data || []
       },
       staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 60 * 2,
+      refetchOnMount: false,
     }))
   })
 
@@ -115,26 +118,15 @@ export default function DiscussionsPage() {
     return date.toLocaleDateString()
   }
 
-  // Prefetch course info for images
-  React.useEffect(() => {
-    const ids = new Set<string>()
-    for (const d of allDiscussions) {
-      if (d.courseId != null) ids.add(String(d.courseId))
-    }
-    ids.forEach((id) => {
-      prefetchCourseImage(id)
-    })
-  }, [allDiscussions, prefetchCourseImage])
+  const imagesReady = useCourseAvatarPreloadGate(
+    allDiscussions.map((d) => d.courseId),
+    { enabled: !isHardLoading && allDiscussions.length > 0, once: true }
+  )
 
   return (
     <div className="space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <h1 className="mt-0 mb-0 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <span className="w-7 h-7 rounded-full ring-1 ring-black/10 dark:ring-white/10 bg-slate-100 dark:bg-neutral-800 grid place-items-center">
-            <BookOpen className="w-4 h-4 text-slate-600 dark:text-neutral-300" />
-          </span>
-          <span>Discussions</span>
-        </h1>
+        <h1 className="mt-0 mb-0 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Discussions</h1>
         <div className="flex gap-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -159,7 +151,7 @@ export default function DiscussionsPage() {
         </div>
       </div>
 
-      {isHardLoading ? (
+      {isHardLoading || (!imagesReady && allDiscussions.length > 0) ? (
         <SkeletonList count={5} hasAvatar variant="row" />
       ) : allDiscussions.length === 0 ? (
         <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-4 text-center">
