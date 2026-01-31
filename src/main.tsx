@@ -50,6 +50,7 @@ function useQueryPersistence(client: QueryClient) {
       'due-assignments',
       'course-gradebook',
       'activity-announcements',
+      'course-discussions',
       // Dashboard priority inputs
       'course-assignment-groups-with-assignments',
       // Dashboard computed ordering (for stable first paint)
@@ -60,14 +61,28 @@ function useQueryPersistence(client: QueryClient) {
       'course-tabs',
       // Inbox (opt-in: stores message previews/threads on disk)
       'conversations',
-      'conversation',
-      'unread-count'
-    ])
+        'conversation',
+        'unread-count',
+        // Dashboard: recent feedback comment lookups
+        'submission-details'
+      ])
+    const isPersistableDiscussions = (queryKey: unknown) => {
+      if (!Array.isArray(queryKey)) return false
+      const params = queryKey[3] as Record<string, unknown> | undefined
+      if (!params || typeof params !== 'object') return true
+      const keys = Object.keys(params)
+      if (keys.length === 0) return true
+      if (params.searchTerm || params.filterBy || params.scope || params.orderBy) return false
+      return params.maxPages === 2 && keys.every((k) => k === 'maxPages')
+    }
     const flush = () => {
       try {
         const snap = dehydrate(client, {
           shouldDehydrateQuery: (q) => {
             const key0 = Array.isArray(q.queryKey) ? String(q.queryKey[0]) : ''
+            if (key0 === 'course-discussions') {
+              return q.state.status === 'success' && isPersistableDiscussions(q.queryKey)
+            }
             return q.state.status === 'success' && allowKeys.has(key0)
           },
         })

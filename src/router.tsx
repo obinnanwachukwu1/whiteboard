@@ -1,6 +1,5 @@
-import { createHashHistory, createRootRoute, createRoute, createRouter, useRouterState } from '@tanstack/react-router'
+import { createHashHistory, createRootRoute, createRoute, createRouter, useNavigate, useRouterState } from '@tanstack/react-router'
 import React from 'react'
-import { useNavigate } from '@tanstack/react-router'
 import { RootLayout } from './routes/RootLayout'
 
 // Lazy load route components for code splitting
@@ -13,11 +12,41 @@ const AssignmentsPage = React.lazy(() => import('./routes/AssignmentsPage'))
 const GradesPage = React.lazy(() => import('./routes/GradesPage'))
 const DiscussionsPage = React.lazy(() => import('./routes/DiscussionsPage'))
 
+function RouteFallback() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const title = React.useMemo(() => {
+    if (pathname.startsWith('/course/')) return 'Course'
+    if (pathname.startsWith('/content')) return 'Content'
+    switch (pathname) {
+      case '/dashboard':
+        return 'Dashboard'
+      case '/announcements':
+        return 'Announcements'
+      case '/assignments':
+        return 'Assignments'
+      case '/grades':
+        return 'Grades'
+      case '/discussions':
+        return 'Discussions'
+      case '/all-courses':
+        return 'All Courses'
+      default:
+        return 'Loading'
+    }
+  }, [pathname])
+
+  return (
+    <div className="space-y-3">
+      <h1 className="mt-0 mb-0 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{title}</h1>
+    </div>
+  )
+}
+
 // Wrapper for lazy-loaded components with Suspense
 function withSuspense(Component: React.LazyExoticComponent<React.ComponentType<any>>): React.FC {
   return function SuspenseWrapper() {
     return (
-      <React.Suspense fallback={null}>
+      <React.Suspense fallback={<RouteFallback />}>
         <Component />
       </React.Suspense>
     )

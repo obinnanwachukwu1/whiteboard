@@ -5,11 +5,41 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 
+// Theme system types
+export type AccentPreset =
+  | 'slate' | 'red' | 'orange' | 'amber' | 'yellow' | 'lime'
+  | 'green' | 'emerald' | 'teal' | 'cyan' | 'sky' | 'blue'
+  | 'indigo' | 'violet' | 'purple' | 'fuchsia' | 'pink' | 'rose'
+
+export type BackgroundMode = 'accent' | 'background'
+export type BackgroundType = 'solid' | 'pattern' | 'image'
+export type PatternId = 'dots' | 'grid' | 'mesh'
+
+export interface BackgroundSettings {
+  type: BackgroundType
+  patternId?: PatternId
+  imageUrl?: string
+  blur: number // 0-30px
+  opacity: number // 10-100%
+  overlay: number // 0-50%
+  extractedAccent?: { h: number; s: number; l: number }
+}
+
+export interface ThemeConfig {
+  theme: 'light' | 'dark'
+  accentPreset: AccentPreset
+  backgroundMode: BackgroundMode
+  background: BackgroundSettings
+}
+
 export type AppConfig = {
   baseUrl: string
   verbose?: boolean
+  // Legacy theme fields (for backward compatibility)
   theme?: 'light' | 'dark'
   accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'
+  // New theme system
+  themeConfig?: ThemeConfig
   prefetchEnabled?: boolean
   cachedCourses?: any[]
   cachedDue?: any[]
@@ -30,11 +60,26 @@ export type AppConfig = {
   aiEnabled?: boolean
 }
 
+export const DEFAULT_BACKGROUND_SETTINGS: BackgroundSettings = {
+  type: 'solid',
+  blur: 0,
+  opacity: 100,
+  overlay: 0,
+}
+
+export const DEFAULT_THEME_CONFIG: ThemeConfig = {
+  theme: 'light',
+  accentPreset: 'slate',
+  backgroundMode: 'accent',
+  background: DEFAULT_BACKGROUND_SETTINGS,
+}
+
 export const DEFAULT_CONFIG: AppConfig = {
   baseUrl: 'https://gatech.instructure.com',
   verbose: false,
   theme: 'light',
   accent: 'default',
+  themeConfig: DEFAULT_THEME_CONFIG,
   prefetchEnabled: true,
   aiEnabled: false, // Default to disabled to be safe, user must opt-in
   cachedCourses: [],

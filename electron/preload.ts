@@ -89,6 +89,30 @@ contextBridge.exposeInMainWorld('canvas', {
   getRateLimit: () => ipcRenderer.invoke('canvas:getRateLimit'),
 })
 
+// Theme config types (mirrored from config.ts for type safety)
+type AccentPreset =
+  | 'slate' | 'red' | 'orange' | 'amber' | 'yellow' | 'lime'
+  | 'green' | 'emerald' | 'teal' | 'cyan' | 'sky' | 'blue'
+  | 'indigo' | 'violet' | 'purple' | 'fuchsia' | 'pink' | 'rose'
+type BackgroundMode = 'accent' | 'background'
+type BackgroundType = 'solid' | 'pattern' | 'image'
+type PatternId = 'dots' | 'grid' | 'mesh'
+interface BackgroundSettings {
+  type: BackgroundType
+  patternId?: PatternId
+  imageUrl?: string
+  blur: number
+  opacity: number
+  overlay: number
+  extractedAccent?: { h: number; s: number; l: number }
+}
+interface ThemeConfig {
+  theme: 'light' | 'dark'
+  accentPreset: AccentPreset
+  backgroundMode: BackgroundMode
+  background: BackgroundSettings
+}
+
 contextBridge.exposeInMainWorld('settings', {
   get: () => ipcRenderer.invoke('config:get'),
   set: (
@@ -97,6 +121,7 @@ contextBridge.exposeInMainWorld('settings', {
       verbose?: boolean
       theme?: 'light' | 'dark'
       accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'
+      themeConfig?: ThemeConfig
       prefetchEnabled?: boolean
       cachedCourses?: any[]
       cachedDue?: any[]
@@ -182,6 +207,13 @@ contextBridge.exposeInMainWorld('embedding', {
     // Return cleanup function
     return () => ipcRenderer.removeListener('embedding:download-progress', handler)
   }
+})
+
+// Theme helpers for background image management
+contextBridge.exposeInMainWorld('theme', {
+  uploadBackgroundImage: (filePath: string) => ipcRenderer.invoke('theme:uploadBackgroundImage', filePath),
+  deleteBackgroundImage: (imageUrl: string) => ipcRenderer.invoke('theme:deleteBackgroundImage', imageUrl),
+  pickBackgroundImage: () => ipcRenderer.invoke('theme:pickBackgroundImage'),
 })
 
 // Platform helpers + body class for macOS styling hooks
