@@ -32,6 +32,7 @@ export interface EmbeddingStatus {
 const EMBEDDING_DIM = 384
 const MAX_SEQ_LENGTH = 256  // MiniLM max sequence length
 const SNIPPET_LENGTH = 300
+const BATCH_DELAY_MS = 50   // Delay between batches to reduce CPU pressure
 
 export class EmbeddingManager extends EventEmitter {
   private modelManager: ModelManager
@@ -87,9 +88,22 @@ export class EmbeddingManager extends EventEmitter {
       }
 
       console.log('[EmbeddingManager] Loading ONNX model...')
+
+      // Use CoreML on macOS (leverages Neural Engine/GPU), with CPU fallback
+      // CoreML dramatically reduces CPU usage and heat on Apple Silicon
+      const isMac = process.platform === 'darwin'
+      const executionProviders = isMac
+        ? ['coreml', 'cpu']  // CoreML first, CPU fallback
+        : ['cpu']
+
+      console.log(`[EmbeddingManager] Using execution providers: ${executionProviders.join(', ')}`)
+
       this.session = await ort.InferenceSession.create(modelPath, {
-        executionProviders: ['cpu'],
+        executionProviders,
         graphOptimizationLevel: 'all',
+        // Limit CPU threads when falling back to CPU
+        intraOpNumThreads: 2,
+        interOpNumThreads: 1,
       })
       console.log('[EmbeddingManager] ONNX model loaded')
 
@@ -304,9 +318,14 @@ export class EmbeddingManager extends EventEmitter {
     let indexed = 0
     let skipped = 0
 
-    // Process in batches for efficiency
-    const batchSize = 16
+    // Process in batches with throttling to reduce CPU/energy usage
+    const batchSize = 8  // Reduced from 16 for lower peak CPU usage
     for (let i = 0; i < items.length; i += batchSize) {
+      // Add delay between batches to let CPU cool down
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS))
+      }
+
       const batch = items.slice(i, i + batchSize)
       const toEmbed: { item: IndexableItem; text: string; hash: string }[] = []
 
@@ -452,9 +471,14 @@ export class EmbeddingManager extends EventEmitter {
     let indexed = 0
     let skipped = 0
 
-    // Process in batches for efficiency
-    const batchSize = 16
+    // Process in batches with throttling to reduce CPU/energy usage
+    const batchSize = 8  // Reduced from 16 for lower peak CPU usage
     for (let i = 0; i < chunks.length; i += batchSize) {
+      // Add delay between batches to let CPU cool down
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS))
+      }
+
       const batch = chunks.slice(i, i + batchSize)
       const toEmbed: typeof batch = []
 
