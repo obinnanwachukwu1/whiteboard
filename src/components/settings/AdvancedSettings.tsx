@@ -2,13 +2,13 @@ import React from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { SettingsSection } from './SettingsSection'
 import { SettingsRow, Toggle, ActionButton } from './SettingsRow'
-import { useAppContext } from '../../context/AppContext'
+import { useAppFlags, useAppSettings } from '../../context/AppContext'
 import { Loader2, Database, HardDrive } from 'lucide-react'
 
 export function AdvancedSettings() {
-  const ctx = useAppContext()
   const queryClient = useQueryClient()
-  const { embeddingsEnabled, prefetchEnabled, setPrefetchEnabled, verbose, setVerbose } = ctx
+  const { embeddingsEnabled, prefetchEnabled, verbose } = useAppFlags()
+  const { setPrefetchEnabled, setVerbose } = useAppSettings()
 
   const [rebuildingEmbeddings, setRebuildingEmbeddings] = React.useState(false)
   const [aiStatus, setAiStatus] = React.useState<{

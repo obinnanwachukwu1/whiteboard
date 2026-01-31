@@ -20,7 +20,7 @@ import {
   Sparkles
 } from 'lucide-react'
 import { useGlobalSearch } from '../hooks/useGlobalSearch'
-import { useAppContext } from '../context/AppContext'
+import { useAppData, useAppFlags } from '../context/AppContext'
 import { useAIPanel } from '../context/AIPanelContext'
 import { coordinateSearch } from '../utils/coordinator'
 import type { SearchResult, SearchResultType } from '../utils/searchIndex'
@@ -71,7 +71,8 @@ function getTypeLabel(type: SearchResultType): string {
 
 export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const navigate = useNavigate()
-  const app = useAppContext()
+  const flags = useAppFlags()
+  const data = useAppData()
   const aiPanel = useAIPanel()
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -85,7 +86,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
     isBuilding, 
     isSearching: isStandardSearching,
     clearSearch 
-  } = useGlobalSearch()
+  } = useGlobalSearch({ enabled: isOpen })
 
   // Deep Search State
   const [isDeepSearching, setIsDeepSearching] = useState(false)
@@ -129,8 +130,8 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
       let options: any = {}
 
       // Pass 1: Coordinate (if AI enabled)
-      if (app.aiEnabled && window.ai) {
-        const plan = await coordinateSearch(query, app.courses)
+      if (flags.aiEnabled && window.ai) {
+        const plan = await coordinateSearch(query, data.courses)
         searchQuery = plan.rewrittenQuery
         options = {
           courseIds: plan.filters?.courseIds,
@@ -228,8 +229,8 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
   }, [navigate, onClose, clearSearch])
 
   // Determine special action visibility
-  const showDeepSearchAction = app.embeddingsEnabled && !deepSearchActive && query.trim().length > 0 && !isDeepSearching
-  const showAskAIAction = app.aiEnabled && query.trim().length > 0 && !deepSearchActive && !isDeepSearching
+  const showDeepSearchAction = flags.embeddingsEnabled && !deepSearchActive && query.trim().length > 0 && !isDeepSearching
+  const showAskAIAction = flags.aiEnabled && query.trim().length > 0 && !deepSearchActive && !isDeepSearching
 
   // Calculate total items for navigation
   const deepSearchIndex = showDeepSearchAction ? results.length : -1

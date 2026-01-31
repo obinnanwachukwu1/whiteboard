@@ -1,13 +1,14 @@
 import React from 'react'
-import { useAppContext } from '../context/AppContext'
+import { useAppData, useAppDataActions } from '../context/AppContext'
 import { useQueryClient } from '@tanstack/react-query'
 
 export function useCourseImages() {
-  const app = useAppContext()
+  const appData = useAppData()
+  const appDataActions = useAppDataActions()
   const queryClient = useQueryClient()
   
   // Use context state directly (instant access)
-  const imgStore = app.courseImages || {}
+  const imgStore = appData.courseImages || {}
 
   const getStoredImage = React.useCallback((courseId: string | number) => {
     return imgStore[String(courseId)]
@@ -21,9 +22,9 @@ export function useCourseImages() {
       if (url && next[String(id)] !== url) { next[String(id)] = url; changed = true }
     }
     if (changed) {
-      await app.setCourseImages(next)
+      await appDataActions.setCourseImages(next)
     }
-  }, [imgStore, app])
+  }, [imgStore, appDataActions])
 
   const prefetchCourseImage = React.useCallback(async (courseId: string | number): Promise<string | undefined> => {
     try {

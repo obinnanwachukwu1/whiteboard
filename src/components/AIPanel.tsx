@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { X, Sparkles, ArrowRight, Loader2, FileText, BookOpen, Megaphone, Layers, File } from 'lucide-react'
 import { useAIPanel, type SearchResultItem } from '../context/AIPanelContext'
-import { useAppContext } from '../context/AppContext'
+import { useAppActions, useAppFlags } from '../context/AppContext'
 import { extractAnnouncementIdFromUrl, extractAssignmentIdFromUrl } from '../utils/urlHelpers'
 import './AIPanel.css'
 
@@ -15,7 +15,8 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 
 export function AIPanel() {
   const panel = useAIPanel()
-  const app = useAppContext()
+  const actions = useAppActions()
+  const flags = useAppFlags()
   const panelRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -86,7 +87,7 @@ export function AIPanel() {
 
     // Try to navigate internally first
     if (type === 'announcement' && contentId) {
-      app.onOpenAnnouncement(courseId, contentId, result.metadata.title)
+      actions.onOpenAnnouncement(courseId, contentId, result.metadata.title)
       // Don't close panel automatically for AI chat, unlike search?
       // Actually, standard behavior is close. User can reopen.
       // Or keep open? Let's close for now to be unobtrusive.
@@ -97,14 +98,14 @@ export function AIPanel() {
     if (type === 'assignment') {
       const assignmentId = contentId || extractAssignmentIdFromUrl(result.metadata.url)
       if (assignmentId) {
-        app.onOpenAssignment(courseId, assignmentId, result.metadata.title)
+        actions.onOpenAssignment(courseId, assignmentId, result.metadata.title)
         return
       }
 
       // Some “discussion assignments” link to discussion topics.
       const topicId = extractAnnouncementIdFromUrl(result.metadata.url)
       if (topicId) {
-        app.onOpenAnnouncement(courseId, topicId, result.metadata.title)
+        actions.onOpenAnnouncement(courseId, topicId, result.metadata.title)
         return
       }
 
@@ -113,20 +114,20 @@ export function AIPanel() {
         return
       }
 
-      app.onOpenCourse(courseId)
+      actions.onOpenCourse(courseId)
       return
     }
 
     if (type === 'page' && contentId) {
-      app.onOpenPage(courseId, contentId, result.metadata.title)
+      actions.onOpenPage(courseId, contentId, result.metadata.title)
     } else if (type === 'file' && contentId) {
-      app.onOpenFile(courseId, contentId, result.metadata.title)
+      actions.onOpenFile(courseId, contentId, result.metadata.title)
     } else if (type === 'module') {
-      app.onOpenModules(courseId)
+      actions.onOpenModules(courseId)
     } else if (result.metadata.url) {
       window.system?.openExternal?.(result.metadata.url)
     } else {
-      app.onOpenCourse(courseId)
+      actions.onOpenCourse(courseId)
     }
   }
 
@@ -143,7 +144,7 @@ export function AIPanel() {
     style.transform = 'translateX(-50%)'
   }
 
-  const isEnabled = app.embeddingsEnabled && app.aiEnabled
+  const isEnabled = flags.embeddingsEnabled && flags.aiEnabled
 
   return (
     <div className="ai-panel" ref={panelRef} style={style}>

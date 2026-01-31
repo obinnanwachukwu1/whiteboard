@@ -20,6 +20,12 @@ type Props = {
 }
 
 export const AssignmentList: React.FC<Props> = ({ due, loading, onOpenAssignment, onOpenCourse, courseImageUrl, navigate }) => {
+  // Memoize sorted list to avoid re-sorting on unrelated renders
+  const sortedDue = React.useMemo(
+    () => [...due].sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime()),
+    [due]
+  )
+
   return (
     <Card>
       <h2 className="mt-0 mb-3 text-slate-900 dark:text-slate-100 text-lg font-semibold flex items-center justify-between gap-2">
@@ -39,10 +45,7 @@ export const AssignmentList: React.FC<Props> = ({ due, loading, onOpenAssignment
       )}
       {!loading && due.length > 0 && (
         <div className="space-y-2">
-          {due
-            .slice()
-            .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
-            .map((d) => {
+          {sortedDue.map((d) => {
               const open = () => {
                 const rid = String(d.assignment_rest_id || extractAssignmentIdFromUrl(d.htmlUrl) || '')
                 if (rid) onOpenAssignment?.(d.course_id, rid, d.name)

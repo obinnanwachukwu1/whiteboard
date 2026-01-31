@@ -1,8 +1,8 @@
 import { SettingsSection } from './SettingsSection'
-import { useAppContext } from '../../context/AppContext'
+import { useAppFlags } from '../../context/AppContext'
 
 export function AboutSettings() {
-  const { embeddingsEnabled } = useAppContext()
+  const { embeddingsEnabled } = useAppFlags()
 
   return (
     <SettingsSection title="About">

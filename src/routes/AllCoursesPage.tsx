@@ -1,13 +1,14 @@
-import { useAppContext } from '../context/AppContext'
+import { useAppData, useAppDataActions } from '../context/AppContext'
 import { AllCoursesManager } from '../components/AllCoursesManager'
 
 export default function AllCoursesPage() {
-  const ctx = useAppContext()
+  const data = useAppData()
+  const dataActions = useAppDataActions()
   return (
     <AllCoursesManager
-      courses={ctx.courses}
-      sidebar={ctx.sidebar}
-      onChange={ctx.setSidebar}
+      courses={data.courses}
+      sidebar={data.sidebar}
+      onChange={dataActions.setSidebar}
     />
   )
 }

@@ -1,6 +1,6 @@
 import React from 'react'
 import { useParams, useSearch, useNavigate } from '@tanstack/react-router'
-import { useAppContext } from '../context/AppContext'
+import { useAppData, useAppFlags } from '../context/AppContext'
 import { CourseView } from '../components/CourseView'
 import { useQueryClient } from '@tanstack/react-query'
 import { enqueuePrefetch } from '../utils/prefetchQueue'
@@ -9,7 +9,8 @@ import { prefetchCourseTab } from '../utils/coursePrefetch'
 import { useCourseInfo } from '../hooks/useCanvasQueries'
 
 export default function CoursePage() {
-  const ctx = useAppContext()
+  const data = useAppData()
+  const flags = useAppFlags()
   const { courseId } = useParams({ from: '/course/$courseId' })
   const search = useSearch({ from: '/course/$courseId' }) as { tab?: string; type?: string; contentId?: string; title?: string }
   const navigate = useNavigate()
@@ -101,11 +102,11 @@ export default function CoursePage() {
     }
   }
 
-  const courseName = (ctx.courses || []).find((c: any) => String(c.id) === String(courseId))?.name
+  const courseName = (data.courses || []).find((c: any) => String(c.id) === String(courseId))?.name
 
   // Warm other tabs in the background once the course is mounted
   React.useEffect(() => {
-    if (!ctx.prefetchEnabled) return
+    if (!flags.prefetchEnabled) return
     let cancelled = false
     const id = String(courseId)
     // Small delay to avoid competing with initial render
@@ -151,7 +152,7 @@ export default function CoursePage() {
       } catch {}
     }, 250)
     return () => { clearTimeout(timer); cancelled = true }
-  }, [courseId, ctx.prefetchEnabled])
+  }, [courseId, flags.prefetchEnabled])
 
   return (
     <>
@@ -165,7 +166,7 @@ export default function CoursePage() {
         content={courseDetail}
         onOpenDetail={onOpenDetail}
         onClearDetail={onClearDetail}
-        baseUrl={ctx.baseUrl}
+        baseUrl={data.baseUrl}
         onNavigateCourse={onNavigateCourse}
       />
     </>

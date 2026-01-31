@@ -4,7 +4,7 @@ import type { ActivityFeedItem } from '../../hooks/useActivityFeed'
 import { formatActivityTime } from '../../hooks/useActivityFeed'
 import { cleanCourseName } from '../../utils/courseName'
 import { useAI } from '../../hooks/useAI'
-import { useAppContext } from '../../context/AppContext'
+import { useAppFlags } from '../../context/AppContext'
 import { SummaryPopover } from './SummaryPopover'
 import { useAIPopover } from '../../hooks/useAIPopover'
 import { ListItemRow } from '../ui/ListItemRow'
@@ -25,7 +25,7 @@ const stripHtml = (html: string) => {
  */
 export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick }) => {
   const { streamSummarize } = useAI()
-  const { aiEnabled } = useAppContext()
+  const { aiEnabled } = useAppFlags()
   
   const showAI = aiEnabled && item.type === 'announcement'
   

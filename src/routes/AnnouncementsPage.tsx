@@ -1,7 +1,7 @@
 import React from 'react'
 import { useActivityAnnouncements } from '../hooks/useCanvasQueries'
 import { Megaphone } from 'lucide-react'
-import { useAppContext } from '../context/AppContext'
+import { useAppActions, useAppData } from '../context/AppContext'
 import { Badge } from '../components/ui/Badge'
 import { ListItemRow } from '../components/ui/ListItemRow'
 import { formatDateTime } from '../utils/dateFormat'
@@ -22,10 +22,11 @@ function extractIdFromUrl(url?: string, key?: string): string | null {
 }
 
 export default function AnnouncementsPage() {
-  const ctx = useAppContext()
+  const data = useAppData()
+  const actions = useAppActions()
   const { courseImageUrl } = useCourseImages()
-  const courses = ctx.courses || []
-  const sidebar = ctx.sidebar
+  const courses = data.courses || []
+  const sidebar = data.sidebar
   const annsQ = useActivityAnnouncements(200)
   const [courseFilter, setCourseFilter] = React.useState<string>('all')
 
@@ -81,18 +82,18 @@ export default function AnnouncementsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {list.map((a: any, i: number) => {
+          {list.map((a: any) => {
             const open = () => {
               const cid = a.courseId
               const tid = a.topicId
-              if (cid != null && tid) ctx.onOpenAnnouncement(cid, String(tid), a.title)
-              else if (cid != null) ctx.onOpenCourse(cid)
+              if (cid != null && tid) actions.onOpenAnnouncement(cid, String(tid), a.title)
+              else if (cid != null) actions.onOpenCourse(cid)
             }
             const img = courseImageUrl(a.courseId)
             
             return (
               <ListItemRow
-                key={i}
+                key={`${a.courseId ?? 'course'}-${a.topicId ?? a.htmlUrl ?? a.title}`}
                 icon={
                   <CourseAvatar
                     courseId={a.courseId || ''}

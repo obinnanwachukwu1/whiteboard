@@ -2,7 +2,7 @@ import React from 'react'
 import { cleanCourseName } from '../../utils/courseName'
 import type { DashboardAssignment } from '../../hooks/usePriorityAssignments'
 import { useAI } from '../../hooks/useAI'
-import { useAppContext } from '../../context/AppContext'
+import { useAppFlags } from '../../context/AppContext'
 import { CourseAvatar } from '../CourseAvatar'
 import { SummaryPopover } from './SummaryPopover'
 import { useAIPopover } from '../../hooks/useAIPopover'
@@ -65,7 +65,7 @@ type Props = {
  */
 export const PriorityItem: React.FC<Props> = ({ assignment, courseImageUrl, onClick }) => {
   const { streamExplainPriority } = useAI()
-  const { aiEnabled } = useAppContext()
+  const { aiEnabled } = useAppFlags()
   const showAI = aiEnabled
   
   const isPastDue = assignment.hoursUntilDue !== null && assignment.hoursUntilDue < 0

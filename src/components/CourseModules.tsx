@@ -1,12 +1,12 @@
 import React from 'react'
-import { FileText, File, MessageSquare, Link as LinkIcon, BookOpen, MoreVertical, Sparkles } from 'lucide-react'
+import { FileText, File, MessageSquare, Link as LinkIcon, BookOpen, MoreVertical, Sparkles, ChevronDown, ChevronRight } from 'lucide-react'
 import { Dropdown } from './ui/Dropdown'
 import { useCourseModules } from '../hooks/useCanvasQueries'
 import type { CanvasModule, CanvasModuleItem, CanvasFile } from '../types/canvas'
 import { ListItemRow } from './ui/ListItemRow'
 import { MetadataBadge } from './ui/MetadataBadge'
 import { useAIPanel } from '../context/AIPanelContext'
-import { useAppContext } from '../context/AppContext'
+import { useAppData, useAppFlags } from '../context/AppContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePrefetchOnHover } from '../hooks/usePrefetchOnHover'
 import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
@@ -72,9 +72,9 @@ const ModuleItemRow: React.FC<{
   menuId: string
   setMenuOpenId: (id: string | null) => void
   anchorEls: React.MutableRefObject<Map<string, HTMLElement | null>>
-  app: any
+  aiEnabled: boolean
   aiPanel: any
-}> = ({ it, courseId, icon, title, kind, onClick, isMenuOpen, menuId, setMenuOpenId, anchorEls, app, aiPanel }) => {
+}> = ({ it, courseId, icon, title, kind, onClick, isMenuOpen, menuId, setMenuOpenId, anchorEls, aiEnabled, aiPanel }) => {
   const hoverHandlers = useModuleItemPrefetch(courseId, it)
 
   return (
@@ -102,7 +102,7 @@ const ModuleItemRow: React.FC<{
                   Open in Browser
                 </button>
               )}
-              {app.aiEnabled && (
+              {aiEnabled && (
                 <button 
                   className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 text-indigo-600 dark:text-indigo-400"
                   onClick={(e) => {
@@ -126,11 +126,48 @@ const ModuleItemRow: React.FC<{
 export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpenContent }) => {
   const { data: modules = null, isLoading, error } = useCourseModules(courseId)
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
+  const [expandedModules, setExpandedModules] = React.useState<Set<string>>(new Set())
   const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
   const aiPanel = useAIPanel()
-  const app = useAppContext()
+  const data = useAppData()
+  const flags = useAppFlags()
   const queryClient = useQueryClient()
   const autoPrefetchedRef = React.useRef<string | null>(null)
+  const initializedForCourseRef = React.useRef<string | null>(null)
+
+  // Initialize: expand only the first module when modules load
+  React.useEffect(() => {
+    if (!modules || !Array.isArray(modules) || modules.length === 0) return
+    const key = String(courseId)
+    if (initializedForCourseRef.current === key) return
+    initializedForCourseRef.current = key
+    const firstModule = modules[0] as CanvasModule
+    const firstId = String(firstModule._id || firstModule.id)
+    setExpandedModules(new Set([firstId]))
+  }, [modules, courseId])
+
+  const toggleModule = React.useCallback((moduleId: string) => {
+    setExpandedModules(prev => {
+      const next = new Set(prev)
+      if (next.has(moduleId)) {
+        next.delete(moduleId)
+      } else {
+        next.add(moduleId)
+      }
+      return next
+    })
+  }, [])
+
+  const expandAll = React.useCallback(() => {
+    if (!modules || !Array.isArray(modules)) return
+    const allIds = (modules as CanvasModule[]).map(m => String(m._id || m.id))
+    setExpandedModules(new Set(allIds))
+  }, [modules])
+
+  const allExpanded = React.useMemo(() => {
+    if (!modules || !Array.isArray(modules) || modules.length === 0) return false
+    return (modules as CanvasModule[]).every(m => expandedModules.has(String(m._id || m.id)))
+  }, [modules, expandedModules])
 
   // Lightweight proactive prefetch: grab meta + content for a few top items.
   // Keeps UX snappy (less "Loading…") while avoiding the old module-items fanout.
@@ -218,12 +255,12 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
 
     // Handle other module item types
     if (it.__typename === 'DiscussionModuleItem' && it.contentId) {
-      const url = new URL(`/courses/${courseId}/discussion_topics/${it.contentId}`, app.baseUrl).toString()
+      const url = new URL(`/courses/${courseId}/discussion_topics/${it.contentId}`, data.baseUrl).toString()
       await openExternal(url)
       return
     }
     if (it.__typename === 'QuizModuleItem' && it.contentId) {
-      const url = new URL(`/courses/${courseId}/quizzes/${it.contentId}`, app.baseUrl).toString()
+      const url = new URL(`/courses/${courseId}/quizzes/${it.contentId}`, data.baseUrl).toString()
       await openExternal(url)
       return
     }
@@ -253,12 +290,12 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
           return
         }
         if (type === 'discussion' && meta?.content_id != null) {
-          const url = new URL(`/courses/${courseId}/discussion_topics/${meta.content_id}`, app.baseUrl).toString()
+          const url = new URL(`/courses/${courseId}/discussion_topics/${meta.content_id}`, data.baseUrl).toString()
           await openExternal(url)
           return
         }
         if (type === 'quiz' && meta?.content_id != null) {
-          const url = new URL(`/courses/${courseId}/quizzes/${meta.content_id}`, app.baseUrl).toString()
+          const url = new URL(`/courses/${courseId}/quizzes/${meta.content_id}`, data.baseUrl).toString()
           await openExternal(url)
           return
         }
@@ -301,6 +338,14 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-3 shrink-0">
         <h3 className="m-0 text-slate-900 dark:text-slate-100 text-base font-semibold">Modules</h3>
+        {!isLoading && modules && modules.length > 1 && !allExpanded && (
+          <button
+            onClick={expandAll}
+            className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+          >
+            Expand All
+          </button>
+        )}
       </div>
       
       <div className="flex-1 overflow-y-auto min-h-0 p-4">
@@ -311,46 +356,62 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
         )}
         {!isLoading && modules && modules.length > 0 && (
           <div className="space-y-3">
-            {(modules as CanvasModule[]).map((m) => (
-              <div key={String(m._id || m.id)}>
-                {/* Module header */}
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm font-medium text-slate-600 dark:text-neutral-300">{m.name}</span>
-                  <span className="text-xs text-slate-400">{m?.moduleItemsConnection?.nodes?.length ?? 0} items</span>
+            {(modules as CanvasModule[]).map((m) => {
+              const moduleId = String(m._id || m.id)
+              const isExpanded = expandedModules.has(moduleId)
+              const itemCount = m?.moduleItemsConnection?.nodes?.length ?? 0
+              
+              return (
+                <div key={moduleId}>
+                  {/* Module header - clickable to toggle */}
+                  <button
+                    onClick={() => toggleModule(moduleId)}
+                    className="flex items-center justify-between w-full mb-1.5 p-1 -ml-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left"
+                  >
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-neutral-300">
+                      {isExpanded ? (
+                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4 text-slate-400" />
+                      )}
+                      {m.name}
+                    </span>
+                    <span className="text-xs text-slate-400">{itemCount} items</span>
+                  </button>
+                  
+                  {/* Module items - only rendered when expanded */}
+                  {isExpanded && itemCount > 0 && (
+                    <ul className="list-none m-0 p-0 space-y-3 ml-5">
+                      {m.moduleItemsConnection?.nodes?.map((it: CanvasModuleItem) => {
+                        const title = it.title || 'Item'
+                        const kind = labelFor(it)
+                        const menuId = String(it.id || it._id)
+                        const isMenuOpen = menuOpenId === menuId
+                        
+                        return (
+                          <li key={String(it.id || it._id)}>
+                            <ModuleItemRow
+                              it={it}
+                              courseId={courseId}
+                              icon={iconFor(it)}
+                              title={title}
+                              kind={kind}
+                              onClick={() => openItem(it, title)}
+                              isMenuOpen={isMenuOpen}
+                              menuId={menuId}
+                              setMenuOpenId={setMenuOpenId}
+                              anchorEls={anchorEls}
+                              aiEnabled={flags.aiEnabled}
+                              aiPanel={aiPanel}
+                            />
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
                 </div>
-                
-                {/* Module items as card-style list */}
-                {(m.moduleItemsConnection?.nodes?.length ?? 0) > 0 && (
-                  <ul className="list-none m-0 p-0 space-y-3">
-                    {m.moduleItemsConnection?.nodes?.map((it: CanvasModuleItem) => {
-                      const title = it.title || 'Item'
-                      const kind = labelFor(it)
-                      const menuId = String(it.id || it._id)
-                      const isMenuOpen = menuOpenId === menuId
-                      
-                      return (
-                        <li key={String(it.id || it._id)}>
-                          <ModuleItemRow
-                            it={it}
-                            courseId={courseId}
-                            icon={iconFor(it)}
-                            title={title}
-                            kind={kind}
-                            onClick={() => openItem(it, title)}
-                            isMenuOpen={isMenuOpen}
-                            menuId={menuId}
-                            setMenuOpenId={setMenuOpenId}
-                            anchorEls={anchorEls}
-                            app={app}
-                            aiPanel={aiPanel}
-                          />
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

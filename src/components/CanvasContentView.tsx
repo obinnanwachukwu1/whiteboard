@@ -7,7 +7,7 @@ import { useAssignmentRest, useCoursePage, useAnnouncement, useMySubmission, use
 import { FullscreenContainer } from './FullscreenContainer'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
 import { useAIPanel } from '../context/AIPanelContext'
-import { useAppContext } from '../context/AppContext'
+import { useAppActions, useAppData, useAppFlags } from '../context/AppContext'
 import { Skeleton, SkeletonText } from './Skeleton'
 import { Dropdown } from './ui/Dropdown'
 import { openExternal } from '../utils/openExternal'
@@ -43,7 +43,9 @@ export const CanvasContentView: React.FC<Props> = ({
     (typeof navigator !== 'undefined' && /windows/i.test(navigator.userAgent)) ||
     (typeof navigator !== 'undefined' && typeof (navigator as any).platform === 'string' && /^win/i.test((navigator as any).platform))
 
-  const app = useAppContext()
+  const data = useAppData()
+  const flags = useAppFlags()
+  const actions = useAppActions()
   const aiPanel = useAIPanel()
   const moreBtnRef = useRef<HTMLButtonElement>(null)
   const [moreOpen, setMoreOpen] = useState(false)
@@ -98,7 +100,7 @@ export const CanvasContentView: React.FC<Props> = ({
     }
 
     // Only show context menu if AI is enabled and we have content
-    if (!app.aiEnabled) return
+    if (!flags.aiEnabled) return
     if (loading || error) return
     
     // Only for text content types for now (not files)
@@ -164,7 +166,7 @@ export const CanvasContentView: React.FC<Props> = ({
   ]
 
   const openInCanvasUrl = useMemo(() => {
-    const baseUrl = app.baseUrl
+    const baseUrl = data.baseUrl
     if (!baseUrl) return null
     if (contentType === 'file') {
       return canvasContentUrl({ baseUrl, courseId, type: 'file', contentId })
@@ -179,7 +181,7 @@ export const CanvasContentView: React.FC<Props> = ({
       return canvasContentUrl({ baseUrl, courseId, type: 'page', contentId })
     }
     return null
-  }, [app.baseUrl, courseId, contentId, contentType])
+  }, [data.baseUrl, courseId, contentId, contentType])
 
   const openInNewWindow = async () => {
     try {
@@ -201,15 +203,15 @@ export const CanvasContentView: React.FC<Props> = ({
 
   const pinId = `${contentType}:${contentId}`
   const isPinned = useMemo(() => {
-    return app.pinnedItems?.some(i => i.id === pinId)
-  }, [app.pinnedItems, pinId])
+    return data.pinnedItems?.some(i => i.id === pinId)
+  }, [data.pinnedItems, pinId])
 
   const togglePin = async () => {
     setMoreOpen(false)
     if (isPinned) {
-      app.unpinItem(pinId)
+      actions.unpinItem(pinId)
     } else {
-      app.pinItem({
+      actions.pinItem({
         id: pinId,
         type: contentType,
         title: resolvedTitle,

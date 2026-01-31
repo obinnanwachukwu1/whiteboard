@@ -1,7 +1,7 @@
 import React from 'react'
 import { Pin, ExternalLink, X, FileText, File, MessageCircle, Megaphone, Link as LinkIcon, BookOpen } from 'lucide-react'
 import { Card } from '../ui/Card'
-import { useAppContext } from '../../context/AppContext'
+import { useAppActions } from '../../context/AppContext'
 import { ListItemRow } from '../ui/ListItemRow'
 
 type PinnedItem = {
@@ -20,7 +20,7 @@ type Props = {
 }
 
 export const PinnedPages: React.FC<Props> = ({ items, onUnpin }) => {
-  const ctx = useAppContext()
+  const actions = useAppActions()
 
   const handleOpen = (item: PinnedItem) => {
     if (item.type === 'url' && item.url) {
@@ -32,22 +32,22 @@ export const PinnedPages: React.FC<Props> = ({ items, onUnpin }) => {
 
     switch (item.type) {
         case 'assignment':
-            ctx.onOpenAssignment(item.courseId, item.contentId!, item.title)
+            actions.onOpenAssignment(item.courseId, item.contentId!, item.title)
             break
         case 'page':
-            ctx.onOpenPage(item.courseId, String(item.contentId!), item.title)
+            actions.onOpenPage(item.courseId, String(item.contentId!), item.title)
             break
         case 'discussion':
-            ctx.onOpenDiscussion(item.courseId, String(item.contentId!), item.title)
+            actions.onOpenDiscussion(item.courseId, String(item.contentId!), item.title)
             break
         case 'announcement':
-            ctx.onOpenAnnouncement(item.courseId, String(item.contentId!), item.title)
+            actions.onOpenAnnouncement(item.courseId, String(item.contentId!), item.title)
             break
         case 'file':
-            ctx.onOpenFile(item.courseId, String(item.contentId!), item.title)
+            actions.onOpenFile(item.courseId, String(item.contentId!), item.title)
             break
         case 'course':
-            ctx.onOpenCourse(item.courseId)
+            actions.onOpenCourse(item.courseId)
             break
     }
   }

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Dropdown } from './ui/Dropdown'
 // removed theme toggle button
-import { useAppContext } from '../context/AppContext'
+import { useAppActions } from '../context/AppContext'
 import { Search, Command } from 'lucide-react'
 import { InboxButton } from './InboxButton'
 
@@ -12,7 +12,7 @@ type Props = {
 }
 
 export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) => {
-  const app = useAppContext()
+  const actions = useAppActions()
   const name = profile?.short_name || profile?.name || 'Whiteboard'
   const avatar = profile?.avatar_url
   const isWin =
@@ -48,7 +48,7 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
     const ok = window.confirm('Sign out of Canvas? You can reconnect later. Your local layout and preferences remain saved.')
     if (!ok) return
     setMenuOpen(false)
-    await app.onSignOut()
+    await actions.onSignOut()
   }
 
   const onCopyEmail = async () => {
@@ -129,7 +129,7 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
             Signed in as
             <div className="truncate text-slate-800 dark:text-slate-200 text-[11px]">{profile?.primary_email || name}</div>
           </div>
-          <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" onClick={() => { setMenuOpen(false); app.onOpenSettings() }}>
+          <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" onClick={() => { setMenuOpen(false); actions.onOpenSettings() }}>
             Settings
           </button>
           <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50" onClick={onCopyEmail} disabled={!profile?.primary_email}>

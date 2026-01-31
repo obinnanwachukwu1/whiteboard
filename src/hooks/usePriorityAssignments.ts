@@ -133,6 +133,32 @@ export function usePriorityAssignments(options?: {
     
     return contexts
   }, [groupQueries])
+
+  // Build O(1) assignment lookup: courseId -> assignmentId -> { groupId, pointsPossible }
+  // This replaces the O(n*m*k) nested loop with O(1) lookups per assignment
+  const assignmentLookup = useMemo(() => {
+    const lookup = new Map<string, Map<string, { groupId: number | string; pointsPossible: number | null }>>()
+    
+    for (const q of groupQueries) {
+      if (!q.data) continue
+      const { courseId, groups } = q.data
+      const courseMap = new Map<string, { groupId: number | string; pointsPossible: number | null }>()
+      
+      for (const group of groups) {
+        const assignments = (group as any).assignments || []
+        for (const a of assignments) {
+          courseMap.set(String(a.id), {
+            groupId: group.id,
+            pointsPossible: a.points_possible ?? null,
+          })
+        }
+      }
+      
+      lookup.set(courseId, courseMap)
+    }
+    
+    return lookup
+  }, [groupQueries])
   
   // Transform due items to PriorityAssignment format with weights
   const priorityAssignments = useMemo((): PriorityAssignment[] => {
@@ -155,29 +181,22 @@ export function usePriorityAssignments(options?: {
         } catch {}
       }
       
-      // Try to calculate weight
+      // Try to calculate weight using O(1) lookup
       let effectiveWeight: number | null = null
       if (context && assignmentId) {
-        // We need the assignment_group_id - try to find it from groups
-        for (const q of groupQueries) {
-          if (q.data?.courseId === courseId) {
-            for (const group of q.data.groups) {
-              const assignment = (group as any).assignments?.find(
-                (a: any) => String(a.id) === assignmentId
-              )
-              if (assignment) {
-                effectiveWeight = calculateAssignmentWeight(
-                  {
-                    id: assignment.id,
-                    assignment_group_id: group.id,
-                    points_possible: assignment.points_possible,
-                  },
-                  context
-                )
-                break
-              }
-            }
-          }
+        // Use the pre-built lookup map instead of nested loops
+        const courseAssignments = assignmentLookup.get(courseId)
+        const assignmentInfo = courseAssignments?.get(assignmentId)
+        
+        if (assignmentInfo) {
+          effectiveWeight = calculateAssignmentWeight(
+            {
+              id: assignmentId,
+              assignment_group_id: assignmentInfo.groupId,
+              points_possible: assignmentInfo.pointsPossible,
+            },
+            context
+          )
         }
       }
       
@@ -193,7 +212,7 @@ export function usePriorityAssignments(options?: {
         htmlUrl: item.htmlUrl,
       }
     })
-  }, [dueQuery.data, weightContexts, groupQueries])
+  }, [dueQuery.data, weightContexts, assignmentLookup])
   
   const byId = useMemo(() => {
     const m = new Map<string, PriorityAssignment>()

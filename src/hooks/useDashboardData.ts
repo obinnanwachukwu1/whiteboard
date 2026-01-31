@@ -64,7 +64,7 @@ export function useDashboardData({ courses, sidebar, due, loading }: UseDashboar
     return sidebar?.customNames?.[String(c.id)] || c.course_code || c.name
   }, [sidebar?.customNames])
 
-  // 2. Optimized Gradebook Calculation (useQueries + memoized results)
+  // 2. Optimized Gradebook Calculation - using select to run calcs only when data changes
   const gradeQueries = useQueries({
     queries: orderedVisibleCourses.map((c) => ({
       queryKey: ['course-gradebook', String(c.id)],
@@ -75,14 +75,26 @@ export function useDashboardData({ courses, sidebar, due, loading }: UseDashboar
         ])
         if (!groupsRes?.ok) throw new Error(groupsRes?.error || 'Failed to load assignment groups')
         if (!assignmentsRes?.ok) throw new Error(assignmentsRes?.error || 'Failed to load gradebook assignments')
-        return { groups: groupsRes.data || [], raw: assignmentsRes.data || [], assignments: [] as any[] }
+        return { groups: groupsRes.data || [], raw: assignmentsRes.data || [] }
+      },
+      // Move grade calculation into select - runs only when raw data changes
+      select: (data: { groups: any[]; raw: any[] }) => {
+        try {
+          const assignments = toAssignmentInputsFromRest(data.raw)
+          const calc = calculateCourseGrades(data.groups, assignments, { useWeights: 'auto', treatUngradedAsZero: true, whatIf: {} })
+          const pct = calc?.current?.totals?.percent
+          const grade = typeof pct === 'number' && Number.isFinite(pct) ? Math.round(pct * 10) / 10 : null
+          return { grade, raw: data.raw, groups: data.groups }
+        } catch {
+          return { grade: null, raw: data.raw, groups: data.groups }
+        }
       },
       staleTime: 1000 * 60 * 15, // 15 minutes
       enabled: true // Always try to fetch/read from cache
     }))
   })
 
-  // Memoize the grade for each course based on the query data
+  // Grade map now just reads pre-computed values from select
   const gradesMap = React.useMemo(() => {
     const map = new Map<string, number | null>()
     
@@ -90,22 +102,8 @@ export function useDashboardData({ courses, sidebar, due, loading }: UseDashboar
       const courseId = orderedVisibleCourses[i]?.id
       if (!courseId) return
       
-      const data = q.data as any
-      if (!data?.groups || !data?.raw) {
-        map.set(String(courseId), null)
-        return
-      }
-
-      // Perform heavy calculation only when data changes
-      try {
-        const assignments = toAssignmentInputsFromRest(data.raw)
-        const calc = calculateCourseGrades(data.groups, assignments, { useWeights: 'auto', treatUngradedAsZero: true, whatIf: {} })
-        const pct = calc?.current?.totals?.percent
-        const val = typeof pct === 'number' && Number.isFinite(pct) ? Math.round(pct * 10) / 10 : null
-        map.set(String(courseId), val)
-      } catch {
-        map.set(String(courseId), null)
-      }
+      const data = q.data as { grade: number | null; raw: any[]; groups: any[] } | undefined
+      map.set(String(courseId), data?.grade ?? null)
     })
     return map
   }, [gradeQueries, orderedVisibleCourses])

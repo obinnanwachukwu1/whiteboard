@@ -4,7 +4,7 @@ import { Badge } from './ui/Badge'
 import { Eye, EyeOff, RotateCcw, MoreVertical } from 'lucide-react'
 import { Dropdown } from './ui/Dropdown'
 import { Card } from './ui/Card'
-import { useAppContext } from '../context/AppContext'
+import { useAppActions } from '../context/AppContext'
 
 type Course = { id: number | string; name: string; course_code?: string }
 
@@ -21,7 +21,7 @@ type Props = {
 }
 
 export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange }) => {
-  const ctx = useAppContext()
+  const actions = useAppActions()
   const hiddenSet = useMemo(() => new Set(sidebar.hiddenCourseIds || []), [sidebar.hiddenCourseIds])
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const btnRef = useRef<HTMLButtonElement | null>(null)
@@ -72,8 +72,8 @@ export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange 
               className="relative min-h-40 flex flex-col justify-between cursor-pointer hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 transition-colors"
               role="button"
               tabIndex={0}
-              onClick={(e) => { if (editingId === idKey) { e.preventDefault(); return } ctx.onOpenCourse(c.id) }}
-              onKeyDown={(e) => { if (editingId === idKey) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ctx.onOpenCourse(c.id) } }}
+              onClick={(e) => { if (editingId === idKey) { e.preventDefault(); return } actions.onOpenCourse(c.id) }}
+              onKeyDown={(e) => { if (editingId === idKey) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); actions.onOpenCourse(c.id) } }}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">

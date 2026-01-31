@@ -77,7 +77,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
         <button
           className={`w-full text-left py-2 pl-7 pr-8 rounded-lg text-sm transition-all duration-150 outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
             active
-              ? 'bg-[var(--accent-100)] dark:bg-[var(--accent-900)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-200)] dark:ring-[var(--accent-800)]'
+              ? 'bg-[var(--accent-200)] dark:bg-[var(--accent-50)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-300)] dark:ring-[var(--accent-300)]'
               : 'hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm hover:shadow-sm text-slate-600 dark:text-slate-300'
           }`}
           onClick={onSelect}
@@ -114,7 +114,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
             preload="intent"
             className={`cursor-default text-left py-2 px-3 rounded-lg text-sm transition-all duration-150 outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
               current === 'dashboard'
-                ? 'bg-[var(--accent-100)] dark:bg-[var(--accent-900)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-200)] dark:ring-[var(--accent-800)]'
+                ? 'bg-[var(--accent-200)] dark:bg-[var(--accent-50)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-300)] dark:ring-[var(--accent-300)]'
                 : 'hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectDashboard()}
@@ -129,7 +129,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
             preload="intent"
             className={`cursor-default text-left py-2 px-3 rounded-lg text-sm transition-all duration-150 outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
               current === 'announcements'
-                ? 'bg-[var(--accent-100)] dark:bg-[var(--accent-900)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-200)] dark:ring-[var(--accent-800)]'
+                ? 'bg-[var(--accent-200)] dark:bg-[var(--accent-50)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-300)] dark:ring-[var(--accent-300)]'
                 : 'hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectAnnouncements?.()}
@@ -144,7 +144,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
             preload="intent"
             className={`cursor-default text-left py-2 px-3 rounded-lg text-sm transition-all duration-150 outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
               current === 'assignments'
-                ? 'bg-[var(--accent-100)] dark:bg-[var(--accent-900)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-200)] dark:ring-[var(--accent-800)]'
+                ? 'bg-[var(--accent-200)] dark:bg-[var(--accent-50)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-300)] dark:ring-[var(--accent-300)]'
                 : 'hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectAssignments?.()}
@@ -159,7 +159,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
             preload="intent"
             className={`cursor-default text-left py-2 px-3 rounded-lg text-sm transition-all duration-150 outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
               current === 'grades'
-                ? 'bg-[var(--accent-100)] dark:bg-[var(--accent-900)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-200)] dark:ring-[var(--accent-800)]'
+                ? 'bg-[var(--accent-200)] dark:bg-[var(--accent-50)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-300)] dark:ring-[var(--accent-300)]'
                 : 'hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectGrades?.()}
@@ -174,7 +174,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
             preload="intent"
             className={`cursor-default text-left py-2 px-3 rounded-lg text-sm transition-all duration-150 outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
               current === 'discussions'
-                ? 'bg-[var(--accent-100)] dark:bg-[var(--accent-900)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-200)] dark:ring-[var(--accent-800)]'
+                ? 'bg-[var(--accent-200)] dark:bg-[var(--accent-50)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-300)] dark:ring-[var(--accent-300)]'
                 : 'hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectDiscussions?.()}
@@ -231,8 +231,8 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
           preload="intent"
           className={`cursor-default w-full text-left py-2 px-3 rounded-lg text-sm transition-all duration-150 outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
             current === 'allCourses'
-              ? 'bg-[var(--glass-bg)] backdrop-blur-sm text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--glass-border)] border-l-[3px] border-l-[var(--accent-500)]'
-              : 'hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm hover:shadow-sm text-slate-700 dark:text-slate-200 border-l-[3px] border-l-transparent'
+              ? 'bg-[var(--accent-200)] dark:bg-[var(--accent-50)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-300)] dark:ring-[var(--accent-300)]'
+              : 'hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm hover:shadow-sm text-slate-700 dark:text-slate-200'
           }`}
           onClick={() => onOpenAllCourses()}
           aria-current={current === 'allCourses' ? 'page' : undefined}

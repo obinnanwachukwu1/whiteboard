@@ -59,6 +59,37 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
     } as any)
   }, [html])
 
+  // Optimize image loading - set eager loading, high priority, and fade-in effect
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    const images = el.querySelectorAll('img')
+    images.forEach((img) => {
+      // Load immediately, don't defer
+      img.setAttribute('loading', 'eager')
+      // Decode in parallel with other work
+      img.setAttribute('decoding', 'async')
+      // High priority fetch
+      img.setAttribute('fetchpriority', 'high')
+
+      // Fade-in effect: start hidden, fade in when loaded
+      img.style.opacity = '0'
+      img.style.transition = 'opacity 0.2s ease-out'
+
+      const handleLoad = () => {
+        img.style.opacity = '1'
+      }
+
+      // If already loaded (cached), show immediately
+      if (img.complete && img.naturalHeight !== 0) {
+        img.style.opacity = '1'
+      } else {
+        img.addEventListener('load', handleLoad, { once: true })
+      }
+    })
+  }, [sanitized])
+
   useEffect(() => {
     const el = containerRef.current
     if (!el) return

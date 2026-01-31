@@ -2,7 +2,7 @@ import React from 'react'
 import { useCourses } from '../hooks/useCanvasQueries'
 import { useQueries } from '@tanstack/react-query'
 import { MessageCircle, Pin, Lock, Search } from 'lucide-react'
-import { useAppContext } from '../context/AppContext'
+import { useAppActions, useAppData } from '../context/AppContext'
 import { Badge } from '../components/ui/Badge'
 import { ListItemRow } from '../components/ui/ListItemRow'
 import { SkeletonList } from '../components/Skeleton'
@@ -12,11 +12,12 @@ import { useCourseImages } from '../hooks/useCourseImages'
 import { useCourseAvatarPreloadGate } from '../hooks/useCourseAvatarPreloadGate'
 
 export default function DiscussionsPage() {
-  const ctx = useAppContext()
+  const data = useAppData()
+  const actions = useAppActions()
   const { courseImageUrl } = useCourseImages()
   const coursesQ = useCourses()
-  const courses = ctx.courses || coursesQ.data || []
-  const sidebar = ctx.sidebar
+  const courses = data.courses || coursesQ.data || []
+  const sidebar = data.sidebar
   const [courseFilter, setCourseFilter] = React.useState<string>('all')
   const [searchTerm, setSearchTerm] = React.useState('')
   const [debouncedSearch, setDebouncedSearch] = React.useState('')
@@ -166,7 +167,7 @@ export default function DiscussionsPage() {
           {allDiscussions.map((d, i) => {
             const open = () => {
               if (d.courseId != null) {
-                ctx.onOpenDiscussion?.(d.courseId, String(d.id), d.title)
+                actions.onOpenDiscussion?.(d.courseId, String(d.id), d.title)
               }
             }
             const img = courseImageUrl(d.courseId)

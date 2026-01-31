@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '../components/ui/Toaster'
 import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
 import { toAssignmentInputsFromRest, toAssignmentGroupInputsFromRest } from '../utils/gradeCalc'
-import { AppProvider, type AppContextValue } from '../context/AppContext'
+import { AppFlagsContext, AppSettingsContext, AppActionsContext, AppDataContext, AppDataActionsContext, type AppFlagsValue, type AppSettingsValue, type AppActionsValue, type AppDataValue, type AppDataActionsValue } from '../context/AppContext'
 import { AIPanelProvider, useAIPanel } from '../context/AIPanelContext'
 import { AIPanel } from '../components/AIPanel'
 import { DEFAULT_THEME_SETTINGS, normalizeThemeSettings, type ThemeSettings } from '../utils/theme'
@@ -265,14 +265,14 @@ export function RootLayout() {
     }
   }, [dueQ.data])
 
-  const saveUserSidebar = async (next: SidebarConfig) => {
+  const saveUserSidebar = useCallback(async (next: SidebarConfig) => {
     try {
       const cfg = await window.settings.get?.()
       const map = (cfg?.ok ? (cfg.data as any)?.userSidebars : undefined) || {}
       if (userKey) map[userKey] = next
       await window.settings.set?.(userKey ? { userSidebars: map } : { sidebar: next })
     } catch {}
-  }
+  }, [userKey])
 
   const saveUserSettings = React.useCallback(async (partial: Record<string, any>) => {
     try {
@@ -365,10 +365,10 @@ export function RootLayout() {
     prevHiddenRef.current = currHidden
   }, [sidebarCfg.hiddenCourseIds])
   
-  const onSidebarConfigChange = async (next: SidebarConfig) => {
+  const onSidebarConfigChange = useCallback(async (next: SidebarConfig) => {
     setSidebarCfg(next)
     await saveUserSidebar(next)
-  }
+  }, [saveUserSidebar])
 
   const coursePrefetchCooldownMs = 10 * 60 * 1000
 
@@ -681,28 +681,31 @@ export function RootLayout() {
     : (loading || profileQ.isLoading || (coursesQ.isLoading && !(cachedCourses && cachedCourses.length)) || (dueQ.isLoading && !(cachedDue && cachedDue.length))),
   [embedBoot, loading, profileQ.isLoading, coursesQ.isLoading, cachedCourses, dueQ.isLoading, cachedDue])
 
-  // Memoize the entire context to prevent unnecessary re-renders of consumers
-  const context: AppContextValue = useMemo(() => ({
-    baseUrl,
-    courses,
-    due,
-    profile,
-    loading: isLoading,
-    sidebar: sidebarCfg,
-    setSidebar: onSidebarConfigChange,
-    courseImages,
-    setCourseImages: saveCourseImages,
-    prefetchEnabled,
-    setPrefetchEnabled: setPrefetchEnabledPersisted,
-    pdfGestureZoomEnabled,
-    setPdfGestureZoomEnabled: setPdfGestureZoomEnabledPersisted,
-    embeddingsEnabled,
-    setEmbeddingsEnabled: setEmbeddingsEnabledPersisted,
+  // Split contexts for performance - these have narrower dependencies
+  // so consumers only rerender when their specific slice changes
+  const flagsContext: AppFlagsValue = useMemo(() => ({
     aiEnabled,
-    setAiEnabled: setAiEnabledPersisted,
+    embeddingsEnabled,
+    prefetchEnabled,
+    pdfGestureZoomEnabled,
     verbose,
+  }), [aiEnabled, embeddingsEnabled, prefetchEnabled, pdfGestureZoomEnabled, verbose])
+
+  const settingsContext: AppSettingsValue = useMemo(() => ({
+    setPrefetchEnabled: setPrefetchEnabledPersisted,
+    setPdfGestureZoomEnabled: setPdfGestureZoomEnabledPersisted,
+    setEmbeddingsEnabled: setEmbeddingsEnabledPersisted,
+    setAiEnabled: setAiEnabledPersisted,
     setVerbose: setVerbosePersisted,
-    saveUserSettings,
+  }), [
+    setPrefetchEnabledPersisted,
+    setPdfGestureZoomEnabledPersisted,
+    setEmbeddingsEnabledPersisted,
+    setAiEnabledPersisted,
+    setVerbosePersisted,
+  ])
+
+  const actionsContext: AppActionsValue = useMemo(() => ({
     onOpenCourse,
     onOpenAssignment,
     onOpenAnnouncement,
@@ -712,18 +715,25 @@ export function RootLayout() {
     onOpenModules,
     onSignOut,
     onOpenSettings,
-    pinnedItems,
     pinItem,
     unpinItem,
-  }), [
-    baseUrl, courses, due, profile, isLoading, sidebarCfg, onSidebarConfigChange,
-    courseImages, saveCourseImages, prefetchEnabled, setPrefetchEnabledPersisted,
-    pdfGestureZoomEnabled, setPdfGestureZoomEnabledPersisted, embeddingsEnabled,
-    setEmbeddingsEnabledPersisted, aiEnabled, setAiEnabledPersisted, verbose,
-    setVerbosePersisted, saveUserSettings, onOpenCourse, onOpenAssignment,
-    onOpenAnnouncement, onOpenDiscussion, onOpenPage, onOpenFile, onOpenModules,
-    onSignOut, onOpenSettings, pinnedItems, pinItem, unpinItem,
-  ])
+  }), [onOpenCourse, onOpenAssignment, onOpenAnnouncement, onOpenDiscussion, onOpenPage, onOpenFile, onOpenModules, onSignOut, onOpenSettings, pinItem, unpinItem])
+
+  const dataContext: AppDataValue = useMemo(() => ({
+    baseUrl,
+    courses,
+    due,
+    profile,
+    loading: isLoading,
+    sidebar: sidebarCfg,
+    courseImages,
+    pinnedItems,
+  }), [baseUrl, courses, due, profile, isLoading, sidebarCfg, courseImages, pinnedItems])
+
+  const dataActionsContext: AppDataActionsValue = useMemo(() => ({
+    setSidebar: onSidebarConfigChange,
+    setCourseImages: saveCourseImages,
+  }), [onSidebarConfigChange, saveCourseImages])
 
   const visibleCourses = useMemo(() => {
     const hidden = new Set(sidebarCfg.hiddenCourseIds || [])
@@ -886,8 +896,12 @@ export function RootLayout() {
       dueAssignments={embedBoot ? [] : (dueQ.data || cachedDue || [])}
       courses={embedBoot ? [] : (coursesQ.data || cachedCourses || [])}
     >
-      <AppProvider value={context}>
-        {isEmbeddedContent ? (
+      <AppFlagsContext.Provider value={flagsContext}>
+        <AppSettingsContext.Provider value={settingsContext}>
+          <AppActionsContext.Provider value={actionsContext}>
+            <AppDataContext.Provider value={dataContext}>
+              <AppDataActionsContext.Provider value={dataActionsContext}>
+                {isEmbeddedContent ? (
           <div className="h-screen w-screen bg-gray-50 dark:bg-neutral-950">
             <main className="h-full w-full overflow-hidden">
               <div className="h-full w-full">
@@ -917,7 +931,7 @@ export function RootLayout() {
                   onSelectAssignments={() => { setActiveCourseId(null) }}
                   onSelectGrades={() => { setActiveCourseId(null) }}
                   onSelectDiscussions={() => { setActiveCourseId(null) }}
-                  onSelectCourse={(id) => context.onOpenCourse(id)}
+                  onSelectCourse={(id) => onOpenCourse(id)}
                   onOpenAllCourses={() => { setActiveCourseId(null) }}
                   onHideCourse={hideCourse}
                   onPrefetchCourse={(id) => { if (prefetchEnabled) prefetchCourseData(id, { isActive: String(id) === String(derivedCourseId ?? activeCourseId ?? '') }) }}
@@ -940,7 +954,11 @@ export function RootLayout() {
             <NotificationManager />
           </>
         )}
-      </AppProvider>
+              </AppDataActionsContext.Provider>
+            </AppDataContext.Provider>
+          </AppActionsContext.Provider>
+        </AppSettingsContext.Provider>
+      </AppFlagsContext.Provider>
     </AIPanelProvider>
   )
 }

@@ -16,7 +16,7 @@ import {
   type PatternId,
 } from '../../utils/theme'
 import { extractAccentColor } from '../../utils/colorExtraction'
-import { useAppContext } from '../../context/AppContext'
+import { useAppData } from '../../context/AppContext'
 
 // Group presets by color family for better organization
 const PRESET_GROUPS: { label: string; presets: AccentPreset[] }[] = [
@@ -28,7 +28,7 @@ const PRESET_GROUPS: { label: string; presets: AccentPreset[] }[] = [
 ]
 
 export function AppearanceSettings() {
-  const ctx = useAppContext()
+  const data = useAppData()
   const [settings, setSettings] = useState<ThemeSettings>(DEFAULT_THEME_SETTINGS)
   const [isExtracting, setIsExtracting] = useState(false)
 
@@ -105,7 +105,7 @@ export function AppearanceSettings() {
       await window.settings.set?.({ themeConfig: newSettings } as any)
 
       // Also save to per-user settings if we have a user
-      const userKey = ctx?.profile?.id ? `${ctx.baseUrl}|${ctx.profile.id}` : null
+      const userKey = data?.profile?.id ? `${data.baseUrl}|${data.profile.id}` : null
       if (userKey) {
         const cfg = await window.settings.get?.()
         const map = (cfg?.ok ? (cfg.data as any)?.userSettings : undefined) || {}
@@ -116,7 +116,7 @@ export function AppearanceSettings() {
     } catch (e) {
       console.error('Failed to save theme settings:', e)
     }
-  }, [ctx])
+  }, [data])
 
   // Theme toggle
   const handleThemeChange = useCallback((theme: 'light' | 'dark') => {

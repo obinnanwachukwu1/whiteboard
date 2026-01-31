@@ -1,4 +1,4 @@
-import { applyThemeAndAccent, applyThemeTokens, DEFAULT_THEME_SETTINGS, normalizeThemeSettings, type Accent, type ThemeSettings } from './theme'
+import { applyThemeAndAccent, applyThemeTokens, DEFAULT_THEME_SETTINGS, normalizeThemeSettings, type Accent } from './theme'
 import { applyThemeCacheToDocument, readThemeCache } from './themeCache'
 
 function getSystemTheme(): 'light' | 'dark' {

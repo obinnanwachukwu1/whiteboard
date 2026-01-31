@@ -1,9 +1,10 @@
 import { SettingsSection } from './SettingsSection'
 import { SettingsRow, Toggle } from './SettingsRow'
-import { useAppContext } from '../../context/AppContext'
+import { useAppFlags, useAppSettings } from '../../context/AppContext'
 
 export function FeaturesSettings() {
-  const { embeddingsEnabled, setEmbeddingsEnabled, aiEnabled, setAiEnabled } = useAppContext()
+  const { embeddingsEnabled, aiEnabled } = useAppFlags()
+  const { setEmbeddingsEnabled, setAiEnabled } = useAppSettings()
 
   return (
     <SettingsSection title="Features">

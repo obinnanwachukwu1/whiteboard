@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { X, Plus, Send, Star, Archive, Trash2, Mail, ArrowLeft } from 'lucide-react'
 import { useConversations, useConversation, useRecipientSearch } from '../hooks/useCanvasQueries'
 import { useCreateConversation, useAddMessage, useUpdateConversation, useDeleteConversation } from '../hooks/useCanvasMutations'
@@ -181,6 +181,148 @@ const ConversationList: React.FC<{
   )
 }
 
+// Memoized Message List - prevents re-render when typing in reply box
+type MessageListProps = {
+  messages: Array<{
+    id: string | number
+    author_id: string | number
+    created_at: string
+    body?: string
+    attachments?: Array<{ id: string | number; url?: string; display_name?: string; filename?: string }>
+  }>
+  participantsMap: Map<string, { name?: string; avatar_url?: string }>
+  isLoading: boolean
+  hasConversation: boolean
+}
+
+const MessageList = React.memo(function MessageList({
+  messages,
+  participantsMap,
+  isLoading,
+  hasConversation,
+}: MessageListProps) {
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  return (
+    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {isLoading && !hasConversation && (
+        <div className="py-2">
+          <SkeletonList count={5} hasAvatar />
+        </div>
+      )}
+      {messages.map((msg) => {
+        const author = participantsMap.get(String(msg.author_id))
+        return (
+          <div key={msg.id} className="flex gap-3">
+            <div className="flex-shrink-0">
+              {author?.avatar_url ? (
+                <img
+                  src={author.avatar_url}
+                  alt={author.name}
+                  className="w-8 h-8 rounded-full"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-neutral-700 flex items-center justify-center text-xs font-medium">
+                  {(author?.name || '?')[0].toUpperCase()}
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2">
+                <span className="font-medium text-sm text-slate-900 dark:text-white">
+                  {author?.name || 'Unknown'}
+                </span>
+                <span className="text-xs text-slate-400 dark:text-neutral-500">
+                  {new Date(msg.created_at).toLocaleString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
+                </span>
+              </div>
+              <HtmlContent
+                html={msg.body || ''}
+                className="mt-1 text-sm text-slate-700 dark:text-slate-300 prose prose-sm dark:prose-invert max-w-none"
+              />
+              {msg.attachments && msg.attachments.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {msg.attachments.map((att) => (
+                    <a
+                      key={att.id}
+                      href={att.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-md bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-neutral-700 transition-colors"
+                    >
+                      {att.display_name || att.filename}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })}
+      <div ref={messagesEndRef} />
+    </div>
+  )
+})
+
+// Reply Composer - isolated state prevents message list rerenders on typing
+type ReplyComposerProps = {
+  conversationId: string | number
+  disabled: boolean
+  addMessageMutation: ReturnType<typeof useAddMessage>
+}
+
+const ReplyComposer: React.FC<ReplyComposerProps> = ({ conversationId, disabled, addMessageMutation }) => {
+  const [replyText, setReplyText] = useState('')
+
+  const handleSendReply = useCallback(async () => {
+    if (!replyText.trim() || disabled) return
+    await addMessageMutation.mutateAsync({
+      conversationId,
+      body: replyText.trim(),
+    })
+    setReplyText('')
+  }, [replyText, disabled, conversationId, addMessageMutation])
+
+  return (
+    <div className="flex-shrink-0 p-4 border-t border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+      <div className="flex gap-2">
+        <textarea
+          value={replyText}
+          onChange={(e) => setReplyText(e.target.value)}
+          placeholder="Type a reply..."
+          rows={2}
+          className="flex-1 px-3 py-2 text-sm rounded-md border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-500)]/30"
+          disabled={disabled}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault()
+              handleSendReply()
+            }
+          }}
+        />
+        <button
+          onClick={handleSendReply}
+          disabled={disabled || !replyText.trim() || addMessageMutation.isPending}
+          className="px-4 py-2 rounded-md text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+          style={{ backgroundColor: 'var(--accent-600)' }}
+          title="Send (Cmd+Enter)"
+        >
+          {addMessageMutation.isPending ? 'Sending…' : <Send className="w-4 h-4" />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // Conversation Thread Component
 const ConversationThread: React.FC<{
   conversationId: string | number
@@ -193,22 +335,6 @@ const ConversationThread: React.FC<{
   const addMessageMutation = useAddMessage()
   const updateMutation = useUpdateConversation()
   const deleteMutation = useDeleteConversation()
-  const [replyText, setReplyText] = useState('')
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [conversation?.messages])
-
-  const handleSendReply = async () => {
-    if (!conversation || isLoading) return
-    if (!replyText.trim()) return
-    await addMessageMutation.mutateAsync({
-      conversationId,
-      body: replyText.trim(),
-    })
-    setReplyText('')
-  }
 
   const handleToggleStar = () => {
     if (!conversation) return
@@ -315,97 +441,19 @@ const ConversationThread: React.FC<{
         </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {isLoading && !conversation && (
-          <div className="py-2">
-            <SkeletonList count={5} hasAvatar />
-          </div>
-        )}
-        {messages.map((msg) => {
-          const author = participantsMap.get(String(msg.author_id))
-          return (
-            <div key={msg.id} className="flex gap-3">
-              <div className="flex-shrink-0">
-                {author?.avatar_url ? (
-                  <img
-                    src={author.avatar_url}
-                    alt={author.name}
-                    className="w-8 h-8 rounded-full"
-                  />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-neutral-700 flex items-center justify-center text-xs font-medium">
-                    {(author?.name || '?')[0].toUpperCase()}
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2">
-                  <span className="font-medium text-sm text-slate-900 dark:text-white">
-                    {author?.name || 'Unknown'}
-                  </span>
-                  <span className="text-xs text-slate-400 dark:text-neutral-500">
-                    {new Date(msg.created_at).toLocaleString(undefined, {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                </div>
-                <HtmlContent
-                  html={msg.body || ''}
-                  className="mt-1 text-sm text-slate-700 dark:text-slate-300 prose prose-sm dark:prose-invert max-w-none"
-                />
-                {msg.attachments && msg.attachments.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {msg.attachments.map((att) => (
-                      <a
-                        key={att.id}
-                        href={att.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-md bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-neutral-700 transition-colors"
-                      >
-                        {att.display_name || att.filename}
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        })}
-        <div ref={messagesEndRef} />
-      </div>
+      <MessageList
+        messages={messages}
+        participantsMap={participantsMap}
+        isLoading={isLoading}
+        hasConversation={!!conversation}
+      />
 
       {/* Reply Input */}
-      <div className="flex-shrink-0 p-4 border-t border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
-        <div className="flex gap-2">
-          <textarea
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            placeholder="Type a reply..."
-            rows={2}
-            className="flex-1 px-3 py-2 text-sm rounded-md border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-500)]/30"
-            disabled={!conversation || isLoading}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault()
-                handleSendReply()
-              }
-            }}
-          />
-          <button
-            onClick={handleSendReply}
-            disabled={!conversation || isLoading || !replyText.trim() || addMessageMutation.isPending}
-            className="px-4 py-2 rounded-md text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
-            style={{ backgroundColor: 'var(--accent-600)' }}
-            title="Send (Cmd+Enter)"
-          >
-            {addMessageMutation.isPending ? 'Sending…' : <Send className="w-4 h-4" />}
-          </button>
-        </div>
-      </div>
+      <ReplyComposer
+        conversationId={conversationId}
+        disabled={!conversation || isLoading}
+        addMessageMutation={addMessageMutation}
+      />
     </div>
   )
 }

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useSearch, useNavigate } from '@tanstack/react-router'
 import { CanvasContentView } from '../components/CanvasContentView'
 import { DiscussionDetail } from '../components/DiscussionDetail'
-import { useAppContext } from '../context/AppContext'
+import { useAppData } from '../context/AppContext'
 import { openExternal } from '../utils/openExternal'
 
 type SearchParams = {
@@ -22,7 +22,7 @@ type ViewState = {
 export default function ContentPage() {
   const search = useSearch({ from: '/content' }) as SearchParams
   const navigate = useNavigate()
-  const ctx = useAppContext()
+  const data = useAppData()
 
   const courseId = String(search.courseId || '')
   // Robust check for embed flag: support string '1', boolean true, or direct URL check as fallback
@@ -43,7 +43,7 @@ export default function ContentPage() {
   // Navigation stack for embedded history
   const [history, setHistory] = useState<ViewState[]>([])
 
-  const courseName = (ctx.courses || []).find((c: any) => String(c.id) === String(courseId))?.name
+  const courseName = (data.courses || []).find((c: any) => String(c.id) === String(courseId))?.name
 
   const onBack = () => {
     if (history.length > 0) {

@@ -1,17 +1,18 @@
 import { Dashboard } from '../components/Dashboard'
-import { useAppContext } from '../context/AppContext'
+import { useAppActions, useAppData } from '../context/AppContext'
 
 export default function DashboardPage() {
-  const ctx = useAppContext()
+  const data = useAppData()
+  const actions = useAppActions()
   return (
     <Dashboard
-      due={ctx.due}
-      loading={ctx.loading}
-      courses={ctx.courses}
-      sidebar={ctx.sidebar}
-      onOpenCourse={(id) => ctx.onOpenCourse(id)}
-      onOpenAssignment={(courseId, assignmentRestId, title) => ctx.onOpenAssignment(courseId, assignmentRestId, title)}
-      onOpenAnnouncement={(courseId, topicId, title) => ctx.onOpenAnnouncement(courseId, topicId, title)}
+      due={data.due}
+      loading={data.loading}
+      courses={data.courses}
+      sidebar={data.sidebar}
+      onOpenCourse={(id) => actions.onOpenCourse(id)}
+      onOpenAssignment={(courseId, assignmentRestId, title) => actions.onOpenAssignment(courseId, assignmentRestId, title)}
+      onOpenAnnouncement={(courseId, topicId, title) => actions.onOpenAnnouncement(courseId, topicId, title)}
     />
   )
 }

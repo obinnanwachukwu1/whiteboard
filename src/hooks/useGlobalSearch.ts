@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { searchManager, type SearchResult } from '../utils/searchIndex'
 import { useCourses } from './useCanvasQueries'
-import { useAppContext } from '../context/AppContext'
+import { useAppData, useAppFlags } from '../context/AppContext'
 import { extractAssignmentIdFromUrl } from '../utils/urlHelpers'
 
 /**
@@ -369,10 +369,12 @@ async function triggerFileAutoIndex(data: {
   })()
 }
 
-export function useGlobalSearch() {
+export function useGlobalSearch(options?: { enabled?: boolean }) {
+  const enabled = options?.enabled ?? true
   const queryClient = useQueryClient()
   const { data: courses } = useCourses()
-  const app = useAppContext()
+  const flags = useAppFlags()
+  const data = useAppData()
   const [isReady, setIsReady] = useState(searchManager.isReady)
   const [isBuilding, setIsBuilding] = useState(searchManager.isBuilding)
   const [query, setQuery] = useState('')
@@ -391,9 +393,9 @@ export function useGlobalSearch() {
   // Get visible (pinned) courses - exclude hidden ones
   const visibleCourses = useMemo(() => {
     if (!courses?.length) return []
-    const hiddenIds = new Set(app?.sidebar?.hiddenCourseIds?.map(String) || [])
+    const hiddenIds = new Set(data?.sidebar?.hiddenCourseIds?.map(String) || [])
     return courses.filter(c => !hiddenIds.has(String(c.id)))
-  }, [courses, app?.sidebar?.hiddenCourseIds])
+  }, [courses, data?.sidebar?.hiddenCourseIds])
 
   // Listen for ready state
   useEffect(() => {
@@ -403,9 +405,9 @@ export function useGlobalSearch() {
     })
   }, [])
 
-  // Poll embedding status periodically
+  // Poll embedding status periodically (only when enabled)
   useEffect(() => {
-    if (!window.embedding) return
+    if (!window.embedding || !enabled) return
 
     const fetchStatus = async () => {
       try {
@@ -430,11 +432,11 @@ export function useGlobalSearch() {
     // Poll every 5 seconds to check for status changes
     const interval = setInterval(fetchStatus, 5000)
     return () => clearInterval(interval)
-  }, [])
+  }, [enabled])
 
-  // Proactively fetch and build index for visible courses
+  // Proactively fetch and build index for visible courses (only when enabled)
   useEffect(() => {
-    if (!visibleCourses?.length || searchManager.isReady || searchManager.isBuilding) return
+    if (!enabled || !visibleCourses?.length || searchManager.isReady || searchManager.isBuilding) return
 
     const timer = setTimeout(async () => {
       setIsBuilding(true)
@@ -516,7 +518,7 @@ export function useGlobalSearch() {
       setIsBuilding(false)
 
     // Trigger embedding indexing in background (non-blocking)
-    if (app.embeddingsEnabled) {
+    if (flags.embeddingsEnabled) {
         triggerEmbeddingIndex({
           courses: visibleCourses,
           courseAssignments,
@@ -534,7 +536,7 @@ export function useGlobalSearch() {
     }, 1500) // 1.5 second delay after courses load
 
     return () => clearTimeout(timer)
-  }, [visibleCourses, queryClient, app.embeddingsEnabled])
+  }, [enabled, visibleCourses, queryClient, flags.embeddingsEnabled])
 
   // Perform search
   const search = useCallback(async (q: string) => {
@@ -639,7 +641,7 @@ export function useGlobalSearch() {
     setIsBuilding(false)
 
     // Trigger embedding indexing in background (non-blocking)
-      if (app.embeddingsEnabled) {
+      if (flags.embeddingsEnabled) {
         triggerEmbeddingIndex({
           courses: visibleCourses,
           courseAssignments,
@@ -648,7 +650,7 @@ export function useGlobalSearch() {
           courseModules,
         })
       }
-  }, [visibleCourses, queryClient, app.embeddingsEnabled])
+  }, [visibleCourses, queryClient, flags.embeddingsEnabled])
  
   return useMemo(() => ({
     query,

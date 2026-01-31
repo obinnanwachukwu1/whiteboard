@@ -1,7 +1,7 @@
 import React from 'react'
 import { SettingsSection } from './SettingsSection'
 import { SettingsRow, Select, TextInput, ActionButton } from './SettingsRow'
-import { useAppContext } from '../../context/AppContext'
+import { useAppData } from '../../context/AppContext'
 
 type GpaRow = { min: number; gpa: number }
 
@@ -51,11 +51,11 @@ function detectScaleType(mapping: GpaRow[]): ScaleType {
 }
 
 export function GradesSettings() {
-  const ctx = useAppContext()
+  const data = useAppData()
   const userKey = React.useMemo(() => {
-    const uid = (ctx?.profile as any)?.id
-    return ctx?.baseUrl && uid ? `${ctx.baseUrl}|${uid}` : null
-  }, [ctx?.baseUrl, (ctx?.profile as any)?.id])
+    const uid = (data?.profile as any)?.id
+    return data?.baseUrl && uid ? `${data.baseUrl}|${uid}` : null
+  }, [data?.baseUrl, (data?.profile as any)?.id])
 
   const [prior, setPrior] = React.useState({ credits: '', gpa: '' })
   const [gpaMap, setGpaMap] = React.useState<GpaRow[]>(PRESETS.plusMinus)

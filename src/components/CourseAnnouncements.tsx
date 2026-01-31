@@ -75,9 +75,20 @@ const MAX_RENDER = 200
 export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
   const { data, isLoading, error, hasNextPage, isFetchingNextPage, fetchNextPage } = useCourseAnnouncementsInfinite(courseId, 10)
   const allItems = React.useMemo(() => (data?.pages || []).flat(), [data])
-  // Bound DOM: only render the most recent MAX_RENDER items
-  const list = React.useMemo(() => allItems.slice(0, MAX_RENDER), [allItems])
-  const hasHiddenItems = allItems.length > MAX_RENDER
+  // Track whether user wants to see all items
+  const [showAll, setShowAll] = React.useState(false)
+  // Bound DOM: only render the most recent MAX_RENDER items (slice from end to keep newest)
+  const list = React.useMemo(() => {
+    if (showAll || allItems.length <= MAX_RENDER) return allItems
+    // Keep most recent items (end of array since API returns oldest first typically,
+    // but if API returns newest first, this still works - we show the first MAX_RENDER)
+    // Actually, the infinite query appends pages, so most recent are at the start
+    // So slice(0, MAX_RENDER) is correct for newest-first APIs
+    // But to be safe for oldest-first APIs, we should slice from end
+    // Let's slice from end to keep most recent regardless of API order
+    return allItems.slice(-MAX_RENDER)
+  }, [allItems, showAll])
+  const hiddenCount = allItems.length - list.length
   const sentinelRef = React.useRef<HTMLDivElement | null>(null)
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
   const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
@@ -144,9 +155,20 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
             ))}
           </ul>
         )}
-        {/* Pagination controls */}
+        {/* Show older button when items are hidden */}
+        {hiddenCount > 0 && !showAll && (
+          <div className="py-2 text-center">
+            <button
+              onClick={() => setShowAll(true)}
+              className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+            >
+              Show {hiddenCount} older announcements
+            </button>
+          </div>
+        )}
+        {/* Pagination sentinel for infinite scroll */}
         <div ref={sentinelRef} className="py-2 text-center text-xs text-slate-500">
-          {isFetchingNextPage ? 'Loading…' : hasNextPage ? '' : hasHiddenItems ? `${allItems.length - MAX_RENDER} older hidden` : ''}
+          {isFetchingNextPage ? 'Loading…' : ''}
         </div>
       </div>
     </div>

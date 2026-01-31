@@ -1,5 +1,5 @@
 import React from 'react'
-import { useAppContext } from '../context/AppContext'
+import { useAppActions, useAppData } from '../context/AppContext'
 import { useDueAssignments } from '../hooks/useCanvasQueries'
 import { Columns3, Calendar, CircleDot, Check, Clock, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { CourseAvatar } from '../components/CourseAvatar'
@@ -23,11 +23,86 @@ function extractIdFromUrl(url?: string, key?: string): string | null {
 type KanbanStatus = 'todo' | 'doing' | 'done'
 const LS_KANBAN = 'kanbanStatusByAssignment'
 
+// Enriched item with precomputed date info
+type EnrichedDueItem = DueItem & {
+  _id: string
+  _dueLabel: string
+  _isPastDue: boolean
+}
+
+// Memoized Kanban card to avoid re-renders when other cards change
+const KanbanCard = React.memo(function KanbanCard({
+  item,
+  courseImageUrl,
+  onDragStart,
+  onDragEnd,
+  onOpenAssignment,
+  onOpenCourse,
+}: {
+  item: EnrichedDueItem
+  courseImageUrl: string | undefined
+  onDragStart: (e: React.DragEvent, id: string) => void
+  onDragEnd: () => void
+  onOpenAssignment: (courseId: string | number, assignmentRestId: string, title: string) => void
+  onOpenCourse: (courseId: string | number) => void
+}) {
+  // Compute assignment ID once
+  const assignmentRestId = React.useMemo(() => {
+    return String(item.assignment_rest_id || extractIdFromUrl(item.htmlUrl, 'assignments') || '')
+  }, [item.assignment_rest_id, item.htmlUrl])
+
+  const handleOpen = React.useCallback(() => {
+    if (assignmentRestId) {
+      onOpenAssignment(item.course_id, assignmentRestId, item.name)
+    } else {
+      onOpenCourse(item.course_id)
+    }
+  }, [item.course_id, item.name, assignmentRestId, onOpenAssignment, onOpenCourse])
+
+  return (
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, item._id)}
+      onDragEnd={onDragEnd}
+      onClick={handleOpen}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpen() } }}
+      className={`group rounded-lg ring-1 ${item._isPastDue ? 'ring-red-200 dark:ring-red-900/50 bg-red-50/50 dark:bg-red-950/20' : 'ring-gray-200 dark:ring-neutral-800 bg-white dark:bg-neutral-900'} p-2.5 cursor-pointer hover:ring-[var(--app-accent)] hover:shadow-sm active:cursor-grabbing transition-all duration-150`}
+    >
+      <div className="flex items-start gap-2.5">
+        <CourseAvatar
+          courseId={item.course_id}
+          courseName={item.course_name || String(item.course_id)}
+          src={courseImageUrl}
+          className="w-7 h-7 rounded-full ring-1 ring-black/10 dark:ring-white/10 flex-shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-sm leading-snug line-clamp-2" title={item.name}>{item.name}</div>
+          <div className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 truncate">{cleanCourseName(item.course_name)}</div>
+          <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-500 dark:text-neutral-400">
+            <span className={`${item._isPastDue ? 'text-red-600 dark:text-red-400 font-medium' : ''}`}>
+              {item._isPastDue && 'Overdue · '}{item._dueLabel}
+            </span>
+            {item.pointsPossible ? (
+              <>
+                <span className="text-slate-300 dark:text-neutral-600">·</span>
+                <span>{item.pointsPossible} pts</span>
+              </>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+})
+
 export default function AssignmentsPage() {
-  const ctx = useAppContext()
+  const data = useAppData()
+  const actions = useAppActions()
   const { courseImageUrl, prefetchCourseImage } = useCourseImages()
-  const courses = ctx.courses || []
-  const sidebar = ctx.sidebar
+  const courses = data.courses || []
+  const sidebar = data.sidebar
   const [courseFilter, setCourseFilter] = React.useState<string>('all')
   const [view, setView] = React.useState<'kanban' | 'calendar'>('kanban')
 
@@ -108,6 +183,41 @@ export default function AssignmentsPage() {
     return col
   }, [allDue, effectiveKanban.status])
 
+  // Precompute date formatting labels once per item to avoid Date work inside render loop
+  const enrichedColumns = React.useMemo(() => {
+    const now = new Date()
+    const todayStr = now.toDateString()
+    const tomorrowStr = new Date(now.getTime() + 86400000).toDateString()
+
+    const enrich = (d: DueItem, status: KanbanStatus): EnrichedDueItem => {
+      const dueDate = new Date(d.dueAt)
+      const dueDateStr = dueDate.toDateString()
+      const isPastDue = dueDate < now && status !== 'done'
+
+      let dueLabel: string
+      if (dueDateStr === todayStr) {
+        dueLabel = `Today ${dueDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+      } else if (dueDateStr === tomorrowStr) {
+        dueLabel = `Tomorrow ${dueDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+      } else {
+        dueLabel = dueDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      }
+
+      return {
+        ...d,
+        _id: assignId(d),
+        _dueLabel: dueLabel,
+        _isPastDue: isPastDue,
+      }
+    }
+
+    return {
+      todo: columns.todo.map(d => enrich(d, 'todo')),
+      doing: columns.doing.map(d => enrich(d, 'doing')),
+      done: columns.done.map(d => enrich(d, 'done')),
+    }
+  }, [columns])
+
   const [dragId, setDragId] = React.useState<string | null>(null)
   const onDragStart = (e: React.DragEvent, id: string) => { setDragId(id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id) }
   const onDragEnd = () => setDragId(null)
@@ -151,9 +261,9 @@ export default function AssignmentsPage() {
       {view === 'kanban' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {([
-            { key: 'todo', label: 'To Do', icon: Clock, count: columns.todo.length },
-            { key: 'doing', label: 'In Progress', icon: CircleDot, count: columns.doing.length },
-            { key: 'done', label: 'Done', icon: Check, count: columns.done.length },
+            { key: 'todo', label: 'To Do', icon: Clock, count: enrichedColumns.todo.length },
+            { key: 'doing', label: 'In Progress', icon: CircleDot, count: enrichedColumns.doing.length },
+            { key: 'done', label: 'Done', icon: Check, count: enrichedColumns.done.length },
           ] as Array<{ key: KanbanStatus; label: string; icon: typeof Clock; count: number }>).map(({ key, label, icon: Icon, count }) => (
             <div
               key={key}
@@ -169,70 +279,22 @@ export default function AssignmentsPage() {
                 <span className="text-xs text-slate-500 dark:text-neutral-400 bg-slate-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded-full">{count}</span>
               </div>
               <div className="p-2 space-y-2">
-                {columns[key].length === 0 && (
+                {enrichedColumns[key].length === 0 && (
                   <div className="text-xs text-slate-400 dark:text-neutral-500 px-2 py-4 text-center">
                     {key === 'todo' ? 'No pending items' : key === 'doing' ? 'Drag items here' : 'Completed items appear here'}
                   </div>
                 )}
-                {columns[key].map((d, i) => {
-                  const id = assignId(d)
-                  const open = () => {
-                    const rid = String(d.assignment_rest_id || extractIdFromUrl(d.htmlUrl, 'assignments') || '')
-                    if (rid) ctx.onOpenAssignment(d.course_id, rid, d.name)
-                    else ctx.onOpenCourse(d.course_id)
-                  }
-                  const img = courseImageUrl(d.course_id)
-                  const dueDate = new Date(d.dueAt)
-                  const now = new Date()
-                  const isPastDue = dueDate < now && key !== 'done'
-                  const isToday = dueDate.toDateString() === now.toDateString()
-                  const isTomorrow = dueDate.toDateString() === new Date(now.getTime() + 86400000).toDateString()
-
-                  // Format due date concisely
-                  const formatDue = () => {
-                    if (isToday) return `Today ${dueDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
-                    if (isTomorrow) return `Tomorrow ${dueDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
-                    return dueDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-                  }
-
-                  return (
-                    <div
-                      key={id + ':' + i}
-                      draggable
-                      onDragStart={(e) => onDragStart(e, id)}
-                      onDragEnd={onDragEnd}
-                      onClick={open}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
-                      className={`group rounded-lg ring-1 ${isPastDue ? 'ring-red-200 dark:ring-red-900/50 bg-red-50/50 dark:bg-red-950/20' : 'ring-gray-200 dark:ring-neutral-800 bg-white dark:bg-neutral-900'} p-2.5 cursor-pointer hover:ring-[var(--app-accent)] hover:shadow-sm active:cursor-grabbing transition-all duration-150`}
-                    >
-                      <div className="flex items-start gap-2.5">
-                        <CourseAvatar
-                          courseId={d.course_id}
-                          courseName={d.course_name || String(d.course_id)}
-                          src={img}
-                          className="w-7 h-7 rounded-full ring-1 ring-black/10 dark:ring-white/10 flex-shrink-0"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium text-sm leading-snug line-clamp-2" title={d.name}>{d.name}</div>
-                          <div className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 truncate">{cleanCourseName(d.course_name)}</div>
-                          <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-500 dark:text-neutral-400">
-                            <span className={`${isPastDue ? 'text-red-600 dark:text-red-400 font-medium' : ''}`}>
-                              {isPastDue && 'Overdue · '}{formatDue()}
-                            </span>
-                            {d.pointsPossible ? (
-                              <>
-                                <span className="text-slate-300 dark:text-neutral-600">·</span>
-                                <span>{d.pointsPossible} pts</span>
-                              </>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
+                {enrichedColumns[key].map((d) => (
+                  <KanbanCard
+                    key={d._id}
+                    item={d}
+                    courseImageUrl={courseImageUrl(d.course_id)}
+                    onDragStart={onDragStart}
+                    onDragEnd={onDragEnd}
+                    onOpenAssignment={actions.onOpenAssignment}
+                    onOpenCourse={actions.onOpenCourse}
+                  />
+                ))}
               </div>
             </div>
           ))}
@@ -240,7 +302,7 @@ export default function AssignmentsPage() {
       )}
 
       {view === 'calendar' && (
-        <CalendarView items={allDue} onOpenCourse={ctx.onOpenCourse} onOpenAssignment={(courseId, rid, title) => ctx.onOpenAssignment(courseId, rid, title)} />
+        <CalendarView items={allDue} onOpenCourse={actions.onOpenCourse} onOpenAssignment={(courseId, rid, title) => actions.onOpenAssignment(courseId, rid, title)} />
       )}
     </div>
   )

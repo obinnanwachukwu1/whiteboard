@@ -1,5 +1,5 @@
 import React from 'react'
-import { useAppContext } from '../context/AppContext'
+import { useAppData } from '../context/AppContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { calculateCourseGrades, toAssignmentInputsFromRest } from '../utils/gradeCalc'
 import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
@@ -31,10 +31,10 @@ const defaultGpaMap: GpaThreshold[] = [
 ]
 
 export default function GradesPage() {
-  const ctx = useAppContext()
+  const data = useAppData()
   const navigate = useNavigate()
-  const courses = ctx.courses || []
-  const sidebar = ctx.sidebar
+  const courses = data.courses || []
+  const sidebar = data.sidebar
   const qc = useQueryClient()
   const { courseImageUrl } = useCourseImages()
   const [courseFilter, setCourseFilter] = React.useState<string>('all')
@@ -58,9 +58,9 @@ export default function GradesPage() {
 
   // Compute userKey for per-user persistence
   const userKey = React.useMemo(() => {
-    const uid = (ctx?.profile as any)?.id
-    return ctx?.baseUrl && uid ? `${ctx.baseUrl}|${uid}` : null
-  }, [ctx?.baseUrl, (ctx?.profile as any)?.id])
+    const uid = (data?.profile as any)?.id
+    return data?.baseUrl && uid ? `${data.baseUrl}|${uid}` : null
+  }, [data?.baseUrl, (data?.profile as any)?.id])
 
   // Load per-user GPA settings (credits/targets/prior/mapping)
   React.useEffect(() => {

@@ -6,14 +6,14 @@ import { Pencil, RotateCcw } from 'lucide-react'
 import { useCourseGradebook } from '../hooks/useCourseGradebook'
 import { useQueryClient } from '@tanstack/react-query'
 import { calculateCourseGrades } from '../utils/gradeCalc'
-import { useAppContext } from '../context/AppContext'
+import { useAppActions } from '../context/AppContext'
 
 type Props = {
   courseId: string | number
 }
 
 export const CourseGrades: React.FC<Props> = ({ courseId }) => {
-  const app = useAppContext()
+  const actions = useAppActions()
   const queryClient = useQueryClient()
   // Keep raw percent input so users can type decimals naturally
   const [rawWhatIfPct, setRawWhatIfPct] = React.useState<Record<string | number, string>>({})
@@ -192,7 +192,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                                 onClick={(e) => {
                                   const target = e.target as HTMLElement
                                   if (target.closest('button, input, select, textarea, a')) return
-                                  if (id != null) app.onOpenAssignment(courseId, String(id), a?.name)
+                                  if (id != null) actions.onOpenAssignment(courseId, String(id), a?.name)
                                 }}
                               >
                                 <td className="py-2 pr-3 pl-3 max-w-0">
@@ -338,7 +338,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
                               onClick={(e) => {
                                 const target = e.target as HTMLElement
                                 if (target.closest('button, input, select, textarea, a')) return
-                                if (id != null) app.onOpenAssignment(courseId, String(id), a?.name)
+                                if (id != null) actions.onOpenAssignment(courseId, String(id), a?.name)
                               }}
                             >
                               <div className="flex items-start justify-between gap-2">
