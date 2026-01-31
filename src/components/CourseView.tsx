@@ -205,7 +205,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
   // No detail/content resets here; parent controls tab/content. Keep tabs seeded via cache above.
 
   return (
-    <Card id="course-content-anchor" className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+    <Card id="course-content-anchor" variant="default" className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
       {availableTabs && (
         <FloatingCourseTabs
           current={activeTab}
@@ -254,7 +254,7 @@ export const CourseView: React.FC<Props> = ({ courseId, courseName, activeTab, o
       )}
 
       {content ? (
-        <div className="flex-1 -m-5 flex flex-col overflow-hidden">
+        <div className="flex-1 -m-5 flex flex-col overflow-hidden bg-white dark:bg-neutral-900 rounded-card">
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-5">
             {content.contentType === 'discussion' ? (
               <DiscussionDetail

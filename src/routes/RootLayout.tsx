@@ -10,7 +10,9 @@ import { toAssignmentInputsFromRest, toAssignmentGroupInputsFromRest } from '../
 import { AppProvider, type AppContextValue } from '../context/AppContext'
 import { AIPanelProvider, useAIPanel } from '../context/AIPanelContext'
 import { AIPanel } from '../components/AIPanel'
-import { applyThemeAndAccent } from '../utils/theme'
+import { DEFAULT_THEME_SETTINGS, normalizeThemeSettings, type ThemeSettings } from '../utils/theme'
+import { readThemeCache } from '../utils/themeCache'
+import { BackgroundLayer } from '../components/BackgroundLayer'
 import { Eye, EyeOff, ExternalLink } from 'lucide-react'
 import { SearchModal } from '../components/SearchModal'
 import { InboxPanel } from '../components/InboxPanel'
@@ -69,7 +71,19 @@ export function RootLayout() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [inboxOpen, setInboxOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  
+
+  // Initialize theme from localStorage synchronously to prevent flash
+  const [themeSettings, setThemeSettings] = useState<ThemeSettings>(() => {
+    // Theme tokens are applied by index.html + bootstrapTheme().
+    // RootLayout keeps settings only for rendering (BackgroundLayer, etc).
+    try {
+      const cache = readThemeCache()
+      const normalized = cache?.settings ? normalizeThemeSettings(cache.settings) : null
+      if (normalized) return normalized
+    } catch {}
+    return DEFAULT_THEME_SETTINGS
+  })
+
   const { pinnedItems, setPinnedItems } = useDashboardSettings()
 
   // Embed windows ("Open in New Window") should not trigger global app fetches.
@@ -123,10 +137,14 @@ export function RootLayout() {
       const cfg = await window.settings.get()
       const data = (cfg.ok ? (cfg.data as any) : {}) as any
       if (data?.baseUrl) setBaseUrl(data.baseUrl)
+
+      // Theme state: the canonical value comes from config.themeConfig.
+      // (Tokens are applied by bootstrapTheme + AppearanceSettings.)
       try {
-        const theme = data?.theme ? data.theme : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-        const accent = (data?.accent) || 'default'
-        applyThemeAndAccent(theme as 'light' | 'dark', accent as any)
+        const fileTheme = data?.themeConfig ? normalizeThemeSettings(data.themeConfig) : null
+        if (fileTheme) {
+          setThemeSettings(fileTheme)
+        }
       } catch {}
       if (data?.sidebar) setSidebarCfg(data.sidebar)
       // Attempt to restore per-user sidebar immediately
@@ -173,6 +191,18 @@ export function RootLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Listen for theme settings changes from AppearanceSettings
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<ThemeSettings>).detail
+      if (detail) {
+        setThemeSettings(detail)
+      }
+    }
+    window.addEventListener('theme-settings-changed', handler)
+    return () => window.removeEventListener('theme-settings-changed', handler)
+  }, [])
+
   // After we know the user, load/migrate any per-user sidebar + settings
   useEffect(() => {
     ;(async () => {
@@ -190,26 +220,21 @@ export function RootLayout() {
           setSidebarCfg(data.sidebar)
         }
 
-        // Settings (theme/accent/prefetchEnabled): prefer per-user; migrate globals
+        // Settings (prefetchEnabled, etc) - theme is handled via localStorage, don't override here
         const perSettings = data?.userSettings?.[userKey]
         if (perSettings) {
           if (typeof perSettings.prefetchEnabled === 'boolean') setPrefetchEnabledState(!!perSettings.prefetchEnabled)
           if (typeof perSettings.pdfGestureZoomEnabled === 'boolean') setPdfGestureZoomEnabledState(!!perSettings.pdfGestureZoomEnabled)
-          const theme = perSettings.theme || (document.documentElement.classList.contains('dark') ? 'dark' : 'light')
-          const accent = perSettings.accent || (data?.accent || 'default')
-          try { applyThemeAndAccent(theme as any, accent as any) } catch {}
         } else {
+          // Migrate non-theme settings if needed
           const next: any = {}
           if (typeof data?.prefetchEnabled === 'boolean') { next.prefetchEnabled = !!data.prefetchEnabled; setPrefetchEnabledState(!!data.prefetchEnabled) }
           if (typeof data?.pdfGestureZoomEnabled === 'boolean') { next.pdfGestureZoomEnabled = !!data.pdfGestureZoomEnabled; setPdfGestureZoomEnabledState(!!data.pdfGestureZoomEnabled) }
-          if (data?.theme) next.theme = data.theme
-          if (data?.accent) next.accent = data.accent
           if (data?.pdfZoom && typeof data.pdfZoom === 'object') next.pdfZoom = data.pdfZoom
           if (Object.keys(next).length) {
             const mapS = { ...(data.userSettings || {}) }
             mapS[userKey] = { ...(mapS[userKey] || {}), ...next }
             await window.settings.set?.({ userSettings: mapS })
-            try { applyThemeAndAccent((next.theme || (document.documentElement.classList.contains('dark') ? 'dark' : 'light')) as any, (next.accent || 'default') as any) } catch {}
           }
         }
         
@@ -448,9 +473,9 @@ export function RootLayout() {
         })
         enqueuePrefetch(async () => {
           await queryClient.prefetchQuery({
-            queryKey: ['course-discussions', id, 50, {}],
+            queryKey: ['course-discussions', id, 50, { maxPages: 2 }],
             queryFn: async () => {
-              const res = await window.canvas.listCourseDiscussions?.(id, { perPage: 50 })
+              const res = await window.canvas.listCourseDiscussions?.(id, { perPage: 50, maxPages: 2 })
               if (!res?.ok) throw new Error(res?.error || 'Failed to load discussions')
               return res.data || []
             },
@@ -530,6 +555,23 @@ export function RootLayout() {
       handlePrefetchNav('discussions')
     })
   }, [prefetchEnabled, hasToken, handlePrefetchNav])
+
+  // Warm route chunks for At A Glance pages to avoid Suspense pop-in.
+  const atAGlanceChunksWarmed = React.useRef(false)
+  useEffect(() => {
+    if (!hasToken || embedBoot) return
+    if (atAGlanceChunksWarmed.current) return
+    atAGlanceChunksWarmed.current = true
+
+    requestIdle(() => {
+      void import('./DashboardPage')
+      void import('./AnnouncementsPage')
+      void import('./AssignmentsPage')
+      void import('./GradesPage')
+      void import('./DiscussionsPage')
+      void import('./AllCoursesPage')
+    })
+  }, [hasToken, embedBoot])
 
   const setActiveCourseId = useCallback((id: string | number | null) => setActiveCourseIdState(id), [])
 
@@ -855,27 +897,34 @@ export function RootLayout() {
           </div>
         ) : (
           <>
-            <div className="h-screen flex flex-col" style={{ backgroundColor: 'var(--app-accent-bg)' }}>
+            <BackgroundLayer settings={themeSettings} />
+            {/* Global glass layer - provides consistent blur/tint across entire app */}
+            <div
+              className="fixed inset-0 z-[5] backdrop-blur-sm pointer-events-none"
+              style={{ backgroundColor: 'var(--app-accent-bg)' }}
+              aria-hidden="true"
+            />
+            <div className="h-screen flex flex-col relative z-10">
               <Header profile={profileQ.data} onOpenSearch={() => setSearchOpen(true)} onOpenInbox={() => setInboxOpen(true)} />
-              <div className="flex flex-1 overflow-hidden" style={{ backgroundColor: 'var(--app-accent-bg)' }}>
+              <div className="flex flex-1 overflow-hidden">
                 <Sidebar
                   courses={visibleCourses}
                   activeCourseId={(currentView === 'course' ? (derivedCourseId ?? activeCourseId) : null)}
                   sidebar={sidebarCfg}
                   current={currentView}
-                  onSelectDashboard={() => { setActiveCourseId(null); navigate({ to: '/dashboard' }) }}
-                  onSelectAnnouncements={() => { setActiveCourseId(null); navigate({ to: '/announcements' }) }}
-                  onSelectAssignments={() => { setActiveCourseId(null); navigate({ to: '/assignments' }) }}
-                  onSelectGrades={() => { setActiveCourseId(null); navigate({ to: '/grades' }) }}
-                  onSelectDiscussions={() => { setActiveCourseId(null); navigate({ to: '/discussions' }) }}
+                  onSelectDashboard={() => { setActiveCourseId(null) }}
+                  onSelectAnnouncements={() => { setActiveCourseId(null) }}
+                  onSelectAssignments={() => { setActiveCourseId(null) }}
+                  onSelectGrades={() => { setActiveCourseId(null) }}
+                  onSelectDiscussions={() => { setActiveCourseId(null) }}
                   onSelectCourse={(id) => context.onOpenCourse(id)}
-                  onOpenAllCourses={() => navigate({ to: '/all-courses' })}
+                  onOpenAllCourses={() => { setActiveCourseId(null) }}
                   onHideCourse={hideCourse}
                   onPrefetchCourse={(id) => { if (prefetchEnabled) prefetchCourseData(id, { isActive: String(id) === String(derivedCourseId ?? activeCourseId ?? '') }) }}
                   onPrefetchNav={(tab) => { if (prefetchEnabled) handlePrefetchNav(tab) }}
                   onReorder={async (nextOrder) => { const next: SidebarConfig = { ...sidebarCfg, order: nextOrder }; setSidebarCfg(next); await saveUserSidebar(next) }}
                 />
-                <main className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-tl-xl">
+                <main className="flex-1 flex flex-col overflow-hidden bg-white/50 dark:bg-neutral-900/50 rounded-tl-xl">
                   <div className={`flex-1 flex flex-col min-h-0 p-6 ${currentView === 'course' ? 'pt-24 overflow-hidden' : 'overflow-y-auto'}`}>
                     <div className={`max-w-6xl w-full mx-auto ${currentView === 'course' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
                       <Outlet />

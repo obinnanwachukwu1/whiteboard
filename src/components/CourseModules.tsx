@@ -79,7 +79,7 @@ const ModuleItemRow: React.FC<{
 
   return (
     <ListItemRow
-      {...hoverHandlers}
+      interactiveProps={hoverHandlers}
       icon={icon}
       title={title}
       subtitle={<MetadataBadge>{kind}</MetadataBadge>}
@@ -311,8 +311,8 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
         )}
         {!isLoading && modules && modules.length > 0 && (
           <div className="space-y-3">
-            {(modules as CanvasModule[]).map((m, i) => (
-              <div key={i}>
+            {(modules as CanvasModule[]).map((m) => (
+              <div key={String(m._id || m.id)}>
                 {/* Module header */}
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-sm font-medium text-slate-600 dark:text-neutral-300">{m.name}</span>
@@ -322,14 +322,14 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
                 {/* Module items as card-style list */}
                 {(m.moduleItemsConnection?.nodes?.length ?? 0) > 0 && (
                   <ul className="list-none m-0 p-0 space-y-3">
-                    {m.moduleItemsConnection?.nodes?.map((it: CanvasModuleItem, j: number) => {
+                    {m.moduleItemsConnection?.nodes?.map((it: CanvasModuleItem) => {
                       const title = it.title || 'Item'
                       const kind = labelFor(it)
-                      const menuId = String(it.id || `${i}-${j}`)
+                      const menuId = String(it.id || it._id)
                       const isMenuOpen = menuOpenId === menuId
                       
                       return (
-                        <li key={j}>
+                        <li key={String(it.id || it._id)}>
                           <ModuleItemRow
                             it={it}
                             courseId={courseId}

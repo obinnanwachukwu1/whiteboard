@@ -92,7 +92,7 @@ export const FullscreenContainer: React.FC<Props> = ({ className = '', children 
           left: bounds.left,
           width: bounds.width,
           height: bounds.height,
-          zIndex: 1,
+          zIndex: 15, // Must be above glass layer (z-5) and main content (z-10)
         }
       : {
           position: 'fixed',
@@ -100,7 +100,7 @@ export const FullscreenContainer: React.FC<Props> = ({ className = '', children 
           left: 0,
           width: 0,
           height: 0,
-          zIndex: 1,
+          zIndex: 15,
           pointerEvents: 'none',
         }
 

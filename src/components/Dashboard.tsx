@@ -205,6 +205,7 @@ export const Dashboard: React.FC<Props> = ({
           showGrades={showGrades}
           onToggleGrades={setShowGrades}
           onClickItem={handleAssignmentClick}
+          courseImageUrl={courseImageUrl}
         />
         
         <PinnedPages

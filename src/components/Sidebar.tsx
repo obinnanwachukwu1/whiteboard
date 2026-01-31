@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { MoreVertical, GripVertical } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 import { Dropdown } from './ui/Dropdown'
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core'
 import { restrictToVerticalAxis, restrictToWindowEdges } from '@dnd-kit/modifiers'
@@ -69,15 +70,15 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
     // Dropdown handles its own mount/animation
     const btnRef = React.useRef<HTMLButtonElement | null>(null)
     return (
-      <div ref={setNodeRef} style={style} className={`relative group rounded-md ${isDragging ? 'scale-[0.99]' : ''}`} onMouseEnter={onPrefetch}>
+      <div ref={setNodeRef} style={style} className={`relative group rounded-lg ${isDragging ? 'scale-[0.99]' : ''}`} onMouseEnter={onPrefetch}>
         <div className="absolute left-1 top-1/2 -translate-y-1/2 p-1 cursor-grab text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100" {...attributes} {...listeners} aria-label="Drag course">
           <GripVertical className="w-4 h-4" />
         </div>
         <button
-          className={`w-full text-left py-2 pl-7 pr-8 rounded-md text-sm transition-all outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
+          className={`w-full text-left py-2 pl-7 pr-8 rounded-lg text-sm transition-all duration-150 outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
             active
-              ? 'bg-[var(--app-accent-active)] text-slate-900 dark:text-slate-100 font-semibold shadow-sm ring-1 ring-black/5 dark:ring-white/10'
-              : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
+              ? 'bg-[var(--accent-100)] dark:bg-[var(--accent-900)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-200)] dark:ring-[var(--accent-800)]'
+              : 'hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm hover:shadow-sm text-slate-600 dark:text-slate-300'
           }`}
           onClick={onSelect}
           title={c.name}
@@ -104,29 +105,32 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
   return (
     <aside
       className="w-64 min-w-[16rem] text-slate-900 dark:text-slate-100 p-4 overflow-y-auto overflow-x-hidden flex flex-col"
-      style={{ backgroundColor: 'var(--app-accent-bg)' }}
     >
       <div className="mb-4">
         <div className="font-semibold mb-2 text-[11px] uppercase tracking-wide text-brand/70">At A Glance</div>
         <nav className="flex flex-col">
-          <button
-          className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
-            current === 'dashboard'
-                ? 'bg-[var(--app-accent-active)] text-slate-900 dark:text-slate-100 font-semibold shadow-sm ring-1 ring-black/5 dark:ring-white/10'
-                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
-          }`}
-            onClick={onSelectDashboard}
+          <Link
+            to="/dashboard"
+            preload="intent"
+            className={`cursor-default text-left py-2 px-3 rounded-lg text-sm transition-all duration-150 outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
+              current === 'dashboard'
+                ? 'bg-[var(--accent-100)] dark:bg-[var(--accent-900)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-200)] dark:ring-[var(--accent-800)]'
+                : 'hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm hover:shadow-sm text-slate-600 dark:text-slate-300'
+            }`}
+            onClick={() => onSelectDashboard()}
             onMouseEnter={() => handleNavHover('dashboard')}
             onMouseLeave={handleMouseLeave}
             aria-current={current === 'dashboard' ? 'page' : undefined}
           >
             Dashboard
-          </button>
-          <button
-            className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
+          </Link>
+          <Link
+            to="/announcements"
+            preload="intent"
+            className={`cursor-default text-left py-2 px-3 rounded-lg text-sm transition-all duration-150 outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
               current === 'announcements'
-                ? 'bg-[var(--app-accent-active)] text-slate-900 dark:text-slate-100 font-semibold shadow-sm ring-1 ring-black/5 dark:ring-white/10'
-                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
+                ? 'bg-[var(--accent-100)] dark:bg-[var(--accent-900)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-200)] dark:ring-[var(--accent-800)]'
+                : 'hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectAnnouncements?.()}
             onMouseEnter={() => handleNavHover('announcements')}
@@ -134,12 +138,14 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
             aria-current={current === 'announcements' ? 'page' : undefined}
           >
             Announcements
-          </button>
-          <button
-            className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
+          </Link>
+          <Link
+            to="/assignments"
+            preload="intent"
+            className={`cursor-default text-left py-2 px-3 rounded-lg text-sm transition-all duration-150 outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
               current === 'assignments'
-                ? 'bg-[var(--app-accent-active)] text-slate-900 dark:text-slate-100 font-semibold shadow-sm ring-1 ring-black/5 dark:ring-white/10'
-                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
+                ? 'bg-[var(--accent-100)] dark:bg-[var(--accent-900)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-200)] dark:ring-[var(--accent-800)]'
+                : 'hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectAssignments?.()}
             onMouseEnter={() => handleNavHover('assignments')}
@@ -147,12 +153,14 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
             aria-current={current === 'assignments' ? 'page' : undefined}
           >
             Assignments
-          </button>
-          <button
-            className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
+          </Link>
+          <Link
+            to="/grades"
+            preload="intent"
+            className={`cursor-default text-left py-2 px-3 rounded-lg text-sm transition-all duration-150 outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
               current === 'grades'
-                ? 'bg-[var(--app-accent-active)] text-slate-900 dark:text-slate-100 font-semibold shadow-sm ring-1 ring-black/5 dark:ring-white/10'
-                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
+                ? 'bg-[var(--accent-100)] dark:bg-[var(--accent-900)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-200)] dark:ring-[var(--accent-800)]'
+                : 'hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectGrades?.()}
             onMouseEnter={() => handleNavHover('grades')}
@@ -160,12 +168,14 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
             aria-current={current === 'grades' ? 'page' : undefined}
           >
             Grades
-          </button>
-          <button
-            className={`text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
+          </Link>
+          <Link
+            to="/discussions"
+            preload="intent"
+            className={`cursor-default text-left py-2 px-3 rounded-lg text-sm transition-all duration-150 outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
               current === 'discussions'
-                ? 'bg-[var(--app-accent-active)] text-slate-900 dark:text-slate-100 font-semibold shadow-sm ring-1 ring-black/5 dark:ring-white/10'
-                : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-600 dark:text-slate-300'
+                ? 'bg-[var(--accent-100)] dark:bg-[var(--accent-900)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-200)] dark:ring-[var(--accent-800)]'
+                : 'hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm hover:shadow-sm text-slate-600 dark:text-slate-300'
             }`}
             onClick={() => onSelectDiscussions?.()}
             onMouseEnter={() => handleNavHover('discussions')}
@@ -173,7 +183,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
             aria-current={current === 'discussions' ? 'page' : undefined}
           >
             Discussions
-          </button>
+          </Link>
         </nav>
       </div>
 
@@ -216,17 +226,19 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
       </div>
 
       <div className="mt-auto pt-2">
-        <button
-          className={`w-full text-left py-2 px-3 rounded-md text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
+        <Link
+          to="/all-courses"
+          preload="intent"
+          className={`cursor-default w-full text-left py-2 px-3 rounded-lg text-sm transition-all duration-150 outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
             current === 'allCourses'
-              ? 'bg-[var(--app-accent-active)] text-slate-900 dark:text-slate-100 font-semibold shadow-sm ring-1 ring-black/5 dark:ring-white/10'
-              : 'hover:[background-color:var(--app-accent-hover)] hover:shadow-sm text-slate-700 dark:text-slate-200'
+              ? 'bg-[var(--glass-bg)] backdrop-blur-sm text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--glass-border)] border-l-[3px] border-l-[var(--accent-500)]'
+              : 'hover:bg-[var(--glass-hover)] hover:backdrop-blur-sm hover:shadow-sm text-slate-700 dark:text-slate-200 border-l-[3px] border-l-transparent'
           }`}
-          onClick={onOpenAllCourses}
+          onClick={() => onOpenAllCourses()}
           aria-current={current === 'allCourses' ? 'page' : undefined}
         >
           All Courses
-        </button>
+        </Link>
       </div>
     </aside>
   )

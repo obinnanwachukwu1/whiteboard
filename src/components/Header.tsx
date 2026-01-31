@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Dropdown } from './ui/Dropdown'
 // removed theme toggle button
-import { applyThemeAndAccent, type Accent } from '../utils/theme'
 import { useAppContext } from '../context/AppContext'
 import { Search, Command } from 'lucide-react'
 import { InboxButton } from './InboxButton'
@@ -21,33 +20,12 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
     // (The preload runs from dist-electron/preload.mjs in dev, so changes may not apply until rebuild/restart.)
     (typeof navigator !== 'undefined' && /windows/i.test(navigator.userAgent)) ||
     (typeof navigator !== 'undefined' && typeof (navigator as any).platform === 'string' && /^win/i.test((navigator as any).platform))
-  const [dark, setDark] = useState<boolean>(false)
-  const [accent, setAccent] = useState<Accent>('default')
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const nameBtnRef = useRef<HTMLButtonElement | null>(null)
   // Legacy visibility handler is a no-op now that Dropdown controls animation
   const setMenuVisible = (_visible?: boolean) => {}
 
-  useEffect(() => {
-    ;(async () => {
-      const cfg = await window.settings.get?.()
-      const userKey = app?.profile?.id ? `${app.baseUrl}|${app.profile.id}` : null
-      const us = (cfg?.ok && userKey) ? (cfg.data as any)?.userSettings?.[userKey] : undefined
-      const isDark = (us?.theme || cfg?.data?.theme) === 'dark'
-      const hasSystemDarkPreference = window.matchMedia('(prefers-color-scheme: dark)').matches
-      const shouldBeDark = (us?.theme || cfg?.data?.theme) ? isDark : hasSystemDarkPreference
-      const acc = (us?.accent ?? (cfg?.ok ? (cfg.data as any)?.accent : undefined)) as Accent | undefined
-      if (acc) setAccent(acc)
-      applyThemeAndAccent(shouldBeDark ? 'dark' : 'light', acc || 'default')
-      setDark(shouldBeDark)
-    })()
-  }, [app?.profile?.id, app?.baseUrl])
-
-  // Keep CSS var in sync if accent state changes elsewhere
-  useEffect(() => {
-    applyThemeAndAccent(dark ? 'dark' : 'light', accent)
-  }, [accent, dark])
 
   // Close dropdown on outside click / Escape
   useEffect(() => {
@@ -83,9 +61,6 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
   return (
     <header
       className={`h-14 text-slate-900 dark:text-slate-100 flex items-center justify-between select-none app-drag relative z-[100] ${isWin ? 'flex-row-reverse pl-4 titlebar-right-inset' : 'px-5 titlebar-left-inset'}`}
-      style={{
-        backgroundColor: 'var(--app-accent-bg)',
-      }}
     >
       <div className="flex items-center gap-3">
         {/* <div className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-brand/10 text-brand">WB</div>

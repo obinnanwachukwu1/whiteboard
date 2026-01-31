@@ -303,7 +303,7 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, topicId, title, on
   const renderReplyBox = () => {
     if (isLoading || !topic || topic.locked || replyingTo !== null) return null
     return (
-      <div className="shrink-0 p-4 border-t border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md">
+      <div className="shrink-0 p-4 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
         <div className="max-w-4xl mx-auto">
           <RichTextEditor
             placeholder="Add a reply..."
@@ -322,7 +322,7 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, topicId, title, on
       return (
         <div className="flex flex-col shrink-0">
           <div
-            className={`h-14 ${canGoBack ? '' : 'border-b border-gray-200 dark:border-neutral-700'} bg-white/95 dark:bg-neutral-900/95 app-drag titlebar-left-inset titlebar-right-inset px-5 grid grid-cols-[1fr_auto_1fr] items-center`}
+            className={`h-14 ${canGoBack ? '' : 'border-b border-gray-200 dark:border-neutral-700'} bg-white dark:bg-neutral-900 app-drag titlebar-left-inset titlebar-right-inset px-5 grid grid-cols-[1fr_auto_1fr] items-center`}
           >
             <div className="flex items-center justify-start">
               {!isEmbedded && ctx.isFullscreen && isWin && (
@@ -382,7 +382,7 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, topicId, title, on
 
     return (
       <div
-        className="flex items-center gap-3 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/90 dark:bg-neutral-900/90 shrink-0"
+        className="flex items-center gap-3 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shrink-0"
       >
         <button
           onClick={onBack}

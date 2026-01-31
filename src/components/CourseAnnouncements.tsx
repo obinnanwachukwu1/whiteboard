@@ -41,7 +41,7 @@ const AnnouncementItem: React.FC<{
 
   return (
     <ListItemRow
-      {...hoverHandlers}
+      interactiveProps={hoverHandlers}
       icon={<Megaphone className="w-4 h-4" />}
       title={a?.title || 'Announcement'}
       subtitle={posted && <MetadataBadge>{posted}</MetadataBadge>}
@@ -70,9 +70,14 @@ const AnnouncementItem: React.FC<{
   )
 }
 
+const MAX_RENDER = 200
+
 export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
   const { data, isLoading, error, hasNextPage, isFetchingNextPage, fetchNextPage } = useCourseAnnouncementsInfinite(courseId, 10)
-  const list = (data?.pages || []).flat()
+  const allItems = React.useMemo(() => (data?.pages || []).flat(), [data])
+  // Bound DOM: only render the most recent MAX_RENDER items
+  const list = React.useMemo(() => allItems.slice(0, MAX_RENDER), [allItems])
+  const hasHiddenItems = allItems.length > MAX_RENDER
   const sentinelRef = React.useRef<HTMLDivElement | null>(null)
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
   const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
@@ -125,8 +130,8 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
         )}
         {!isLoading && list && list.length > 0 && (
           <ul className="list-none m-0 p-0 space-y-3">
-            {list.map((a: any, i: number) => (
-              <li key={i}>
+            {list.map((a: any) => (
+              <li key={String(a.id)}>
                 <AnnouncementItem 
                   a={a} 
                   courseId={courseId}
@@ -141,7 +146,7 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
         )}
         {/* Pagination controls */}
         <div ref={sentinelRef} className="py-2 text-center text-xs text-slate-500">
-          {isFetchingNextPage ? 'Loading…' : hasNextPage ? '' : ''}
+          {isFetchingNextPage ? 'Loading…' : hasNextPage ? '' : hasHiddenItems ? `${allItems.length - MAX_RENDER} older hidden` : ''}
         </div>
       </div>
     </div>

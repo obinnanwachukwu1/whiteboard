@@ -225,7 +225,7 @@ export const CanvasContentView: React.FC<Props> = ({
       return (
         <>
           <div
-            className={`h-14 ${canGoBack ? '' : 'border-b border-gray-200 dark:border-neutral-700'} bg-white/95 dark:bg-neutral-900/95 app-drag titlebar-left-inset titlebar-right-inset px-5 grid grid-cols-[1fr_auto_1fr] items-center`}
+            className={`h-14 ${canGoBack ? '' : 'border-b border-gray-200 dark:border-neutral-700'} bg-white dark:bg-neutral-900 app-drag titlebar-left-inset titlebar-right-inset px-5 grid grid-cols-[1fr_auto_1fr] items-center`}
           >
             <div className="flex items-center justify-start">
               {!isEmbedded && ctx.isFullscreen && isWin && (
@@ -273,7 +273,7 @@ export const CanvasContentView: React.FC<Props> = ({
 
     // Standard single-row layout for main app
     return (
-      <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white/90 dark:bg-neutral-900/90">
+      <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
         <Button variant="ghost" size="sm" onClick={onBack} title="Back">
           <ArrowLeft className="w-4 h-4" />
         </Button>

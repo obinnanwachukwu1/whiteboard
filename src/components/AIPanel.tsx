@@ -150,7 +150,7 @@ export function AIPanel() {
       {/* Header */}
       <div className="ai-panel-header" onMouseDown={handleMouseDown}>
         <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-medium select-none">
-          <Sparkles className="w-4 h-4 text-amber-500" />
+          <Sparkles className="w-4 h-4" style={{ color: 'var(--accent-500)' }} />
           AI Assistant
         </div>
         <button className="ai-panel-close ml-auto" onClick={panel.close} aria-label="Close">
@@ -199,7 +199,7 @@ export function AIPanel() {
 
         {!panel.isLoading && !panel.error && !panel.results && !panel.answer && (
           <div className="ai-panel-empty">
-            <Sparkles className="ai-panel-empty-icon text-amber-500/50" />
+            <Sparkles className="ai-panel-empty-icon" style={{ color: 'var(--accent-400)', opacity: 0.5 }} />
             <div className="ai-panel-empty-title">
               How can I help?
             </div>

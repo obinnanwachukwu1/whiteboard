@@ -41,7 +41,7 @@ const DiscussionItemRow: React.FC<{
 
   return (
     <ListItemRow
-      {...hoverHandlers}
+      interactiveProps={hoverHandlers}
       icon={<MessageCircle className="w-4 h-4" />}
       title={
         <span className="flex items-center gap-1.5">
@@ -183,12 +183,12 @@ export const CourseDiscussions: React.FC<Props> = ({ courseId, onOpen }) => {
         )}
         {!isLoading && list && list.length > 0 && (
           <ul className="list-none m-0 p-0 space-y-3">
-            {list.map((d: DiscussionTopic, i: number) => {
+            {list.map((d: DiscussionTopic) => {
               const menuId = String(d.id)
               const isMenuOpen = menuOpenId === menuId
               
               return (
-                <li key={i}>
+                <li key={String(d.id)}>
                   <DiscussionItemRow 
                     d={d}
                     courseId={courseId}

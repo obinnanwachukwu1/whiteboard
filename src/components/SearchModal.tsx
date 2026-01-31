@@ -292,7 +292,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
         {/* Input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-neutral-800">
           {deepSearchActive ? (
-            <Sparkles className="w-5 h-5 text-indigo-500 shrink-0" />
+            <Sparkles className="w-5 h-5 shrink-0" style={{ color: 'var(--accent-500)' }} />
           ) : (
             <Search className="w-5 h-5 text-slate-400 shrink-0" />
           )}
@@ -387,7 +387,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
               }}
               onMouseEnter={() => setSelectedIndex(deepSearchIndex)}
             >
-              <div className="mt-0.5 p-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">
+              <div className="mt-0.5 p-1.5 rounded-lg" style={{ backgroundColor: 'var(--accent-100)', color: 'var(--accent-600)' }}>
                 <Search className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
@@ -422,7 +422,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
               }}
               onMouseEnter={() => setSelectedIndex(askAIIndex)}
             >
-              <div className="mt-0.5 p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+              <div className="mt-0.5 p-1.5 rounded-lg" style={{ backgroundColor: 'var(--accent-100)', color: 'var(--accent-600)' }}>
                 <Sparkles className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">

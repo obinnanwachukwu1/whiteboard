@@ -170,8 +170,8 @@
 }
 
 .ai-panel-input-wrapper:focus-within {
-  border-color: var(--accent-color, #3b82f6);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--accent-500);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
 .ai-panel-input {
@@ -202,7 +202,7 @@
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: #0f172a;
+  background: var(--accent-600);
   border: none;
   color: white;
   cursor: pointer;
@@ -211,16 +211,16 @@
 }
 
 .dark .ai-panel-submit {
-  background: #f5f5f5;
-  color: #171717;
+  background: var(--accent-500);
+  color: white;
 }
 
 .ai-panel-submit:hover {
-  background: #1e293b;
+  background: var(--accent-700);
 }
 
 .dark .ai-panel-submit:hover {
-  background: #e5e5e5;
+  background: var(--accent-400);
 }
 
 .ai-panel-submit:disabled {

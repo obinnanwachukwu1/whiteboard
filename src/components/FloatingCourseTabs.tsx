@@ -1,4 +1,5 @@
 import React, { useRef, useState, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { BookOpen, Megaphone, FileText, Percent, Link as LinkIcon } from 'lucide-react'
 
 export type CourseTabKey = 'home' | 'wiki' | 'syllabus' | 'announcements' | 'discussions' | 'files' | 'modules' | 'links' | 'assignments' | 'grades' | 'people'
@@ -97,7 +98,8 @@ export const FloatingCourseTabs: React.FC<Props> = ({ current, onChange, anchorI
     }
   }, [anchorId, tabList.length])
 
-  return (
+  // Use portal to escape backdrop-filter containing block from Card
+  const content = (
     <div
       ref={containerRef}
       className="fixed top-20 z-50 px-2 py-2 pointer-events-none transition-opacity duration-150"
@@ -136,4 +138,6 @@ export const FloatingCourseTabs: React.FC<Props> = ({ current, onChange, anchorI
       </div>
     </div>
   )
+
+  return createPortal(content, document.body)
 }

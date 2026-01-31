@@ -82,7 +82,7 @@ const ConversationRow: React.FC<{
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 mt-0.5">
           {conv.workflow_state === 'unread' ? (
-            <div className="w-2 h-2 rounded-full bg-blue-500" />
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--accent-500)' }} />
           ) : (
             <div className="w-2 h-2" />
           )}
@@ -157,7 +157,8 @@ const ConversationList: React.FC<{
         <p className="text-sm text-slate-500 dark:text-neutral-400">No messages</p>
         <button
           onClick={onCompose}
-          className="mt-4 px-4 py-2 text-sm rounded-md bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 transition-opacity"
+          className="mt-4 px-4 py-2 text-sm rounded-md text-white hover:opacity-90 transition-opacity"
+          style={{ backgroundColor: 'var(--accent-600)' }}
         >
           Compose message
         </button>
@@ -248,7 +249,7 @@ const ConversationThread: React.FC<{
         </div>
         <div className="flex-1 flex flex-col items-center justify-center p-8">
           <p className="text-sm text-red-500 mb-4">Failed to load conversation</p>
-          <button onClick={onBack} className="text-sm text-blue-600 hover:underline">
+          <button onClick={onBack} className="text-sm hover:underline" style={{ color: 'var(--accent-600)' }}>
             Go back
           </button>
         </div>
@@ -385,7 +386,7 @@ const ConversationThread: React.FC<{
             onChange={(e) => setReplyText(e.target.value)}
             placeholder="Type a reply..."
             rows={2}
-            className="flex-1 px-3 py-2 text-sm rounded-md border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            className="flex-1 px-3 py-2 text-sm rounded-md border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-500)]/30"
             disabled={!conversation || isLoading}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -397,7 +398,8 @@ const ConversationThread: React.FC<{
           <button
             onClick={handleSendReply}
             disabled={!conversation || isLoading || !replyText.trim() || addMessageMutation.isPending}
-            className="px-4 py-2 rounded-md bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 disabled:opacity-50 transition-opacity"
+            className="px-4 py-2 rounded-md text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+            style={{ backgroundColor: 'var(--accent-600)' }}
             title="Send (Cmd+Enter)"
           >
             {addMessageMutation.isPending ? 'Sending…' : <Send className="w-4 h-4" />}
@@ -555,7 +557,7 @@ const ComposeMessage: React.FC<{
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder="Optional"
-            className="w-full px-3 py-2 text-sm rounded-md border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            className="w-full px-3 py-2 text-sm rounded-md border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-[var(--accent-500)]/30"
           />
         </div>
 
@@ -569,7 +571,7 @@ const ComposeMessage: React.FC<{
             onChange={(e) => setBody(e.target.value)}
             placeholder="Write your message..."
             rows={8}
-            className="w-full px-3 py-2 text-sm rounded-md border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            className="w-full px-3 py-2 text-sm rounded-md border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-500)]/30"
           />
         </div>
       </div>
@@ -585,7 +587,8 @@ const ComposeMessage: React.FC<{
           <button
             onClick={handleSend}
             disabled={recipients.length === 0 || !body.trim() || createMutation.isPending}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 disabled:opacity-50 transition-opacity"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+            style={{ backgroundColor: 'var(--accent-600)' }}
           >
             {createMutation.isPending ? 'Sending…' : (<><Send className="w-4 h-4" />Send</>)}
           </button>
@@ -686,7 +689,8 @@ export const InboxPanel: React.FC<Props> = ({ isOpen, onClose }) => {
             {!selectedConversation && !isComposing && (
               <button
                 onClick={() => setIsComposing(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 transition-opacity"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md text-white hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: 'var(--accent-600)' }}
               >
                 <Plus className="w-4 h-4" />
                 Compose
@@ -727,9 +731,10 @@ export const InboxPanel: React.FC<Props> = ({ isOpen, onClose }) => {
                     onClick={() => setScope(s.value)}
                     className={`px-3 py-1.5 text-sm rounded-md whitespace-nowrap transition-colors ${
                       scope === s.value
-                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                        ? 'text-white'
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-neutral-800'
                     }`}
+                    style={scope === s.value ? { backgroundColor: 'var(--accent-600)' } : undefined}
                   >
                     {s.label}
                   </button>
