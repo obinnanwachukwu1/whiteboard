@@ -89,6 +89,53 @@ export default defineConfig(({ command }) => {
     optimizeDeps: {
       exclude: ['keytar'],
     },
+    build: {
+      chunkSizeWarningLimit: 600, // Raise limit slightly for acceptable chunks like tiptap
+      rollupOptions: {
+        // Suppress pdfjs-dist eval warning (it's safe - used for font loading)
+        onwarn(warning, warn) {
+          if (warning.code === 'EVAL' && warning.id?.includes('pdfjs-dist')) {
+            return
+          }
+          warn(warning)
+        },
+        output: {
+          manualChunks(id) {
+            // Split large vendor libraries into separate chunks
+            if (id.includes('node_modules')) {
+              // TipTap editor (rich text)
+              if (id.includes('@tiptap') || id.includes('prosemirror')) {
+                return 'tiptap'
+              }
+              // Apollo GraphQL client
+              if (id.includes('@apollo') || id.includes('graphql')) {
+                return 'apollo'
+              }
+              // React Query
+              if (id.includes('@tanstack/react-query') && !id.includes('devtools')) {
+                return 'react-query'
+              }
+              // React Router
+              if (id.includes('@tanstack/react-router') && !id.includes('devtools')) {
+                return 'react-router'
+              }
+              // Icons
+              if (id.includes('lucide-react')) {
+                return 'icons'
+              }
+              // DnD Kit
+              if (id.includes('@dnd-kit')) {
+                return 'dnd-kit'
+              }
+              // Marked (markdown)
+              if (id.includes('marked')) {
+                return 'marked'
+              }
+            }
+          },
+        },
+      },
+    },
     plugins: [
       react(),
       tailwindcss(),

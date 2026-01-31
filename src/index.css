@@ -6,25 +6,90 @@
 html, body, #root { height: 100%; overflow: hidden; }
 body { background-color: var(--app-accent-root); }
 
-/* App accent colors - can be changed programmatically */
-/* 
- * To change colors, use the setAccentColor function in App.tsx:
- * setAccentColor('rgb(59 130 246 / 0.8)', 'rgb(30 58 138 / 0.8)') // Blue theme
- * setAccentColor('rgb(34 197 94 / 0.8)', 'rgb(21 128 61 / 0.8)') // Green theme
- * setAccentColor('rgb(168 85 247 / 0.8)', 'rgb(109 40 217 / 0.8)') // Purple theme
- */
+/* ============ Theme System CSS Variables ============ */
+/* These are set dynamically by theme.ts but have sensible defaults */
+
 :root {
+  /* Base HSL values for accent color */
+  --accent-h: 215;
+  --accent-s: 16%;
+  --accent-l: 47%;
+
+  /* Accent shade scale (50-950) */
+  --accent-50: hsl(215, 10%, 97%);
+  --accent-100: hsl(215, 15%, 94%);
+  --accent-200: hsl(215, 20%, 88%);
+  --accent-300: hsl(215, 30%, 78%);
+  --accent-400: hsl(215, 16%, 65%);
+  --accent-500: hsl(215, 16%, 55%);
+  --accent-600: hsl(215, 16%, 45%);
+  --accent-700: hsl(215, 21%, 38%);
+  --accent-800: hsl(215, 26%, 30%);
+  --accent-900: hsl(215, 31%, 22%);
+  --accent-950: hsl(215, 36%, 12%);
+
+  /* Semantic accent tokens */
+  --accent-primary: var(--accent-600);
+  --accent-hover: var(--accent-700);
+  --accent-active: var(--accent-800);
+  --accent-ring: hsla(215, 16%, 50%, 0.3);
+  --accent-border: var(--accent-300);
+  --accent-shadow: hsla(215, 16%, 40%, 0.15);
+
+  /* Glass surface tokens (semi-transparent overlays) */
+  --glass-bg: hsla(215, 20%, 98%, 0.8);
+  --glass-hover: hsla(215, 25%, 95%, 0.95);
+  --glass-active: hsla(215, 30%, 92%, 1);
+  --glass-border: hsla(215, 20%, 80%, 0.6);
+
+  /* Background layer tokens */
+  --bg-image: none;
+  --bg-blur: 0px;
+  --bg-opacity: 1;
+  --bg-overlay: 0;
+
+  /* Legacy tokens (for backward compatibility) */
   --app-accent-bg: rgb(255 255 255 / 0.8);
   --app-accent-root: rgb(255 255 255);
-  /* Dark header background: neutral black/gray glass, not blue */
+  --app-accent-hover: rgb(241 245 249 / 0.95);
+  --app-accent-active: rgb(0 0 0 / 0.06);
   --app-accent-bg-dark: rgb(18 18 18 / 0.85);
+
   /* Override Tailwind v4 brand token to neutral gray to avoid blue tint in dark mode */
   --color-brand: 163 163 163; /* neutral-400 */
 }
 
-/* Slightly deeper brand in dark to maintain contrast without blue hue */
+/* Dark mode overrides */
 .dark {
+  --accent-50: hsl(215, 10%, 10%);
+  --accent-100: hsl(215, 15%, 15%);
+  --accent-200: hsl(215, 20%, 20%);
+  --accent-300: hsl(215, 30%, 30%);
+  --accent-400: hsl(215, 16%, 40%);
+  --accent-500: hsl(215, 16%, 50%);
+  --accent-600: hsl(215, 16%, 60%);
+  --accent-700: hsl(215, 21%, 70%);
+  --accent-800: hsl(215, 26%, 80%);
+  --accent-900: hsl(215, 31%, 88%);
+  --accent-950: hsl(215, 36%, 94%);
+
+  --accent-primary: var(--accent-400);
+  --accent-hover: var(--accent-300);
+  --accent-active: var(--accent-200);
+  --accent-ring: hsla(215, 16%, 50%, 0.4);
+  --accent-border: var(--accent-700);
+  --accent-shadow: hsla(215, 16%, 20%, 0.3);
+
+  --glass-bg: hsla(215, 10%, 15%, 0.85);
+  --glass-hover: hsla(215, 15%, 20%, 0.9);
+  --glass-active: hsla(215, 20%, 25%, 0.95);
+  --glass-border: hsla(215, 10%, 30%, 0.5);
+
   --app-accent-root: rgb(18 18 18);
+  --app-accent-bg: rgb(18 18 18 / 0.85);
+  --app-accent-hover: rgb(38 38 38 / 0.9);
+  --app-accent-active: rgb(255 255 255 / 0.1);
+
   --color-brand: 180 180 180; /* neutral-500-ish */
 }
 
@@ -55,6 +120,13 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 .rounded-control { border-radius: 0.5rem; } /* ~rounded-lg for inputs/buttons */
 /* Modern, airy shadow to make cards pop without harsh edges */
 .shadow-card { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 8px 20px -8px rgb(0 0 0 / 0.08); }
+
+/* Accent color text on hover */
+.hover-accent-text { transition: color 150ms; }
+.hover-accent-text:hover { color: var(--accent-600); }
+.dark .hover-accent-text:hover { color: var(--accent-400); }
+.group:hover .group-hover-accent-text { color: var(--accent-600); }
+.dark .group:hover .group-hover-accent-text { color: var(--accent-400); }
 
 /* Playful, subtle animations for the sign-in experience */
 @keyframes gradientShift {
