@@ -55,9 +55,9 @@ export async function extractTextFromPdf(file: File): Promise<string> {
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
     const page = await pdf.getPage(pageNumber)
-    const textContent = await page.getTextContent({ 
-      normalizeWhitespace: true, 
-      disableCombineTextItems: false 
+    const textContent = await page.getTextContent({
+      normalizeWhitespace: true,
+      disableCombineTextItems: false,
     })
     const textItems = textContent.items.filter((item: any): item is TextItem => 'str' in item)
     const lines = textItems.map((item: any) => ({ str: item.str, hasEOL: Boolean(item.hasEOL) }))
@@ -74,9 +74,9 @@ export async function extractTextFromArrayBuffer(buffer: ArrayBuffer): Promise<s
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
     const page = await pdf.getPage(pageNumber)
-    const textContent = await page.getTextContent({ 
-      normalizeWhitespace: true, 
-      disableCombineTextItems: false 
+    const textContent = await page.getTextContent({
+      normalizeWhitespace: true,
+      disableCombineTextItems: false,
     })
     const textItems = textContent.items.filter((item: any): item is TextItem => 'str' in item)
     const lines = textItems.map((item: any) => ({ str: item.str, hasEOL: Boolean(item.hasEOL) }))

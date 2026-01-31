@@ -36,7 +36,7 @@ export function NotificationManager() {
       if (!res.ok) throw new Error(res.error)
       return res.data
     },
-    staleTime: 5000, 
+    staleTime: 5000,
     refetchInterval: 5000,
   })
 
@@ -47,8 +47,11 @@ export function NotificationManager() {
   }
 
   // Get courses for name lookup (cached from RootLayout)
-  const { data: courses } = useCourses({ enrollment_state: 'active' }, { enabled: settings.enabled })
-  
+  const { data: courses } = useCourses(
+    { enrollment_state: 'active' },
+    { enabled: settings.enabled },
+  )
+
   const courseMap = useMemo(() => {
     const map = new Map<string | number, string>()
     if (courses) {
@@ -87,7 +90,13 @@ export function NotificationManager() {
       notifyNewAnnouncements: settings.notifyNewAnnouncements,
       lastChecked: settings.lastChecked,
     })
-  }, [settings.enabled, settings.notifyDueAssignments, settings.notifyNewGrades, settings.notifyNewAnnouncements, settings.lastChecked])
+  }, [
+    settings.enabled,
+    settings.notifyDueAssignments,
+    settings.notifyNewGrades,
+    settings.notifyNewAnnouncements,
+    settings.lastChecked,
+  ])
 
   // Request permission on mount if enabled
   useEffect(() => {
@@ -124,7 +133,7 @@ export function NotificationManager() {
       for (const item of items) {
         if (!item.created_at) continue
         const itemDate = new Date(item.created_at)
-        
+
         // Track max date found
         if (itemDate > maxDate) maxDate = itemDate
 
@@ -137,16 +146,26 @@ export function NotificationManager() {
             // Prefetch content
             if (item.course_id && item.discussion_topic_id) {
               queryClient.prefetchQuery({
-                queryKey: ['announcement', String(item.course_id), String(item.discussion_topic_id)],
+                queryKey: [
+                  'announcement',
+                  String(item.course_id),
+                  String(item.discussion_topic_id),
+                ],
                 queryFn: async () => {
-                  const res = await window.canvas.getAnnouncement?.(item.course_id!, item.discussion_topic_id!)
+                  const res = await window.canvas.getAnnouncement?.(
+                    item.course_id!,
+                    item.discussion_topic_id!,
+                  )
                   return res?.ok ? res.data : null
                 },
                 staleTime: 1000 * 60 * 60, // 1 hour
               })
             }
 
-            const snippet = item.message ? item.message.replace(/<[^>]*>/g, '').slice(0, 80) + (item.message.length > 80 ? '...' : '') : 'Tap to view.'
+            const snippet = item.message
+              ? item.message.replace(/<[^>]*>/g, '').slice(0, 80) +
+                (item.message.length > 80 ? '...' : '')
+              : 'Tap to view.'
             const notif = new Notification(`New Announcement`, {
               body: `${courseName}: ${item.title || 'Announcement'}\n${snippet}`,
               silent: false,
@@ -161,8 +180,8 @@ export function NotificationManager() {
                     tab: 'announcements',
                     type: 'announcement',
                     contentId: String(item.discussion_topic_id),
-                    title: item.title
-                  }
+                    title: item.title,
+                  },
                 })
               } else if (item.html_url) {
                 ;(await import('../utils/openExternal')).openExternal(item.html_url)
@@ -174,7 +193,10 @@ export function NotificationManager() {
               queryClient.prefetchQuery({
                 queryKey: ['assignment-rest', String(item.course_id), String(item.assignment_id)],
                 queryFn: async () => {
-                  const res = await window.canvas.getAssignmentRest?.(item.course_id!, item.assignment_id!)
+                  const res = await window.canvas.getAssignmentRest?.(
+                    item.course_id!,
+                    item.assignment_id!,
+                  )
                   return res?.ok ? res.data : null
                 },
                 staleTime: 1000 * 60 * 60,
@@ -193,22 +215,22 @@ export function NotificationManager() {
                 // If we have an assignment ID, maybe go to assignment detail?
                 // Activity stream items for submission often have 'assignment_id'
                 if (item.assignment_id) {
-                   navigate({
+                  navigate({
                     to: '/course/$courseId',
                     params: { courseId: String(item.course_id) },
                     search: {
                       tab: 'assignments',
                       type: 'assignment',
                       contentId: String(item.assignment_id),
-                      title: item.title
-                    }
+                      title: item.title,
+                    },
                   })
                 } else {
                   // Fallback to grades list
-                   navigate({
+                  navigate({
                     to: '/course/$courseId',
                     params: { courseId: String(item.course_id) },
-                    search: { tab: 'grades' }
+                    search: { tab: 'grades' },
                   })
                 }
               } else if (item.html_url) {
@@ -251,14 +273,14 @@ export function NotificationManager() {
         const due = new Date(assign.dueAt)
         const id = Number(assign.assignment_rest_id || assign.assignment_graphql_id)
         if (!id) continue
-        
+
         // If due in future (but soon) AND not already notified
         if (due > now && due <= in24h && !notifiedIds.has(id)) {
           // Calculate hours left
           const diffMs = due.getTime() - now.getTime()
           const hoursLeft = Math.max(0, Math.round(diffMs / (1000 * 60 * 60)))
           const courseName = assign.course_name || 'Assignment'
-          
+
           // Prefetch assignment details
           if (assign.course_id && (assign.assignment_rest_id || assign.assignment_graphql_id)) {
             const assignId = String(assign.assignment_rest_id || assign.assignment_graphql_id)
@@ -277,24 +299,24 @@ export function NotificationManager() {
             silent: false,
           })
           notif.onclick = async () => {
-             window.focus()
-             // Use assignment_rest_id or graphql_id. CoursePage expects numeric REST ID usually, or handle both?
-             // checking CoursePage... it treats contentId as string.
-             // We need course_id. listDueAssignments returns it.
-             if (assign.course_id && (assign.assignment_rest_id || assign.assignment_graphql_id)) {
-               navigate({
-                  to: '/course/$courseId',
-                  params: { courseId: String(assign.course_id) },
-                  search: {
-                    tab: 'assignments',
-                    type: 'assignment',
-                    contentId: String(assign.assignment_rest_id || assign.assignment_graphql_id),
-                    title: assign.name
-                  }
-               })
-             } else if (assign.htmlUrl) {
-                ;(await import('../utils/openExternal')).openExternal(assign.htmlUrl)
-             }
+            window.focus()
+            // Use assignment_rest_id or graphql_id. CoursePage expects numeric REST ID usually, or handle both?
+            // checking CoursePage... it treats contentId as string.
+            // We need course_id. listDueAssignments returns it.
+            if (assign.course_id && (assign.assignment_rest_id || assign.assignment_graphql_id)) {
+              navigate({
+                to: '/course/$courseId',
+                params: { courseId: String(assign.course_id) },
+                search: {
+                  tab: 'assignments',
+                  type: 'assignment',
+                  contentId: String(assign.assignment_rest_id || assign.assignment_graphql_id),
+                  title: assign.name,
+                },
+              })
+            } else if (assign.htmlUrl) {
+              ;(await import('../utils/openExternal')).openExternal(assign.htmlUrl)
+            }
           }
 
           newNotifiedIds.push(id)
@@ -302,8 +324,8 @@ export function NotificationManager() {
       }
 
       if (newNotifiedIds.length > 0) {
-        await updateSettings({ 
-          notifiedAssignmentIds: [...settings.notifiedAssignmentIds, ...newNotifiedIds] 
+        await updateSettings({
+          notifiedAssignmentIds: [...settings.notifiedAssignmentIds, ...newNotifiedIds],
         })
       }
       return assignments

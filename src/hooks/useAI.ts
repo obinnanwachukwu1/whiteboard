@@ -1,79 +1,81 @@
 // src/hooks/useAI.ts
-import { useState } from 'react';
+import { useState } from 'react'
 
 // Message type for chat completions
 export type AIMessage = {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-};
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
 
 // Response type
 export type AIResponse = {
-  id: string;
+  id: string
   choices: Array<{
-    message: AIMessage;
-    finish_reason: string;
-  }>;
-};
+    message: AIMessage
+    finish_reason: string
+  }>
+}
 
 export const useAI = () => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const chat = async (messages: AIMessage[], max_tokens = 500): Promise<string | null> => {
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
     try {
-      // @ts-ignore - Exposed via preload
-      const res = await window.ai.chat(messages, max_tokens);
-      
+      const res = await window.ai.chat(messages, max_tokens)
+
       if (res.error) {
-        throw new Error(res.error.message || 'Unknown AI error');
+        throw new Error(res.error.message || 'Unknown AI error')
       }
 
-      const content = res.choices?.[0]?.message?.content || null;
-      return content;
+      const content = res.choices?.[0]?.message?.content || null
+      return content
     } catch (e: any) {
-      console.error('AI Error:', e);
-      setError(e.message || 'Failed to communicate with AI');
-      return null;
+      console.error('AI Error:', e)
+      setError(e.message || 'Failed to communicate with AI')
+      return null
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const summarize = async (text: string, bulletPoints = 2): Promise<string | null> => {
     return chat([
       {
         role: 'system',
-        content: `You are a helpful assistant. Summarize the following text into exactly ${bulletPoints} concise bullet points. Return ONLY the bullet points, no intro/outro.`
+        content: `You are a helpful assistant. Summarize the following text into exactly ${bulletPoints} concise bullet points. Return ONLY the bullet points, no intro/outro.`,
       },
       {
         role: 'user',
-        content: text
-      }
-    ]);
-  };
+        content: text,
+      },
+    ])
+  }
 
-  const streamSummarize = (text: string, onUpdate: (text: string) => void, bulletPoints = 2): (() => void) => {
-    let accumulated = '';
+  const streamSummarize = (
+    text: string,
+    onUpdate: (text: string) => void,
+    bulletPoints = 2,
+  ): (() => void) => {
+    let accumulated = ''
     const messages = [
       {
         role: 'system',
-        content: `You are a helpful assistant. Summarize the following text into exactly ${bulletPoints} concise bullet points. Return ONLY the bullet points, no intro/outro.`
+        content: `You are a helpful assistant. Summarize the following text into exactly ${bulletPoints} concise bullet points. Return ONLY the bullet points, no intro/outro.`,
       },
       {
         role: 'user',
-        content: text
-      }
-    ];
-    
-    // @ts-ignore - Exposed via preload
-    return window.ai.chatStream(messages, (chunk) => {
-      accumulated += chunk;
-      onUpdate(accumulated);
-    });
-  };
+        content: text,
+      },
+    ]
+
+    return window.ai.chatStream(messages, (chunk: string) => {
+      accumulated += chunk
+      onUpdate(accumulated)
+    })
+  }
 
   type PriorityExplainPayload = {
     assignmentName: string
@@ -138,10 +140,12 @@ export const useAI = () => {
 
     const userContent = [
       'Facts:',
-      ...lines.map(l => `- ${l}`),
+      ...lines.map((l) => `- ${l}`),
       drafts.length ? 'Draft:' : '',
-      ...drafts.map(d => `- ${d}`),
-    ].filter(Boolean).join('\n')
+      ...drafts.map((d) => `- ${d}`),
+    ]
+      .filter(Boolean)
+      .join('\n')
 
     return [
       { role: 'system', content: systemContent },
@@ -156,11 +160,10 @@ export const useAI = () => {
 
   const streamExplainPriority = (
     payload: PriorityExplainPayload,
-    onUpdate: (text: string) => void
+    onUpdate: (text: string) => void,
   ): (() => void) => {
     const messages = buildPriorityMessages(payload)
     let accumulated = ''
-    // @ts-ignore - Exposed via preload
     return window.ai.chatStream(messages, (chunk: string) => {
       accumulated += chunk
       onUpdate(accumulated)
@@ -174,6 +177,6 @@ export const useAI = () => {
     explainPriority,
     streamExplainPriority,
     loading,
-    error
-  };
-};
+    error,
+  }
+}

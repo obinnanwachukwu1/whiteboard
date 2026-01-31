@@ -6,7 +6,10 @@ class PrefetchQueue {
   private running = 0
   private guard: (() => Promise<GuardResult> | GuardResult) | null = null
   private maxQueueSize = 50 // Prevent unbounded queue growth
-  constructor(private concurrency = 2, private minIntervalMs = 250) {}
+  constructor(
+    private concurrency = 2,
+    private minIntervalMs = 250,
+  ) {}
 
   enqueue(task: PrefetchTask) {
     // Drop oldest tasks if queue is too large (prevents memory leak)
@@ -34,7 +37,6 @@ class PrefetchQueue {
           // Put task back and delay
           this.q.unshift(next)
           if (process.env.NODE_ENV === 'development') {
-            // eslint-disable-next-line no-console
             console.warn('[Prefetch] Pausing due to guard', res)
           }
           setTimeout(() => this.run(), res.waitMs)
@@ -48,8 +50,8 @@ class PrefetchQueue {
     this.running++
     try {
       await next()
-    } catch {}
-    finally {
+    } catch {
+    } finally {
       setTimeout(() => {
         this.running--
         this.run()

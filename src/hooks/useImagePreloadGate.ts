@@ -43,7 +43,9 @@ export function useImagePreloadGate(urls: Array<string | undefined | null>, opts
     // If we already crossed the gate once, keep the UI stable.
     if (once && everReadyRef.current) {
       // still warm any new URLs
-      uniq.forEach((u) => { preloadImage(u).catch(() => {}) })
+      uniq.forEach((u) => {
+        preloadImage(u).catch(() => {})
+      })
       setReady(true)
       return
     }
@@ -72,7 +74,6 @@ export function useImagePreloadGate(urls: Array<string | undefined | null>, opts
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, enabled, once])
 
   return ready

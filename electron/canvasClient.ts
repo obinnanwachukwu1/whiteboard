@@ -1,4 +1,3 @@
-
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { app } from 'electron'
 import fs from 'node:fs'
@@ -111,8 +110,9 @@ export class CanvasClient {
       if (this.verbose && url) {
         const method = (config.method || 'GET').toUpperCase()
         const paramsDbg = config.params ? ` params=${safeLog(config.params)}` : ''
-        const dataDbg = config.data ? ` data=${typeof config.data === 'string' ? '(body)' : safeLog(config.data).slice(0, 200)}` : ''
-        // eslint-disable-next-line no-console
+        const dataDbg = config.data
+          ? ` data=${typeof config.data === 'string' ? '(body)' : safeLog(config.data).slice(0, 200)}`
+          : ''
         console.log(`[${method}] ${url}${paramsDbg}${dataDbg}`)
       }
 
@@ -121,8 +121,18 @@ export class CanvasClient {
       // Track rate limit hints if provided
       const costRaw = resp.headers['x-request-cost']
       const remainingRaw = resp.headers['x-rate-limit-remaining']
-      const cost = typeof costRaw === 'string' ? Number(costRaw) : Array.isArray(costRaw) ? Number(costRaw[0]) : undefined
-      const remaining = typeof remainingRaw === 'string' ? Number(remainingRaw) : Array.isArray(remainingRaw) ? Number(remainingRaw[0]) : undefined
+      const cost =
+        typeof costRaw === 'string'
+          ? Number(costRaw)
+          : Array.isArray(costRaw)
+            ? Number(costRaw[0])
+            : undefined
+      const remaining =
+        typeof remainingRaw === 'string'
+          ? Number(remainingRaw)
+          : Array.isArray(remainingRaw)
+            ? Number(remainingRaw[0])
+            : undefined
       if (Number.isFinite(cost) || Number.isFinite(remaining)) {
         this.lastRateLimit = {
           cost: Number.isFinite(cost) ? cost : undefined,
@@ -130,24 +140,35 @@ export class CanvasClient {
           at: Date.now(),
         }
         if (this.verbose) {
-          // eslint-disable-next-line no-console
-          console.log('[Canvas rate]', { cost: this.lastRateLimit.cost, remaining: this.lastRateLimit.remaining })
+          console.log('[Canvas rate]', {
+            cost: this.lastRateLimit.cost,
+            remaining: this.lastRateLimit.remaining,
+          })
         }
       }
       if (this.retry.retryStatuses.includes(resp.status) && attempt <= this.retry.maxRetries) {
         const ra = resp.headers['retry-after']
-        const delay = ra ? Math.max(500, Number(ra) * 1000 || 0) : this.retry.backoffFactor * attempt * 1000
+        const delay = ra
+          ? Math.max(500, Number(ra) * 1000 || 0)
+          : this.retry.backoffFactor * attempt * 1000
         if (this.verbose) {
-          // eslint-disable-next-line no-console
-          console.warn(`Retrying (${attempt}/${this.retry.maxRetries}) in ${(delay / 1000).toFixed(1)}s due to ${resp.status}...`)
+          console.warn(
+            `Retrying (${attempt}/${this.retry.maxRetries}) in ${(delay / 1000).toFixed(1)}s due to ${resp.status}...`,
+          )
         }
         await sleep(delay)
         continue
       }
       if (resp.status >= 400) {
         let body: any
-        try { body = resp.data } catch { body = resp.statusText }
-        throw new CanvasError(`HTTP ${resp.status} for ${config.url}: ${JSON.stringify(body, null, 2)}`)
+        try {
+          body = resp.data
+        } catch {
+          body = resp.statusText
+        }
+        throw new CanvasError(
+          `HTTP ${resp.status} for ${config.url}: ${JSON.stringify(body, null, 2)}`,
+        )
       }
       return resp
     }
@@ -179,14 +200,22 @@ export class CanvasClient {
     return resp.data
   }
 
-  async paginate<T = any>(pathOrUrl: string, params?: Record<string, any>, maxPages?: number): Promise<T[]> {
+  async paginate<T = any>(
+    pathOrUrl: string,
+    params?: Record<string, any>,
+    maxPages?: number,
+  ): Promise<T[]> {
     const out: T[] = []
     let url: string | null = this.url(pathOrUrl)
     let first = true
     let pages = 0
     while (url) {
       if (maxPages && pages >= maxPages) break
-      const resp = await this.request<any>({ method: 'GET', url, params: first ? params : undefined })
+      const resp = await this.request<any>({
+        method: 'GET',
+        url,
+        params: first ? params : undefined,
+      })
       first = false
       pages++
       const data = resp.data
@@ -198,7 +227,10 @@ export class CanvasClient {
       }
       const link = (resp.headers['link'] || resp.headers['Link']) as string | undefined
       if (link) {
-        const match = link.split(',').map((s) => s.trim()).find((s) => s.endsWith('rel="next"'))
+        const match = link
+          .split(',')
+          .map((s) => s.trim())
+          .find((s) => s.endsWith('rel="next"'))
         if (match) {
           const m = match.match(/<(.*)>/)
           url = m ? m[1] : null
@@ -218,7 +250,10 @@ export class CanvasClient {
   }
 
   listCourses(params: { enrollment_state?: string; include?: string[]; per_page?: number } = {}) {
-    const p: Record<string, any> = { per_page: params.per_page ?? 100, enrollment_state: params.enrollment_state ?? 'active' }
+    const p: Record<string, any> = {
+      per_page: params.per_page ?? 100,
+      enrollment_state: params.enrollment_state ?? 'active',
+    }
     if (params.include) p['include[]'] = params.include
     return this.paginate<any>('/courses', p)
   }
@@ -260,12 +295,19 @@ export class CanvasClient {
 
   // Announcements (Discussions API)
   listCourseAnnouncements(courseId: string | number, perPage = 50) {
-    const p: Record<string, any> = { per_page: Math.min(100, Math.max(1, perPage)), only_announcements: true }
+    const p: Record<string, any> = {
+      per_page: Math.min(100, Math.max(1, perPage)),
+      only_announcements: true,
+    }
     return this.paginate<any>(`/courses/${courseId}/discussion_topics`, p)
   }
   // Single-page announcements fetch for pagination UI
   listCourseAnnouncementsPage(courseId: string | number, page = 1, perPage = 10) {
-    const p: Record<string, any> = { per_page: Math.min(100, Math.max(1, perPage)), page: Math.max(1, Number(page) || 1), only_announcements: true }
+    const p: Record<string, any> = {
+      per_page: Math.min(100, Math.max(1, perPage)),
+      page: Math.max(1, Number(page) || 1),
+      only_announcements: true,
+    }
     return this.get<any[]>(`/courses/${courseId}/discussion_topics`, p)
   }
   getAnnouncement(courseId: string | number, topicId: string | number) {
@@ -273,14 +315,17 @@ export class CanvasClient {
   }
 
   // Discussions (NOT announcements)
-  listCourseDiscussions(courseId: string | number, params: {
-    perPage?: number
-    searchTerm?: string
-    filterBy?: 'all' | 'unread'
-    scope?: 'locked' | 'unlocked' | 'pinned' | 'unpinned'
-    orderBy?: 'position' | 'recent_activity' | 'title'
-    maxPages?: number
-  } = {}) {
+  listCourseDiscussions(
+    courseId: string | number,
+    params: {
+      perPage?: number
+      searchTerm?: string
+      filterBy?: 'all' | 'unread'
+      scope?: 'locked' | 'unlocked' | 'pinned' | 'unpinned'
+      orderBy?: 'position' | 'recent_activity' | 'title'
+      maxPages?: number
+    } = {},
+  ) {
     const p: Record<string, any> = {
       per_page: Math.min(100, Math.max(1, params.perPage ?? 50)),
       order_by: params.orderBy ?? 'recent_activity',
@@ -291,8 +336,9 @@ export class CanvasClient {
     if (params.filterBy === 'unread') p.filter_by = 'unread'
 
     // Note: without only_announcements=true, this returns actual discussions
-    return this.paginate<any>(`/courses/${courseId}/discussion_topics`, p, params.maxPages)
-      .then((topics) => topics.filter((t: any) => !t.is_announcement))
+    return this.paginate<any>(`/courses/${courseId}/discussion_topics`, p, params.maxPages).then(
+      (topics) => topics.filter((t: any) => !t.is_announcement),
+    )
   }
 
   getDiscussion(courseId: string | number, topicId: string | number) {
@@ -315,28 +361,28 @@ export class CanvasClient {
     courseId: string | number,
     topicId: string | number,
     entryId: string | number,
-    message: string
+    message: string,
   ) {
     return this.post<any>(
       `/courses/${courseId}/discussion_topics/${topicId}/entries/${entryId}/replies`,
-      { message }
+      { message },
     )
   }
 
   markDiscussionEntryRead(
     courseId: string | number,
     topicId: string | number,
-    entryId: string | number
+    entryId: string | number,
   ) {
     return this.put<void>(
-      `/courses/${courseId}/discussion_topics/${topicId}/entries/${entryId}/read`
+      `/courses/${courseId}/discussion_topics/${topicId}/entries/${entryId}/read`,
     )
   }
 
   async markDiscussionEntriesRead(
     courseId: string | number,
     topicId: string | number,
-    entryIds: (string | number)[]
+    entryIds: (string | number)[],
   ) {
     // Mark multiple entries as read in parallel (with concurrency limit)
     const concurrency = 5
@@ -352,7 +398,7 @@ export class CanvasClient {
           } catch {
             return { id: entryId, success: false }
           }
-        })
+        }),
       )
       for (const r of batchResults) {
         if (r.status === 'fulfilled') results.push(r.value)
@@ -431,19 +477,26 @@ export class CanvasClient {
 
   async listCourseModulesGql(courseRestId: string | number, _first = 20, _itemsFirst = 50) {
     // REST: include items and content_details. This avoids expensive per-module fan-out.
-    const modules = await this.paginate<any>(
-      `/courses/${courseRestId}/modules`,
-      { per_page: 50, 'include[]': ['items', 'content_details'] },
-    )
+    const modules = await this.paginate<any>(`/courses/${courseRestId}/modules`, {
+      per_page: 50,
+      'include[]': ['items', 'content_details'],
+    })
     const mapType = (t?: string) => {
       switch ((t || '').toLowerCase()) {
-        case 'assignment': return 'AssignmentModuleItem'
-        case 'page': return 'PageModuleItem'
-        case 'file': return 'FileModuleItem'
-        case 'discussion': return 'DiscussionModuleItem'
-        case 'externalurl': return 'ExternalUrlModuleItem'
-        case 'quiz': return 'QuizModuleItem'
-        default: return 'ModuleItem'
+        case 'assignment':
+          return 'AssignmentModuleItem'
+        case 'page':
+          return 'PageModuleItem'
+        case 'file':
+          return 'FileModuleItem'
+        case 'discussion':
+          return 'DiscussionModuleItem'
+        case 'externalurl':
+          return 'ExternalUrlModuleItem'
+        case 'quiz':
+          return 'QuizModuleItem'
+        default:
+          return 'ModuleItem'
       }
     }
     const normalized = (modules || []).map((m: any) => ({
@@ -486,7 +539,11 @@ export class CanvasClient {
     return this.get('/users/self/todo')
   }
 
-  async getMySubmission(courseId: string | number, assignmentRestId: string | number, include: string[] = []) {
+  async getMySubmission(
+    courseId: string | number,
+    assignmentRestId: string | number,
+    include: string[] = [],
+  ) {
     const p: Record<string, any> = {}
     if (include.length) p['include[]'] = include
     return this.get(`/courses/${courseId}/assignments/${assignmentRestId}/submissions/self`, p)
@@ -501,7 +558,7 @@ export class CanvasClient {
       body?: string
       url?: string
       fileIds?: Array<string | number>
-    }
+    },
   ) {
     const form = new URLSearchParams()
     form.set('submission[submission_type]', params.submissionType)
@@ -516,39 +573,60 @@ export class CanvasClient {
   async startSubmissionFileUpload(
     courseId: string | number,
     assignmentRestId: string | number,
-    file: { name: string; size: number; contentType?: string }
+    file: { name: string; size: number; contentType?: string },
   ) {
     const form = new URLSearchParams()
     form.set('name', file.name)
     form.set('size', String(Math.max(0, Math.floor(file.size))))
     if (file.contentType) form.set('content_type', file.contentType)
     form.set('on_duplicate', 'rename')
-    return this.post(`/courses/${courseId}/assignments/${assignmentRestId}/submissions/self/files`, form)
+    return this.post(
+      `/courses/${courseId}/assignments/${assignmentRestId}/submissions/self/files`,
+      form,
+    )
   }
 
   private guessContentType(filename: string): string {
     const ext = path.extname(filename || '').toLowerCase()
     switch (ext) {
-      case '.pdf': return 'application/pdf'
-      case '.doc': return 'application/msword'
-      case '.docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      case '.ppt': return 'application/vnd.ms-powerpoint'
-      case '.pptx': return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-      case '.xls': return 'application/vnd.ms-excel'
-      case '.xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      case '.txt': return 'text/plain'
-      case '.csv': return 'text/csv'
-      case '.png': return 'image/png'
+      case '.pdf':
+        return 'application/pdf'
+      case '.doc':
+        return 'application/msword'
+      case '.docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      case '.ppt':
+        return 'application/vnd.ms-powerpoint'
+      case '.pptx':
+        return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      case '.xls':
+        return 'application/vnd.ms-excel'
+      case '.xlsx':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      case '.txt':
+        return 'text/plain'
+      case '.csv':
+        return 'text/csv'
+      case '.png':
+        return 'image/png'
       case '.jpg':
-      case '.jpeg': return 'image/jpeg'
-      case '.gif': return 'image/gif'
-      case '.zip': return 'application/zip'
-      default: return 'application/octet-stream'
+      case '.jpeg':
+        return 'image/jpeg'
+      case '.gif':
+        return 'image/gif'
+      case '.zip':
+        return 'application/zip'
+      default:
+        return 'application/octet-stream'
     }
   }
 
-  private async uploadMultipartFile(uploadUrl: string, uploadParams: Record<string, any>, filePath: string) {
-    const mod = await import('form-data') as any as { default: new () => FormDataType }
+  private async uploadMultipartFile(
+    uploadUrl: string,
+    uploadParams: Record<string, any>,
+    filePath: string,
+  ) {
+    const mod = (await import('form-data')) as any as { default: new () => FormDataType }
     const FormData = mod.default as any
     const form = new FormData()
 
@@ -575,7 +653,9 @@ export class CanvasClient {
     })
 
     if (resp.status >= 400) {
-      throw new CanvasError(`Upload failed (HTTP ${resp.status}): ${JSON.stringify(resp.data, null, 2)}`)
+      throw new CanvasError(
+        `Upload failed (HTTP ${resp.status}): ${JSON.stringify(resp.data, null, 2)}`,
+      )
     }
     return resp.data
   }
@@ -648,14 +728,14 @@ export class CanvasClient {
   async resolveModuleItemUrl(url: string): Promise<string> {
     const target = this.url(url)
     try {
-      const resp = await this.axios.get(target, { 
+      const resp = await this.axios.get(target, {
         maxRedirects: 5,
-        validateStatus: (status) => status >= 200 && status < 400 
+        validateStatus: (status) => status >= 200 && status < 400,
       })
       // In Node.js axios, the final URL is in resp.request.res.responseUrl
       const finalUrl = (resp.request as any)?.res?.responseUrl
       return finalUrl || target
-    } catch (e) {
+    } catch (_e) {
       return target
     }
   }
@@ -694,7 +774,7 @@ export class CanvasClient {
     // Create a stable filename for the course image so we can cache it
     const ext = path.extname(new URL(imageUrl).pathname) || '.jpg'
     const destPath = path.join(tempDir, `course-image-${courseId}${ext}`)
-    
+
     if (fs.existsSync(destPath)) {
       return destPath
     }
@@ -703,13 +783,13 @@ export class CanvasClient {
   }
 
   private async downloadUrlToPath(url: string, destPath: string): Promise<string> {
-    // Determine if we need auth headers. 
+    // Determine if we need auth headers.
     // If it's a Canvas API URL, yes. If it's an S3 signed URL (redirect), usually no.
-    // However, Axios follows redirects. 
+    // However, Axios follows redirects.
     // Safe bet: try fetching. If it's a direct download URL from API, it needs auth.
     // If it's a public URL, auth won't hurt usually, unless it's S3.
     // But often image_download_url is just the API endpoint that redirects.
-    
+
     // We use fetch here to stream.
     // We need to pass the Authorization header if it's the API root.
     const headers: Record<string, string> = {}
@@ -723,7 +803,7 @@ export class CanvasClient {
 
     const fileStream = createWriteStream(destPath)
     await pipeline(Readable.fromWeb(response.body as any), fileStream)
-    
+
     return destPath
   }
 
@@ -731,7 +811,7 @@ export class CanvasClient {
     // Get file metadata first to get the signed URL
     const meta = await this.get(`/files/${fileId}`)
     const url = meta.url // time-limited signed URL
-    
+
     if (!url) {
       throw new Error('No file URL available')
     }
@@ -750,11 +830,15 @@ export class CanvasClient {
   }
 
   async listCourseFolders(courseId: string | number, perPage = 100) {
-    return this.paginate<any>(`/courses/${courseId}/folders`, { per_page: Math.min(100, Math.max(1, perPage)) })
+    return this.paginate<any>(`/courses/${courseId}/folders`, {
+      per_page: Math.min(100, Math.max(1, perPage)),
+    })
   }
 
   async listFolderFiles(folderId: string | number, perPage = 100) {
-    return this.paginate<any>(`/folders/${folderId}/files`, { per_page: Math.min(100, Math.max(1, perPage)) })
+    return this.paginate<any>(`/folders/${folderId}/files`, {
+      per_page: Math.min(100, Math.max(1, perPage)),
+    })
   }
 
   async listCourseUsers(courseId: string | number, perPage = 100) {
@@ -789,7 +873,9 @@ export class CanvasClient {
   }
 
   // Conversations (Inbox)
-  async listConversations(params: { scope?: 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'; perPage?: number } = {}) {
+  async listConversations(
+    params: { scope?: 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'; perPage?: number } = {},
+  ) {
     const p: Record<string, any> = {
       per_page: params.perPage ?? 25,
       'include[]': ['participant_avatars'],
@@ -825,7 +911,7 @@ export class CanvasClient {
     formData.append('group_conversation', String(params.groupConversation ?? true))
     if (params.subject) formData.append('subject', params.subject)
     if (params.contextCode) formData.append('context_code', params.contextCode)
-    
+
     const resp = await this.axios.request({
       method: 'POST',
       url: this.url('/conversations'),
@@ -845,11 +931,14 @@ export class CanvasClient {
     return this.post(`/conversations/${conversationId}/add_message`, data)
   }
 
-  async updateConversation(conversationId: string | number, params: {
-    workflowState?: 'read' | 'unread' | 'archived'
-    starred?: boolean
-    subscribed?: boolean
-  }) {
+  async updateConversation(
+    conversationId: string | number,
+    params: {
+      workflowState?: 'read' | 'unread' | 'archived'
+      starred?: boolean
+      subscribed?: boolean
+    },
+  ) {
     const data: Record<string, any> = {}
     if (params.workflowState) data['conversation[workflow_state]'] = params.workflowState
     if (params.starred !== undefined) data['conversation[starred]'] = params.starred
@@ -877,11 +966,18 @@ export class CanvasClient {
     return this.get('/search/recipients', p)
   }
 
-  async listCourseFiles(courseId: string | number, perPage = 100, sort: 'name' | 'size' | 'created_at' | 'updated_at' = 'updated_at', order: 'asc' | 'desc' = 'desc') {
+  async listCourseFiles(
+    courseId: string | number,
+    perPage = 100,
+    sort: 'name' | 'size' | 'created_at' | 'updated_at' = 'updated_at',
+    order: 'asc' | 'desc' = 'desc',
+  ) {
     const p: Record<string, any> = { per_page: Math.min(100, Math.max(1, perPage)), sort, order }
     return this.paginate<any>(`/courses/${courseId}/files`, p)
   }
-  async listDueAssignmentsGql(params: { days?: number; onlyPublished?: boolean; includeCourseName?: boolean } = {}) {
+  async listDueAssignmentsGql(
+    params: { days?: number; onlyPublished?: boolean; includeCourseName?: boolean } = {},
+  ) {
     const days = params.days ?? 7
     const onlyPublished = params.onlyPublished ?? true
     const includeCourseName = params.includeCourseName ?? true
@@ -913,10 +1009,12 @@ export class CanvasClient {
               state: n?.workflow_state, // REST uses workflow_state, GQL uses state.
               pointsPossible: n?.points_possible,
               htmlUrl: n?.html_url,
-              submission: n?.submission ? {
-                submittedAt: n.submission.submitted_at,
-                workflowState: n.submission.workflow_state,
-              } : undefined,
+              submission: n?.submission
+                ? {
+                    submittedAt: n.submission.submitted_at,
+                    workflowState: n.submission.workflow_state,
+                  }
+                : undefined,
             }
             if (includeCourseName) item.course_name = cname
             out.push(item)
@@ -925,19 +1023,20 @@ export class CanvasClient {
       } catch (_e) {
         // ignore course-level errors to avoid blocking whole dashboard
         if (this.verbose) {
-          // eslint-disable-next-line no-console
           console.warn(`[Canvas] Failed to fetch assignments for course ${cid}:`, _e)
         }
       }
     })
 
     let i = 0
-    const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, () => (async () => {
-      while (i < tasks.length) {
-        const cur = i++
-        await tasks[cur]()
-      }
-    })())
+    const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, () =>
+      (async () => {
+        while (i < tasks.length) {
+          const cur = i++
+          await tasks[cur]()
+        }
+      })(),
+    )
     await Promise.all(workers)
 
     out.sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt)))
@@ -1000,7 +1099,11 @@ async function deleteToken(baseUrl: string): Promise<{ insecure: boolean }> {
   }
 }
 
-export async function initCanvas(config: { token?: string; baseUrl?: string; verbose?: boolean }): Promise<{ insecure: boolean }> {
+export async function initCanvas(config: {
+  token?: string
+  baseUrl?: string
+  verbose?: boolean
+}): Promise<{ insecure: boolean }> {
   currentBaseUrl = (config.baseUrl || DEFAULT_BASE_URL).replace(/\/$/, '')
   let insecure = false
   if (config.token) {
@@ -1034,7 +1137,11 @@ export async function listCourses(opts?: { enrollment_state?: string }) {
   return ensureClient().listCourses({ enrollment_state: opts?.enrollment_state || 'active' })
 }
 
-export async function listDueAssignments(opts?: { days?: number; onlyPublished?: boolean; includeCourseName?: boolean }) {
+export async function listDueAssignments(opts?: {
+  days?: number
+  onlyPublished?: boolean
+  includeCourseName?: boolean
+}) {
   return ensureClient().listDueAssignmentsGql(opts)
 }
 
@@ -1068,7 +1175,11 @@ export async function listCourseAnnouncements(courseId: string | number, perPage
   return ensureClient().listCourseAnnouncements(courseId, perPage)
 }
 
-export async function listCourseAnnouncementsPage(courseId: string | number, page = 1, perPage = 10) {
+export async function listCourseAnnouncementsPage(
+  courseId: string | number,
+  page = 1,
+  perPage = 10,
+) {
   return ensureClient().listCourseAnnouncementsPage(courseId, page, perPage)
 }
 
@@ -1077,13 +1188,16 @@ export async function getAnnouncement(courseId: string | number, topicId: string
 }
 
 // Discussions
-export async function listCourseDiscussions(courseId: string | number, params?: {
-  perPage?: number
-  searchTerm?: string
-  filterBy?: 'all' | 'unread'
-  scope?: 'locked' | 'unlocked' | 'pinned' | 'unpinned'
-  orderBy?: 'position' | 'recent_activity' | 'title'
-}) {
+export async function listCourseDiscussions(
+  courseId: string | number,
+  params?: {
+    perPage?: number
+    searchTerm?: string
+    filterBy?: 'all' | 'unread'
+    scope?: 'locked' | 'unlocked' | 'pinned' | 'unpinned'
+    orderBy?: 'position' | 'recent_activity' | 'title'
+  },
+) {
   return ensureClient().listCourseDiscussions(courseId, params)
 }
 
@@ -1098,7 +1212,7 @@ export async function getDiscussionView(courseId: string | number, topicId: stri
 export async function postDiscussionEntry(
   courseId: string | number,
   topicId: string | number,
-  message: string
+  message: string,
 ) {
   return ensureClient().postDiscussionEntry(courseId, topicId, message)
 }
@@ -1107,7 +1221,7 @@ export async function postDiscussionReply(
   courseId: string | number,
   topicId: string | number,
   entryId: string | number,
-  message: string
+  message: string,
 ) {
   return ensureClient().postDiscussionReply(courseId, topicId, entryId, message)
 }
@@ -1115,7 +1229,7 @@ export async function postDiscussionReply(
 export async function markDiscussionEntryRead(
   courseId: string | number,
   topicId: string | number,
-  entryId: string | number
+  entryId: string | number,
 ) {
   return ensureClient().markDiscussionEntryRead(courseId, topicId, entryId)
 }
@@ -1123,7 +1237,7 @@ export async function markDiscussionEntryRead(
 export async function markDiscussionEntriesRead(
   courseId: string | number,
   topicId: string | number,
-  entryIds: (string | number)[]
+  entryIds: (string | number)[],
 ) {
   return ensureClient().markDiscussionEntriesRead(courseId, topicId, entryIds)
 }
@@ -1144,7 +1258,11 @@ export async function listTodo() {
   return ensureClient().listTodo()
 }
 
-export async function getMySubmission(courseId: string | number, assignmentRestId: string | number, include?: string[]) {
+export async function getMySubmission(
+  courseId: string | number,
+  assignmentRestId: string | number,
+  include?: string[],
+) {
   return ensureClient().getMySubmission(courseId, assignmentRestId, include || [])
 }
 
@@ -1156,7 +1274,7 @@ export async function submitAssignment(
     body?: string
     url?: string
     fileIds?: Array<string | number>
-  }
+  },
 ) {
   return ensureClient().submitAssignment(courseId, assignmentRestId, params)
 }
@@ -1181,7 +1299,10 @@ export async function getCourseInfo(courseId: string | number) {
 export async function getCourseFrontPage(courseId: string | number) {
   return ensureClient().getCourseFrontPage(courseId)
 }
-export async function getAssignmentRest(courseId: string | number, assignmentRestId: string | number) {
+export async function getAssignmentRest(
+  courseId: string | number,
+  assignmentRestId: string | number,
+) {
   return ensureClient().getAssignmentRest(courseId, assignmentRestId)
 }
 export async function getFile(fileId: string | number) {
@@ -1200,7 +1321,12 @@ export async function getFileBytes(fileId: string | number) {
   return ensureClient().getFileBytes(fileId)
 }
 
-export async function listCourseFiles(courseId: string | number, perPage = 100, sort: 'name' | 'size' | 'created_at' | 'updated_at' = 'updated_at', order: 'asc' | 'desc' = 'desc') {
+export async function listCourseFiles(
+  courseId: string | number,
+  perPage = 100,
+  sort: 'name' | 'size' | 'created_at' | 'updated_at' = 'updated_at',
+  order: 'asc' | 'desc' = 'desc',
+) {
   return ensureClient().listCourseFiles(courseId, perPage, sort, order)
 }
 
@@ -1229,7 +1355,10 @@ export async function listGroupUsers(groupId: string | number, perPage = 100) {
 }
 
 // Conversations (Inbox)
-export async function listConversations(params?: { scope?: 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'; perPage?: number }) {
+export async function listConversations(params?: {
+  scope?: 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'
+  perPage?: number
+}) {
   return ensureClient().listConversations(params)
 }
 
@@ -1251,15 +1380,22 @@ export async function createConversation(params: {
   return ensureClient().createConversation(params)
 }
 
-export async function addMessage(conversationId: string | number, body: string, includedMessages?: string[]) {
+export async function addMessage(
+  conversationId: string | number,
+  body: string,
+  includedMessages?: string[],
+) {
   return ensureClient().addMessage(conversationId, body, includedMessages)
 }
 
-export async function updateConversation(conversationId: string | number, params: {
-  workflowState?: 'read' | 'unread' | 'archived'
-  starred?: boolean
-  subscribed?: boolean
-}) {
+export async function updateConversation(
+  conversationId: string | number,
+  params: {
+    workflowState?: 'read' | 'unread' | 'archived'
+    starred?: boolean
+    subscribed?: boolean
+  },
+) {
   return ensureClient().updateConversation(conversationId, params)
 }
 

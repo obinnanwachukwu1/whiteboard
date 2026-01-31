@@ -78,7 +78,10 @@ function sum(arr: number[]) {
 
 type ScoreRecord = { id: string | number; score: number; possible: number }
 
-function applyDropRules(records: ScoreRecord[], rules?: DropRules | null): { kept: ScoreRecord[]; dropped: ScoreRecord[] } {
+function applyDropRules(
+  records: ScoreRecord[],
+  rules?: DropRules | null,
+): { kept: ScoreRecord[]; dropped: ScoreRecord[] } {
   if (!records.length) return { kept: [], dropped: [] }
   if (!rules) return { kept: records.slice(), dropped: [] }
   const never = new Set((rules.never_drop || []).map(toKey))
@@ -86,7 +89,7 @@ function applyDropRules(records: ScoreRecord[], rules?: DropRules | null): { kep
   const candidates = records.filter((r) => !never.has(toKey(r.id)) && r.possible > 0)
   const others = records.filter((r) => never.has(toKey(r.id)) || r.possible <= 0)
 
-  let working = candidates.slice()
+  const working = candidates.slice()
   const dropped: ScoreRecord[] = []
 
   const dropLowest = Math.max(0, Number(rules.drop_lowest || 0))
@@ -120,7 +123,10 @@ function applyDropRules(records: ScoreRecord[], rules?: DropRules | null): { kep
 function calcByGroups(
   groups: AssignmentGroupInput[],
   assignments: AssignmentInput[],
-  opts: Required<Pick<CalcOptions, 'treatUngradedAsZero' | 'applyDropRules'>> & { useWeights: boolean; whatIf?: WhatIfOverrides },
+  opts: Required<Pick<CalcOptions, 'treatUngradedAsZero' | 'applyDropRules'>> & {
+    useWeights: boolean
+    whatIf?: WhatIfOverrides
+  },
 ) {
   const whatIf: WhatIfOverrides = opts.whatIf || {}
   const byGroup = new Map<string, AssignmentInput[]>()
@@ -134,7 +140,9 @@ function calcByGroups(
 
   const groupResults: GroupResult[] = []
   for (const [gid, list] of byGroup.entries()) {
-    const g = groupsMap.get(gid) || ({ id: gid, name: 'Ungrouped', groupWeight: 0, rules: null } as AssignmentGroupInput)
+    const g =
+      groupsMap.get(gid) ||
+      ({ id: gid, name: 'Ungrouped', groupWeight: 0, rules: null } as AssignmentGroupInput)
     const weight = Number(g.groupWeight || 0)
 
     const recs: ScoreRecord[] = []
@@ -144,7 +152,9 @@ function calcByGroups(
       if (a.submission?.excused) continue // Canvas excludes excused from totals
 
       // what-if override takes precedence
-      const override = Object.prototype.hasOwnProperty.call(whatIf, toKey(a.id)) ? whatIf[a.id] : undefined
+      const override = Object.prototype.hasOwnProperty.call(whatIf, toKey(a.id))
+        ? whatIf[a.id]
+        : undefined
       const raw = override !== undefined ? override : a.submission?.score
 
       if (opts.treatUngradedAsZero) {
@@ -159,7 +169,9 @@ function calcByGroups(
       }
     }
 
-    const { kept, dropped } = opts.applyDropRules ? applyDropRules(recs, g.rules) : { kept: recs, dropped: [] }
+    const { kept, dropped } = opts.applyDropRules
+      ? applyDropRules(recs, g.rules)
+      : { kept: recs, dropped: [] }
     const pe = sum(kept.map((r) => r.score))
     const pp = sum(kept.map((r) => r.possible))
     const percent = pp > 0 ? (pe / pp) * 100 : null
@@ -186,7 +198,7 @@ function calcByGroups(
   let percent: number | null
   if (opts.useWeights) {
     // Re-normalize weight across groups that have any pointsPossible (Canvas current grade behavior)
-    const eligible = groupResults.filter((g) => (g.pointsPossible > 0))
+    const eligible = groupResults.filter((g) => g.pointsPossible > 0)
     const weightSum = sum(eligible.map((g) => g.weight)) || 0
     let weighted = 0
     for (const g of groupResults) {
@@ -225,8 +237,18 @@ export function calculateCourseGrades(
     useWeights = !!options.useWeights
   }
 
-  const current = calcByGroups(groups, assignments, { treatUngradedAsZero: false, applyDropRules, useWeights, whatIf: options.whatIf })
-  const final = calcByGroups(groups, assignments, { treatUngradedAsZero, applyDropRules, useWeights, whatIf: options.whatIf })
+  const current = calcByGroups(groups, assignments, {
+    treatUngradedAsZero: false,
+    applyDropRules,
+    useWeights,
+    whatIf: options.whatIf,
+  })
+  const final = calcByGroups(groups, assignments, {
+    treatUngradedAsZero,
+    applyDropRules,
+    useWeights,
+    whatIf: options.whatIf,
+  })
 
   return { current, final }
 }

@@ -1,0 +1,9 @@
+node_modules
+.pnpm-store
+dist
+dist-electron
+release
+build
+native
+resources
+public

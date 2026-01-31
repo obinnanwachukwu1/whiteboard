@@ -55,70 +55,76 @@ export function ImageDropZone({
     }
   }, [disabled, isUploading, onImageSelect])
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    if (!disabled && !isUploading) {
-      setIsDragging(true)
-    }
-  }, [disabled, isUploading])
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      if (!disabled && !isUploading) {
+        setIsDragging(true)
+      }
+    },
+    [disabled, isUploading],
+  )
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
   }, [])
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault()
+      setIsDragging(false)
 
-    if (disabled || isUploading) return
-    setError(null)
+      if (disabled || isUploading) return
+      setError(null)
 
-    const files = e.dataTransfer.files
-    if (files.length === 0) return
+      const files = e.dataTransfer.files
+      if (files.length === 0) return
 
-    const file = files[0]
+      const file = files[0]
 
-    // Check file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp']
-    if (!validTypes.includes(file.type)) {
-      setError('Invalid file type. Use JPG, PNG, or WebP')
-      return
-    }
-
-    // Check file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
-      setError('File too large. Maximum size is 10MB')
-      return
-    }
-
-    // Note: In Electron, drag-drop gives us file paths
-    // @ts-ignore - path exists on dropped files in Electron
-    const filePath = file.path
-    if (!filePath) {
-      setError('Could not read file path')
-      return
-    }
-
-    setIsUploading(true)
-
-    try {
-      const uploadResult = await window.theme?.uploadBackgroundImage?.(filePath)
-
-      if (!uploadResult?.ok) {
-        setError(uploadResult?.error || 'Failed to upload image')
+      // Check file type
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp']
+      if (!validTypes.includes(file.type)) {
+        setError('Invalid file type. Use JPG, PNG, or WebP')
         return
       }
 
-      if (uploadResult.data?.url) {
-        onImageSelect(uploadResult.data.url)
+      // Check file size (10MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        setError('File too large. Maximum size is 10MB')
+        return
       }
-    } catch (e: any) {
-      setError(e?.message || 'Failed to upload image')
-    } finally {
-      setIsUploading(false)
-    }
-  }, [disabled, isUploading, onImageSelect])
+
+      // Note: In Electron, drag-drop gives us file paths
+      // @ts-expect-error -- Electron drag-drop files include a `path` property.
+      const filePath = file.path
+      if (!filePath) {
+        setError('Could not read file path')
+        return
+      }
+
+      setIsUploading(true)
+
+      try {
+        const uploadResult = await window.theme?.uploadBackgroundImage?.(filePath)
+
+        if (!uploadResult?.ok) {
+          setError(uploadResult?.error || 'Failed to upload image')
+          return
+        }
+
+        if (uploadResult.data?.url) {
+          onImageSelect(uploadResult.data.url)
+        }
+      } catch (e: any) {
+        setError(e?.message || 'Failed to upload image')
+      } finally {
+        setIsUploading(false)
+      }
+    },
+    [disabled, isUploading, onImageSelect],
+  )
 
   const handleRemove = useCallback(async () => {
     if (!imageUrl || disabled) return
@@ -138,11 +144,7 @@ export function ImageDropZone({
     return (
       <div className="relative group">
         <div className="relative w-full h-32 rounded-lg overflow-hidden ring-1 ring-gray-200 dark:ring-neutral-700">
-          <img
-            src={imageUrl}
-            alt="Background preview"
-            className="w-full h-full object-cover"
-          />
+          <img src={imageUrl} alt="Background preview" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
             <button
               onClick={handleRemove}
@@ -172,9 +174,10 @@ export function ImageDropZone({
         className={`
           w-full h-32 rounded-lg border-2 border-dashed transition-colors
           flex flex-col items-center justify-center gap-2
-          ${isDragging
-            ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30'
-            : 'border-gray-300 dark:border-neutral-600 hover:border-gray-400 dark:hover:border-neutral-500'
+          ${
+            isDragging
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30'
+              : 'border-gray-300 dark:border-neutral-600 hover:border-gray-400 dark:hover:border-neutral-500'
           }
           ${disabled || isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         `}
@@ -182,9 +185,7 @@ export function ImageDropZone({
         {isUploading ? (
           <>
             <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
-            <span className="text-sm text-slate-500 dark:text-neutral-400">
-              Uploading...
-            </span>
+            <span className="text-sm text-slate-500 dark:text-neutral-400">Uploading...</span>
           </>
         ) : (
           <>
@@ -203,11 +204,7 @@ export function ImageDropZone({
         )}
       </button>
 
-      {error && (
-        <p className="text-xs text-red-500 dark:text-red-400 text-center">
-          {error}
-        </p>
-      )}
+      {error && <p className="text-xs text-red-500 dark:text-red-400 text-center">{error}</p>}
     </div>
   )
 }

@@ -24,7 +24,12 @@ type PdfEvent = {
   [key: string]: any
 }
 
-export const PdfViewerIframe: React.FC<Props> = ({ fileId, className = '', fullscreen = false, onPageChange }) => {
+export const PdfViewerIframe: React.FC<Props> = ({
+  fileId,
+  className = '',
+  fullscreen = false,
+  onPageChange,
+}) => {
   const fileUrlQ = useFileBytes(fileId)
   const fileMetaQ = useFileMeta(fileId)
 
@@ -62,7 +67,7 @@ export const PdfViewerIframe: React.FC<Props> = ({ fileId, className = '', fulls
       sendCommand({ type: 'LOAD_PDF', url: targetUrl })
       lastLoadedUrlRef.current = targetUrl
     },
-    [sendCommand]
+    [sendCommand],
   )
 
   // Handle events from the iframe viewer
@@ -125,7 +130,11 @@ export const PdfViewerIframe: React.FC<Props> = ({ fileId, className = '', fulls
           break
 
         case 'ERROR':
-          setViewerState((prev) => ({ ...prev, isLoading: false, error: data.message || 'Unknown error' }))
+          setViewerState((prev) => ({
+            ...prev,
+            isLoading: false,
+            error: data.message || 'Unknown error',
+          }))
           break
 
         case 'COPY':
@@ -211,13 +220,17 @@ export const PdfViewerIframe: React.FC<Props> = ({ fileId, className = '', fulls
 
       {viewerState.isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-50/70 dark:bg-neutral-900/70">
-          <div className="text-sm font-medium text-slate-500 dark:text-neutral-400">Rendering PDF...</div>
+          <div className="text-sm font-medium text-slate-500 dark:text-neutral-400">
+            Rendering PDF...
+          </div>
         </div>
       )}
 
       {viewerState.error && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-50/70 dark:bg-neutral-900/70">
-          <div className="text-red-600 dark:text-red-400 text-sm text-center p-4">{viewerState.error}</div>
+          <div className="text-red-600 dark:text-red-400 text-sm text-center p-4">
+            {viewerState.error}
+          </div>
         </div>
       )}
     </div>

@@ -1,7 +1,16 @@
 import React from 'react'
 import { useAppActions, useAppData } from '../context/AppContext'
 import { useDueAssignments } from '../hooks/useCanvasQueries'
-import { Columns3, Calendar, CircleDot, Check, Clock, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import {
+  Columns3,
+  Calendar,
+  CircleDot,
+  Check,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  X,
+} from 'lucide-react'
 import { CourseAvatar } from '../components/CourseAvatar'
 import { useCourseImages } from '../hooks/useCourseImages'
 import { courseHueFor } from '../utils/colorHelpers'
@@ -67,7 +76,12 @@ const KanbanCard = React.memo(function KanbanCard({
       onClick={handleOpen}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpen() } }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          handleOpen()
+        }
+      }}
       className={`group rounded-lg ring-1 ${item._isPastDue ? 'ring-red-200 dark:ring-red-900/50 bg-red-50/50 dark:bg-red-950/20' : 'ring-gray-200 dark:ring-neutral-800 bg-white dark:bg-neutral-900'} p-2.5 cursor-pointer hover:ring-[var(--app-accent)] hover:shadow-sm active:cursor-grabbing transition-all duration-150`}
     >
       <div className="flex items-start gap-2.5">
@@ -78,11 +92,18 @@ const KanbanCard = React.memo(function KanbanCard({
           className="w-7 h-7 rounded-full ring-1 ring-black/10 dark:ring-white/10 flex-shrink-0"
         />
         <div className="min-w-0 flex-1">
-          <div className="font-medium text-sm leading-snug line-clamp-2" title={item.name}>{item.name}</div>
-          <div className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 truncate">{cleanCourseName(item.course_name)}</div>
+          <div className="font-medium text-sm leading-snug line-clamp-2" title={item.name}>
+            {item.name}
+          </div>
+          <div className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 truncate">
+            {cleanCourseName(item.course_name)}
+          </div>
           <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-500 dark:text-neutral-400">
-            <span className={`${item._isPastDue ? 'text-red-600 dark:text-red-400 font-medium' : ''}`}>
-              {item._isPastDue && 'Overdue · '}{item._dueLabel}
+            <span
+              className={`${item._isPastDue ? 'text-red-600 dark:text-red-400 font-medium' : ''}`}
+            >
+              {item._isPastDue && 'Overdue · '}
+              {item._dueLabel}
             </span>
             {item.pointsPossible ? (
               <>
@@ -121,13 +142,17 @@ export default function AssignmentsPage() {
   const dueQ = useDueAssignments({ days: 365, includeCourseName: true })
   const allDue = React.useMemo(() => {
     const list = (dueQ.data || []) as DueItem[]
-    return list.filter((d) => (courseFilter === 'all' ? true : String(d.course_id) === courseFilter))
+    return list.filter((d) =>
+      courseFilter === 'all' ? true : String(d.course_id) === courseFilter,
+    )
   }, [dueQ.data, courseFilter])
 
   // Image helpers
   React.useEffect(() => {
     const ids = new Set<string>()
-    for (const d of allDue) { if (d.course_id != null) ids.add(String(d.course_id)) }
+    for (const d of allDue) {
+      if (d.course_id != null) ids.add(String(d.course_id))
+    }
     ids.forEach((id) => {
       prefetchCourseImage(id)
     })
@@ -139,21 +164,34 @@ export default function AssignmentsPage() {
       if (!raw) return {}
       const obj = JSON.parse(raw)
       return typeof obj === 'object' && obj ? obj : {}
-    } catch { return {} }
+    } catch {
+      return {}
+    }
   })
-  React.useEffect(() => { try { localStorage.setItem(LS_KANBAN, JSON.stringify(kanban)) } catch {} }, [kanban])
-  const setStatus = (id: string, status: KanbanStatus) => setKanban((prev) => ({ ...prev, [id]: status }))
-  const assignId = (d: DueItem) => String(d.assignment_rest_id || extractIdFromUrl(d.htmlUrl, 'assignments') || `${d.course_id}:${d.name}:${d.dueAt}`)
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(LS_KANBAN, JSON.stringify(kanban))
+    } catch {}
+  }, [kanban])
+  const setStatus = (id: string, status: KanbanStatus) =>
+    setKanban((prev) => ({ ...prev, [id]: status }))
+  const assignId = (d: DueItem) =>
+    String(
+      d.assignment_rest_id ||
+        extractIdFromUrl(d.htmlUrl, 'assignments') ||
+        `${d.course_id}:${d.name}:${d.dueAt}`,
+    )
 
   // Derive effective status, forcing 'done' if Canvas says submitted
   const effectiveKanban = React.useMemo(() => {
     const next = { ...kanban }
     let changed = false
     for (const d of allDue) {
-      const isSubmitted = Boolean(d.submission?.submittedAt) || 
-                          d.submission?.workflowState === 'submitted' || 
-                          d.submission?.workflowState === 'graded'
-      
+      const isSubmitted =
+        Boolean(d.submission?.submittedAt) ||
+        d.submission?.workflowState === 'submitted' ||
+        d.submission?.workflowState === 'graded'
+
       if (isSubmitted) {
         const id = assignId(d)
         if (next[id] !== 'done') {
@@ -179,7 +217,9 @@ export default function AssignmentsPage() {
       const st = (effectiveKanban.status[id] || 'todo') as KanbanStatus
       col[st].push(d)
     }
-    ;(Object.keys(col) as KanbanStatus[]).forEach((k) => col[k].sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt))))
+    ;(Object.keys(col) as KanbanStatus[]).forEach((k) =>
+      col[k].sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt))),
+    )
     return col
   }, [allDue, effectiveKanban.status])
 
@@ -212,22 +252,36 @@ export default function AssignmentsPage() {
     }
 
     return {
-      todo: columns.todo.map(d => enrich(d, 'todo')),
-      doing: columns.doing.map(d => enrich(d, 'doing')),
-      done: columns.done.map(d => enrich(d, 'done')),
+      todo: columns.todo.map((d) => enrich(d, 'todo')),
+      doing: columns.doing.map((d) => enrich(d, 'doing')),
+      done: columns.done.map((d) => enrich(d, 'done')),
     }
   }, [columns])
 
   const [dragId, setDragId] = React.useState<string | null>(null)
-  const onDragStart = (e: React.DragEvent, id: string) => { setDragId(id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id) }
+  const onDragStart = (e: React.DragEvent, id: string) => {
+    setDragId(id)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', id)
+  }
   const onDragEnd = () => setDragId(null)
-  const onDropTo = (status: KanbanStatus) => (e: React.DragEvent) => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain') || dragId; if (id) setStatus(id, status); setDragId(null) }
-  const onDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }
+  const onDropTo = (status: KanbanStatus) => (e: React.DragEvent) => {
+    e.preventDefault()
+    const id = e.dataTransfer.getData('text/plain') || dragId
+    if (id) setStatus(id, status)
+    setDragId(null)
+  }
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
 
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="mt-0 mb-0 text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Assignments</h1>
+        <h1 className="mt-0 mb-0 text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+          Assignments
+        </h1>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-control ring-1 ring-black/10 dark:ring-white/10 overflow-hidden flex-shrink-0">
             <button
@@ -252,7 +306,9 @@ export default function AssignmentsPage() {
           >
             <option value="all">All Courses</option>
             {orderedCourses.map((c: any) => (
-              <option key={String(c.id)} value={String(c.id)}>{labelFor(c)}</option>
+              <option key={String(c.id)} value={String(c.id)}>
+                {labelFor(c)}
+              </option>
             ))}
           </select>
         </div>
@@ -260,11 +316,18 @@ export default function AssignmentsPage() {
 
       {view === 'kanban' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {([
-            { key: 'todo', label: 'To Do', icon: Clock, count: enrichedColumns.todo.length },
-            { key: 'doing', label: 'In Progress', icon: CircleDot, count: enrichedColumns.doing.length },
-            { key: 'done', label: 'Done', icon: Check, count: enrichedColumns.done.length },
-          ] as Array<{ key: KanbanStatus; label: string; icon: typeof Clock; count: number }>).map(({ key, label, icon: Icon, count }) => (
+          {(
+            [
+              { key: 'todo', label: 'To Do', icon: Clock, count: enrichedColumns.todo.length },
+              {
+                key: 'doing',
+                label: 'In Progress',
+                icon: CircleDot,
+                count: enrichedColumns.doing.length,
+              },
+              { key: 'done', label: 'Done', icon: Check, count: enrichedColumns.done.length },
+            ] as Array<{ key: KanbanStatus; label: string; icon: typeof Clock; count: number }>
+          ).map(({ key, label, icon: Icon, count }) => (
             <div
               key={key}
               onDragOver={onDragOver}
@@ -276,12 +339,18 @@ export default function AssignmentsPage() {
                   <Icon className="w-4 h-4 text-slate-500 dark:text-neutral-400" />
                   <span className="text-sm font-semibold">{label}</span>
                 </div>
-                <span className="text-xs text-slate-500 dark:text-neutral-400 bg-slate-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded-full">{count}</span>
+                <span className="text-xs text-slate-500 dark:text-neutral-400 bg-slate-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded-full">
+                  {count}
+                </span>
               </div>
               <div className="p-2 space-y-2">
                 {enrichedColumns[key].length === 0 && (
                   <div className="text-xs text-slate-400 dark:text-neutral-500 px-2 py-4 text-center">
-                    {key === 'todo' ? 'No pending items' : key === 'doing' ? 'Drag items here' : 'Completed items appear here'}
+                    {key === 'todo'
+                      ? 'No pending items'
+                      : key === 'doing'
+                        ? 'Drag items here'
+                        : 'Completed items appear here'}
                   </div>
                 )}
                 {enrichedColumns[key].map((d) => (
@@ -302,16 +371,28 @@ export default function AssignmentsPage() {
       )}
 
       {view === 'calendar' && (
-        <CalendarView items={allDue} onOpenCourse={actions.onOpenCourse} onOpenAssignment={(courseId, rid, title) => actions.onOpenAssignment(courseId, rid, title)} />
+        <CalendarView
+          items={allDue}
+          onOpenCourse={actions.onOpenCourse}
+          onOpenAssignment={(courseId, rid, title) =>
+            actions.onOpenAssignment(courseId, rid, title)
+          }
+        />
       )}
     </div>
   )
 }
 
-const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: string | number) => void; onOpenAssignment?: (courseId: string | number, assignmentRestId: string, title: string) => void }>
-  = ({ items, onOpenCourse, onOpenAssignment }) => {
+const CalendarView: React.FC<{
+  items: DueItem[]
+  onOpenCourse?: (courseId: string | number) => void
+  onOpenAssignment?: (courseId: string | number, assignmentRestId: string, title: string) => void
+}> = ({ items, onOpenCourse, onOpenAssignment }) => {
   const { courseImageUrl } = useCourseImages()
-  const [month, setMonth] = React.useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })
+  const [month, setMonth] = React.useState(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1)
+  })
   const [selectedDate, setSelectedDate] = React.useState<Date | null>(null)
 
   // Assignment hover popover
@@ -327,7 +408,8 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
   const goToToday = () => setMonth(new Date(today.getFullYear(), today.getMonth(), 1))
   const firstWeekday = startOfMonth.getDay()
   const daysInMonth = endOfMonth.getDate()
-  const isCurrentMonth = month.getFullYear() === today.getFullYear() && month.getMonth() === today.getMonth()
+  const isCurrentMonth =
+    month.getFullYear() === today.getFullYear() && month.getMonth() === today.getMonth()
 
   const byDate = React.useMemo(() => {
     const map = new Map<string, DueItem[]>()
@@ -337,16 +419,19 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
       if (!map.has(k)) map.set(k, [])
       map.get(k)!.push(it)
     }
-    for (const v of map.values()) v.sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
+    for (const v of map.values())
+      v.sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
     return map
   }, [items])
 
   // Get items in this month for mobile list view
   const itemsInMonth = React.useMemo(() => {
-    return items.filter((it) => {
-      const dt = new Date(it.dueAt)
-      return dt.getFullYear() === month.getFullYear() && dt.getMonth() === month.getMonth()
-    }).sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
+    return items
+      .filter((it) => {
+        const dt = new Date(it.dueAt)
+        return dt.getFullYear() === month.getFullYear() && dt.getMonth() === month.getMonth()
+      })
+      .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
   }, [items, month])
 
   // Group by date for mobile list
@@ -374,7 +459,8 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
 
   const cells: Array<{ date: Date | null }> = []
   for (let i = 0; i < firstWeekday; i++) cells.push({ date: null })
-  for (let d = 1; d <= daysInMonth; d++) cells.push({ date: new Date(month.getFullYear(), month.getMonth(), d) })
+  for (let d = 1; d <= daysInMonth; d++)
+    cells.push({ date: new Date(month.getFullYear(), month.getMonth(), d) })
 
   // Pad to complete the last week
   const remainder = cells.length % 7
@@ -407,7 +493,9 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="font-semibold text-slate-900 dark:text-slate-100 min-w-[140px] text-center">{monthLabel}</span>
+          <span className="font-semibold text-slate-900 dark:text-slate-100 min-w-[140px] text-center">
+            {monthLabel}
+          </span>
           <button
             onClick={nextMonth}
             className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-neutral-800 text-slate-600 dark:text-neutral-400"
@@ -429,8 +517,11 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
       <div className="hidden md:block rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 overflow-hidden">
         {/* Weekday headers */}
         <div className="grid grid-cols-7 border-b border-gray-200 dark:border-neutral-800">
-          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => (
-            <div key={d} className={`text-xs font-medium py-2 text-center ${i === 0 || i === 6 ? 'text-slate-400 dark:text-neutral-500' : 'text-slate-600 dark:text-neutral-400'}`}>
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, i) => (
+            <div
+              key={d}
+              className={`text-xs font-medium py-2 text-center ${i === 0 || i === 6 ? 'text-slate-400 dark:text-neutral-500' : 'text-slate-600 dark:text-neutral-400'}`}
+            >
               {d}
             </div>
           ))}
@@ -444,7 +535,10 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
 
             if (!date) {
               return (
-                <div key={idx} className={`min-h-[100px] p-1.5 border-b border-r border-gray-100 dark:border-neutral-800 ${isWeekend ? 'bg-slate-50/50 dark:bg-neutral-900/50' : ''}`} />
+                <div
+                  key={idx}
+                  className={`min-h-[100px] p-1.5 border-b border-r border-gray-100 dark:border-neutral-800 ${isWeekend ? 'bg-slate-50/50 dark:bg-neutral-900/50' : ''}`}
+                />
               )
             }
 
@@ -466,35 +560,46 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
                 }`}
               >
                 {/* Date number */}
-                <div className={`text-sm font-medium mb-1 ${
-                  isToday
-                    ? 'w-7 h-7 rounded-full bg-[var(--app-accent)] text-white flex items-center justify-center'
-                    : isPast
-                      ? 'text-slate-400 dark:text-neutral-500'
-                      : 'text-slate-700 dark:text-neutral-300'
-                }`}>
+                <div
+                  className={`text-sm font-medium mb-1 ${
+                    isToday
+                      ? 'w-7 h-7 rounded-full bg-[var(--app-accent)] text-white flex items-center justify-center'
+                      : isPast
+                        ? 'text-slate-400 dark:text-neutral-500'
+                        : 'text-slate-700 dark:text-neutral-300'
+                  }`}
+                >
                   {date.getDate()}
                 </div>
 
                 {/* Assignment items */}
                 <div className="space-y-0.5">
                   {list.slice(0, 3).map((it, i) => {
-                    const time = new Date(it.dueAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+                    const time = new Date(it.dueAt).toLocaleTimeString(undefined, {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })
                     const isOverdue = new Date(it.dueAt) < today
                     const assignmentInfo = {
-                      id: it.assignment_rest_id || extractIdFromUrl(it.htmlUrl, 'assignments') || `${it.course_id}:${it.name}`,
+                      id:
+                        it.assignment_rest_id ||
+                        extractIdFromUrl(it.htmlUrl, 'assignments') ||
+                        `${it.course_id}:${it.name}`,
                       name: it.name,
                       courseId: it.course_id,
                       courseName: it.course_name,
                       dueAt: it.dueAt,
                       pointsPossible: it.pointsPossible,
                       htmlUrl: it.htmlUrl,
-                      courseImageUrl: courseImageUrl(it.course_id)
+                      courseImageUrl: courseImageUrl(it.course_id),
                     }
                     return (
                       <div
                         key={i}
-                        onClick={(e) => { e.stopPropagation(); openItem(it) }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openItem(it)
+                        }}
                         onMouseEnter={(e) => handleMouseEnter(assignmentInfo, e)}
                         onMouseLeave={handleMouseLeave}
                         className={`group flex items-center gap-1 px-1 py-0.5 rounded text-[11px] cursor-pointer transition-colors ${
@@ -507,7 +612,9 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
                           className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                           style={{ backgroundColor: getCourseColor(it) }}
                         />
-                        <span className={`truncate flex-1 ${isOverdue ? 'text-red-700 dark:text-red-400' : 'text-slate-700 dark:text-neutral-300'}`}>
+                        <span
+                          className={`truncate flex-1 ${isOverdue ? 'text-red-700 dark:text-red-400' : 'text-slate-700 dark:text-neutral-300'}`}
+                        >
                           {it.name}
                         </span>
                         <span className="text-slate-400 dark:text-neutral-500 flex-shrink-0 hidden group-hover:inline">
@@ -533,7 +640,11 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
         <div className="hidden md:block rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 overflow-hidden">
           <div className="px-3 py-2 border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between">
             <span className="font-semibold text-sm">
-              {selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+              {selectedDate.toLocaleDateString(undefined, {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+              })}
             </span>
             <button
               onClick={() => setSelectedDate(null)}
@@ -544,7 +655,10 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
           </div>
           <div className="divide-y divide-gray-100 dark:divide-neutral-800">
             {selectedDateItems.map((it, i) => {
-              const time = new Date(it.dueAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+              const time = new Date(it.dueAt).toLocaleTimeString(undefined, {
+                hour: 'numeric',
+                minute: '2-digit',
+              })
               const isOverdue = new Date(it.dueAt) < today
               return (
                 <div
@@ -559,14 +673,23 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
                     className="w-8 h-8 rounded-full ring-1 ring-black/10 dark:ring-white/10 flex-shrink-0"
                   />
                   <div className="min-w-0 flex-1">
-                    <div className={`font-medium text-sm ${isOverdue ? 'text-red-700 dark:text-red-400' : ''}`}>
+                    <div
+                      className={`font-medium text-sm ${isOverdue ? 'text-red-700 dark:text-red-400' : ''}`}
+                    >
                       {it.name}
                     </div>
                     <div className="text-xs text-slate-500 dark:text-neutral-400 flex items-center gap-1.5">
                       <span>{it.course_name}</span>
                       <span>·</span>
-                      <span className={isOverdue ? 'text-red-600 dark:text-red-400' : ''}>{time}</span>
-                      {it.pointsPossible ? <><span>·</span><span>{it.pointsPossible} pts</span></> : null}
+                      <span className={isOverdue ? 'text-red-600 dark:text-red-400' : ''}>
+                        {time}
+                      </span>
+                      {it.pointsPossible ? (
+                        <>
+                          <span>·</span>
+                          <span>{it.pointsPossible} pts</span>
+                        </>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -581,7 +704,9 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
         {groupedByDate.length === 0 && (
           <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-4 text-center">
             <Calendar className="w-8 h-8 text-slate-300 dark:text-neutral-600 mx-auto mb-2" />
-            <div className="text-sm text-slate-500 dark:text-neutral-400">No assignments this month</div>
+            <div className="text-sm text-slate-500 dark:text-neutral-400">
+              No assignments this month
+            </div>
           </div>
         )}
         {groupedByDate.map(({ date, items: dayItems }, gi) => {
@@ -589,20 +714,31 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
           const isPastDate = date < today && !isDateToday
           return (
             <div key={gi}>
-              <div className={`text-xs font-semibold mb-1.5 px-1 flex items-center gap-2 ${
-                isDateToday
-                  ? 'text-[var(--app-accent)]'
-                  : isPastDate
-                    ? 'text-slate-400 dark:text-neutral-500'
-                    : 'text-slate-600 dark:text-neutral-300'
-              }`}>
-                {isDateToday && <span className="w-1.5 h-1.5 rounded-full bg-[var(--app-accent)]" />}
-                {date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+              <div
+                className={`text-xs font-semibold mb-1.5 px-1 flex items-center gap-2 ${
+                  isDateToday
+                    ? 'text-[var(--app-accent)]'
+                    : isPastDate
+                      ? 'text-slate-400 dark:text-neutral-500'
+                      : 'text-slate-600 dark:text-neutral-300'
+                }`}
+              >
+                {isDateToday && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--app-accent)]" />
+                )}
+                {date.toLocaleDateString(undefined, {
+                  weekday: 'long',
+                  month: 'short',
+                  day: 'numeric',
+                })}
                 {isDateToday && <span className="text-[10px] uppercase tracking-wide">Today</span>}
               </div>
               <div className="space-y-2">
                 {dayItems.map((it, i) => {
-                  const time = new Date(it.dueAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+                  const time = new Date(it.dueAt).toLocaleTimeString(undefined, {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })
                   const isOverdue = new Date(it.dueAt) < today
                   return (
                     <div
@@ -610,7 +746,12 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
                       role="button"
                       tabIndex={0}
                       onClick={() => openItem(it)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openItem(it) } }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          openItem(it)
+                        }
+                      }}
                       className={`rounded-card ring-1 bg-white/70 dark:bg-neutral-900/70 px-3 py-2.5 cursor-pointer transition-all ${
                         isOverdue
                           ? 'ring-red-200 dark:ring-red-900/50 hover:ring-red-300 dark:hover:ring-red-800'
@@ -623,16 +764,29 @@ const CalendarView: React.FC<{ items: DueItem[]; onOpenCourse?: (courseId: strin
                           style={{ backgroundColor: getCourseColor(it) }}
                         />
                         <div className="min-w-0 flex-1">
-                          <div className={`font-medium text-sm ${isOverdue ? 'text-red-700 dark:text-red-400' : ''}`} title={it.name}>
+                          <div
+                            className={`font-medium text-sm ${isOverdue ? 'text-red-700 dark:text-red-400' : ''}`}
+                            title={it.name}
+                          >
                             {it.name}
                           </div>
                           <div className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 flex items-center gap-1.5">
-                            <span className="truncate">{it.course_name || String(it.course_id)}</span>
-                            <span>·</span>
-                            <span className={`flex-shrink-0 ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : ''}`}>
-                              {isOverdue && 'Overdue · '}{time}
+                            <span className="truncate">
+                              {it.course_name || String(it.course_id)}
                             </span>
-                            {it.pointsPossible ? <><span>·</span><span className="flex-shrink-0">{it.pointsPossible} pts</span></> : null}
+                            <span>·</span>
+                            <span
+                              className={`flex-shrink-0 ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : ''}`}
+                            >
+                              {isOverdue && 'Overdue · '}
+                              {time}
+                            </span>
+                            {it.pointsPossible ? (
+                              <>
+                                <span>·</span>
+                                <span className="flex-shrink-0">{it.pointsPossible} pts</span>
+                              </>
+                            ) : null}
                           </div>
                         </div>
                       </div>

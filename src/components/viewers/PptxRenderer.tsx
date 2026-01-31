@@ -58,7 +58,7 @@ const PptxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDo
       if (!data || !data.type) return
 
       switch (data.type) {
-        case 'READY':
+        case 'READY': {
           setViewerState((prev) => ({ ...prev, isReady: true }))
           // Send theme when ready
           const isDark = document.documentElement.classList.contains('dark')
@@ -74,6 +74,7 @@ const PptxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDo
             lastLoadedUrlRef.current = url
           }
           break
+        }
 
         case 'LOADING_STARTED':
           setViewerState((prev) => ({ ...prev, isLoading: true, error: null }))

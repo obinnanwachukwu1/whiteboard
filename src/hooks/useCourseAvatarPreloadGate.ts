@@ -7,7 +7,10 @@ type Options = {
   once?: boolean
 }
 
-export function useCourseAvatarPreloadGate(courseIds: Array<string | number | undefined | null>, opts: Options = {}) {
+export function useCourseAvatarPreloadGate(
+  courseIds: Array<string | number | undefined | null>,
+  opts: Options = {},
+) {
   const enabled = opts.enabled ?? true
   const once = opts.once ?? true
   const { prefetchCourseImage } = useCourseImages()
@@ -39,14 +42,15 @@ export function useCourseAvatarPreloadGate(courseIds: Array<string | number | un
     }
     if (once && everReadyRef.current) {
       // Warm any newly requested IDs in the background.
-      uniqIds.forEach((id) => { prefetchCourseImage(id).catch(() => {}) })
+      uniqIds.forEach((id) => {
+        prefetchCourseImage(id).catch(() => {})
+      })
       setReady(true)
       return
     }
 
     let cancelled = false
     setReady(false)
-
     ;(async () => {
       const res = await Promise.allSettled(uniqIds.map((id) => prefetchCourseImage(id)))
       const urls = res
@@ -67,7 +71,6 @@ export function useCourseAvatarPreloadGate(courseIds: Array<string | number | un
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, enabled, once])
 
   return ready
