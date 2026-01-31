@@ -1,9 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useLayoutEffect, useState } from 'react'
 import { courseHueFor } from '../utils/colorHelpers'
-
-// Module-level cache of URLs that have been successfully loaded
-// This prevents flickering when components remount or lists re-render
-const loadedUrls = new Set<string>()
+import { isImagePreloaded, markImagePreloaded, preloadImage } from '../utils/imagePreload'
 
 type Props = {
   courseId: string | number
@@ -15,14 +12,29 @@ type Props = {
 }
 
 export const CourseAvatar: React.FC<Props> = ({ courseId, courseName, src, className = '', style, size }) => {
-  // Check if this URL has already been loaded (from cache or previous render)
-  const isAlreadyLoaded = src ? loadedUrls.has(src) : false
-  const [loaded, setLoaded] = useState(isAlreadyLoaded)
+  const [loaded, setLoaded] = useState(() => (src ? isImagePreloaded(src) : false))
 
   // Deterministic color generation
   const hVal = courseHueFor(courseId, courseName || String(courseId))
   const hue = Number.isFinite(hVal) ? hVal : 0
   const fallback = `linear-gradient(135deg, hsl(${hue}, 75%, 62%), hsl(${(hue + 24) % 360}, 85%, 50%))`
+
+  // Best-effort sync check before paint (helps avoid first-frame fallback when cached)
+  useLayoutEffect(() => {
+    if (!src) return
+
+    if (isImagePreloaded(src)) {
+      if (!loaded) setLoaded(true)
+      return
+    }
+
+    const img = new Image()
+    img.src = src
+    if (img.complete && img.naturalWidth > 0) {
+      markImagePreloaded(src)
+      if (!loaded) setLoaded(true)
+    }
+  }, [src, loaded])
 
   useEffect(() => {
     if (!src) {
@@ -30,34 +42,22 @@ export const CourseAvatar: React.FC<Props> = ({ courseId, courseName, src, class
       return
     }
 
-    // If already in our cache, mark as loaded immediately
-    if (loadedUrls.has(src)) {
+    if (isImagePreloaded(src)) {
       setLoaded(true)
       return
     }
 
-    // Check if browser has it cached (complete = true means already loaded)
-    const img = new Image()
-    img.src = src
-
-    if (img.complete && img.naturalWidth > 0) {
-      // Image is already cached by browser
-      loadedUrls.add(src)
-      setLoaded(true)
-      return
-    }
-
-    // Otherwise wait for load
+    let cancelled = false
     setLoaded(false)
-    img.onload = () => {
-      loadedUrls.add(src)
-      setLoaded(true)
-    }
-    img.onerror = () => setLoaded(false)
-
+    preloadImage(src)
+      .then(() => {
+        if (!cancelled) setLoaded(true)
+      })
+      .catch(() => {
+        if (!cancelled) setLoaded(false)
+      })
     return () => {
-      img.onload = null
-      img.onerror = null
+      cancelled = true
     }
   }, [src])
 
@@ -80,7 +80,6 @@ export const CourseAvatar: React.FC<Props> = ({ courseId, courseName, src, class
           className={`absolute inset-0 w-full h-full object-cover ${
             loaded ? 'opacity-100' : 'opacity-0'
           }`}
-          style={{ transition: loaded ? 'none' : 'opacity 200ms ease-out' }}
         />
       )}
     </div>
