@@ -17,6 +17,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { Readable } from 'node:stream'
+import { canvasFileUrlToPath, fileUrlToPathSafe, normalizeWin32Path } from './pathUtils'
 
 import {
   initCanvas,
@@ -86,7 +87,7 @@ app.on('web-contents-created', (_event, contents) => {
       } else if (parsed.protocol === 'file:') {
         // Restrict file:// to app bundle
         // Normalize paths for comparison
-        const targetPath = path.resolve(fileURLToPath(url))
+        const targetPath = path.resolve(fileUrlToPathSafe(url))
         if (targetPath.startsWith(RENDERER_DIST)) {
           isAllowed = true
         }
@@ -397,7 +398,7 @@ function getPreloadPath(): string {
 function createWindow() {
   const icon = getIconPath()
   // Determine initial background color based on saved theme to prevent flash
-  const savedTheme = appConfig?.theme
+  const savedTheme = appConfig?.themeConfig?.theme ?? appConfig?.theme
   const isDark = savedTheme === 'dark' || (!savedTheme && process.platform === 'darwin')
   const bgColor = isDark ? '#020617' : '#ffffff' // slate-950 for dark, white for light
 
@@ -571,6 +572,27 @@ function createWindow() {
     win.loadFile(path.join(RENDERER_DIST, 'index.html'), { hash: '/dashboard' })
   }
 }
+
+// Windows: allow renderer to update caption button color when theme changes.
+ipcMain.handle(
+  'window:setTitleBarOverlayTheme',
+  async (event, opts: { isDark: boolean }): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      if (process.platform !== 'win32') return { ok: false, error: 'Unsupported platform' }
+      const senderWin = BrowserWindow.fromWebContents(event.sender)
+      if (!senderWin) return { ok: false, error: 'No window' }
+
+      senderWin.setTitleBarOverlay({
+        color: '#00000000',
+        symbolColor: opts?.isDark ? '#ffffff' : '#000000',
+        height: 56,
+      })
+      return { ok: true }
+    } catch (e: any) {
+      return { ok: false, error: String(e?.message || e) }
+    }
+  },
+)
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -767,11 +789,10 @@ app.whenReady().then(async () => {
         normalized = normalized.replace(/^canvas-file:\/\/+/, 'canvas-file:///')
       }
 
-      const fileUrl = normalized.replace(/^canvas-file:/, 'file:')
-      const filePath = fileURLToPath(fileUrl)
+      const filePath = canvasFileUrlToPath(normalized)
 
       // Security check: resolve to absolute path and verify it's in temp directory
-      const tempDir = await fs.promises.realpath(app.getPath('temp'))
+      const tempDir = await fs.promises.realpath(normalizeWin32Path(app.getPath('temp')))
       const resolvedPath = await fs.promises.realpath(path.resolve(filePath))
 
       const rel = path.relative(tempDir, resolvedPath)
@@ -2211,7 +2232,7 @@ const ALLOWED_IMAGE_TYPES = ['.jpg', '.jpeg', '.png', '.webp']
 
 // Get the theme backgrounds directory (in app temp)
 function getThemeBackgroundsDir(): string {
-  const tempDir = app.getPath('temp')
+  const tempDir = normalizeWin32Path(app.getPath('temp'))
   const bgDir = path.join(tempDir, THEME_BACKGROUNDS_DIR)
   if (!fs.existsSync(bgDir)) {
     fs.mkdirSync(bgDir, { recursive: true })
@@ -2320,7 +2341,7 @@ ipcMain.handle(
       }
 
       const fileUrl = imageUrl.replace(/^canvas-file:/, 'file:')
-      const filePath = fileURLToPath(fileUrl)
+      const filePath = fileUrlToPathSafe(fileUrl)
 
       // Security: ensure file is in theme backgrounds directory
       const bgDir = getThemeBackgroundsDir()

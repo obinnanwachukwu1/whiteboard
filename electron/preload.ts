@@ -369,6 +369,8 @@ if (process.isMainFrame) {
   contextBridge.exposeInMainWorld('platform', {
     isMac: process.platform === 'darwin',
     isWindows: process.platform === 'win32',
+    setTitleBarOverlayTheme: (opts: { isDark: boolean }) =>
+      ipcRenderer.invoke('window:setTitleBarOverlayTheme', opts),
   })
 
   // Tag the <html> or <body> so renderer CSS can adjust spacing for traffic lights

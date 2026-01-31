@@ -89,12 +89,43 @@ export class EmbeddingManager extends EventEmitter {
 
       console.log('[EmbeddingManager] Loading ONNX model...')
 
-      // Use CoreML on macOS (leverages Neural Engine/GPU), with CPU fallback
-      // CoreML dramatically reduces CPU usage and heat on Apple Silicon
-      const isMac = process.platform === 'darwin'
-      const executionProviders = isMac
-        ? ['coreml', 'cpu']  // CoreML first, CPU fallback
-        : ['cpu']
+      // Prefer an accelerator EP where available, with CPU fallback.
+      // - macOS: CoreML (Neural Engine/GPU)
+      // - Windows: DirectML (GPU via D3D12 across NVIDIA/AMD/Intel)
+      // - Linux: typically CUDA/ROCm/OpenVINO depending on build; if not bundled, CPU.
+      const supportedBackends = (() => {
+        try {
+          return ort.listSupportedBackends?.().map((b) => b.name) ?? []
+        } catch {
+          return []
+        }
+      })()
+      const supported = new Set(supportedBackends)
+
+      // Optional override for debugging/experiments. Examples: "dml", "coreml", "cuda", "cpu".
+      const requested = (process.env.WB_ONNX_EP || '').trim().toLowerCase()
+
+      const executionProviders: string[] = []
+      if (requested) {
+        if (requested === 'cpu' || supported.has(requested)) {
+          executionProviders.push(requested)
+        } else {
+          console.warn(
+            `[EmbeddingManager] Requested EP "${requested}" not available; supported: ${supportedBackends.join(', ') || '(unknown)'}`,
+          )
+        }
+      }
+
+      if (!executionProviders.length) {
+        if (process.platform === 'darwin' && supported.has('coreml')) {
+          executionProviders.push('coreml')
+        } else if (process.platform === 'win32' && supported.has('dml')) {
+          executionProviders.push('dml')
+        }
+      }
+
+      // Always keep CPU as a safe fallback.
+      if (!executionProviders.includes('cpu')) executionProviders.push('cpu')
 
       console.log(`[EmbeddingManager] Using execution providers: ${executionProviders.join(', ')}`)
 

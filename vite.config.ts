@@ -100,7 +100,7 @@ export default defineConfig(({ command }) => {
   return {
     base: isDev ? '/' : './',
     test: {
-      include: ['src/**/*.test.{ts,tsx}'],
+      include: ['src/**/*.test.{ts,tsx}', 'electron/**/*.test.{ts,tsx}'],
       exclude: ['native/**', 'dist/**', 'dist-electron/**', 'release/**', 'node_modules/**'],
     },
     optimizeDeps: {

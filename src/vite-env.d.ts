@@ -260,6 +260,10 @@ declare global {
     platform: {
       isMac: boolean
       isWindows: boolean
+      setTitleBarOverlayTheme: (opts: { isDark: boolean }) => Promise<{
+        ok: boolean
+        error?: string
+      }>
     }
   }
 }

@@ -6,6 +6,7 @@ import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { createWriteStream } from 'node:fs'
 import { Readable } from 'node:stream'
+import { normalizeWin32Path } from './pathUtils'
 
 // Uploads: use node-friendly multipart form
 // (Types provided via a local d.ts in electron/form-data.d.ts)
@@ -755,7 +756,7 @@ export class CanvasClient {
     const url = meta.url
     if (!url) throw new Error('No file URL available')
 
-    const tempDir = app.getPath('temp')
+    const tempDir = normalizeWin32Path(app.getPath('temp'))
     // Sanitize filename to avoid directory traversal
     const safeName = (meta.filename || `file-${fileId}`).replace(/[^a-zA-Z0-9.-]/g, '_')
     const destPath = path.join(tempDir, `canvas-${fileId}-${safeName}`)
@@ -770,7 +771,7 @@ export class CanvasClient {
   }
 
   async downloadCourseImage(courseId: string | number, imageUrl: string): Promise<string> {
-    const tempDir = app.getPath('temp')
+    const tempDir = normalizeWin32Path(app.getPath('temp'))
     // Create a stable filename for the course image so we can cache it
     const ext = path.extname(new URL(imageUrl).pathname) || '.jpg'
     const destPath = path.join(tempDir, `course-image-${courseId}${ext}`)

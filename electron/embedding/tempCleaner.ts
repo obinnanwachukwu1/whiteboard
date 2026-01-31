@@ -4,6 +4,7 @@
 import { app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
+import { normalizeWin32Path } from '../pathUtils'
 
 const CANVAS_FILE_PREFIX = 'canvas-'
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
@@ -19,7 +20,7 @@ export async function cleanupTempFiles(): Promise<{
   errors: number
   totalBytes: number
 }> {
-  const tempDir = app.getPath('temp')
+  const tempDir = normalizeWin32Path(app.getPath('temp'))
   const now = Date.now()
   let deleted = 0
   let errors = 0
@@ -79,7 +80,7 @@ export async function getTempFileStats(): Promise<{
   oldestMs: number | null
   newestMs: number | null
 }> {
-  const tempDir = app.getPath('temp')
+  const tempDir = normalizeWin32Path(app.getPath('temp'))
   const now = Date.now()
   let count = 0
   let totalBytes = 0

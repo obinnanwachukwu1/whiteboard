@@ -5,6 +5,7 @@ import { useAppFlags, useAppSettings } from '../../context/AppContext'
 export function FeaturesSettings() {
   const { embeddingsEnabled, aiEnabled } = useAppFlags()
   const { setEmbeddingsEnabled, setAiEnabled } = useAppSettings()
+  const isMac = window.platform?.isMac ?? false
 
   return (
     <SettingsSection title="Features">
@@ -18,17 +19,19 @@ export function FeaturesSettings() {
         />
       </SettingsRow>
 
-      <SettingsRow
-        label="Apple Intelligence"
-        description="Local AI features (macOS 26.1+). Runs on-device."
-        disabled={!embeddingsEnabled}
-      >
-        <Toggle
-          checked={aiEnabled}
-          onChange={(checked) => setAiEnabled(checked).catch(() => {})}
+      {isMac ? (
+        <SettingsRow
+          label="Apple Intelligence"
+          description="Local AI features (macOS 26.1+). Runs on-device."
           disabled={!embeddingsEnabled}
-        />
-      </SettingsRow>
+        >
+          <Toggle
+            checked={aiEnabled}
+            onChange={(checked) => setAiEnabled(checked).catch(() => {})}
+            disabled={!embeddingsEnabled}
+          />
+        </SettingsRow>
+      ) : null}
     </SettingsSection>
   )
 }

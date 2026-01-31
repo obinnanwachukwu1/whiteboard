@@ -225,11 +225,23 @@ export function RootLayout() {
       const detail = (e as CustomEvent<ThemeSettings>).detail
       if (detail) {
         setThemeSettings(detail)
+        // Windows caption buttons: switch symbols to white on dark theme.
+        if (window.platform?.isWindows) {
+          window.platform
+            .setTitleBarOverlayTheme({ isDark: detail.theme === 'dark' })
+            .catch(() => {})
+        }
       }
     }
     window.addEventListener('theme-settings-changed', handler)
     return () => window.removeEventListener('theme-settings-changed', handler)
   }, [])
+
+  // Also apply on first mount so the initial buttons match the current theme.
+  useEffect(() => {
+    if (!window.platform?.isWindows) return
+    window.platform.setTitleBarOverlayTheme({ isDark: themeSettings.theme === 'dark' }).catch(() => {})
+  }, [themeSettings.theme])
 
   // After we know the user, load/migrate any per-user sidebar + settings
   useEffect(() => {
