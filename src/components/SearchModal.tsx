@@ -345,7 +345,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       <div
         className="relative w-full max-w-xl mx-4 bg-white dark:bg-neutral-900 rounded-xl shadow-2xl ring-1 ring-black/10 dark:ring-white/10 overflow-hidden animate-in fade-in zoom-in-95 duration-150"

@@ -1,3 +1,5 @@
+import './wdyr'
+
 // Polyfill URL.parse for older Chromium versions (Electron 30 uses Chrome 124, URL.parse added in Chrome 126)
 // This is needed by pdfjs-dist v5.x
 if (typeof URL.parse !== 'function') {

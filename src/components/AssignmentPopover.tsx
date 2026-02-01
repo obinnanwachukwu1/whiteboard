@@ -173,7 +173,7 @@ export const AssignmentPopover: React.FC<Props> = ({
         bg-white dark:bg-neutral-900
         rounded-xl shadow-2xl overflow-hidden
         border border-slate-200 dark:border-neutral-800
-        transition-all duration-150 ease-out pointer-events-auto
+        transition-[opacity,transform] duration-150 ease-out pointer-events-auto
         ${isOpen ? 'opacity-100 translate-y-0 scale-100 animate-pop' : 'opacity-0 translate-y-1 scale-95 pointer-events-none'}
       `}
       style={style}

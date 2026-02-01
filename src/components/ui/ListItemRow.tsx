@@ -52,7 +52,7 @@ export const ListItemRow: React.FC<Props> = ({
   const { style: restStyle, ...restProps } = rest
 
   const mergedStyle = React.useMemo(() => {
-    return { ...(restStyle || {}), ...((interactiveProps as any)?.style || {}), willChange: 'transform' } as React.CSSProperties
+    return { ...(restStyle || {}), ...((interactiveProps as any)?.style || {}) } as React.CSSProperties
   }, [restStyle, interactiveProps])
   const mergedOnClick = useCallback((e: MouseEvent<HTMLDivElement>) => {
     interactiveProps?.onClick?.(e)
@@ -83,11 +83,10 @@ export const ListItemRow: React.FC<Props> = ({
         style={mergedStyle}
         className={`
           group cursor-pointer flex items-center justify-between gap-3 ring-1
-          transition-[transform,box-shadow,background-color,border-color] duration-200 ease-out relative
-          transform-gpu
+          transition-colors duration-150 ease-out relative
           ${active || menuOpen 
-            ? `${density === 'compact' ? 'scale-[1.005]' : 'scale-[1.01]'} shadow-sm ring-[var(--app-accent-hover)] bg-[var(--app-accent-bg)]` 
-            : `ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 hover:${density === 'compact' ? 'scale-[1.005]' : 'scale-[1.01]'} hover:shadow-sm hover:ring-[var(--app-accent-hover)] hover:bg-[var(--app-accent-bg)]`
+            ? `ring-[var(--app-accent-hover)] bg-[var(--app-accent-bg)]` 
+            : `ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 hover:ring-[var(--app-accent-hover)] hover:bg-[var(--app-accent-bg)]`
           }
           ${density === 'compact' ? 'rounded-lg px-2 py-1.5' : 'rounded-card px-3 py-2'}
           ${interactiveProps?.className || ''}

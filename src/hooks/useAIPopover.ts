@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 
 type UseAIPopoverOptions = {
   enabled: boolean
@@ -16,31 +16,44 @@ export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverO
   const [showPopover, setShowPopover] = useState(false)
   const isHoveredRef = useRef(false)
   const [cursorPos, setCursorPos] = useState<{x: number, y: number} | null>(null)
+  const cursorPosRef = useRef<{x: number, y: number} | null>(null)
   const [text, setText] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const textRef = useRef<string | null>(null)
+  const loadingRef = useRef(false)
 
   const streamCleanupRef = useRef<(() => void) | null>(null)
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Store onGenerate in a ref so it doesn't reset the hover timer on every render
   const onGenerateRef = useRef(onGenerate)
   onGenerateRef.current = onGenerate
 
+  const setTextState = useCallback((next: string | null) => {
+    textRef.current = next
+    setText(next)
+  }, [])
+
+  const setLoadingState = useCallback((next: boolean) => {
+    loadingRef.current = next
+    setLoading(next)
+  }, [])
+
   const startGeneration = useCallback(() => {
     // Start generation if not already done/doing
-    if (!text && !loading) {
-      setLoading(true)
+    if (!textRef.current && !loadingRef.current) {
+      setLoadingState(true)
       const result = onGenerateRef.current((newText) => {
-        setText(newText)
+        setTextState(newText)
       })
 
       if (result === false) {
-        setLoading(false)
+        setLoadingState(false)
       } else if (typeof result === 'function') {
         streamCleanupRef.current = result
       }
     }
-  }, [text, loading])
+  }, [setLoadingState, setTextState])
 
   const handleMouseEnter = useCallback((e: React.MouseEvent) => {
     if (hoverTimeoutRef.current) {
@@ -48,15 +61,17 @@ export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverO
       hoverTimeoutRef.current = null
     }
     isHoveredRef.current = true
-    
-    // Only capture position if we are not already showing
+
     if (!showPopover) {
-      setCursorPos({ x: e.clientX, y: e.clientY })
+      cursorPosRef.current = { x: e.clientX, y: e.clientY }
     }
 
     if (enabled) {
       hoverTimeoutRef.current = setTimeout(() => {
         if (isHoveredRef.current) {
+          if (!showPopover) {
+            setCursorPos(cursorPosRef.current)
+          }
           setShowPopover(true)
           startGeneration()
         }
@@ -66,7 +81,7 @@ export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverO
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!showPopover) {
-      setCursorPos({ x: e.clientX, y: e.clientY })
+      cursorPosRef.current = { x: e.clientX, y: e.clientY }
     }
   }, [showPopover])
 
@@ -80,29 +95,31 @@ export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverO
     hoverTimeoutRef.current = setTimeout(() => {
       isHoveredRef.current = false
       setShowPopover(false)
+      setCursorPos(null)
       
       // Cleanup stream
       if (streamCleanupRef.current) {
         streamCleanupRef.current()
         streamCleanupRef.current = null
       }
-      setLoading(false)
-      setText(null)
+      setLoadingState(false)
+      setTextState(null)
     }, 100)
-  }, [])
+  }, [setLoadingState, setTextState])
 
   // Force close if disabled
   useEffect(() => {
     if (!enabled && showPopover) {
       setShowPopover(false)
+      setCursorPos(null)
       if (streamCleanupRef.current) {
         streamCleanupRef.current()
         streamCleanupRef.current = null
       }
-      setLoading(false)
-      setText(null)
+      setLoadingState(false)
+      setTextState(null)
     }
-  }, [enabled, showPopover])
+  }, [enabled, showPopover, setLoadingState, setTextState])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -113,11 +130,11 @@ export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverO
   }, [])
 
   return {
-    triggerProps: {
+    triggerProps: useMemo(() => ({
       onMouseEnter: handleMouseEnter,
       onMouseMove: handleMouseMove,
       onMouseLeave: handleMouseLeave,
-    },
+    }), [handleMouseEnter, handleMouseMove, handleMouseLeave]),
     popoverProps: {
       position: cursorPos,
       isOpen: showPopover,

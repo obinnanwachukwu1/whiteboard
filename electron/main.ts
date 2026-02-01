@@ -36,6 +36,7 @@ import type { SearchResult } from './embedding/vectorStore'
 import { FileMetaStore } from './embedding/fileMetaStore'
 import { cleanupTempFiles } from './embedding/tempCleaner'
 import { registerIndexingIPC } from './embedding/indexingService'
+import installExtension, { REACT_DEVELOPER_TOOLS } from 'electron-devtools-installer'
 
 const aiManager = new AIManager()
 const embeddingManager = new EmbeddingManager()
@@ -771,6 +772,16 @@ app.whenReady().then(async () => {
     return false
   })
 
+  // Install React DevTools in development
+  if (VITE_DEV_SERVER_URL) {
+    try {
+      await installExtension(REACT_DEVELOPER_TOOLS)
+      console.log('React DevTools installed')
+    } catch (err) {
+      console.error('Failed to install React DevTools:', err)
+    }
+  }
+
   createAppMenu()
 
   // load config and create window
@@ -780,7 +791,7 @@ app.whenReady().then(async () => {
   aiManager.start(!!appConfig.aiEnabled)
 
   // Register custom protocol for secure file serving
-  // SECURITY: Only allow access to files in the temp directory
+  // SECURITY: Only allow access to files in temp or theme backgrounds dir
   protocol.handle('canvas-file', async (req) => {
     try {
       // Normalize to ensure we always have canvas-file:///path (no host component)
@@ -791,26 +802,36 @@ app.whenReady().then(async () => {
 
       const filePath = canvasFileUrlToPath(normalized)
 
-      // Security check: resolve to absolute path and verify it's in temp directory
+      const resolvedPath = path.resolve(filePath)
+      if (!fs.existsSync(resolvedPath)) {
+        return new Response('Not Found', { status: 404, headers: { 'Content-Type': 'text/plain' } })
+      }
+
+      // Security check: resolve to absolute path and verify it's allowed
+      const resolvedReal = await fs.promises.realpath(resolvedPath)
       const tempDir = await fs.promises.realpath(normalizeWin32Path(app.getPath('temp')))
-      const resolvedPath = await fs.promises.realpath(path.resolve(filePath))
+      const themeDir = await fs.promises.realpath(getThemeBackgroundsDir())
+      const legacyDir = getThemeBackgroundsLegacyDir()
+      const legacyReal = fs.existsSync(legacyDir) ? await fs.promises.realpath(legacyDir) : null
 
-      const rel = path.relative(tempDir, resolvedPath)
-      const isSub = rel && !rel.startsWith('..') && !path.isAbsolute(rel)
+      const allowed =
+        isPathInDir(tempDir, resolvedReal) ||
+        isPathInDir(themeDir, resolvedReal) ||
+        (legacyReal ? isPathInDir(legacyReal, resolvedReal) : false)
 
-      if (!isSub) {
-        console.warn(`[Security] Blocked access to file outside temp dir: ${resolvedPath}`)
-        return new Response('Forbidden: Access denied to files outside temp directory', {
+      if (!allowed) {
+        console.warn(`[Security] Blocked access to file outside allowed dirs: ${resolvedReal}`)
+        return new Response('Forbidden: Access denied to files outside allowed directories', {
           status: 403,
           headers: { 'Content-Type': 'text/plain' },
         })
       }
 
       // Support Range requests (required for video/audio streaming + seeking, and for PDF.js range reads)
-      const stat = await fs.promises.stat(resolvedPath)
+      const stat = await fs.promises.stat(resolvedReal)
       const size = stat.size
 
-      const ext = path.extname(resolvedPath).toLowerCase()
+      const ext = path.extname(resolvedReal).toLowerCase()
       const contentType = (() => {
         switch (ext) {
           case '.pdf':
@@ -890,7 +911,7 @@ app.whenReady().then(async () => {
           return new Response(null, { status: 206, headers })
         }
 
-        const stream = fs.createReadStream(resolvedPath, { start, end })
+        const stream = fs.createReadStream(resolvedReal, { start, end })
         return new Response(Readable.toWeb(stream) as any, { status: 206, headers })
       }
 
@@ -900,7 +921,7 @@ app.whenReady().then(async () => {
         return new Response(null, { status: 200, headers })
       }
 
-      const stream = fs.createReadStream(resolvedPath)
+      const stream = fs.createReadStream(resolvedReal)
       return new Response(Readable.toWeb(stream) as any, { status: 200, headers })
     } catch (e) {
       console.error(`[canvas-file] Error handling request: ${req.url}`, e)
@@ -2230,14 +2251,25 @@ const THEME_BACKGROUNDS_DIR = 'theme-backgrounds'
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_IMAGE_TYPES = ['.jpg', '.jpeg', '.png', '.webp']
 
-// Get the theme backgrounds directory (in app temp)
+// Get the theme backgrounds directory (persisted under userData)
 function getThemeBackgroundsDir(): string {
-  const tempDir = normalizeWin32Path(app.getPath('temp'))
-  const bgDir = path.join(tempDir, THEME_BACKGROUNDS_DIR)
+  const userDir = normalizeWin32Path(app.getPath('userData'))
+  const bgDir = path.join(userDir, THEME_BACKGROUNDS_DIR)
   if (!fs.existsSync(bgDir)) {
     fs.mkdirSync(bgDir, { recursive: true })
   }
   return bgDir
+}
+
+// Legacy location (temp) for backward compatibility
+function getThemeBackgroundsLegacyDir(): string {
+  const tempDir = normalizeWin32Path(app.getPath('temp'))
+  return path.join(tempDir, THEME_BACKGROUNDS_DIR)
+}
+
+function isPathInDir(baseDir: string, targetPath: string) {
+  const rel = path.relative(baseDir, targetPath)
+  return rel && !rel.startsWith('..') && !path.isAbsolute(rel)
 }
 
 ipcMain.handle(
@@ -2343,10 +2375,12 @@ ipcMain.handle(
       const fileUrl = imageUrl.replace(/^canvas-file:/, 'file:')
       const filePath = fileUrlToPathSafe(fileUrl)
 
-      // Security: ensure file is in theme backgrounds directory
+      // Security: ensure file is in theme backgrounds directory (current or legacy)
       const bgDir = getThemeBackgroundsDir()
+      const legacyDir = getThemeBackgroundsLegacyDir()
       const resolvedPath = path.resolve(filePath)
-      if (!resolvedPath.startsWith(bgDir)) {
+      const allowed = isPathInDir(bgDir, resolvedPath) || isPathInDir(legacyDir, resolvedPath)
+      if (!allowed) {
         return { ok: false, error: 'Cannot delete file outside theme backgrounds directory' }
       }
 

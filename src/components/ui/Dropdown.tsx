@@ -69,7 +69,7 @@ export const Dropdown: React.FC<Props> = ({ open, onOpenChange, children, align 
   const menu = (
     <div
       role="menu"
-      className={`fixed z-[110] min-w-[180px] rounded-md shadow-xl ring-1 ring-black/10 dark:ring-white/10 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md overflow-hidden origin-top-right transition-all duration-150 ease-out ${visible ? 'opacity-100 translate-y-0 scale-100 animate-pop' : 'opacity-0 translate-y-1 scale-95'} ${className}`}
+      className={`fixed z-[110] min-w-[180px] rounded-md shadow-xl ring-1 ring-black/10 dark:ring-white/10 bg-white/95 dark:bg-neutral-900/95 overflow-hidden origin-top-right transition-[opacity,transform] duration-150 ease-out ${visible ? 'opacity-100 translate-y-0 scale-100 animate-pop' : 'opacity-0 translate-y-1 scale-95'} ${className}`}
       style={coords ? { top: coords.top, left: coords.left, right: coords.right, ...style } : { top: offsetY, ...(align === 'right' ? { right: 0 } : { left: 0 }), ...style }}
       onMouseDown={(e) => { e.stopPropagation() }}
       onClick={(e) => { e.stopPropagation() }}

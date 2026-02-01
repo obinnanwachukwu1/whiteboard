@@ -57,7 +57,7 @@ export const CourseGradeCard: React.FC<Props> = ({
   const sliderGpa = Number.isFinite(sliderVal) ? toGpa(sliderVal) : null
 
   return (
-    <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-3 transition-transform duration-200 ease-out hover:scale-[1.01] hover:shadow-sm hover:ring-[var(--app-accent-hover)] hover:bg-[var(--app-accent-bg)]">
+    <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-3 transition-colors duration-150 ease-out hover:ring-[var(--app-accent-hover)] hover:bg-[var(--app-accent-bg)]">
       {/* Clickable header */}
       <div
         role="button"

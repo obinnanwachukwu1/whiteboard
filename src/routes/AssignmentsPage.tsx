@@ -82,7 +82,7 @@ const KanbanCard = React.memo(function KanbanCard({
           handleOpen()
         }
       }}
-      className={`group rounded-lg ring-1 ${item._isPastDue ? 'ring-red-200 dark:ring-red-900/50 bg-red-50/50 dark:bg-red-950/20' : 'ring-gray-200 dark:ring-neutral-800 bg-white dark:bg-neutral-900'} p-2.5 cursor-pointer hover:ring-[var(--app-accent)] hover:shadow-sm active:cursor-grabbing transition-all duration-150`}
+      className={`group rounded-lg ring-1 ${item._isPastDue ? 'ring-red-200 dark:ring-red-900/50 bg-red-50/50 dark:bg-red-950/20' : 'ring-gray-200 dark:ring-neutral-800 bg-white dark:bg-neutral-900'} p-2.5 cursor-pointer hover:ring-[var(--app-accent)] active:cursor-grabbing transition-colors duration-150`}
     >
       <div className="flex items-start gap-2.5">
         <CourseAvatar

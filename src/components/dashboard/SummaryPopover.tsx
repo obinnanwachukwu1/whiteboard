@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Wand2 } from 'lucide-react'
 import { marked } from 'marked'
@@ -14,6 +14,19 @@ type Props = {
   onMouseLeave: () => void
 }
 
+const PopoverHeader = React.memo(({ title }: { title?: string }) => {
+  return (
+    <div className="flex items-center gap-2 mb-3 text-indigo-600 dark:text-indigo-400 font-medium text-sm">
+      <div className="p-1.5 rounded-md bg-indigo-50 dark:bg-indigo-900/20">
+        <Wand2 className="w-3.5 h-3.5" />
+      </div>
+      {title || 'AI Summary'}
+    </div>
+  )
+})
+
+PopoverHeader.displayName = 'PopoverHeader'
+
 export const SummaryPopover: React.FC<Props> = ({ 
   position, 
   isOpen, 
@@ -23,12 +36,13 @@ export const SummaryPopover: React.FC<Props> = ({
   onMouseEnter,
   onMouseLeave
 }) => {
+  const popoverRef = useRef<HTMLDivElement | null>(null)
   const [style, setStyle] = useState<React.CSSProperties>({})
   const [isVisible, setIsVisible] = useState(false)
   const [renderedHtml, setRenderedHtml] = useState<string>('')
   
   // Buffer logic for streaming text
-  const flushTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastRenderedTextLength = useRef<number>(0)
 
   // Handle markdown rendering with newline buffering
@@ -87,13 +101,14 @@ export const SummaryPopover: React.FC<Props> = ({
   }, [isOpen])
 
   // Positioning logic
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!position || !isVisible) return
     
     const updatePosition = () => {
       const { x, y } = position
       const width = 320
-      const margin = 16
+      const margin = 6
+      const height = popoverRef.current?.getBoundingClientRect().height ?? 200
       
       // Default: Bottom Right of cursor
       let left = x + margin
@@ -107,12 +122,9 @@ export const SummaryPopover: React.FC<Props> = ({
       }
       
       // Check Bottom Boundary (shift up)
-      // Assuming variable height, but let's check against a safe max
-      // Or we can just let it flow up if it's too low
-      const estimatedHeight = 200 
-      if (top + estimatedHeight > window.innerHeight) {
+      if (top + height > window.innerHeight) {
         // Position above the cursor
-        top = y - estimatedHeight - margin
+        top = y - height - margin
         origin = origin.replace('top', 'bottom')
       }
 
@@ -136,7 +148,7 @@ export const SummaryPopover: React.FC<Props> = ({
       window.removeEventListener('scroll', updatePosition, true)
       window.removeEventListener('resize', updatePosition)
     }
-  }, [position, isVisible])
+  }, [position, isVisible, renderedHtml, isLoading])
 
   if (!isVisible && !isOpen) return null
 
@@ -147,19 +159,15 @@ export const SummaryPopover: React.FC<Props> = ({
         rounded-xl shadow-2xl 
         border border-slate-200 dark:border-neutral-800 
         p-4 overflow-hidden
-        transition-all duration-150 ease-out pointer-events-auto
+        transition-[opacity,transform] duration-150 ease-out pointer-events-auto
         ${isOpen ? 'opacity-100 translate-y-0 scale-100 animate-pop' : 'opacity-0 translate-y-1 scale-95 pointer-events-none'}
       `}
       style={style}
+      ref={popoverRef}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <div className="flex items-center gap-2 mb-3 text-indigo-600 dark:text-indigo-400 font-medium text-sm">
-        <div className="p-1.5 rounded-md bg-indigo-50 dark:bg-indigo-900/20">
-            <Wand2 className="w-3.5 h-3.5" />
-        </div>
-        {title || 'AI Summary'}
-      </div>
+      <PopoverHeader title={title} />
       
       <div className="min-h-[60px] text-sm text-slate-600 dark:text-neutral-300 leading-relaxed">
         {isLoading && !text ? (

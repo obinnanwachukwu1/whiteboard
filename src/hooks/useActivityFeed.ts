@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useCallback } from 'react'
 import { useUnreadAnnouncements } from './useUnreadAnnouncements'
 import { useUpcomingEvents } from './useUpcomingEvents'
 
@@ -122,7 +122,14 @@ export function useActivityFeed(options?: {
   }, [feedItems])
   
   const isEmpty = feedItems.length === 0
-  
+  const isLoading = announcementsQuery.isLoading || eventsQuery.isLoading
+  const isError = announcementsQuery.isError || eventsQuery.isError
+
+  const refetch = useCallback(() => {
+    announcementsQuery.refetch()
+    eventsQuery.refetch()
+  }, [announcementsQuery, eventsQuery])
+
   return {
     /** All activity feed items */
     items: feedItems,
@@ -141,14 +148,11 @@ export function useActivityFeed(options?: {
     /** Unread announcement count (from announcements query) */
     unreadAnnouncementCount: announcementsQuery.unreadCount,
     /** Loading state */
-    isLoading: announcementsQuery.isLoading || eventsQuery.isLoading,
+    isLoading,
     /** Error state */
-    isError: announcementsQuery.isError || eventsQuery.isError,
+    isError,
     /** Refetch all data */
-    refetch: () => {
-      announcementsQuery.refetch()
-      eventsQuery.refetch()
-    },
+    refetch,
   }
 }
 

@@ -180,6 +180,8 @@ export const CourseFiles: React.FC<Props> = ({ courseId, currentFolderId, onFold
     return [...folderItems, ...fileItems]
   }, [listFolders, files])
 
+  const showListSkeleton = isLoading || (effectiveCurrent != null && filesQ.isLoading)
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
@@ -208,7 +210,7 @@ export const CourseFiles: React.FC<Props> = ({ courseId, currentFolderId, onFold
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
-        {isLoading && <SkeletonList count={8} hasAvatar variant="row" />}
+        {showListSkeleton && <SkeletonList count={8} hasAvatar variant="row" />}
         
         {/* Breadcrumb */}
         <div className="text-sm text-slate-600 dark:text-neutral-300 mb-2 flex items-center gap-1 overflow-x-auto whitespace-nowrap">
@@ -228,7 +230,6 @@ export const CourseFiles: React.FC<Props> = ({ courseId, currentFolderId, onFold
         {/* Combined folders + files list */}
         {effectiveCurrent != null && (
           <>
-            {filesQ.isLoading && <div className="text-slate-500 dark:text-neutral-400 text-sm">Loading files…</div>}
             {!filesQ.isLoading && combinedItems.length === 0 && (
               <div className="text-slate-500 dark:text-neutral-400 text-sm">No items in this folder</div>
             )}

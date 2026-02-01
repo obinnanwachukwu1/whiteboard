@@ -15,45 +15,24 @@ type Props = {
   onClick?: () => void
 }
 
-const stripHtml = (html: string) => {
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-  return doc.body.textContent || ''
+type TriggerProps = ReturnType<typeof useAIPopover>['triggerProps']
+
+type RowProps = Props & {
+  triggerProps: TriggerProps
 }
 
-/**
- * Single activity feed item (announcement or calendar event).
- */
-export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick }) => {
-  const { streamSummarize } = useAI()
-  const { aiEnabled } = useAppFlags()
-  
-  const showAI = aiEnabled && item.type === 'announcement'
-  
-  const { triggerProps, popoverProps } = useAIPopover({
-    enabled: showAI,
-    onGenerate: (update) => {
-      const rawText = item.message || item.title
-      const cleanText = stripHtml(rawText || '')
-      
-      if (cleanText.trim()) {
-        return streamSummarize(cleanText, update)
-      }
-      return false
-    }
-  })
-  
-  
+const ActivityRow = React.memo(({ item, onMarkRead, onClick, triggerProps }: RowProps) => {
   const Icon = item.type === 'announcement' ? Megaphone : Calendar
   const iconColor = item.type === 'announcement' 
     ? 'text-violet-500 dark:text-violet-400' 
     : 'text-emerald-500 dark:text-emerald-400'
-  
-  const handleMarkRead = (e: React.MouseEvent) => {
+
+  const handleMarkRead = React.useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     if (item.type === 'announcement' && item.topicId && onMarkRead) {
       onMarkRead(item.topicId)
     }
-  }
+  }, [item, onMarkRead])
 
   return (
     <ListItemRow
@@ -85,7 +64,49 @@ export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick }) => 
           </button>
         ) : undefined
       }
-      after={<SummaryPopover {...popoverProps} />}
     />
+  )
+})
+
+ActivityRow.displayName = 'ActivityRow'
+
+const stripHtml = (html: string) => {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  return doc.body.textContent || ''
+}
+
+/**
+ * Single activity feed item (announcement or calendar event).
+ */
+export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick }) => {
+  const { streamSummarize } = useAI()
+  const { aiEnabled } = useAppFlags()
+  
+  const showAI = aiEnabled && item.type === 'announcement'
+  
+  const { triggerProps, popoverProps } = useAIPopover({
+    enabled: showAI,
+    onGenerate: (update) => {
+      const rawText = item.message || item.title
+      const cleanText = stripHtml(rawText || '')
+      
+      if (cleanText.trim()) {
+        return streamSummarize(cleanText, update)
+      }
+      return false
+    }
+  })
+  
+  
+  return (
+    <>
+      <ActivityRow
+        item={item}
+        onMarkRead={onMarkRead}
+        onClick={onClick}
+        triggerProps={triggerProps}
+      />
+      <SummaryPopover {...popoverProps} />
+    </>
   )
 }
