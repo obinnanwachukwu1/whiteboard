@@ -34,6 +34,8 @@ export type DashboardAssignment = RankedAssignment & {
  * Combines due assignments with grade weight information.
  */
 export function usePriorityAssignments(options?: {
+  /** Gate all background work (default: true) */
+  enabled?: boolean
   /** Override time horizon from settings */
   horizonDays?: number
   /** Override max items from settings */
@@ -46,13 +48,17 @@ export function usePriorityAssignments(options?: {
     alsoDue: DashboardAssignment[]
     alsoDueCount: number
   } | null>(null)
-  
+
+  const enabled = options?.enabled ?? true
   const horizonDays = options?.horizonDays ?? timeHorizon
   const limit = options?.limit ?? maxPriorityItems
-  
+
   // Fetch due assignments (this uses a longer horizon to get "also due" items)
-  const dueQuery = useDueAssignments({ days: 60, onlyPublished: true, includeCourseName: true })
-  
+  const dueQuery = useDueAssignments(
+    { days: 60, onlyPublished: true, includeCourseName: true },
+    { enabled },
+  )
+
   // Get unique course IDs from due assignments
   const courseIds = useMemo(() => {
     if (!dueQuery.data) return []
@@ -64,7 +70,7 @@ export function usePriorityAssignments(options?: {
     }
     return Array.from(ids)
   }, [dueQuery.data])
-  
+
   // Fetch assignment groups for each course (to get grade weights)
   const groupQueries = useQueries({
     queries: courseIds.map((courseId) => ({
@@ -75,7 +81,7 @@ export function usePriorityAssignments(options?: {
         return { courseId, groups: res.data || [] }
       },
       staleTime: 1000 * 60 * 30, // 30 minutes - weights don't change often
-      enabled: courseIds.length > 0,
+      enabled: enabled && courseIds.length > 0,
     })),
   })
 
@@ -105,15 +111,15 @@ export function usePriorityAssignments(options?: {
   const cachedOrder = orderQ.data
   const cachedOrderUsable = Boolean(
     cachedOrder &&
-      Array.isArray(cachedOrder.mainIds) &&
-      cachedOrder.mainIds.length > 0 &&
-      Date.now() - cachedOrder.updatedAt < 1000 * 60 * 60 * 24,
+    Array.isArray(cachedOrder.mainIds) &&
+    cachedOrder.mainIds.length > 0 &&
+    Date.now() - cachedOrder.updatedAt < 1000 * 60 * 60 * 24,
   )
-  
+
   // Build weight contexts per course
   const weightContexts = useMemo(() => {
     const contexts = new Map<string, ReturnType<typeof buildWeightContext>>()
-    
+
     for (const q of groupQueries) {
       if (q.data) {
         const { courseId, groups } = q.data
@@ -122,28 +128,35 @@ export function usePriorityAssignments(options?: {
           id: g.id,
           name: g.name,
           group_weight: g.group_weight,
-          assignments: g.assignments?.map((a: any) => ({
-            id: a.id,
-            points_possible: a.points_possible,
-          })) || [],
+          assignments:
+            g.assignments?.map((a: any) => ({
+              id: a.id,
+              points_possible: a.points_possible,
+            })) || [],
         }))
         contexts.set(courseId, buildWeightContext(formattedGroups))
       }
     }
-    
+
     return contexts
   }, [groupQueries])
 
   // Build O(1) assignment lookup: courseId -> assignmentId -> { groupId, pointsPossible }
   // This replaces the O(n*m*k) nested loop with O(1) lookups per assignment
   const assignmentLookup = useMemo(() => {
-    const lookup = new Map<string, Map<string, { groupId: number | string; pointsPossible: number | null }>>()
-    
+    const lookup = new Map<
+      string,
+      Map<string, { groupId: number | string; pointsPossible: number | null }>
+    >()
+
     for (const q of groupQueries) {
       if (!q.data) continue
       const { courseId, groups } = q.data
-      const courseMap = new Map<string, { groupId: number | string; pointsPossible: number | null }>()
-      
+      const courseMap = new Map<
+        string,
+        { groupId: number | string; pointsPossible: number | null }
+      >()
+
       for (const group of groups) {
         const assignments = (group as any).assignments || []
         for (const a of assignments) {
@@ -153,21 +166,21 @@ export function usePriorityAssignments(options?: {
           })
         }
       }
-      
+
       lookup.set(courseId, courseMap)
     }
-    
+
     return lookup
   }, [groupQueries])
-  
+
   // Transform due items to PriorityAssignment format with weights
   const priorityAssignments = useMemo((): PriorityAssignment[] => {
     if (!dueQuery.data) return []
-    
+
     return dueQuery.data.map((item) => {
       const courseId = String(item.course_id)
       const context = weightContexts.get(courseId)
-      
+
       // Extract assignment ID from URL if available
       let assignmentId: string | null = null
       if (item.htmlUrl) {
@@ -180,14 +193,14 @@ export function usePriorityAssignments(options?: {
           }
         } catch {}
       }
-      
+
       // Try to calculate weight using O(1) lookup
       let effectiveWeight: number | null = null
       if (context && assignmentId) {
         // Use the pre-built lookup map instead of nested loops
         const courseAssignments = assignmentLookup.get(courseId)
         const assignmentInfo = courseAssignments?.get(assignmentId)
-        
+
         if (assignmentInfo) {
           effectiveWeight = calculateAssignmentWeight(
             {
@@ -195,11 +208,11 @@ export function usePriorityAssignments(options?: {
               assignment_group_id: assignmentInfo.groupId,
               points_possible: assignmentInfo.pointsPossible,
             },
-            context
+            context,
           )
         }
       }
-      
+
       return {
         id: assignmentId || item.htmlUrl || `${item.course_id}-${item.name}`,
         name: item.name,
@@ -208,12 +221,15 @@ export function usePriorityAssignments(options?: {
         courseName: item.course_name,
         pointsPossible: item.pointsPossible ?? null,
         effectiveWeight,
-        isSubmitted: Boolean(item.submission?.submittedAt) || item.submission?.workflowState === 'submitted' || item.submission?.workflowState === 'graded',
+        isSubmitted:
+          Boolean(item.submission?.submittedAt) ||
+          item.submission?.workflowState === 'submitted' ||
+          item.submission?.workflowState === 'graded',
         htmlUrl: item.htmlUrl,
       }
     })
   }, [dueQuery.data, weightContexts, assignmentLookup])
-  
+
   const byId = useMemo(() => {
     const m = new Map<string, PriorityAssignment>()
     for (const a of priorityAssignments) m.set(String(a.id), a)
@@ -263,17 +279,30 @@ export function usePriorityAssignments(options?: {
     }
 
     // Normal path: rank with weights when available, otherwise rank without.
-    const source = weightsReady ? priorityAssignments : priorityAssignments.map((a) => ({ ...a, effectiveWeight: null }))
+    const source = weightsReady
+      ? priorityAssignments
+      : priorityAssignments.map((a) => ({ ...a, effectiveWeight: null }))
     return rankAssignmentsByPriority(source, rankOpts)
-  }, [priorityAssignments, byId, weightsReady, cachedOrderUsable, cachedOrder, horizonDays, limit, showSubmitted])
-  
+  }, [
+    priorityAssignments,
+    byId,
+    weightsReady,
+    cachedOrderUsable,
+    cachedOrder,
+    horizonDays,
+    limit,
+    showSubmitted,
+  ])
+
   // Get assignments that are NOT in the main ranked list (overflow)
   const alsoDue = useMemo(() => {
     // Create set of IDs already shown in main list
     const mainIds = new Set(rankedAssignments.map((a) => String(a.id)))
-    
+
     // Filter priority assignments
-    const pool = weightsReady ? priorityAssignments : priorityAssignments.map((a) => ({ ...a, effectiveWeight: null }))
+    const pool = weightsReady
+      ? priorityAssignments
+      : priorityAssignments.map((a) => ({ ...a, effectiveWeight: null }))
 
     return pool
       .filter((a) => {
@@ -317,7 +346,7 @@ export function usePriorityAssignments(options?: {
       alsoIds,
     } satisfies PriorityOrderCache)
   }, [weightsReady, dueQuery.data, rankedAssignments, alsoDue, queryClient, orderKey])
-  
+
   // Transform to dashboard-ready format
   const dashboardAssignments = useMemo((): DashboardAssignment[] => {
     return rankedAssignments.map((a) => ({
@@ -327,7 +356,7 @@ export function usePriorityAssignments(options?: {
       courseLabel: a.courseName || String(a.courseId),
     }))
   }, [rankedAssignments])
-  
+
   // Also due with display format
   const alsoDueAssignments = useMemo((): DashboardAssignment[] => {
     return alsoDue.slice(0, 10).map((a) => ({
@@ -337,7 +366,7 @@ export function usePriorityAssignments(options?: {
       courseLabel: a.courseName || String(a.courseId),
     }))
   }, [alsoDue])
-  
+
   // Only show the big skeleton on true cold starts.
   // We can render without weights while group queries fill in.
   const isHardLoading = !dueQuery.data && dueQuery.isLoading
@@ -358,7 +387,7 @@ export function usePriorityAssignments(options?: {
     alsoDue: alsoDueAssignments,
     alsoDueCount: alsoDue.length,
   }
-  
+
   return {
     /** Top priority assignments for the dashboard */
     assignments: stable.assignments,

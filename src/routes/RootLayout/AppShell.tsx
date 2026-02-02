@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Outlet } from '@tanstack/react-router'
 import {
   AppFlagsContext,
@@ -22,6 +23,7 @@ import { NotificationManager } from '../../components/NotificationManager'
 import type { ThemeSettings } from '../../utils/theme'
 import { AISidePanelKeyboardHandler } from './AISidePanelKeyboardHandler'
 import { AISidePanel } from '../../components/AISidePanel'
+import { useDashboardData } from '../../hooks/useDashboardData'
 
 type CurrentView =
   | 'dashboard'
@@ -67,132 +69,162 @@ type Props = {
   onOpenAllCourses: () => void
   onHideCourse: (id: string | number) => void
   onPrefetchCourse: (id: string | number) => void
-  onPrefetchNav: (tab: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions') => void
+  onPrefetchNav: (
+    tab: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions',
+  ) => void
   onReorder: (nextOrder: Array<string | number>) => void
 }
 
-export function AppShell({
-  embeddingsEnabled,
-  aiEnabled,
-  aiDueAssignments,
-  aiCourses,
-  flagsContext,
-  settingsContext,
-  actionsContext,
-  dataContext,
-  dataActionsContext,
-  isEmbeddedContent,
-  themeSettings,
-  profile,
-  searchOpen,
-  settingsOpen,
-  inboxOpen,
-  onCloseSearch,
-  onCloseSettings,
-  onCloseInbox,
-  onOpenSearch,
-  onOpenInbox,
-  visibleCourses,
-  currentView,
-  derivedCourseId,
-  activeCourseId,
-  sidebarCfg,
-  onSelectDashboard,
-  onSelectAnnouncements,
-  onSelectAssignments,
-  onSelectGrades,
-  onSelectDiscussions,
-  onSelectCourse,
-  onOpenAllCourses,
-  onHideCourse,
-  onPrefetchCourse,
-  onPrefetchNav,
-  onReorder,
-}: Props) {
+function AppShellInner(props: Props) {
+  const dashboard = useDashboardData({
+    courses: props.aiEnabled ? (props.aiCourses as any[]) : [],
+    sidebar: props.sidebarCfg,
+    due: props.dataContext.due as any,
+    loading: props.dataContext.loading,
+  })
+
+  const aiUserName = props.profile?.short_name || props.profile?.name || ''
+
+  const aiPinnedCourses = useMemo(() => {
+    const list = props.visibleCourses || []
+    return list
+      .slice(0, 8)
+      .map((c: any) => {
+        try {
+          return dashboard.labelFor?.(c) || c?.name || c?.course_code || 'Course'
+        } catch {
+          return c?.name || c?.course_code || 'Course'
+        }
+      })
+      .filter(Boolean)
+  }, [props.visibleCourses, dashboard.labelFor])
+
+  const aiCourseGrades = useMemo(() => {
+    if (!props.aiEnabled) return []
+    const list = dashboard.orderedVisibleCourses || []
+    return list.slice(0, 30).map((c: any) => ({
+      courseId: c.id,
+      courseName: dashboard.labelFor(c),
+      grade: dashboard.gradeForCourse(c.id),
+    }))
+  }, [
+    props.aiEnabled,
+    dashboard.orderedVisibleCourses,
+    dashboard.labelFor,
+    dashboard.gradeForCourse,
+  ])
+
+  const aiRecentSubmissions = useMemo(() => {
+    if (!props.aiEnabled) return []
+    const list = dashboard.recentFeedback || []
+    return list.map((s: any) => ({
+      courseId: s.courseId,
+      courseName: s.courseName,
+      assignmentId: s.id,
+      name: s.name,
+      score: s.score,
+      pointsPossible: s.pointsPossible,
+      gradedAt: s.gradedAt,
+      htmlUrl: s.htmlUrl,
+    }))
+  }, [props.aiEnabled, dashboard.recentFeedback])
+
   return (
     <AIPanelProvider
-      embeddingsEnabled={embeddingsEnabled}
-      aiEnabled={aiEnabled}
-      dueAssignments={aiDueAssignments}
-      courses={aiCourses}
+      embeddingsEnabled={props.embeddingsEnabled}
+      aiEnabled={props.aiEnabled}
+      userName={aiUserName}
+      pinnedCourses={aiPinnedCourses}
+      dueAssignments={props.aiDueAssignments}
+      courses={props.aiCourses}
+      courseGrades={aiCourseGrades}
+      recentSubmissions={aiRecentSubmissions}
     >
-      <AppFlagsContext.Provider value={flagsContext}>
-        <AppSettingsContext.Provider value={settingsContext}>
-          <AppActionsContext.Provider value={actionsContext}>
-            <AppDataContext.Provider value={dataContext}>
-              <AppDataActionsContext.Provider value={dataActionsContext}>
-                {isEmbeddedContent ? (
-                  <div className="h-screen w-screen bg-gray-50 dark:bg-neutral-950">
-                    <main className="h-full w-full overflow-hidden">
-                      <div className="h-full w-full">
-                        <Outlet />
-                      </div>
-                    </main>
+      {props.isEmbeddedContent ? (
+        <div className="h-screen w-screen bg-gray-50 dark:bg-neutral-950">
+          <main className="h-full w-full overflow-hidden">
+            <div className="h-full w-full">
+              <Outlet />
+            </div>
+          </main>
+        </div>
+      ) : (
+        <>
+          <BackgroundLayer settings={props.themeSettings} />
+          {/* Global glass layer - provides consistent blur/tint across entire app */}
+          <div
+            className="fixed inset-0 z-[5] pointer-events-none"
+            style={{ backgroundColor: 'var(--app-accent-bg)' }}
+            aria-hidden="true"
+          />
+          <div className="h-screen flex flex-col relative z-10">
+            <Header
+              profile={props.profile}
+              onOpenSearch={props.onOpenSearch}
+              onOpenInbox={props.onOpenInbox}
+            />
+            <div className="flex flex-1 overflow-hidden">
+              <Sidebar
+                courses={props.visibleCourses}
+                activeCourseId={
+                  props.currentView === 'course'
+                    ? (props.derivedCourseId ?? props.activeCourseId)
+                    : null
+                }
+                sidebar={props.sidebarCfg}
+                current={props.currentView}
+                onSelectDashboard={props.onSelectDashboard}
+                onSelectAnnouncements={props.onSelectAnnouncements}
+                onSelectAssignments={props.onSelectAssignments}
+                onSelectGrades={props.onSelectGrades}
+                onSelectDiscussions={props.onSelectDiscussions}
+                onSelectCourse={props.onSelectCourse}
+                onOpenAllCourses={props.onOpenAllCourses}
+                onHideCourse={props.onHideCourse}
+                onPrefetchCourse={props.onPrefetchCourse}
+                onPrefetchNav={props.onPrefetchNav}
+                onReorder={props.onReorder}
+              />
+              <main className="flex-1 flex overflow-hidden bg-white/50 dark:bg-neutral-900/50 rounded-tl-xl">
+                {/* Content area - shrinks when AI panel is open */}
+                <div
+                  className={`flex-1 flex flex-col min-h-0 min-w-0 p-6 ${props.currentView === 'course' ? 'pt-24 overflow-hidden' : 'overflow-y-auto'}`}
+                >
+                  <div
+                    className={`max-w-6xl w-full mx-auto ${props.currentView === 'course' ? 'flex-1 flex flex-col min-h-0' : ''}`}
+                  >
+                    <Outlet />
                   </div>
-                ) : (
-                  <>
-                    <BackgroundLayer settings={themeSettings} />
-                    {/* Global glass layer - provides consistent blur/tint across entire app */}
-                    <div
-                      className="fixed inset-0 z-[5] pointer-events-none"
-                      style={{ backgroundColor: 'var(--app-accent-bg)' }}
-                      aria-hidden="true"
-                    />
-                    <div className="h-screen flex flex-col relative z-10">
-                      <Header
-                        profile={profile}
-                        onOpenSearch={onOpenSearch}
-                        onOpenInbox={onOpenInbox}
-                      />
-                      <div className="flex flex-1 overflow-hidden">
-                        <Sidebar
-                          courses={visibleCourses}
-                          activeCourseId={
-                            currentView === 'course' ? (derivedCourseId ?? activeCourseId) : null
-                          }
-                          sidebar={sidebarCfg}
-                          current={currentView}
-                          onSelectDashboard={onSelectDashboard}
-                          onSelectAnnouncements={onSelectAnnouncements}
-                          onSelectAssignments={onSelectAssignments}
-                          onSelectGrades={onSelectGrades}
-                          onSelectDiscussions={onSelectDiscussions}
-                          onSelectCourse={onSelectCourse}
-                          onOpenAllCourses={onOpenAllCourses}
-                          onHideCourse={onHideCourse}
-                          onPrefetchCourse={onPrefetchCourse}
-                          onPrefetchNav={onPrefetchNav}
-                          onReorder={onReorder}
-                        />
-                        <main className="flex-1 flex overflow-hidden bg-white/50 dark:bg-neutral-900/50 rounded-tl-xl">
-                          {/* Content area - shrinks when AI panel is open */}
-                          <div
-                            className={`flex-1 flex flex-col min-h-0 min-w-0 p-6 ${currentView === 'course' ? 'pt-24 overflow-hidden' : 'overflow-y-auto'}`}
-                          >
-                            <div
-                              className={`max-w-6xl w-full mx-auto ${currentView === 'course' ? 'flex-1 flex flex-col min-h-0' : ''}`}
-                            >
-                              <Outlet />
-                            </div>
-                          </div>
+                </div>
 
-                          {/* AI Side Panel - flex sibling, content shrinks to accommodate */}
-                          <AISidePanel />
-                        </main>
-                      </div>
-                    </div>
-                    <SearchModal isOpen={searchOpen} onClose={onCloseSearch} />
-                    <SettingsModal isOpen={settingsOpen} onClose={onCloseSettings} />
-                    <InboxPanel isOpen={inboxOpen} onClose={onCloseInbox} />
-                    <AISidePanelKeyboardHandler />
-                    <NotificationManager />
-                  </>
-                )}
-              </AppDataActionsContext.Provider>
-            </AppDataContext.Provider>
-          </AppActionsContext.Provider>
-        </AppSettingsContext.Provider>
-      </AppFlagsContext.Provider>
+                {/* AI Side Panel - flex sibling, content shrinks to accommodate */}
+                <AISidePanel />
+              </main>
+            </div>
+          </div>
+          <SearchModal isOpen={props.searchOpen} onClose={props.onCloseSearch} />
+          <SettingsModal isOpen={props.settingsOpen} onClose={props.onCloseSettings} />
+          <InboxPanel isOpen={props.inboxOpen} onClose={props.onCloseInbox} />
+          <AISidePanelKeyboardHandler />
+          <NotificationManager />
+        </>
+      )}
     </AIPanelProvider>
+  )
+}
+
+export function AppShell(props: Props) {
+  return (
+    <AppFlagsContext.Provider value={props.flagsContext}>
+      <AppSettingsContext.Provider value={props.settingsContext}>
+        <AppActionsContext.Provider value={props.actionsContext}>
+          <AppDataContext.Provider value={props.dataContext}>
+            <AppDataActionsContext.Provider value={props.dataActionsContext}>
+              <AppShellInner {...props} />
+            </AppDataActionsContext.Provider>
+          </AppDataContext.Provider>
+        </AppActionsContext.Provider>
+      </AppSettingsContext.Provider>
+    </AppFlagsContext.Provider>
   )
 }

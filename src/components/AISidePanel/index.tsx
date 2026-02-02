@@ -1,5 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { useAIPanel } from '../../context/AIPanelContext'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  useAIPanelActions,
+  useAIPanelState,
+  type SearchResultItem,
+} from '../../context/AIPanelContext'
+import { useAppActions } from '../../context/AppContext'
+import { extractAnnouncementIdFromUrl, extractAssignmentIdFromUrl } from '../../utils/urlHelpers'
 import { AISidePanelHeader } from './AISidePanelHeader'
 import { AISidePanelInput } from './AISidePanelInput'
 import { AISidePanelMessages } from './AISidePanelMessages'
@@ -11,16 +17,21 @@ type Props = {
 const ANIMATION_DURATION = 350 // ms
 
 export const AISidePanel: React.FC<Props> = ({ className = '' }) => {
-  const panel = useAIPanel()
+  const panelState = useAIPanelState()
+  const panelActions = useAIPanelActions()
+  const actions = useAppActions()
   const panelRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const [scrollNonce, setScrollNonce] = useState(0)
+
+  // render tracing removed from AI sidebar to reduce dev noise
 
   // Track render state for close animation
-  const [rendered, setRendered] = useState(panel.isOpen)
+  const [rendered, setRendered] = useState(panelState.isOpen)
   const [isClosing, setIsClosing] = useState(false)
 
   useEffect(() => {
-    if (panel.isOpen) {
+    if (panelState.isOpen) {
       setRendered(true)
       setIsClosing(false)
     } else if (rendered) {
@@ -32,31 +43,92 @@ export const AISidePanel: React.FC<Props> = ({ className = '' }) => {
       }, ANIMATION_DURATION)
       return () => clearTimeout(t)
     }
-  }, [panel.isOpen, rendered])
+  }, [panelState.isOpen, rendered])
 
   // Focus input when panel opens
   useEffect(() => {
-    if (panel.isOpen && !isClosing) {
+    if (panelState.isOpen && !isClosing) {
       const t = setTimeout(() => {
         inputRef.current?.focus()
       }, 100)
       return () => clearTimeout(t)
     }
-  }, [panel.isOpen, isClosing])
+  }, [panelState.isOpen, isClosing])
 
   // Handle escape key
   useEffect(() => {
-    if (!panel.isOpen) return
+    if (!panelState.isOpen) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        panel.close()
+        panelActions.close()
       }
     }
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [panel.isOpen, panel])
+  }, [panelState.isOpen, panelActions])
+
+  const handleExamplePromptClick = useCallback(
+    (prompt: string) => {
+      setScrollNonce((n) => n + 1)
+      panelActions.sendMessage(prompt)
+    },
+    [panelActions],
+  )
+
+  const handleSubmit = useCallback(async () => {
+    setScrollNonce((n) => n + 1)
+    await panelActions.submit()
+  }, [panelActions])
+
+  const handleResultClick = useCallback(
+    (result: SearchResultItem) => {
+      const { courseId, type } = result.metadata
+      const rawId = result.id.split(':').pop()
+      const contentId = rawId && rawId !== 'undefined' ? rawId : null
+
+      if (type === 'announcement' && contentId) {
+        actions.onOpenAnnouncement(courseId, contentId, result.metadata.title)
+        return
+      }
+
+      if (type === 'assignment') {
+        const assignmentId = contentId || extractAssignmentIdFromUrl(result.metadata.url)
+        if (assignmentId) {
+          actions.onOpenAssignment(courseId, assignmentId, result.metadata.title)
+          return
+        }
+
+        const topicId = extractAnnouncementIdFromUrl(result.metadata.url)
+        if (topicId) {
+          actions.onOpenAnnouncement(courseId, topicId, result.metadata.title)
+          return
+        }
+
+        if (result.metadata.url) {
+          window.system?.openExternal?.(result.metadata.url)
+          return
+        }
+
+        actions.onOpenCourse(courseId)
+        return
+      }
+
+      if (type === 'page' && contentId) {
+        actions.onOpenPage(courseId, contentId, result.metadata.title)
+      } else if (type === 'file' && contentId) {
+        actions.onOpenFile(courseId, contentId, result.metadata.title)
+      } else if (type === 'module') {
+        actions.onOpenModules(courseId)
+      } else if (result.metadata.url) {
+        window.system?.openExternal?.(result.metadata.url)
+      } else {
+        actions.onOpenCourse(courseId)
+      }
+    },
+    [actions],
+  )
 
   if (!rendered) return null
 
@@ -77,32 +149,31 @@ export const AISidePanel: React.FC<Props> = ({ className = '' }) => {
       <div
         className="
           w-[360px] h-full flex flex-col
-          bg-white/70 dark:bg-neutral-900/70
-          backdrop-blur-xl
+          bg-white dark:bg-neutral-900
           rounded-2xl
           shadow-lg
-          ring-1 ring-gray-200/80 dark:ring-neutral-700/80
           overflow-hidden
           mr-4
         "
       >
-        <AISidePanelHeader onClose={panel.close} />
+        <AISidePanelHeader onClose={panelActions.close} onNewChat={panelActions.clearHistory} />
 
         <AISidePanelMessages
-          messages={panel.history}
-          answer={panel.answer}
-          results={panel.results}
-          isLoading={panel.isLoading}
-          error={panel.error}
+          messages={panelState.messages}
+          isLoading={panelState.isLoading}
+          error={panelState.error}
+          scrollOnInput={panelState.query}
+          scrollToBottomNonce={scrollNonce}
+          onExamplePromptClick={handleExamplePromptClick}
+          onResultClick={handleResultClick}
         />
 
         <AISidePanelInput
           ref={inputRef}
-          query={panel.query}
-          onQueryChange={panel.setQuery}
-          onSubmit={panel.submit}
-          isLoading={panel.isLoading}
-          onClear={panel.clear}
+          query={panelState.query}
+          onQueryChange={panelActions.setQuery}
+          onSubmit={handleSubmit}
+          isLoading={panelState.isLoading}
         />
       </div>
     </div>
