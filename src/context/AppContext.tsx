@@ -41,6 +41,7 @@ export type AppActionsValue = {
   onOpenPage: (courseId: string | number, pageUrlOrSlug: string, title?: string) => void
   onOpenFile: (courseId: string | number, fileId: string | number, title?: string) => void
   onOpenModules: (courseId: string | number) => void
+  onOpenSearch: () => void
   onSignOut: () => Promise<void>
   onOpenSettings: () => void
   pinItem: (item: {

@@ -12,7 +12,6 @@ import {
 import { useCourses, useDueAssignments, useProfile } from '../../hooks/useCanvasQueries'
 import { useWindowControlsOverlayInsets } from '../../hooks/useWindowControlsOverlayInsets'
 import { useDashboardSettings } from '../../hooks/useDashboardSettings'
-import { useRenderTrace } from '../../hooks/useRenderTrace'
 import type { SidebarConfig } from '../../components/Sidebar'
 import { useRootLayoutNavigation } from './useRootLayoutNavigation'
 import { useRootLayoutTheme } from './useRootLayoutTheme'
@@ -60,17 +59,20 @@ export function useRootLayoutState() {
     return h.startsWith('#/content') && h.includes('embed=1')
   }, [])
 
+  const onOpenSearch = useCallback(() => setSearchOpen(true), [])
+  const onToggleSearch = useCallback(() => setSearchOpen((prev) => !prev), [])
+
   // Global Cmd+K / Ctrl+K keyboard shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        setSearchOpen((prev) => !prev)
+        onToggleSearch()
       }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [onToggleSearch])
 
   // Listen for native menu actions (Settings...)
   useEffect(() => {
@@ -99,24 +101,6 @@ export function useRootLayoutState() {
     const uid = (profileQ.data as any)?.id
     return hasToken && uid ? `${baseUrl}|${uid}` : null
   }, [hasToken, baseUrl, profileQ.data])
-
-  useRenderTrace('RootLayout', {
-    hasToken,
-    loading,
-    theme: themeSettings.theme,
-    backgroundType: themeSettings.background.type,
-    searchOpen,
-    inboxOpen,
-    settingsOpen,
-    profileLoading: profileQ.isLoading,
-    coursesLoading: coursesQ.isLoading,
-    dueLoading: dueQ.isLoading,
-    coursesCount: coursesQ.data?.length ?? 0,
-    dueCount: dueQ.data?.length ?? 0,
-    sidebarHidden: sidebarCfg.hiddenCourseIds?.length ?? 0,
-    sidebarOrder: sidebarCfg.order?.length ?? 0,
-  })
-
 
   useRootLayoutBootstrap({
     baseUrl,
@@ -244,44 +228,53 @@ export function useRootLayoutState() {
     [saveUserSettings],
   )
 
-  const setEmbeddingsEnabledPersisted = useCallback(async (v: boolean) => {
-    setEmbeddingsEnabledState(v)
+  const setEmbeddingsEnabledPersisted = useCallback(
+    async (v: boolean) => {
+      setEmbeddingsEnabledState(v)
 
-    if (!v) {
-      setAiEnabledState(false)
+      if (!v) {
+        setAiEnabledState(false)
+        try {
+          await window.settings.set?.({ embeddingsEnabled: false, aiEnabled: false })
+        } catch {}
+        await saveUserSettings({ embeddingsEnabled: false, aiEnabled: false })
+        return
+      }
+
       try {
-        await window.settings.set?.({ embeddingsEnabled: false, aiEnabled: false })
+        await window.settings.set?.({ embeddingsEnabled: true })
       } catch {}
-      await saveUserSettings({ embeddingsEnabled: false, aiEnabled: false })
-      return
-    }
+      await saveUserSettings({ embeddingsEnabled: true })
+    },
+    [saveUserSettings],
+  )
 
-    try {
-      await window.settings.set?.({ embeddingsEnabled: true })
-    } catch {}
-    await saveUserSettings({ embeddingsEnabled: true })
-  }, [saveUserSettings])
-
-  const setAiEnabledPersisted = useCallback(async (v: boolean) => {
-    setAiEnabledState(v)
-    try {
-      await window.settings.set?.({ aiEnabled: v })
-    } catch {}
-    await saveUserSettings({ aiEnabled: v })
-  }, [saveUserSettings])
+  const setAiEnabledPersisted = useCallback(
+    async (v: boolean) => {
+      setAiEnabledState(v)
+      try {
+        await window.settings.set?.({ aiEnabled: v })
+      } catch {}
+      await saveUserSettings({ aiEnabled: v })
+    },
+    [saveUserSettings],
+  )
 
   const onOpenSettings = useCallback(() => setSettingsOpen(true), [])
 
-  const setCourseImages = useCallback(async (map: Record<string, string>) => {
-    setCourseImagesState(map)
-    try {
-      const cfg = await window.settings.get?.()
-      const data = (cfg?.ok ? (cfg.data as any) : {}) as any
-      const url = data?.baseUrl || baseUrl
-      const next = { ...(data.courseImages || {}), [url]: map }
-      await window.settings.set?.({ courseImages: next })
-    } catch {}
-  }, [baseUrl])
+  const setCourseImages = useCallback(
+    async (map: Record<string, string>) => {
+      setCourseImagesState(map)
+      try {
+        const cfg = await window.settings.get?.()
+        const data = (cfg?.ok ? (cfg.data as any) : {}) as any
+        const url = data?.baseUrl || baseUrl
+        const next = { ...(data.courseImages || {}), [url]: map }
+        await window.settings.set?.({ courseImages: next })
+      } catch {}
+    },
+    [baseUrl],
+  )
 
   const onOpenCourse = useCallback(
     (id: string | number) => {
@@ -487,6 +480,7 @@ export function useRootLayoutState() {
       onOpenPage,
       onOpenFile,
       onOpenModules,
+      onOpenSearch,
       onSignOut,
       onOpenSettings,
       pinItem,
@@ -500,6 +494,7 @@ export function useRootLayoutState() {
       onOpenPage,
       onOpenFile,
       onOpenModules,
+      onOpenSearch,
       onSignOut,
       onOpenSettings,
       pinItem,
@@ -556,20 +551,15 @@ export function useRootLayoutState() {
     [onSidebarConfigChange, setCourseImages],
   )
 
-  const {
-    currentView,
-    derivedCourseId,
-    isEmbeddedContent,
-    handlePrefetchNav,
-    prefetchCourseData,
-  } = useRootLayoutNavigation({
-    coursesData: coursesQ.data,
-    sidebarCfg,
-    activeCourseId,
-    prefetchEnabled,
-    hasToken,
-    queryClient,
-  })
+  const { currentView, derivedCourseId, isEmbeddedContent, handlePrefetchNav, prefetchCourseData } =
+    useRootLayoutNavigation({
+      coursesData: coursesQ.data,
+      sidebarCfg,
+      activeCourseId,
+      prefetchEnabled,
+      hasToken,
+      queryClient,
+    })
 
   // Embedding cleanup when a course is unpinned
   const prevHiddenRef = useRef<Set<string | number>>(new Set())
@@ -616,8 +606,7 @@ export function useRootLayoutState() {
 
   const openTokenHelp = () => {
     try {
-      if (baseUrl)
-        window.system?.openExternal?.(`${baseUrl.replace(/\/?$/, '')}/profile/settings`)
+      if (baseUrl) window.system?.openExternal?.(`${baseUrl.replace(/\/?$/, '')}/profile/settings`)
     } catch {}
   }
 
@@ -659,7 +648,7 @@ export function useRootLayoutState() {
       onCloseSearch: () => setSearchOpen(false),
       onCloseSettings: () => setSettingsOpen(false),
       onCloseInbox: () => setInboxOpen(false),
-      onOpenSearch: () => setSearchOpen(true),
+      onOpenSearch,
       onOpenInbox: () => setInboxOpen(true),
       visibleCourses,
       currentView,
@@ -680,7 +669,9 @@ export function useRootLayoutState() {
             isActive: String(id) === String(derivedCourseId ?? activeCourseId ?? ''),
           })
       },
-      onPrefetchNav: (tab: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions') => {
+      onPrefetchNav: (
+        tab: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions',
+      ) => {
         if (prefetchEnabled) handlePrefetchNav(tab)
       },
       onReorder: async (nextOrder: Array<string | number>) => {

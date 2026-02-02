@@ -26,6 +26,10 @@
   let currentUrl = null;
   let selectionMode = 'text'; // 'text' or 'hand'
 
+  // When set, avoid re-applying fit/auto scale modes on resize.
+  // This prevents expensive relayout loops during container width animations (e.g. AI panel open/close).
+  let suspendFitOnResizeUntil = 0;
+
   // Trackpad pinch zoom state (ctrl/meta + wheel on Chromium)
   let pinchActive = false;
   let pinchStartScale = 1;
@@ -423,6 +427,9 @@
     
       // Handle window resize
       window.addEventListener('resize', function() {
+        try {
+          if (performance.now() < suspendFitOnResizeUntil) return;
+        } catch {}
         // If in a "fit" mode, re-apply it on resize
         const currentValue = pdfViewer.currentScaleValue;
         if (currentValue === 'page-width' || currentValue === 'page-fit' || currentValue === 'auto') {
@@ -457,6 +464,16 @@
   function installInputHandlers() {
     if (!viewerContainer) return;
 
+    function isEditableTarget(t) {
+      if (!t) return false;
+      const tag = (t.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      try {
+        if (t.isContentEditable) return true;
+      } catch {}
+      return false;
+    }
+
     // Ensure webview gets focus on click so keyboard commands work
     viewerContainer.addEventListener('mousedown', () => {
       window.focus();
@@ -465,6 +482,18 @@
     // Explicitly handle Copy command (Cmd+C / Ctrl+C)
     // This fixes issues where the Electron menu "Copy" doesn't reach the webview
     document.addEventListener('keydown', (event) => {
+      // Cmd+K / Ctrl+K: open global search
+      // Cmd+I / Ctrl+I: open AI panel
+      if ((event.metaKey || event.ctrlKey) && !event.altKey) {
+        const key = String(event.key || '').toLowerCase();
+        if ((key === 'k' || key === 'i') && !isEditableTarget(event.target)) {
+          event.preventDefault();
+          event.stopPropagation();
+          sendToParent('SHORTCUT', { action: key === 'k' ? 'search' : 'ai' });
+          return;
+        }
+      }
+
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c') {
         // Only trigger if text is selected
         const selection = window.getSelection();
@@ -884,6 +913,14 @@
         
       case 'SET_SCALE_MODE':
         setScaleMode(command.mode);
+        break;
+
+      case 'SUSPEND_FIT_ON_RESIZE':
+        try {
+          const ms = Number(command.ms);
+          const dur = Number.isFinite(ms) ? Math.max(0, ms) : 400;
+          suspendFitOnResizeUntil = Math.max(suspendFitOnResizeUntil, performance.now() + dur);
+        } catch {}
         break;
         
       case 'ZOOM_IN':

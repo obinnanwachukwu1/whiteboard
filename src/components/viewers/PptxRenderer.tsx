@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useAppActions } from '../../context/AppContext'
+import { useAIPanelActions } from '../../context/AIPanelContext'
 
 type Props = {
   url: string
@@ -24,6 +26,8 @@ type PptxEvent = {
 }
 
 const PptxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDownload }) => {
+  const appActions = useAppActions()
+  const aiPanel = useAIPanelActions()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [viewerState, setViewerState] = useState<ViewerState>({
     currentSlide: 1,
@@ -52,7 +56,8 @@ const PptxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDo
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       // Only accept messages from our iframe
-      if (iframeRef.current && event.source !== iframeRef.current.contentWindow) return
+      const src = iframeRef.current?.contentWindow
+      if (!src || event.source !== src) return
 
       const data = event.data as PptxEvent
       if (!data || !data.type) return
@@ -125,12 +130,17 @@ const PptxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDo
         case 'DOWNLOAD_REQUESTED':
           onDownload?.()
           break
+
+        case 'SHORTCUT':
+          if ((data as any).action === 'search') appActions.onOpenSearch()
+          if ((data as any).action === 'ai') aiPanel.open()
+          break
       }
     }
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [url, sendCommand, onDownload])
+  }, [url, sendCommand, onDownload, appActions, aiPanel])
 
   /**
    * Load PPTX when URL changes and viewer is ready

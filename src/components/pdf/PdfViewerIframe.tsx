@@ -1,5 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useFileBytes, useFileMeta } from '../../hooks/useCanvasQueries'
+import { useAppActions } from '../../context/AppContext'
+import { useAIPanelActions, useAIPanelState } from '../../context/AIPanelContext'
 
 type Props = {
   fileId: string | number
@@ -30,6 +32,9 @@ export const PdfViewerIframe: React.FC<Props> = ({
   fullscreen = false,
   onPageChange,
 }) => {
+  const appActions = useAppActions()
+  const aiPanel = useAIPanelActions()
+  const aiPanelState = useAIPanelState()
   const fileUrlQ = useFileBytes(fileId)
   const fileMetaQ = useFileMeta(fileId)
 
@@ -69,6 +74,16 @@ export const PdfViewerIframe: React.FC<Props> = ({
     },
     [sendCommand],
   )
+
+  // Avoid expensive pdf.js refits while the AI panel animates its width.
+  // This keeps the PDF scale stable during open/close and removes jank.
+  const lastAiOpenRef = useRef<boolean>(aiPanelState.isOpen)
+  useLayoutEffect(() => {
+    if (!viewerState.isReady) return
+    if (lastAiOpenRef.current === aiPanelState.isOpen) return
+    lastAiOpenRef.current = aiPanelState.isOpen
+    sendCommand({ type: 'SUSPEND_FIT_ON_RESIZE', ms: 400 })
+  }, [aiPanelState.isOpen, sendCommand, viewerState.isReady])
 
   // Handle events from the iframe viewer
   useEffect(() => {
@@ -165,12 +180,17 @@ export const PdfViewerIframe: React.FC<Props> = ({
             } catch {}
           })()
           break
+
+        case 'SHORTCUT':
+          if (data.action === 'search') appActions.onOpenSearch()
+          if (data.action === 'ai') aiPanel.open()
+          break
       }
     }
 
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
-  }, [attemptLoadUrl, fileId, fileMetaQ.data, onPageChange, sendCommand, url])
+  }, [attemptLoadUrl, fileId, fileMetaQ.data, onPageChange, sendCommand, url, appActions, aiPanel])
 
   // Load PDF when URL changes (and viewer is ready)
   useEffect(() => {

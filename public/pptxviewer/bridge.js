@@ -797,9 +797,31 @@
       trackCurrentSlide();
     }, { passive: true });
 
+    function isEditableTarget(t) {
+      if (!t) return false;
+      const tag = String(t.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      try {
+        if (t.isContentEditable) return true;
+      } catch {}
+      return false;
+    }
+
     // Handle keyboard navigation
     document.addEventListener('keydown', (e) => {
-      if (e.target.tagName === 'INPUT') return; // Don't interfere with input
+      // Cmd+K / Ctrl+K: open global search
+      // Cmd+I / Ctrl+I: open AI panel
+      if ((e.metaKey || e.ctrlKey) && !e.altKey) {
+        const key = String(e.key || '').toLowerCase();
+        if ((key === 'k' || key === 'i') && !isEditableTarget(e.target)) {
+          e.preventDefault();
+          e.stopPropagation();
+          sendToParent('SHORTCUT', { action: key === 'k' ? 'search' : 'ai' });
+          return;
+        }
+      }
+
+      if (isEditableTarget(e.target)) return; // Don't interfere with inputs
 
       switch (e.key) {
         case 'ArrowLeft':
