@@ -105,7 +105,7 @@ const DiscussionItemRow: React.FC<{
                   ;(await import('../utils/openExternal')).openExternal(d.html_url!)
                 }}
               >
-                Open in Browser
+                Open in Canvas
               </button>
             </Dropdown>
           </>

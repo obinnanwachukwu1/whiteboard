@@ -110,6 +110,7 @@ export const CourseView: React.FC<Props> = ({
         <CourseTabContent
           activeTab={activeTab}
           courseId={courseId}
+          courseName={courseName}
           frontQ={frontQ}
           infoQ={infoQ}
           hasSyllabus={hasSyllabus}

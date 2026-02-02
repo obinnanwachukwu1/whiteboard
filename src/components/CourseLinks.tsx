@@ -158,7 +158,7 @@ export const CourseLinks: React.FC<Props> = ({ courseId, onNavigate }) => {
                                 ;(await import('../utils/openExternal')).openExternal(url)
                               }}
                             >
-                              Open in Browser
+                              {type === 'external' || type === 'external_tool' ? 'Open in Browser' : 'Open in Canvas'}
                             </button>
                           </Dropdown>
                         </>

@@ -1,19 +1,22 @@
 import React from 'react'
-import { FileText, File, MessageSquare, Link as LinkIcon, BookOpen, MoreVertical, Sparkles, ChevronDown, ChevronRight } from 'lucide-react'
+import { FileText, File, MessageSquare, Link as LinkIcon, BookOpen, MoreVertical, Sparkles, ChevronDown, ChevronRight, Pin, ExternalLink, SquareArrowOutUpRight } from 'lucide-react'
 import { Dropdown } from './ui/Dropdown'
 import { useCourseModules } from '../hooks/useCanvasQueries'
 import type { CanvasModule, CanvasModuleItem, CanvasFile } from '../types/canvas'
 import { ListItemRow } from './ui/ListItemRow'
 import { MetadataBadge } from './ui/MetadataBadge'
 import { useAIPanel } from '../context/AIPanelContext'
-import { useAppData, useAppFlags } from '../context/AppContext'
+import { useAppData, useAppFlags, useAppActions } from '../context/AppContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePrefetchOnHover } from '../hooks/usePrefetchOnHover'
 import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
 import { SkeletonList } from './Skeleton'
+import { canvasContentUrl } from '../utils/canvasContentUrl'
+import { openExternal } from '../utils/openExternal'
 
 type Props = {
   courseId: string | number
+  courseName?: string
   onOpenExternal?: (url: string) => void
   onOpenContent?: (content: {
     courseId: string | number
@@ -64,6 +67,8 @@ function useModuleItemPrefetch(courseId: string | number, it: CanvasModuleItem) 
 const ModuleItemRow: React.FC<{
   it: CanvasModuleItem
   courseId: string | number
+  courseName?: string
+  baseUrl?: string
   icon: React.ReactNode
   title: string
   kind: string
@@ -74,8 +79,56 @@ const ModuleItemRow: React.FC<{
   anchorEls: React.MutableRefObject<Map<string, HTMLElement | null>>
   aiEnabled: boolean
   aiPanel: any
-}> = ({ it, courseId, icon, title, kind, onClick, isMenuOpen, menuId, setMenuOpenId, anchorEls, aiEnabled, aiPanel }) => {
+  isPinned: boolean
+  onTogglePin: () => void
+}> = ({ it, courseId, courseName, baseUrl, icon, title, kind, onClick, isMenuOpen, menuId, setMenuOpenId, anchorEls, aiEnabled, aiPanel, isPinned, onTogglePin }) => {
   const hoverHandlers = useModuleItemPrefetch(courseId, it)
+
+  // Determine if this item can be opened in CanvasContentView (and thus new window)
+  const canOpenInApp = (
+    (it.__typename === 'PageModuleItem' && it.pageUrl) ||
+    (it.__typename === 'AssignmentModuleItem' && it.contentId) ||
+    (it.__typename === 'FileModuleItem' && it.contentId)
+  )
+
+  // Get the content type and ID for building Canvas URL and opening in new window
+  const getContentInfo = (): { type: 'page' | 'assignment' | 'file'; contentId: string } | null => {
+    if (it.__typename === 'PageModuleItem' && it.pageUrl) {
+      return { type: 'page', contentId: it.pageUrl }
+    }
+    if (it.__typename === 'AssignmentModuleItem' && it.contentId) {
+      return { type: 'assignment', contentId: String(it.contentId) }
+    }
+    if (it.__typename === 'FileModuleItem' && it.contentId) {
+      return { type: 'file', contentId: String(it.contentId) }
+    }
+    return null
+  }
+
+  const contentInfo = getContentInfo()
+
+  const openInCanvasUrl = baseUrl && contentInfo
+    ? canvasContentUrl({ baseUrl, courseId, type: contentInfo.type, contentId: contentInfo.contentId })
+    : it.htmlUrl
+
+  const handleOpenInCanvas = async () => {
+    setMenuOpenId(null)
+    await openExternal(openInCanvasUrl)
+  }
+
+  const handleOpenInNewWindow = async () => {
+    if (!contentInfo) return
+    setMenuOpenId(null)
+    try {
+      await window.system?.openContentWindow?.({
+        courseId: String(courseId),
+        courseName: courseName || undefined,
+        type: contentInfo.type,
+        contentId: contentInfo.contentId,
+        title,
+      })
+    } catch {}
+  }
 
   return (
     <ListItemRow
@@ -97,13 +150,33 @@ const ModuleItemRow: React.FC<{
               <MoreVertical className="w-4 h-4" />
             </button>
             <Dropdown open={isMenuOpen} onOpenChange={(o) => setMenuOpenId(o ? menuId : null)} align="right" offsetY={32} anchorEl={anchorEls.current.get(menuId)}>
-              {it.htmlUrl && (
-                <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(it.htmlUrl!) }}>
-                  Open in Browser
+              <button
+                className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                onClick={(e) => { e.stopPropagation(); onTogglePin() }}
+              >
+                <Pin className="w-4 h-4" />
+                {isPinned ? 'Unpin from Dashboard' : 'Pin to Dashboard'}
+              </button>
+              {openInCanvasUrl && (
+                <button
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                  onClick={(e) => { e.stopPropagation(); handleOpenInCanvas() }}
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  {it.__typename === 'ExternalUrlModuleItem' ? 'Open in Browser' : 'Open in Canvas'}
+                </button>
+              )}
+              {canOpenInApp && (
+                <button
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                  onClick={(e) => { e.stopPropagation(); handleOpenInNewWindow() }}
+                >
+                  <SquareArrowOutUpRight className="w-4 h-4" />
+                  Open in New Window
                 </button>
               )}
               {aiEnabled && (
-                <button 
+                <button
                   className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 text-indigo-600 dark:text-indigo-400"
                   onClick={(e) => {
                     e.stopPropagation()
@@ -111,7 +184,7 @@ const ModuleItemRow: React.FC<{
                     aiPanel.open(`Explain this module item: "${title}"`, 'ask-ai', true)
                   }}
                 >
-                  <Sparkles className="w-3 h-3" />
+                  <Sparkles className="w-4 h-4" />
                   Explain
                 </button>
               )}
@@ -123,7 +196,7 @@ const ModuleItemRow: React.FC<{
   )
 }
 
-export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpenContent }) => {
+export const CourseModules: React.FC<Props> = ({ courseId, courseName, onOpenExternal, onOpenContent }) => {
   const { data: modules = null, isLoading, error } = useCourseModules(courseId)
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
   const [expandedModules, setExpandedModules] = React.useState<Set<string>>(new Set())
@@ -131,6 +204,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
   const aiPanel = useAIPanel()
   const data = useAppData()
   const flags = useAppFlags()
+  const actions = useAppActions()
   const queryClient = useQueryClient()
   const autoPrefetchedRef = React.useRef<string | null>(null)
   const initializedForCourseRef = React.useRef<string | null>(null)
@@ -387,12 +461,46 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
                         const kind = labelFor(it)
                         const menuId = String(it.id || it._id)
                         const isMenuOpen = menuOpenId === menuId
-                        
+
+                        // Calculate pinId based on item type
+                        const getPinInfo = (): { type: 'page' | 'assignment' | 'file'; contentId: string } | null => {
+                          if (it.__typename === 'PageModuleItem' && it.pageUrl) {
+                            return { type: 'page', contentId: it.pageUrl }
+                          }
+                          if (it.__typename === 'AssignmentModuleItem' && it.contentId) {
+                            return { type: 'assignment', contentId: String(it.contentId) }
+                          }
+                          if (it.__typename === 'FileModuleItem' && it.contentId) {
+                            return { type: 'file', contentId: String(it.contentId) }
+                          }
+                          return null
+                        }
+                        const pinInfo = getPinInfo()
+                        const pinId = pinInfo ? `${pinInfo.type}:${pinInfo.contentId}` : `module-item:${it._id}`
+                        const isPinned = data.pinnedItems?.some((i) => i.id === pinId) ?? false
+
+                        const handleTogglePin = () => {
+                          setMenuOpenId(null)
+                          if (isPinned) {
+                            actions.unpinItem(pinId)
+                          } else {
+                            actions.pinItem({
+                              id: pinId,
+                              type: pinInfo?.type || 'page',
+                              title,
+                              courseId,
+                              contentId: pinInfo?.contentId || it._id,
+                            })
+                          }
+                        }
+
                         return (
                           <li key={String(it.id || it._id)}>
                             <ModuleItemRow
                               it={it}
                               courseId={courseId}
+                              courseName={courseName}
+                              baseUrl={data.baseUrl}
                               icon={iconFor(it)}
                               title={title}
                               kind={kind}
@@ -403,6 +511,8 @@ export const CourseModules: React.FC<Props> = ({ courseId, onOpenExternal, onOpe
                               anchorEls={anchorEls}
                               aiEnabled={flags.aiEnabled}
                               aiPanel={aiPanel}
+                              isPinned={isPinned}
+                              onTogglePin={handleTogglePin}
                             />
                           </li>
                         )

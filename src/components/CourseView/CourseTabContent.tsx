@@ -20,6 +20,7 @@ type Detail = {
 type Props = {
   activeTab: CourseTabKey
   courseId: string | number
+  courseName?: string
   frontQ: any
   infoQ: any
   hasSyllabus: boolean
@@ -32,6 +33,7 @@ type Props = {
 export const CourseTabContent: React.FC<Props> = ({
   activeTab,
   courseId,
+  courseName,
   frontQ,
   infoQ,
   hasSyllabus,
@@ -105,6 +107,7 @@ export const CourseTabContent: React.FC<Props> = ({
         <div className="flex-1 flex flex-col overflow-hidden">
           <CourseModules
             courseId={courseId}
+            courseName={courseName}
             onOpenExternal={onNavigate}
             onOpenContent={(c) =>
               onOpenDetail({
@@ -127,6 +130,7 @@ export const CourseTabContent: React.FC<Props> = ({
         <div className="flex-1 flex flex-col overflow-hidden">
           <CourseFiles
             courseId={courseId}
+            courseName={courseName}
             currentFolderId={currentFolderId}
             onFolderChange={onFolderChange}
             onOpenContent={(c) =>

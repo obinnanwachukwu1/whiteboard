@@ -1,5 +1,5 @@
 import React from 'react'
-import { FileText, File, Image as ImageIcon, Video, Folder as FolderIcon, ChevronRight, ArrowUpDown, FileArchive, FileSpreadsheet, FileAudio, FileCode2, Presentation, MoreVertical } from 'lucide-react'
+import { FileText, File, Image as ImageIcon, Video, Folder as FolderIcon, ChevronRight, ArrowUpDown, FileArchive, FileSpreadsheet, FileAudio, FileCode2, Presentation, MoreVertical, Pin, ExternalLink, SquareArrowOutUpRight } from 'lucide-react'
 import { Button } from './ui/Button'
 import { useCourseFolders, useFolderFiles } from '../hooks/useCanvasQueries'
 import type { CanvasFolder, CanvasFile } from '../types/canvas'
@@ -7,9 +7,13 @@ import { Dropdown } from './ui/Dropdown'
 import { ListItemRow } from './ui/ListItemRow'
 import { MetadataBadge } from './ui/MetadataBadge'
 import { SkeletonList } from './Skeleton'
+import { useAppData, useAppActions } from '../context/AppContext'
+import { canvasContentUrl } from '../utils/canvasContentUrl'
+import { openExternal } from '../utils/openExternal'
 
 type Props = {
   courseId: string | number
+  courseName?: string
   currentFolderId?: string | null
   onFolderChange?: (folderId: string | null) => void
   onOpenContent?: (content: { courseId: string | number; contentType: 'file'; contentId: string; title: string }) => void
@@ -69,7 +73,7 @@ function fileTypeLabel(name?: string, contentType?: string) {
   return null
 }
 
-export const CourseFiles: React.FC<Props> = ({ courseId, currentFolderId, onFolderChange, onOpenContent }) => {
+export const CourseFiles: React.FC<Props> = ({ courseId, courseName, currentFolderId, onFolderChange, onOpenContent }) => {
   const { data: folders = [], isLoading, error } = useCourseFolders(courseId, 100)
   // Use controlled folder state if provided, otherwise use local state
   const [localCurrent, setLocalCurrent] = React.useState<string | null>(null)
@@ -83,6 +87,8 @@ export const CourseFiles: React.FC<Props> = ({ courseId, currentFolderId, onFold
   }, [onFolderChange])
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
   const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
+  const data = useAppData()
+  const actions = useAppActions()
 
   const byId = React.useMemo(() => new Map((folders as CanvasFolder[]).map((f) => [String(f.id), f])), [folders])
   const children = React.useMemo(() => {
@@ -279,8 +285,42 @@ export const CourseFiles: React.FC<Props> = ({ courseId, currentFolderId, onFold
                           }
                           onClick={handleOpen}
                           menuOpen={isMenuOpen}
-                          menu={
-                            f?.url ? (
+                          menu={(() => {
+                            const pinId = `file:${f.id}`
+                            const isPinned = data.pinnedItems?.some((i) => i.id === pinId) ?? false
+                            const openInCanvasUrl = data.baseUrl
+                              ? canvasContentUrl({ baseUrl: data.baseUrl, courseId, type: 'file', contentId: String(f.id) })
+                              : f?.url
+
+                            const handleTogglePin = () => {
+                              setMenuOpenId(null)
+                              if (isPinned) {
+                                actions.unpinItem(pinId)
+                              } else {
+                                actions.pinItem({
+                                  id: pinId,
+                                  type: 'file',
+                                  title: name,
+                                  courseId,
+                                  contentId: String(f.id),
+                                })
+                              }
+                            }
+
+                            const handleOpenInNewWindow = async () => {
+                              setMenuOpenId(null)
+                              try {
+                                await window.system?.openContentWindow?.({
+                                  courseId: String(courseId),
+                                  courseName: courseName || undefined,
+                                  type: 'file',
+                                  contentId: String(f.id),
+                                  title: name,
+                                })
+                              } catch {}
+                            }
+
+                            return (
                               <>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : menuId) }}
@@ -291,13 +331,35 @@ export const CourseFiles: React.FC<Props> = ({ courseId, currentFolderId, onFold
                                   <MoreVertical className="w-4 h-4" />
                                 </button>
                                 <Dropdown open={isMenuOpen} onOpenChange={(o) => setMenuOpenId(o ? menuId : null)} align="right" offsetY={40} anchorEl={anchorEls.current.get(menuId)}>
-                                  <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(f.url!) }}>
-                                    Open in Browser
+                                  <button
+                                    className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                                    onClick={(e) => { e.stopPropagation(); handleTogglePin() }}
+                                  >
+                                    <Pin className="w-4 h-4" />
+                                    {isPinned ? 'Unpin from Dashboard' : 'Pin to Dashboard'}
                                   </button>
+                                  {openInCanvasUrl && (
+                                    <button
+                                      className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                                      onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); await openExternal(openInCanvasUrl) }}
+                                    >
+                                      <ExternalLink className="w-4 h-4" />
+                                      Open in Canvas
+                                    </button>
+                                  )}
+                                  {viewable && (
+                                    <button
+                                      className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                                      onClick={(e) => { e.stopPropagation(); handleOpenInNewWindow() }}
+                                    >
+                                      <SquareArrowOutUpRight className="w-4 h-4" />
+                                      Open in New Window
+                                    </button>
+                                  )}
                                 </Dropdown>
                               </>
-                            ) : undefined
-                          }
+                            )
+                          })()}
                         />
                       </li>
                     )
