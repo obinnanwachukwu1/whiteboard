@@ -159,6 +159,16 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 }
 .animate-slide-in-right { animation: slideInRight 0.25s ease-out; }
 
+/* Width-based expand/collapse for AI side panel (clips fixed-width content) */
+@keyframes ai-panel-expand {
+  0% { width: 0; }
+  100% { width: 376px; }
+}
+@keyframes ai-panel-collapse {
+  0% { width: 376px; }
+  100% { width: 0; }
+}
+
 @keyframes slideOutRight {
   0% { transform: translateX(0); }
   100% { transform: translateX(100%); }

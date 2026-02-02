@@ -20,7 +20,8 @@ import { InboxPanel } from '../../components/InboxPanel'
 import { SettingsModal } from '../../components/SettingsModal'
 import { NotificationManager } from '../../components/NotificationManager'
 import type { ThemeSettings } from '../../utils/theme'
-import { AIPanelKeyboardHandler } from './AIPanelKeyboardHandler'
+import { AISidePanelKeyboardHandler } from './AISidePanelKeyboardHandler'
+import { AISidePanel } from '../../components/AISidePanel'
 
 type CurrentView =
   | 'dashboard'
@@ -163,9 +164,10 @@ export function AppShell({
                           onPrefetchNav={onPrefetchNav}
                           onReorder={onReorder}
                         />
-                        <main className="flex-1 flex flex-col overflow-hidden bg-white/50 dark:bg-neutral-900/50 rounded-tl-xl">
+                        <main className="flex-1 flex overflow-hidden bg-white/50 dark:bg-neutral-900/50 rounded-tl-xl">
+                          {/* Content area - shrinks when AI panel is open */}
                           <div
-                            className={`flex-1 flex flex-col min-h-0 p-6 ${currentView === 'course' ? 'pt-24 overflow-hidden' : 'overflow-y-auto'}`}
+                            className={`flex-1 flex flex-col min-h-0 min-w-0 p-6 ${currentView === 'course' ? 'pt-24 overflow-hidden' : 'overflow-y-auto'}`}
                           >
                             <div
                               className={`max-w-6xl w-full mx-auto ${currentView === 'course' ? 'flex-1 flex flex-col min-h-0' : ''}`}
@@ -173,13 +175,16 @@ export function AppShell({
                               <Outlet />
                             </div>
                           </div>
+
+                          {/* AI Side Panel - flex sibling, content shrinks to accommodate */}
+                          <AISidePanel />
                         </main>
                       </div>
                     </div>
                     <SearchModal isOpen={searchOpen} onClose={onCloseSearch} />
                     <SettingsModal isOpen={settingsOpen} onClose={onCloseSettings} />
                     <InboxPanel isOpen={inboxOpen} onClose={onCloseInbox} />
-                    <AIPanelKeyboardHandler />
+                    <AISidePanelKeyboardHandler />
                     <NotificationManager />
                   </>
                 )}
