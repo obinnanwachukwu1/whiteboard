@@ -1,0 +1,19 @@
+Context:
+## Attached Page
+Title: Introduction to the Course
+Course: Applied Combinatorics - MATH-3012-K&L
+Content:
+Welcome to Math 3012! Your instructor is Dr. Changxin Ding. This course is all about counting- but not just in the way you learned as a child. We want to explore the mathematical structures at work behind the scenes and use them to solve harder problems. In addition to learning specific knowledge and tools, we have some overall goals to work towards- by the end of the semester, we hope you’ll be able to: Apply basic counting techniques, and combine them to solve more complex problems Prove statements at the appropriate level using the principles of induction, inclusion/exclusion,and other combinatorial methods Solve problems at an appropriate level using recurrence relations, generating functions, andtools and ideas from graph theory In the above areas, communicate and document your mathematical reasoning and processeffectively Navigation Instructions The following tabs should show up in the navigation bar to the right, which you can use to move around our site. The Announcements tab takes you to the course announcements, where I will post course related information throughout the semester. I recommend checking your Canvas settings to be sure you also get notified when an announcement is posted. The Modules tab takes you to the coursework. The Ed Discussion tab will take you to our Ed Discussion page, where you can find discussion/question boards to help you stay connected asynchronously. The Grades tab takes you to the grade book, where you will find the grades you have earned on graded assignments, as well as your current grade. This is where you will be able to track your progress in the course. The GT Student Resources tab provides easy access to campus support for mental health and wellbeing, academic success, diversity, financial assistance, and professional enrichment resources. Please review and take advantage of these resources as necessary, and feel free to reach out if you need help connecting with any other assistance. The CIOS tab is where you will find a link to complete the end-of-term feedback survey for this course.
+
+Today is Monday, February 2, 2026.
+
+## Related Content (Semantic Search)
+[page] Syllabus: Assignment and Grading Information (Applied Combinatorics - MATH-3012-K&L): Course Syllabus: Grading Information MATH 3012 | Section K&L | 3 Credits Course Requirements and Grading At any level, we all learn math by doing math. This course is carefully designed to help you engage with the material in increasingly challenging ways, with an increasing amount of independence....
+
+[page] Syllabus Overview (Applied Combinatorics - MATH-3012-K&L): Course Syllabus MATH 3012 | Section K&L | 3 Credits General Information This first page describes logistical and technical aspects of the course. Please note that the official course syllabus consists of all pages in this first module, so please review them all carefully. Course Description This...
+
+[page] Syllabus: Communication Guide (Applied Combinatorics - MATH-3012-K&L): Canvas Announcements I will communicate important information through announcements . You may access the announcements directly in the left navigation menu to see the latest updates. Contacting Me Students should ask public content and course related questions via the "Ed Discussion" link in the...
+
+[page] Course Schedule and Material (Applied Combinatorics - MATH-3012-K&L): Here are some practice problems from our course coordinate Dr. Kalila Lehmann. 3012_Supplementary_Problems.pdf 3012_Supplementary_Problems_key.pdf Date Day Topics Learning objectives Textbook Sections Notes, Comments, and other materials Homework Coverage (Due Date) 1/12 Monday Introduction to the...
+
+Question: Explain the attached page "Introduction to the Course". Summarize it and list key takeaways.
