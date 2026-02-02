@@ -37,14 +37,8 @@ export function BackgroundLayer({ settings }: BackgroundLayerProps) {
     // Pattern background
     if (background.type === 'pattern') {
       // CSS pattern background (default to 'dots' if no patternId)
-      const patternId = (background.patternId || 'dots') as PatternId
-      const patternCSS = generatePatternCSS(
-        patternId,
-        accentHSL.h,
-        accentHSL.s,
-        accentHSL.l,
-        dark
-      )
+      const patternId = (background.patternId || 'solid') as PatternId
+      const patternCSS = generatePatternCSS(patternId, accentHSL.h, accentHSL.s, accentHSL.l, dark)
 
       // Parse the CSS string into style properties
       // First normalize whitespace (collapse newlines and multiple spaces)
@@ -106,8 +100,8 @@ export function BackgroundLayer({ settings }: BackgroundLayerProps) {
           ...backgroundStyle,
           opacity: imageOpacity,
           filter: blurAmount > 0 ? `blur(${blurAmount}px)` : undefined,
-          // Scale up slightly when blurred to avoid edge artifacts
-          transform: blurAmount > 0 ? 'scale(1.05)' : undefined,
+          // Keep a slight zoom for images
+          transform: showImageEffects ? 'scale(1.05)' : undefined,
         }}
         aria-hidden="true"
       />

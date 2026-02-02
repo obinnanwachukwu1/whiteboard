@@ -35,10 +35,11 @@ export function useRootLayoutNavigation({
   const coursePrefetchCooldown = useRef<Map<string, number>>(new Map())
   const navPrefetchCooldown = useRef<Map<string, number>>(new Map())
 
-  const pathname = useRouterState({ select: (s: any) => s.location.pathname })
-  const rawSearch = useRouterState({
-    select: (s: any) => (s.location as any).searchStr ?? (s.location as any).search ?? '',
-  }) as any
+  const routerState = useRouterState()
+  const pathname = routerState.location.pathname
+  const rawSearch = ((routerState.location as any).searchStr ??
+    (routerState.location as any).search ??
+    '') as unknown
   const searchStr = useMemo(() => {
     if (typeof rawSearch === 'string') return rawSearch
     try {
@@ -183,6 +184,7 @@ export function useRootLayoutNavigation({
         promises.push(
           queryClient.prefetchInfiniteQuery({
             queryKey: ['course-announcements-infinite', id, 10],
+            initialPageParam: 1,
             queryFn: async ({ pageParam = 1 }) => {
               const res = await window.canvas.listCourseAnnouncementsPage?.(
                 id,

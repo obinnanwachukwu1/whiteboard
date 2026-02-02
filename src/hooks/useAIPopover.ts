@@ -15,8 +15,8 @@ type UseAIPopoverOptions = {
 export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverOptions) => {
   const [showPopover, setShowPopover] = useState(false)
   const isHoveredRef = useRef(false)
-  const [cursorPos, setCursorPos] = useState<{x: number, y: number} | null>(null)
-  const cursorPosRef = useRef<{x: number, y: number} | null>(null)
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
+  const cursorPosRef = useRef<{ x: number; y: number } | null>(null)
   const [text, setText] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const textRef = useRef<string | null>(null)
@@ -24,6 +24,10 @@ export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverO
 
   const streamCleanupRef = useRef<(() => void) | null>(null)
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const closeCleanupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const CLOSE_GRACE_MS = 90
+  const EXIT_ANIM_MS = 200
 
   // Store onGenerate in a ref so it doesn't reset the hover timer on every render
   const onGenerateRef = useRef(onGenerate)
@@ -55,69 +59,95 @@ export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverO
     }
   }, [setLoadingState, setTextState])
 
-  const handleMouseEnter = useCallback((e: React.MouseEvent) => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current)
-      hoverTimeoutRef.current = null
-    }
-    isHoveredRef.current = true
+  const handleMouseEnter = useCallback(
+    (e: React.MouseEvent) => {
+      if (closeCleanupTimeoutRef.current) {
+        clearTimeout(closeCleanupTimeoutRef.current)
+        closeCleanupTimeoutRef.current = null
+      }
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current)
+        hoverTimeoutRef.current = null
+      }
+      isHoveredRef.current = true
 
-    if (!showPopover) {
-      cursorPosRef.current = { x: e.clientX, y: e.clientY }
-    }
+      if (!showPopover) {
+        cursorPosRef.current = { x: e.clientX, y: e.clientY }
+      }
 
-    if (enabled) {
-      hoverTimeoutRef.current = setTimeout(() => {
-        if (isHoveredRef.current) {
-          if (!showPopover) {
-            setCursorPos(cursorPosRef.current)
+      if (enabled) {
+        hoverTimeoutRef.current = setTimeout(() => {
+          if (isHoveredRef.current) {
+            if (!showPopover) {
+              setCursorPos(cursorPosRef.current)
+            }
+            setShowPopover(true)
+            startGeneration()
           }
-          setShowPopover(true)
-          startGeneration()
-        }
-      }, delay)
-    }
-  }, [showPopover, enabled, delay, startGeneration])
+        }, delay)
+      }
+    },
+    [showPopover, enabled, delay, startGeneration],
+  )
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!showPopover) {
-      cursorPosRef.current = { x: e.clientX, y: e.clientY }
-    }
-  }, [showPopover])
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!showPopover) {
+        cursorPosRef.current = { x: e.clientX, y: e.clientY }
+      }
+    },
+    [showPopover],
+  )
 
   const handleMouseLeave = useCallback(() => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current)
       hoverTimeoutRef.current = null
     }
-    
+
+    if (closeCleanupTimeoutRef.current) {
+      clearTimeout(closeCleanupTimeoutRef.current)
+      closeCleanupTimeoutRef.current = null
+    }
+
     // Give a small grace period before closing (for moving to popover)
     hoverTimeoutRef.current = setTimeout(() => {
       isHoveredRef.current = false
       setShowPopover(false)
-      setCursorPos(null)
-      
-      // Cleanup stream
+
+      // Stop any in-flight stream immediately, but keep content around
+      // during the exit animation so the popover closes smoothly.
       if (streamCleanupRef.current) {
         streamCleanupRef.current()
         streamCleanupRef.current = null
       }
-      setLoadingState(false)
-      setTextState(null)
-    }, 100)
+
+      closeCleanupTimeoutRef.current = setTimeout(() => {
+        if (isHoveredRef.current) return
+        setCursorPos(null)
+        setLoadingState(false)
+        setTextState(null)
+      }, EXIT_ANIM_MS)
+    }, CLOSE_GRACE_MS)
   }, [setLoadingState, setTextState])
 
   // Force close if disabled
   useEffect(() => {
     if (!enabled && showPopover) {
       setShowPopover(false)
-      setCursorPos(null)
       if (streamCleanupRef.current) {
         streamCleanupRef.current()
         streamCleanupRef.current = null
       }
-      setLoadingState(false)
-      setTextState(null)
+
+      if (closeCleanupTimeoutRef.current) {
+        clearTimeout(closeCleanupTimeoutRef.current)
+      }
+      closeCleanupTimeoutRef.current = setTimeout(() => {
+        setCursorPos(null)
+        setLoadingState(false)
+        setTextState(null)
+      }, EXIT_ANIM_MS)
     }
   }, [enabled, showPopover, setLoadingState, setTextState])
 
@@ -126,15 +156,19 @@ export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverO
     return () => {
       if (streamCleanupRef.current) streamCleanupRef.current()
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current)
+      if (closeCleanupTimeoutRef.current) clearTimeout(closeCleanupTimeoutRef.current)
     }
   }, [])
 
   return {
-    triggerProps: useMemo(() => ({
-      onMouseEnter: handleMouseEnter,
-      onMouseMove: handleMouseMove,
-      onMouseLeave: handleMouseLeave,
-    }), [handleMouseEnter, handleMouseMove, handleMouseLeave]),
+    triggerProps: useMemo(
+      () => ({
+        onMouseEnter: handleMouseEnter,
+        onMouseMove: handleMouseMove,
+        onMouseLeave: handleMouseLeave,
+      }),
+      [handleMouseEnter, handleMouseMove, handleMouseLeave],
+    ),
     popoverProps: {
       position: cursorPos,
       isOpen: showPopover,
@@ -145,10 +179,14 @@ export const useAIPopover = ({ enabled, delay = 600, onGenerate }: UseAIPopoverO
           clearTimeout(hoverTimeoutRef.current)
           hoverTimeoutRef.current = null
         }
+        if (closeCleanupTimeoutRef.current) {
+          clearTimeout(closeCleanupTimeoutRef.current)
+          closeCleanupTimeoutRef.current = null
+        }
         isHoveredRef.current = true
       },
-      onMouseLeave: handleMouseLeave
+      onMouseLeave: handleMouseLeave,
     },
-    isHovered: isHoveredRef.current
+    isHovered: isHoveredRef.current,
   }
 }

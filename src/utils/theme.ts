@@ -4,16 +4,39 @@
 import { THEME_CACHE_KEY } from './themeCache'
 
 export type AccentPreset =
-  | 'slate' | 'red' | 'orange' | 'amber' | 'yellow' | 'lime'
-  | 'green' | 'emerald' | 'teal' | 'cyan' | 'sky' | 'blue'
-  | 'indigo' | 'violet' | 'purple' | 'fuchsia' | 'pink' | 'rose'
+  | 'slate'
+  | 'red'
+  | 'orange'
+  | 'amber'
+  | 'yellow'
+  | 'lime'
+  | 'green'
+  | 'emerald'
+  | 'teal'
+  | 'cyan'
+  | 'sky'
+  | 'blue'
+  | 'indigo'
+  | 'violet'
+  | 'purple'
+  | 'fuchsia'
+  | 'pink'
+  | 'rose'
 
 // Legacy type for backward compatibility
-export type Accent = 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'
+export type Accent =
+  | 'default'
+  | 'red'
+  | 'orange'
+  | 'yellow'
+  | 'green'
+  | 'blue'
+  | 'indigo'
+  | 'violet'
 
 export type BackgroundMode = 'accent' | 'background'
 export type BackgroundType = 'solid' | 'pattern' | 'image'
-export type PatternId = 'dots' | 'grid' | 'mesh'
+export type PatternId = 'solid' | 'dots' | 'grid' | 'mesh'
 
 export interface BackgroundSettings {
   type: BackgroundType
@@ -54,10 +77,12 @@ function isBackgroundMode(value: unknown): value is BackgroundMode {
 }
 
 function isPatternId(value: unknown): value is PatternId {
-  return value === 'dots' || value === 'grid' || value === 'mesh'
+  return value === 'solid' || value === 'dots' || value === 'grid' || value === 'mesh'
 }
 
-function normalizeExtractedAccent(value: unknown): BackgroundSettings['extractedAccent'] | undefined {
+function normalizeExtractedAccent(
+  value: unknown,
+): BackgroundSettings['extractedAccent'] | undefined {
   if (!isRecord(value)) return undefined
   const h = clampNumber(value.h, 0, 360, NaN)
   const s = clampNumber(value.s, 0, 100, NaN)
@@ -71,17 +96,14 @@ export function normalizeThemeSettings(input: unknown): ThemeSettings | null {
   if (!isRecord(input)) return null
 
   const theme: ThemeSettings['theme'] =
-    input.theme === 'dark' || input.theme === 'light'
-      ? input.theme
-      : DEFAULT_THEME_SETTINGS.theme
+    input.theme === 'dark' || input.theme === 'light' ? input.theme : DEFAULT_THEME_SETTINGS.theme
 
   // Accept both new and legacy shapes.
-  const accentPreset: AccentPreset =
-    isAccentPreset(input.accentPreset)
-      ? input.accentPreset
-      : (typeof (input as any).accent === 'string'
-          ? legacyAccentToPreset((input as any).accent as any)
-          : DEFAULT_THEME_SETTINGS.accentPreset)
+  const accentPreset: AccentPreset = isAccentPreset(input.accentPreset)
+    ? input.accentPreset
+    : typeof (input as any).accent === 'string'
+      ? legacyAccentToPreset((input as any).accent as any)
+      : DEFAULT_THEME_SETTINGS.accentPreset
 
   const backgroundRaw = isRecord(input.background) ? input.background : {}
   const type: BackgroundType = isBackgroundType(backgroundRaw.type) ? backgroundRaw.type : 'solid'
@@ -94,7 +116,7 @@ export function normalizeThemeSettings(input: unknown): ThemeSettings | null {
   }
 
   if (type === 'pattern') {
-    background.patternId = isPatternId(backgroundRaw.patternId) ? backgroundRaw.patternId : 'dots'
+    background.patternId = isPatternId(backgroundRaw.patternId) ? backgroundRaw.patternId : 'solid'
   }
 
   if (type === 'image') {
@@ -106,34 +128,38 @@ export function normalizeThemeSettings(input: unknown): ThemeSettings | null {
   }
 
   // If background mode is missing, infer it from background type.
-  const backgroundMode: BackgroundMode =
-    isBackgroundMode(input.backgroundMode)
-      ? input.backgroundMode
-      : (type === 'solid' ? 'accent' : 'background')
+  const backgroundMode: BackgroundMode = isBackgroundMode(input.backgroundMode)
+    ? input.backgroundMode
+    : type === 'solid'
+      ? 'accent'
+      : 'background'
 
   return { theme, accentPreset, backgroundMode, background }
 }
 
 // HSL values for each accent preset (base hue, saturation, lightness for the primary shade)
-export const ACCENT_PRESETS: Record<AccentPreset, { h: number; s: number; l: number; name: string }> = {
-  slate:   { h: 215, s: 16, l: 47, name: 'Slate' },
-  red:     { h: 0,   s: 72, l: 51, name: 'Red' },
-  orange:  { h: 25,  s: 95, l: 53, name: 'Orange' },
-  amber:   { h: 38,  s: 92, l: 50, name: 'Amber' },
-  yellow:  { h: 48,  s: 96, l: 53, name: 'Yellow' },
-  lime:    { h: 84,  s: 81, l: 44, name: 'Lime' },
-  green:   { h: 142, s: 71, l: 45, name: 'Green' },
+export const ACCENT_PRESETS: Record<
+  AccentPreset,
+  { h: number; s: number; l: number; name: string }
+> = {
+  slate: { h: 215, s: 16, l: 47, name: 'Slate' },
+  red: { h: 0, s: 72, l: 51, name: 'Red' },
+  orange: { h: 25, s: 95, l: 53, name: 'Orange' },
+  amber: { h: 38, s: 92, l: 50, name: 'Amber' },
+  yellow: { h: 48, s: 96, l: 53, name: 'Yellow' },
+  lime: { h: 84, s: 81, l: 44, name: 'Lime' },
+  green: { h: 142, s: 71, l: 45, name: 'Green' },
   emerald: { h: 160, s: 84, l: 39, name: 'Emerald' },
-  teal:    { h: 173, s: 80, l: 40, name: 'Teal' },
-  cyan:    { h: 189, s: 94, l: 43, name: 'Cyan' },
-  sky:     { h: 199, s: 89, l: 48, name: 'Sky' },
-  blue:    { h: 217, s: 91, l: 60, name: 'Blue' },
-  indigo:  { h: 239, s: 84, l: 67, name: 'Indigo' },
-  violet:  { h: 258, s: 90, l: 66, name: 'Violet' },
-  purple:  { h: 271, s: 81, l: 56, name: 'Purple' },
+  teal: { h: 173, s: 80, l: 40, name: 'Teal' },
+  cyan: { h: 189, s: 94, l: 43, name: 'Cyan' },
+  sky: { h: 199, s: 89, l: 48, name: 'Sky' },
+  blue: { h: 217, s: 91, l: 60, name: 'Blue' },
+  indigo: { h: 239, s: 84, l: 67, name: 'Indigo' },
+  violet: { h: 258, s: 90, l: 66, name: 'Violet' },
+  purple: { h: 271, s: 81, l: 56, name: 'Purple' },
   fuchsia: { h: 292, s: 84, l: 61, name: 'Fuchsia' },
-  pink:    { h: 330, s: 81, l: 60, name: 'Pink' },
-  rose:    { h: 350, s: 89, l: 60, name: 'Rose' },
+  pink: { h: 330, s: 81, l: 60, name: 'Pink' },
+  rose: { h: 350, s: 89, l: 60, name: 'Rose' },
 }
 
 // Map legacy accent names to new presets
@@ -153,12 +179,17 @@ export function legacyAccentToPreset(accent: Accent): AccentPreset {
 }
 
 // Generate a full shade scale from HSL values
-function generateShadeScale(h: number, s: number, _l: number, dark: boolean): Record<string, string> {
+function generateShadeScale(
+  h: number,
+  s: number,
+  _l: number,
+  dark: boolean,
+): Record<string, string> {
   // Shade scale with adjusted lightness for each step
   // In light mode: higher numbers = darker
   // In dark mode: we invert the logic for better contrast
   const shades: Record<string, { s: number; l: number }> = {
-    '50':  { s: Math.max(s - 20, 10), l: dark ? 10 : 97 },
+    '50': { s: Math.max(s - 20, 10), l: dark ? 10 : 97 },
     '100': { s: Math.max(s - 15, 15), l: dark ? 15 : 94 },
     '200': { s: Math.max(s - 10, 20), l: dark ? 20 : 88 },
     '300': { s: Math.max(s - 5, 30), l: dark ? 30 : 78 },
@@ -179,7 +210,12 @@ function generateShadeScale(h: number, s: number, _l: number, dark: boolean): Re
 }
 
 // Generate all CSS tokens from accent HSL values
-export function generateAccentTokens(h: number, s: number, l: number, dark: boolean): Record<string, string> {
+export function generateAccentTokens(
+  h: number,
+  s: number,
+  l: number,
+  dark: boolean,
+): Record<string, string> {
   const shades = generateShadeScale(h, s, l, dark)
 
   // Semantic tokens mapped to shade scale
@@ -234,9 +270,7 @@ export function generateAccentTokens(h: number, s: number, l: number, dark: bool
     '--app-accent-hover': dark
       ? `hsla(${h}, ${Math.max(s - 35, 15)}%, 18%, 0.75)`
       : `hsla(${h}, ${Math.max(s, 45)}%, 94%, 0.75)`,
-    '--app-accent-active': dark
-      ? `hsla(${h}, ${s}%, 50%, 0.2)`
-      : `hsla(${h}, ${s}%, 55%, 0.25)`,
+    '--app-accent-active': dark ? `hsla(${h}, ${s}%, 50%, 0.2)` : `hsla(${h}, ${s}%, 55%, 0.25)`,
   }
 
   return tokens
@@ -272,7 +306,7 @@ export function applyThemeTokens(settings: ThemeSettings) {
   let h: number, s: number, l: number
 
   if (backgroundMode === 'background' && background.extractedAccent) {
-    ({ h, s, l } = background.extractedAccent)
+    ;({ h, s, l } = background.extractedAccent)
   } else {
     const preset = ACCENT_PRESETS[accentPreset] || ACCENT_PRESETS.slate
     ;({ h, s, l } = preset)
@@ -349,9 +383,7 @@ export function computeAccentBase(accent: Accent, dark: boolean): string {
   }
 
   // More visible base color in light mode
-  return dark
-    ? `hsl(${h}, ${Math.max(s - 30, 15)}%, 20%)`
-    : `hsl(${h}, ${Math.max(s, 35)}%, 94%)`
+  return dark ? `hsl(${h}, ${Math.max(s - 30, 15)}%, 20%)` : `hsl(${h}, ${Math.max(s, 35)}%, 94%)`
 }
 
 export function computeAccentHover(accent: Accent, dark: boolean): string {
@@ -377,9 +409,7 @@ export function computeAccentActive(accent: Accent, dark: boolean): string {
   }
 
   // More visible active state in light mode
-  return dark
-    ? `hsla(${h}, ${s}%, 50%, 0.5)`
-    : `hsla(${h}, ${s}%, 50%, 0.25)`
+  return dark ? `hsla(${h}, ${s}%, 50%, 0.5)` : `hsla(${h}, ${s}%, 50%, 0.25)`
 }
 
 // Legacy function - wraps new system

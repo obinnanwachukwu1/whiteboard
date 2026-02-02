@@ -34,7 +34,8 @@ const buildCoachHints = (description: string | undefined) => {
     deliverables.push('a memo')
   }
   if (/reflection/.test(text)) deliverables.push('a reflection')
-  if (/peer\s*review/.test(text) || /discussion\s*board/.test(text)) deliverables.push('a peer-review draft')
+  if (/peer\s*review/.test(text) || /discussion\s*board/.test(text))
+    deliverables.push('a peer-review draft')
 
   let next: string | null = null
   if (/audienc/.test(text) && /memo/.test(text)) {
@@ -66,55 +67,53 @@ type RowProps = Props & {
   isPastDue: boolean
 }
 
-const PriorityRow = React.memo(({
-  assignment,
-  courseImageUrl,
-  onClick,
-  triggerProps,
-  isPastDue,
-}: RowProps) => {
-  return (
-    <ListItemRow
-      interactiveProps={triggerProps}
-      onClick={onClick}
-      icon={
-        <CourseAvatar
-          courseId={assignment.courseId}
-          courseName={assignment.courseName}
-          src={courseImageUrl}
-          className="w-full h-full rounded-full"
-        />
-      }
-      title={assignment.name}
-      subtitle={
-        <span className="flex items-center justify-between gap-2 w-full">
-          <span className="truncate">
-            {cleanCourseName(assignment.courseLabel)}
-            {assignment.weightDisplay.text && (
-              <>
-                <span className="text-slate-300 dark:text-neutral-600 mx-1.5">·</span>
-                <span
-                  className={
-                    assignment.weightDisplay.emphasis === 'high'
-                      ? 'text-amber-600 dark:text-amber-400 font-medium'
-                      : assignment.weightDisplay.emphasis === 'medium'
-                      ? 'text-slate-600 dark:text-neutral-300'
-                      : 'text-slate-400 dark:text-neutral-500'
-                  }
-                >
-                  {assignment.weightDisplay.text}
-                </span>
-              </>
-            )}
+const PriorityRow = React.memo(
+  ({ assignment, courseImageUrl, onClick, triggerProps, isPastDue }: RowProps) => {
+    return (
+      <ListItemRow
+        interactiveProps={triggerProps}
+        onClick={onClick}
+        icon={
+          <CourseAvatar
+            courseId={assignment.courseId}
+            courseName={assignment.courseName}
+            src={courseImageUrl}
+            className="w-full h-full rounded-full"
+          />
+        }
+        title={assignment.name}
+        subtitle={
+          <span className="flex items-center justify-between gap-2 w-full">
+            <span className="truncate">
+              {cleanCourseName(assignment.courseLabel)}
+              {assignment.weightDisplay.text && (
+                <>
+                  <span className="text-slate-300 dark:text-neutral-600 mx-1.5">·</span>
+                  <span
+                    className={
+                      assignment.weightDisplay.emphasis === 'high'
+                        ? 'text-amber-600 dark:text-amber-400 font-medium'
+                        : assignment.weightDisplay.emphasis === 'medium'
+                          ? 'text-slate-600 dark:text-neutral-300'
+                          : 'text-slate-400 dark:text-neutral-500'
+                    }
+                  >
+                    {assignment.weightDisplay.text}
+                  </span>
+                </>
+              )}
+            </span>
+            <span
+              className={`whitespace-nowrap flex-shrink-0 ${isPastDue ? 'text-red-500 dark:text-red-400 font-medium' : ''}`}
+            >
+              {assignment.relativeTime}
+            </span>
           </span>
-          <span className={`whitespace-nowrap flex-shrink-0 ${isPastDue ? 'text-red-500 dark:text-red-400 font-medium' : ''}`}>
-            {assignment.relativeTime}
-          </span>
-        </span>
-      }
-    />
-  )
-})
+        }
+      />
+    )
+  },
+)
 
 PriorityRow.displayName = 'PriorityRow'
 
@@ -126,20 +125,18 @@ export const PriorityItem: React.FC<Props> = ({ assignment, courseImageUrl, onCl
   const { streamExplainPriority } = useAI()
   const { aiEnabled } = useAppFlags()
   const showAI = aiEnabled
-  
+
   const isPastDue = assignment.hoursUntilDue !== null && assignment.hoursUntilDue < 0
 
   const courseId = assignment.courseId
-  const restId = assignment.htmlUrl ? extractAssignmentIdFromUrl(assignment.htmlUrl) || assignment.id : assignment.id
+  const restId = assignment.htmlUrl
+    ? extractAssignmentIdFromUrl(assignment.htmlUrl) || assignment.id
+    : assignment.id
 
-  const { data: assignmentRest } = useAssignmentRest(
-    courseId,
-    restId,
-    {
-      enabled: showAI && !!courseId && !!restId,
-      staleTime: 1000 * 60 * 10,
-    }
-  )
+  const { data: assignmentRest } = useAssignmentRest(courseId, restId, [], {
+    enabled: showAI && !!courseId && !!restId,
+    staleTime: 1000 * 60 * 10,
+  })
 
   const descriptionText = assignmentRest?.description
     ? sanitizeCoachText(stripHtml(assignmentRest.description)).slice(0, 800)
@@ -164,37 +161,48 @@ export const PriorityItem: React.FC<Props> = ({ assignment, courseImageUrl, onCl
   const { triggerProps, popoverProps } = useAIPopover({
     enabled: showAI,
     onGenerate: (update) => {
-      return streamExplainPriority({
-        assignmentName: assignment.name,
-        courseName: cleanCourseName(assignment.courseLabel),
-        relativeDue: coachRelativeDue,
-        hoursUntilDue: assignment.hoursUntilDue ?? null,
-        urgencyMultiplier: assignment.urgencyMultiplier ?? null,
-        weightText: assignment.weightDisplay.text,
-        weightPercent: assignment.effectiveWeight ?? null,
-        pointsPossible: assignment.pointsPossible && assignment.pointsPossible > 0 ? assignment.pointsPossible : null,
-        rank: null,
-        assignmentDescription: descriptionText,
-        draftWhy: [
-          isPastDue ? `Past due (~${Math.abs(Math.round(hours ?? 0))}h)` : `Due ${assignment.relativeTime}`,
-          assignment.weightDisplay.text || (assignment.pointsPossible ? `${assignment.pointsPossible} pts` : ''),
-          hints.deliverablesText ? `Deliverables: ${hints.deliverablesText}` : '',
-        ].filter(Boolean).join('; '),
-        draftNext: (() => {
-          let next = hints.next || 'Start now; outline and submit'
-          if (!hints.next && hours !== null) {
-            if (hours <= 6) next = 'Block 30m now; submit'
-            else if (hours <= 24) next = 'Do a 45m push today'
-            else if (hours <= 72) next = 'Schedule 45m today; start draft'
-            else next = 'Book 30m today to start'
-          }
-          if (isPastDue) {
-            next = 'Submit ASAP; recover partial credit'
-          }
-          return next
-        })(),
-      }, update)
-    }
+      return streamExplainPriority(
+        {
+          assignmentName: assignment.name,
+          courseName: cleanCourseName(assignment.courseLabel),
+          relativeDue: coachRelativeDue,
+          hoursUntilDue: assignment.hoursUntilDue ?? null,
+          urgencyMultiplier: assignment.urgencyMultiplier ?? null,
+          weightText: assignment.weightDisplay.text,
+          weightPercent: assignment.effectiveWeight ?? null,
+          pointsPossible:
+            assignment.pointsPossible && assignment.pointsPossible > 0
+              ? assignment.pointsPossible
+              : null,
+          rank: null,
+          assignmentDescription: descriptionText,
+          draftWhy: [
+            isPastDue
+              ? `Past due (~${Math.abs(Math.round(hours ?? 0))}h)`
+              : `Due ${assignment.relativeTime}`,
+            assignment.weightDisplay.text ||
+              (assignment.pointsPossible ? `${assignment.pointsPossible} pts` : ''),
+            hints.deliverablesText ? `Deliverables: ${hints.deliverablesText}` : '',
+          ]
+            .filter(Boolean)
+            .join('; '),
+          draftNext: (() => {
+            let next = hints.next || 'Start now; outline and submit'
+            if (!hints.next && hours !== null) {
+              if (hours <= 6) next = 'Block 30m now; submit'
+              else if (hours <= 24) next = 'Do a 45m push today'
+              else if (hours <= 72) next = 'Schedule 45m today; start draft'
+              else next = 'Book 30m today to start'
+            }
+            if (isPastDue) {
+              next = 'Submit ASAP; recover partial credit'
+            }
+            return next
+          })(),
+        },
+        update,
+      )
+    },
   })
 
   return (
@@ -206,10 +214,7 @@ export const PriorityItem: React.FC<Props> = ({ assignment, courseImageUrl, onCl
         triggerProps={triggerProps}
         isPastDue={isPastDue}
       />
-      <SummaryPopover
-        {...popoverProps}
-        title="AI Coach"
-      />
+      <SummaryPopover {...popoverProps} title="AI Coach" />
     </>
   )
 }

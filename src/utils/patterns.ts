@@ -49,7 +49,7 @@ function generateGridPattern(h: number, s: number, _l: number, dark: boolean): s
 // Mesh gradient - multi-point color mesh with complementary hues
 function generateMeshPattern(h: number, s: number, _l: number, dark: boolean): string {
   // Generate complementary and analogous hues
-  const h2 = (h + 60) % 360  // Analogous
+  const h2 = (h + 60) % 360 // Analogous
   const h3 = (h + 180) % 360 // Complementary
   const h4 = (h + 240) % 360 // Split-complementary
 
@@ -80,6 +80,12 @@ function generateMeshPattern(h: number, s: number, _l: number, dark: boolean): s
 // Pattern definitions
 export const PATTERNS: PatternDefinition[] = [
   {
+    id: 'solid',
+    name: 'Solid',
+    description: 'Clean accent tint',
+    generate: generateSolidPattern,
+  },
+  {
     id: 'dots',
     name: 'Dots',
     description: 'Subtle polka dot grid',
@@ -101,21 +107,43 @@ export const PATTERNS: PatternDefinition[] = [
 
 // Get pattern by ID
 export function getPattern(id: PatternId): PatternDefinition | undefined {
-  return PATTERNS.find(p => p.id === id)
+  return PATTERNS.find((p) => p.id === id)
 }
 
 // Generate CSS for a pattern
-export function generatePatternCSS(patternId: PatternId, h: number, s: number, l: number, dark: boolean): string {
+export function generatePatternCSS(
+  patternId: PatternId,
+  h: number,
+  s: number,
+  l: number,
+  dark: boolean,
+): string {
   const pattern = getPattern(patternId)
   if (!pattern) return ''
   return pattern.generate(h, s, l, dark)
 }
 
 // Generate pattern preview (smaller scale for thumbnails)
-export function generatePatternPreview(patternId: PatternId, h: number, s: number, l: number, dark: boolean): string {
+export function generatePatternPreview(
+  patternId: PatternId,
+  h: number,
+  s: number,
+  l: number,
+  dark: boolean,
+): string {
   const css = generatePatternCSS(patternId, h, s, l, dark)
   // Scale down the background-size for previews
   return css.replace(/background-size:\s*(\d+)px\s+(\d+)px/g, (_, w, h) => {
     return `background-size: ${Math.round(parseInt(w) / 2)}px ${Math.round(parseInt(h) / 2)}px`
   })
+}
+// Solid pattern - plain accent-tinted background
+function generateSolidPattern(h: number, s: number, _l: number, dark: boolean): string {
+  const bgColor = dark
+    ? `hsl(${h}, ${Math.max(s - 50, 5)}%, 8%)`
+    : `hsl(${h}, ${Math.max(s - 40, 10)}%, 98%)`
+
+  return `
+    background-color: ${bgColor};
+  `
 }

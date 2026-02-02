@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { SettingsSection } from './SettingsSection'
 import { SettingsRow, SegmentedControl } from './SettingsRow'
-import { Slider } from './Slider'
 import { ImageDropZone } from './ImageDropZone'
 import { PatternPicker } from './PatternPicker'
 import {
@@ -12,7 +11,6 @@ import {
   DEFAULT_THEME_SETTINGS,
   type ThemeSettings,
   type AccentPreset,
-  type BackgroundType,
   type PatternId,
 } from '../../utils/theme'
 import { extractAccentColor } from '../../utils/colorExtraction'
@@ -31,6 +29,7 @@ export function AppearanceSettings() {
   const data = useAppData()
   const [settings, setSettings] = useState<ThemeSettings>(DEFAULT_THEME_SETTINGS)
   const [isExtracting, setIsExtracting] = useState(false)
+  const DEFAULT_IMAGE_BLUR = 12
 
   // Load saved settings on mount
   useEffect(() => {
@@ -89,115 +88,159 @@ export function AppearanceSettings() {
         }
       } catch {}
     })()
-    return () => { mounted = false }
+    return () => {
+      mounted = false
+    }
   }, [])
 
   // Save and apply settings
-  const saveSettings = useCallback(async (newSettings: ThemeSettings) => {
-    setSettings(newSettings)
-    applyThemeTokens(newSettings)
+  const saveSettings = useCallback(
+    async (newSettings: ThemeSettings) => {
+      setSettings(newSettings)
+      applyThemeTokens(newSettings)
 
-    // Dispatch event so other components (like BackgroundLayer) can update
-    window.dispatchEvent(new CustomEvent('theme-settings-changed', { detail: newSettings }))
+      // Dispatch event so other components (like BackgroundLayer) can update
+      window.dispatchEvent(new CustomEvent('theme-settings-changed', { detail: newSettings }))
 
-    try {
-      // Save to global config
-      await window.settings.set?.({ themeConfig: newSettings } as any)
+      try {
+        // Save to global config
+        await window.settings.set?.({ themeConfig: newSettings } as any)
 
-      // Also save to per-user settings if we have a user
-      const userKey = data?.profile?.id ? `${data.baseUrl}|${data.profile.id}` : null
-      if (userKey) {
-        const cfg = await window.settings.get?.()
-        const map = (cfg?.ok ? (cfg.data as any)?.userSettings : undefined) || {}
-        const cur = map[userKey] || {}
-        map[userKey] = { ...cur, themeConfig: newSettings }
-        await window.settings.set?.({ userSettings: map })
+        // Also save to per-user settings if we have a user
+        const userKey = data?.profile?.id ? `${data.baseUrl}|${data.profile.id}` : null
+        if (userKey) {
+          const cfg = await window.settings.get?.()
+          const map = (cfg?.ok ? (cfg.data as any)?.userSettings : undefined) || {}
+          const cur = map[userKey] || {}
+          map[userKey] = { ...cur, themeConfig: newSettings }
+          await window.settings.set?.({ userSettings: map })
+        }
+      } catch (e) {
+        console.error('Failed to save theme settings:', e)
       }
-    } catch (e) {
-      console.error('Failed to save theme settings:', e)
-    }
-  }, [data])
+    },
+    [data],
+  )
 
   // Theme toggle
-  const handleThemeChange = useCallback((theme: 'light' | 'dark') => {
-    saveSettings({ ...settings, theme })
-  }, [settings, saveSettings])
+  const handleThemeChange = useCallback(
+    (theme: 'light' | 'dark') => {
+      saveSettings({ ...settings, theme })
+    },
+    [settings, saveSettings],
+  )
 
   // Accent preset change
-  const handleAccentChange = useCallback((preset: AccentPreset) => {
-    saveSettings({
-      ...settings,
-      accentPreset: preset,
-      // When changing accent in background mode, clear extracted color
-      background: {
-        ...settings.background,
-        extractedAccent: undefined,
-      },
-    })
-  }, [settings, saveSettings])
+  const handleAccentChange = useCallback(
+    (preset: AccentPreset) => {
+      saveSettings({
+        ...settings,
+        accentPreset: preset,
+        // When changing accent in background mode, clear extracted color
+        background: {
+          ...settings.background,
+          extractedAccent: undefined,
+        },
+      })
+    },
+    [settings, saveSettings],
+  )
 
-  // Background type change (solid, pattern, image)
-  const handleBackgroundTypeChange = useCallback((type: BackgroundType) => {
-    saveSettings({
-      ...settings,
-      // Set backgroundMode based on type: solid = accent mode, pattern/image = background mode
-      backgroundMode: type === 'solid' ? 'accent' : 'background',
-      background: {
-        ...settings.background,
-        type,
-        // Clear type-specific settings
-        patternId: type === 'pattern' ? (settings.background.patternId || 'dots') : undefined,
-        imageUrl: type === 'image' ? settings.background.imageUrl : undefined,
-        extractedAccent: type === 'image' ? settings.background.extractedAccent : undefined,
-        // Reset image controls for non-image types
-        blur: type === 'image' ? settings.background.blur : 0,
-        opacity: type === 'image' ? settings.background.opacity : 100,
-        overlay: type === 'image' ? settings.background.overlay : 0,
-      },
-    })
-  }, [settings, saveSettings])
+  const handleBackgroundTypeChange = useCallback(
+    (type: 'color' | 'image') => {
+      if (type === 'image') {
+        const blur = settings.background.blur > 0 ? settings.background.blur : DEFAULT_IMAGE_BLUR
+        saveSettings({
+          ...settings,
+          backgroundMode: 'background',
+          background: {
+            ...settings.background,
+            type: 'image',
+            imageUrl: settings.background.imageUrl,
+            extractedAccent: settings.background.extractedAccent,
+            blur,
+            opacity: 100,
+            overlay: 0,
+          },
+        })
+        return
+      }
+
+      const nextPattern = settings.background.patternId || 'solid'
+      saveSettings({
+        ...settings,
+        backgroundMode: 'accent',
+        background: {
+          ...settings.background,
+          type: 'pattern',
+          patternId: nextPattern,
+          imageUrl: undefined,
+          extractedAccent: undefined,
+          blur: 0,
+          opacity: 100,
+          overlay: 0,
+        },
+      })
+    },
+    [settings, saveSettings],
+  )
 
   // Pattern selection
-  const handlePatternSelect = useCallback((patternId: PatternId) => {
-    saveSettings({
-      ...settings,
-      background: {
-        ...settings.background,
-        patternId,
-      },
-    })
-  }, [settings, saveSettings])
+  const handlePatternSelect = useCallback(
+    (patternId: PatternId) => {
+      saveSettings({
+        ...settings,
+        background: {
+          ...settings.background,
+          type: 'pattern',
+          patternId,
+        },
+      })
+    },
+    [settings, saveSettings],
+  )
 
   // Image selection
-  const handleImageSelect = useCallback(async (imageUrl: string) => {
-    setIsExtracting(true)
+  const handleImageSelect = useCallback(
+    async (imageUrl: string) => {
+      setIsExtracting(true)
 
-    try {
-      // Extract accent color from the image
-      const extractedAccent = await extractAccentColor(imageUrl)
+      try {
+        // Extract accent color from the image
+        const extractedAccent = await extractAccentColor(imageUrl)
 
-      saveSettings({
-        ...settings,
-        background: {
-          ...settings.background,
-          imageUrl,
-          extractedAccent,
-        },
-      })
-    } catch (e) {
-      console.error('Failed to extract color:', e)
-      // Still save the image even if extraction fails
-      saveSettings({
-        ...settings,
-        background: {
-          ...settings.background,
-          imageUrl,
-        },
-      })
-    } finally {
-      setIsExtracting(false)
-    }
-  }, [settings, saveSettings])
+        saveSettings({
+          ...settings,
+          background: {
+            ...settings.background,
+            type: 'image',
+            imageUrl,
+            extractedAccent,
+            blur: settings.background.blur > 0 ? settings.background.blur : DEFAULT_IMAGE_BLUR,
+            opacity: 100,
+            overlay: 0,
+          },
+        })
+      } catch (e) {
+        console.error('Failed to extract color:', e)
+        // Still save the image even if extraction fails
+        saveSettings({
+          ...settings,
+          background: {
+            ...settings.background,
+            type: 'image',
+            imageUrl,
+            blur: settings.background.blur > 0 ? settings.background.blur : DEFAULT_IMAGE_BLUR,
+            opacity: 100,
+            overlay: 0,
+          },
+        })
+      } finally {
+        setIsExtracting(false)
+      }
+    },
+    [settings, saveSettings],
+  )
 
   // Image removal
   const handleImageRemove = useCallback(() => {
@@ -205,7 +248,8 @@ export function AppearanceSettings() {
       ...settings,
       background: {
         ...settings.background,
-        type: 'solid',
+        type: 'pattern',
+        patternId: settings.background.patternId || 'solid',
         imageUrl: undefined,
         extractedAccent: undefined,
         blur: 0,
@@ -216,29 +260,36 @@ export function AppearanceSettings() {
   }, [settings, saveSettings])
 
   // Image controls
-  const handleBlurChange = useCallback((blur: number) => {
-    saveSettings({
-      ...settings,
-      background: { ...settings.background, blur },
-    })
-  }, [settings, saveSettings])
+  const BLUR_OPTIONS = [
+    { value: 'none', label: 'None', amount: 0 },
+    { value: 'light', label: 'Light', amount: 6 },
+    { value: 'moderate', label: 'Moderate', amount: 12 },
+    { value: 'heavy', label: 'Heavy', amount: 20 },
+  ] as const
 
-  const handleOpacityChange = useCallback((opacity: number) => {
-    saveSettings({
-      ...settings,
-      background: { ...settings.background, opacity },
-    })
-  }, [settings, saveSettings])
+  const blurChoice = (() => {
+    const blur = settings.background.blur
+    if (blur <= 0) return 'none'
+    if (blur <= 8) return 'light'
+    if (blur <= 16) return 'moderate'
+    return 'heavy'
+  })()
 
-  const handleOverlayChange = useCallback((overlay: number) => {
-    saveSettings({
-      ...settings,
-      background: { ...settings.background, overlay },
-    })
-  }, [settings, saveSettings])
+  const handleBlurChoiceChange = useCallback(
+    (value: (typeof BLUR_OPTIONS)[number]['value']) => {
+      const option = BLUR_OPTIONS.find((o) => o.value === value)
+      if (!option) return
+      saveSettings({
+        ...settings,
+        background: { ...settings.background, blur: option.amount },
+      })
+    },
+    [settings, saveSettings],
+  )
 
   const dark = settings.theme === 'dark'
   const isImageBackground = settings.background.type === 'image'
+  const backgroundChoice = isImageBackground ? 'image' : 'color'
 
   return (
     <SettingsSection title="Appearance">
@@ -257,11 +308,10 @@ export function AppearanceSettings() {
       {/* Background Type Selection */}
       <SettingsRow label="Background">
         <SegmentedControl
-          value={settings.background.type}
+          value={backgroundChoice}
           onChange={handleBackgroundTypeChange}
           options={[
-            { value: 'solid', label: 'Solid' },
-            { value: 'pattern', label: 'Pattern' },
+            { value: 'color', label: 'Color' },
             { value: 'image', label: 'Image' },
           ]}
         />
@@ -281,24 +331,25 @@ export function AppearanceSettings() {
                     w-5 h-5 rounded-full transition-all duration-150
                     ring-1 ring-black/10 dark:ring-white/10
                     hover:scale-110
-                    ${settings.accentPreset === preset
-                      ? 'ring-2 ring-offset-2 ring-slate-900 dark:ring-white'
-                      : ''
+                    ${
+                      settings.accentPreset === preset
+                        ? 'ring-2 ring-offset-2 ring-slate-900 dark:ring-white'
+                        : ''
                     }
                   `}
                   style={{ backgroundColor: getPresetSwatchColor(preset, dark) }}
                 />
-              ))
+              )),
             )}
           </div>
         </SettingsRow>
       )}
 
       {/* Pattern Picker */}
-      {settings.background.type === 'pattern' && (
+      {backgroundChoice === 'color' && (
         <div className="px-4 py-3 border-b border-gray-100 dark:border-neutral-800">
           <PatternPicker
-            selected={settings.background.patternId}
+            selected={settings.background.patternId || 'solid'}
             onSelect={handlePatternSelect}
             accentPreset={settings.accentPreset}
             dark={dark}
@@ -325,30 +376,13 @@ export function AppearanceSettings() {
           {/* Image Controls */}
           {settings.background.imageUrl && (
             <div className="space-y-3 pt-2">
-              <Slider
-                label="Blur"
-                value={settings.background.blur}
-                onChange={handleBlurChange}
-                min={0}
-                max={30}
-                unit="px"
-              />
-              <Slider
-                label="Opacity"
-                value={settings.background.opacity}
-                onChange={handleOpacityChange}
-                min={10}
-                max={100}
-                unit="%"
-              />
-              <Slider
-                label="Overlay"
-                value={settings.background.overlay}
-                onChange={handleOverlayChange}
-                min={0}
-                max={50}
-                unit="%"
-              />
+              <SettingsRow label="Blur" indent>
+                <SegmentedControl
+                  value={blurChoice}
+                  onChange={handleBlurChoiceChange}
+                  options={BLUR_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                />
+              </SettingsRow>
             </div>
           )}
         </div>
