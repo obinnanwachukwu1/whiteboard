@@ -470,33 +470,6 @@ function createWindow() {
     // If isQuitting is true, let the window close normally
   })
 
-  // WORKAROUND: Force a repaint of native window controls (traffic lights) on blur.
-  // This fixes the issue where traffic lights disappear when the window loses focus
-  // in 'hiddenInset' mode.
-  win.on('blur', () => {
-    if (process.platform === 'darwin') {
-      try {
-        // Toggle visibility to force a redraw
-        win?.setWindowButtonVisibility(false)
-        // Immediate timeout to bring them back
-        setTimeout(() => {
-          try {
-            win?.setWindowButtonVisibility(true)
-          } catch {}
-        }, 0)
-      } catch {}
-    }
-  })
-
-  // Ensure they are visible on focus
-  win.on('focus', () => {
-    if (process.platform === 'darwin') {
-      try {
-        win?.setWindowButtonVisibility(true)
-      } catch {}
-    }
-  })
-
   try {
     win.webContents.setVisualZoomLevelLimits(1, 1)
   } catch {}
