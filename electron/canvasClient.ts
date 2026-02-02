@@ -742,8 +742,14 @@ export class CanvasClient {
   }
 
   // Assignments (REST detail for description)
-  async getAssignmentRest(courseId: string | number, assignmentRestId: string | number) {
-    return this.get(`/courses/${courseId}/assignments/${assignmentRestId}`)
+  async getAssignmentRest(
+    courseId: string | number,
+    assignmentRestId: string | number,
+    include?: string[],
+  ) {
+    const p: Record<string, any> = {}
+    if (include && include.length > 0) p['include[]'] = include
+    return this.get(`/courses/${courseId}/assignments/${assignmentRestId}`, p)
   }
 
   // Files
@@ -1303,8 +1309,9 @@ export async function getCourseFrontPage(courseId: string | number) {
 export async function getAssignmentRest(
   courseId: string | number,
   assignmentRestId: string | number,
+  include?: string[],
 ) {
-  return ensureClient().getAssignmentRest(courseId, assignmentRestId)
+  return ensureClient().getAssignmentRest(courseId, assignmentRestId, include)
 }
 export async function getFile(fileId: string | number) {
   return ensureClient().getFile(fileId)

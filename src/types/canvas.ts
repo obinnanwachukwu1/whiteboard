@@ -65,6 +65,7 @@ export type AssignmentRestDetail = {
   due_at?: string | null
   submission_types?: string[]
   allowed_extensions?: string[]
+  submission?: SubmissionDetail
   external_tool_tag_attributes?: {
     url?: string
     new_tab?: boolean
@@ -146,21 +147,21 @@ export type ActivityAnnouncement = {
 export type DiscussionTopic = {
   id: string | number
   title: string
-  message?: string                    // HTML body of the discussion prompt
+  message?: string // HTML body of the discussion prompt
   html_url?: string
   posted_at?: string
   last_reply_at?: string
-  discussion_subentry_count?: number  // Total reply count
+  discussion_subentry_count?: number // Total reply count
   read_state?: 'read' | 'unread'
   unread_count?: number
   subscribed?: boolean
-  user_name?: string                  // Author name
+  user_name?: string // Author name
   user_id?: string | number
   locked?: boolean
   pinned?: boolean
-  require_initial_post?: boolean      // Must post before seeing others
+  require_initial_post?: boolean // Must post before seeing others
   discussion_type?: 'side_comment' | 'threaded'
-  assignment_id?: string | number     // If graded discussion
+  assignment_id?: string | number // If graded discussion
   delayed_post_at?: string
   lock_at?: string
   author?: {
@@ -174,13 +175,13 @@ export type DiscussionEntry = {
   id: string | number
   user_id: string | number
   user_name?: string
-  message: string                     // HTML content
+  message: string // HTML content
   created_at: string
   updated_at?: string
   read_state?: 'read' | 'unread'
   forced_read_state?: boolean
-  replies?: DiscussionEntry[]         // Nested replies (threaded discussions)
-  recent_replies?: DiscussionEntry[]  // For side_comment type
+  replies?: DiscussionEntry[] // Nested replies (threaded discussions)
+  recent_replies?: DiscussionEntry[] // For side_comment type
   has_more_replies?: boolean
   attachment?: {
     id: string | number
@@ -198,7 +199,7 @@ export type DiscussionParticipant = {
 export type DiscussionView = {
   participants: DiscussionParticipant[]
   unread_entries: (string | number)[]
-  view: DiscussionEntry[]             // Top-level entries
+  view: DiscussionEntry[] // Top-level entries
 }
 
 // Legacy alias for backward compatibility

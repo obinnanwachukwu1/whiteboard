@@ -1346,9 +1346,14 @@ ipcMain.handle(
 
 ipcMain.handle(
   'canvas:getAssignmentRest',
-  async (_evt, courseId: string | number, assignmentRestId: string | number) => {
+  async (
+    _evt,
+    courseId: string | number,
+    assignmentRestId: string | number,
+    include?: string[],
+  ) => {
     try {
-      const data = await svcGetAssignmentRest(courseId, assignmentRestId)
+      const data = await svcGetAssignmentRest(courseId, assignmentRestId, include)
       return { ok: true, data }
     } catch (e: any) {
       const msg = e instanceof CanvasError ? e.message : String(e?.message || e)

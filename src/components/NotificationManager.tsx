@@ -273,6 +273,13 @@ export function NotificationManager() {
         const due = new Date(assign.dueAt)
         const id = Number(assign.assignment_rest_id || assign.assignment_graphql_id)
         if (!id) continue
+        const workflowState = assign.submission?.workflowState
+        const isSubmitted =
+          Boolean(assign.submission?.submittedAt) ||
+          workflowState === 'submitted' ||
+          workflowState === 'graded' ||
+          workflowState === 'pending_review'
+        if (isSubmitted) continue
 
         // If due in future (but soon) AND not already notified
         if (due > now && due <= in24h && !notifiedIds.has(id)) {

@@ -1,5 +1,14 @@
 import React from 'react'
-import { ExternalLink, Link2, Loader2, UploadCloud, X, File, CheckCircle2, Clock } from 'lucide-react'
+import {
+  ExternalLink,
+  Link2,
+  Loader2,
+  UploadCloud,
+  X,
+  File,
+  CheckCircle2,
+  Clock,
+} from 'lucide-react'
 import type { AssignmentRestDetail, SubmissionDetail } from '../../types/canvas'
 import { Button } from '../ui/Button'
 import { useSubmitAssignment, useSubmitAssignmentUpload } from '../../hooks/useCanvasMutations'
@@ -11,10 +20,22 @@ type Props = {
   assignmentRestId: string | number
   assignment: AssignmentRestDetail
   submission?: SubmissionDetail | null
+  discussion?: {
+    title?: string
+    onOpen: () => void
+  }
 }
 
-export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRestId, assignment, submission }) => {
-  const submissionTypes = Array.isArray(assignment.submission_types) ? assignment.submission_types : []
+export const AssignmentSubmitPanel: React.FC<Props> = ({
+  courseId,
+  assignmentRestId,
+  assignment,
+  submission,
+  discussion,
+}) => {
+  const submissionTypes = Array.isArray(assignment.submission_types)
+    ? assignment.submission_types
+    : []
   const supportsUpload = submissionTypes.includes('online_upload')
   const supportsText = submissionTypes.includes('online_text_entry')
   const supportsUrl = submissionTypes.includes('online_url')
@@ -30,7 +51,7 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
     if (supportsText) return 'text'
     return 'url'
   })
-  
+
   React.useEffect(() => {
     if (!supportsUpload && !supportsText && !supportsUrl) return
 
@@ -54,7 +75,9 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
   // Parse allowed extensions for display and filtering
   const allowedExtensions = React.useMemo(() => {
     if (!assignment.allowed_extensions) return []
-    return assignment.allowed_extensions.map(e => e.trim().toLowerCase().replace(/^\./, '')).filter(Boolean)
+    return assignment.allowed_extensions
+      .map((e) => e.trim().toLowerCase().replace(/^\./, ''))
+      .filter(Boolean)
   }, [assignment.allowed_extensions])
 
   // Get latest comment
@@ -92,10 +115,11 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
     setErr(null)
     try {
       // Create filter from allowed extensions
-      const filters = allowedExtensions.length > 0 
-        ? [{ name: 'Allowed Extensions', extensions: allowedExtensions }] 
-        : undefined
-      
+      const filters =
+        allowedExtensions.length > 0
+          ? [{ name: 'Allowed Extensions', extensions: allowedExtensions }]
+          : undefined
+
       const res = await window.system.pickFiles({ multiple: true, filters })
       if (!res?.ok) {
         setErr(res?.error || 'Failed to pick files')
@@ -121,10 +145,10 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
           setErr('Pick at least one file to upload.')
           return
         }
-        
-        await submitUpload.mutateAsync({ 
-          courseId, 
-          assignmentRestId, 
+
+        await submitUpload.mutateAsync({
+          courseId,
+          assignmentRestId,
           filePaths: picked.map((p) => p.path),
         })
         setPicked([])
@@ -137,7 +161,12 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
           setErr('Enter some text to submit.')
           return
         }
-        await submitText.mutateAsync({ courseId, assignmentRestId, submissionType: 'online_text_entry', body: textBody })
+        await submitText.mutateAsync({
+          courseId,
+          assignmentRestId,
+          submissionType: 'online_text_entry',
+          body: textBody,
+        })
         setTextBody('')
         setAttempting(false)
         return
@@ -159,7 +188,12 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
           setErr('Invalid URL.')
           return
         }
-        await submitText.mutateAsync({ courseId, assignmentRestId, submissionType: 'online_url', url: v })
+        await submitText.mutateAsync({
+          courseId,
+          assignmentRestId,
+          submissionType: 'online_url',
+          url: v,
+        })
         setUrlValue('')
         setAttempting(false)
       }
@@ -182,17 +216,25 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
         <div className="p-4 flex flex-col gap-3">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${score != null ? 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'}`}>
-                {score != null ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+              <div
+                className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${score != null ? 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'}`}
+              >
+                {score != null ? (
+                  <CheckCircle2 className="w-5 h-5" />
+                ) : (
+                  <Clock className="w-5 h-5" />
+                )}
               </div>
               <div>
                 <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                  {excused ? 'Excused' : (score != null ? 'Graded' : 'Submitted')}
+                  {excused ? 'Excused' : score != null ? 'Graded' : 'Submitted'}
                 </div>
                 <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                  {gradedAt 
-                    ? `Graded ${new Date(gradedAt).toLocaleDateString()}` 
-                    : (submittedAt ? `Submitted ${new Date(submittedAt).toLocaleDateString()}` : 'No date')}
+                  {gradedAt
+                    ? `Graded ${new Date(gradedAt).toLocaleDateString()}`
+                    : submittedAt
+                      ? `Submitted ${new Date(submittedAt).toLocaleDateString()}`
+                      : 'No date'}
                 </div>
               </div>
             </div>
@@ -202,14 +244,26 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
                 <div className="text-right">
                   <div className="text-lg font-bold text-neutral-900 dark:text-neutral-100 tabular-nums">
                     {score}
-                    {typeof pts === 'number' && <span className="text-sm text-neutral-500 font-normal ml-0.5">/{pts}</span>}
+                    {typeof pts === 'number' && (
+                      <span className="text-sm text-neutral-500 font-normal ml-0.5">/{pts}</span>
+                    )}
                   </div>
                   <div className="text-xs text-neutral-500">Score</div>
                 </div>
               )}
 
-              {!locked && !attempting && (
-                <Button 
+              {!locked && !attempting && discussion?.onOpen && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={discussion.onOpen}
+                  className="h-8 px-3 text-xs font-medium bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 shadow-sm"
+                >
+                  Open Discussion
+                </Button>
+              )}
+              {!locked && !attempting && !discussion?.onOpen && (
+                <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => setAttempting(true)}
@@ -225,10 +279,13 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
             <div className="mt-2 pt-3 border-t border-neutral-200 dark:border-neutral-800">
               <div className="flex items-center gap-2 mb-1.5">
                 <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
-                  {latestSubmissionComment.author_name || 'Instructor Feedback'}
+                  Feedback
                 </span>
                 <span className="text-[10px] text-neutral-400">
-                  {latestSubmissionComment.created_at && new Date(latestSubmissionComment.created_at).toLocaleDateString()}
+                  {(latestSubmissionComment.author_name || 'Instructor') +
+                    (latestSubmissionComment.created_at
+                      ? ` · ${new Date(latestSubmissionComment.created_at).toLocaleDateString()}`
+                      : '')}
                 </span>
               </div>
               <p className="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-wrap">
@@ -246,11 +303,18 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
       <div className="mb-8">
         {renderSubmissionStatus()}
         <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 p-6 text-center">
-          <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">External Submission</h3>
+          <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">
+            External Submission
+          </h3>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4 max-w-sm mx-auto">
             This assignment requires submission via an external tool.
           </p>
-          <Button size="sm" variant="ghost" onClick={openExternalPortal} className="gap-2 border border-neutral-200 dark:border-neutral-700">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={openExternalPortal}
+            className="gap-2 border border-neutral-200 dark:border-neutral-700"
+          >
             <ExternalLink className="w-4 h-4" />
             Launch External Tool
           </Button>
@@ -259,36 +323,63 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
     )
   }
 
-  if (!canSubmitInApp) return null
+  if (!canSubmitInApp) {
+    const status = renderSubmissionStatus()
+    if (status) return <div className="mb-8">{status}</div>
+    if (discussion?.onOpen) {
+      return (
+        <div className="mb-8 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 p-4">
+          <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+            Discussion
+          </div>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+            This assignment is submitted via a discussion post.
+          </p>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={discussion.onOpen}
+            className="mt-3 h-8 px-3 text-xs font-medium bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 shadow-sm"
+          >
+            Open Discussion
+          </Button>
+        </div>
+      )
+    }
+    return null
+  }
 
   // If already submitted and not attempting a new one, just show status
   if (hasSubmission && !attempting) {
-    return (
-      <div className="mb-8">
-        {renderSubmissionStatus()}
-      </div>
-    )
+    return <div className="mb-8">{renderSubmissionStatus()}</div>
   }
 
   return (
     <div className="mb-8">
       {hasSubmission && (
         <div className="mb-6 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">New Attempt</h3>
-          <Button size="sm" variant="ghost" onClick={() => setAttempting(false)} className="text-xs h-7">
+          <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+            New Attempt
+          </h3>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setAttempting(false)}
+            className="text-xs h-7"
+          >
             Cancel
           </Button>
         </div>
       )}
-      
+
       {/* Simplified Tabs */}
       <div className="flex gap-6 border-b border-neutral-200 dark:border-neutral-800 mb-6">
         {supportsUpload && (
           <button
             onClick={() => setMode('upload')}
             className={`pb-3 text-sm font-medium transition-colors relative ${
-              mode === 'upload' 
-                ? 'text-neutral-900 dark:text-neutral-100' 
+              mode === 'upload'
+                ? 'text-neutral-900 dark:text-neutral-100'
                 : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300'
             }`}
           >
@@ -302,8 +393,8 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
           <button
             onClick={() => setMode('text')}
             className={`pb-3 text-sm font-medium transition-colors relative ${
-              mode === 'text' 
-                ? 'text-neutral-900 dark:text-neutral-100' 
+              mode === 'text'
+                ? 'text-neutral-900 dark:text-neutral-100'
                 : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300'
             }`}
           >
@@ -317,8 +408,8 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
           <button
             onClick={() => setMode('url')}
             className={`pb-3 text-sm font-medium transition-colors relative ${
-              mode === 'url' 
-                ? 'text-neutral-900 dark:text-neutral-100' 
+              mode === 'url'
+                ? 'text-neutral-900 dark:text-neutral-100'
                 : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300'
             }`}
           >
@@ -334,7 +425,7 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
         {/* Upload Mode */}
         {mode === 'upload' && (
           <div className="space-y-4">
-            <div 
+            <div
               onClick={() => !locked && !busy && pickFiles()}
               className={`
                 group relative border border-dashed rounded-xl p-8 text-center transition-all cursor-pointer
@@ -348,24 +439,30 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
                 Click to select files
               </h4>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                {allowedExtensions.length > 0 
+                {allowedExtensions.length > 0
                   ? `Allowed: ${allowedExtensions.join(', ')}`
-                  : 'All file types accepted'
-                }
+                  : 'All file types accepted'}
               </p>
             </div>
 
             {picked.length > 0 && (
               <div className="space-y-2">
                 {picked.map((f) => (
-                  <div key={f.path} className="flex items-center justify-between p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+                  <div
+                    key={f.path}
+                    className="flex items-center justify-between p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900"
+                  >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-8 h-8 rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center shrink-0">
                         <File className="w-4 h-4 text-neutral-500" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{f.name}</div>
-                        <div className="text-xs text-neutral-500">{Math.round(f.size / 1024)} KB</div>
+                        <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">
+                          {f.name}
+                        </div>
+                        <div className="text-xs text-neutral-500">
+                          {Math.round(f.size / 1024)} KB
+                        </div>
                       </div>
                     </div>
                     <button
@@ -399,7 +496,9 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
         {mode === 'url' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">Website URL</label>
+              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                Website URL
+              </label>
               <div className="relative">
                 <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                 <input
@@ -423,11 +522,21 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({ courseId, assignmentRes
         <div className="mt-6 flex justify-end">
           <Button
             onClick={doSubmit}
-            disabled={busy || locked || (mode === 'upload' && !picked.length) || (mode === 'text' && !textBody.trim()) || (mode === 'url' && !urlValue.trim())}
+            disabled={
+              busy ||
+              locked ||
+              (mode === 'upload' && !picked.length) ||
+              (mode === 'text' && !textBody.trim()) ||
+              (mode === 'url' && !urlValue.trim())
+            }
             className="w-full sm:w-auto min-w-[120px]"
           >
             {busy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {locked ? 'Assignment Locked' : hasSubmission ? 'Re-submit Assignment' : 'Submit Assignment'}
+            {locked
+              ? 'Assignment Locked'
+              : hasSubmission
+                ? 'Re-submit Assignment'
+                : 'Submit Assignment'}
           </Button>
         </div>
       </div>

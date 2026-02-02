@@ -62,8 +62,11 @@ if (process.isMainFrame) {
       ipcRenderer.invoke('canvas:listCoursePages', courseId, perPage),
     getCoursePage: (courseId: string | number, slugOrUrl: string) =>
       ipcRenderer.invoke('canvas:getCoursePage', courseId, slugOrUrl),
-    getAssignmentRest: (courseId: string | number, assignmentRestId: string | number) =>
-      ipcRenderer.invoke('canvas:getAssignmentRest', courseId, assignmentRestId),
+    getAssignmentRest: (
+      courseId: string | number,
+      assignmentRestId: string | number,
+      include?: string[],
+    ) => ipcRenderer.invoke('canvas:getAssignmentRest', courseId, assignmentRestId, include),
     getFile: (fileId: string | number) => ipcRenderer.invoke('canvas:getFile', fileId),
     getFileBytes: async (fileId: string | number) => {
       return ipcRenderer.invoke('canvas:getFileBytes', fileId)

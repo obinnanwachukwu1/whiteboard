@@ -1,9 +1,28 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { Button } from './ui/Button'
-import { ArrowLeft, Maximize2, Minimize2, MoreHorizontal, ExternalLink, SquareArrowOutUpRight, Sparkles, FileText, Info, Download, Pin } from 'lucide-react'
+import {
+  ArrowLeft,
+  Maximize2,
+  Minimize2,
+  MoreHorizontal,
+  ExternalLink,
+  SquareArrowOutUpRight,
+  Sparkles,
+  FileText,
+  Info,
+  Download,
+  Pin,
+} from 'lucide-react'
 import { HtmlContent } from './HtmlContent'
 import { FileViewer } from './FileViewer'
-import { useAssignmentRest, useCoursePage, useAnnouncement, useMySubmission, useFileMeta } from '../hooks/useCanvasQueries'
+import {
+  useAssignmentRest,
+  useCoursePage,
+  useAnnouncement,
+  useMySubmission,
+  useFileMeta,
+  useCourseDiscussions,
+} from '../hooks/useCanvasQueries'
 import { FullscreenContainer } from './FullscreenContainer'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
 import { useAIPanel } from '../context/AIPanelContext'
@@ -41,7 +60,9 @@ export const CanvasContentView: React.FC<Props> = ({
 }) => {
   const isWin =
     (typeof navigator !== 'undefined' && /windows/i.test(navigator.userAgent)) ||
-    (typeof navigator !== 'undefined' && typeof (navigator as any).platform === 'string' && /^win/i.test((navigator as any).platform))
+    (typeof navigator !== 'undefined' &&
+      typeof (navigator as any).platform === 'string' &&
+      /^win/i.test((navigator as any).platform))
 
   const data = useAppData()
   const flags = useAppFlags()
@@ -49,20 +70,54 @@ export const CanvasContentView: React.FC<Props> = ({
   const aiPanel = useAIPanel()
   const moreBtnRef = useRef<HTMLButtonElement>(null)
   const [moreOpen, setMoreOpen] = useState(false)
-  
-  const pageQ = useCoursePage(contentType === 'page' ? courseId : undefined, contentType === 'page' ? contentId : undefined, { enabled: contentType === 'page' })
-  const assignQ = useAssignmentRest(contentType === 'assignment' ? courseId : undefined, contentType === 'assignment' ? contentId : undefined, { enabled: contentType === 'assignment' })
-  const submissionQ = useMySubmission(
-    contentType === 'assignment' ? courseId : undefined,
-    contentType === 'assignment' ? contentId : undefined,
-    ['submission_comments'],
-    { enabled: contentType === 'assignment' },
+
+  const isAssignment = contentType === 'assignment'
+  const pageQ = useCoursePage(
+    contentType === 'page' ? courseId : undefined,
+    contentType === 'page' ? contentId : undefined,
+    { enabled: contentType === 'page' },
   )
-  const annQ = useAnnouncement(contentType === 'announcement' ? courseId : undefined, contentType === 'announcement' ? contentId : undefined, { enabled: contentType === 'announcement' })
-  const fileQ = useFileMeta(contentType === 'file' ? contentId : undefined, { enabled: contentType === 'file' })
-  
+  const assignQ = useAssignmentRest(
+    isAssignment ? courseId : undefined,
+    isAssignment ? contentId : undefined,
+    isAssignment ? ['submission'] : [],
+    { enabled: isAssignment },
+  )
+  const submissionQ = useMySubmission(
+    isAssignment ? courseId : undefined,
+    isAssignment ? contentId : undefined,
+    ['submission_comments'],
+    { enabled: isAssignment },
+  )
+  const isDiscussionAssignment =
+    isAssignment && !!assignQ.data?.submission_types?.includes('discussion_topic')
+  const discussionsQ = useCourseDiscussions(
+    isDiscussionAssignment ? courseId : undefined,
+    { perPage: 50, maxPages: 2 },
+    { enabled: isDiscussionAssignment },
+  )
+  const annQ = useAnnouncement(
+    contentType === 'announcement' ? courseId : undefined,
+    contentType === 'announcement' ? contentId : undefined,
+    { enabled: contentType === 'announcement' },
+  )
+  const fileQ = useFileMeta(contentType === 'file' ? contentId : undefined, {
+    enabled: contentType === 'file',
+  })
+
   const loading = pageQ.isLoading || assignQ.isLoading || annQ.isLoading || fileQ.isLoading
-  const error = pageQ.error?.message || assignQ.error?.message || annQ.error?.message || fileQ.error?.message || null
+  const error =
+    pageQ.error?.message ||
+    assignQ.error?.message ||
+    annQ.error?.message ||
+    fileQ.error?.message ||
+    null
+  const submissionError = submissionQ.error?.message || null
+  const discussionTopic = useMemo(() => {
+    if (!isDiscussionAssignment || !discussionsQ.data) return null
+    const id = String(contentId)
+    return discussionsQ.data.find((t) => String(t.assignment_id) === id) || null
+  }, [isDiscussionAssignment, discussionsQ.data, contentId])
 
   const resolvedTitle = useMemo(() => {
     if (contentType === 'page' && pageQ.data?.title) return pageQ.data.title
@@ -76,33 +131,35 @@ export const CanvasContentView: React.FC<Props> = ({
 
   // Context Menu State
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
-  const [fileDownloadTarget, setFileDownloadTarget] = useState<{ id: string; name: string } | null>(null)
+  const [fileDownloadTarget, setFileDownloadTarget] = useState<{ id: string; name: string } | null>(
+    null,
+  )
 
   const handleContextMenu = (e: React.MouseEvent) => {
     // Check for file link under cursor first
     const target = e.target as HTMLElement
     const anchor = target.closest('a')
     const href = anchor?.href || anchor?.getAttribute('href')
-    
+
     // Check if it looks like a file link (typical Canvas patterns)
     const isFileLink = href && (/\/files\/\d+/.test(href) || href.includes('/download'))
 
     if (isFileLink && href) {
-        e.preventDefault()
-        // Try to extract ID
-        const match = href.match(/\/files\/(\d+)/)
-        if (match && match[1]) {
-            const name = anchor?.innerText || 'File'
-            setFileDownloadTarget({ id: match[1], name })
-            setMenuPos({ x: e.clientX, y: e.clientY })
-            return
-        }
+      e.preventDefault()
+      // Try to extract ID
+      const match = href.match(/\/files\/(\d+)/)
+      if (match && match[1]) {
+        const name = anchor?.innerText || 'File'
+        setFileDownloadTarget({ id: match[1], name })
+        setMenuPos({ x: e.clientX, y: e.clientY })
+        return
+      }
     }
 
     // Only show context menu if AI is enabled and we have content
     if (!flags.aiEnabled) return
     if (loading || error) return
-    
+
     // Only for text content types for now (not files)
     if (contentType === 'file') return
 
@@ -122,48 +179,66 @@ export const CanvasContentView: React.FC<Props> = ({
     const text = getContentText()
     // Strip HTML roughly for prompt efficiency
     const cleanText = text.replace(/<[^>]*>/g, ' ').slice(0, 4000) // Limit length
-    aiPanel.open(`Summarize this ${contentType}: "${resolvedTitle}"\n\n${cleanText}`, 'ask-ai', true)
+    aiPanel.open(
+      `Summarize this ${contentType}: "${resolvedTitle}"\n\n${cleanText}`,
+      'ask-ai',
+      true,
+    )
   }
 
   const handleExplain = () => {
     const text = getContentText()
     const cleanText = text.replace(/<[^>]*>/g, ' ').slice(0, 4000)
-    aiPanel.open(`Explain the key concepts in this ${contentType}: "${resolvedTitle}"\n\n${cleanText}`, 'ask-ai', true)
+    aiPanel.open(
+      `Explain the key concepts in this ${contentType}: "${resolvedTitle}"\n\n${cleanText}`,
+      'ask-ai',
+      true,
+    )
   }
 
   const handleTasks = () => {
     const text = getContentText()
     const cleanText = text.replace(/<[^>]*>/g, ' ').slice(0, 4000)
-    aiPanel.open(`Create a checklist of tasks from this ${contentType}: "${resolvedTitle}"\n\n${cleanText}`, 'ask-ai', true)
+    aiPanel.open(
+      `Create a checklist of tasks from this ${contentType}: "${resolvedTitle}"\n\n${cleanText}`,
+      'ask-ai',
+      true,
+    )
   }
 
-  const menuItems: ContextMenuItem[] = fileDownloadTarget ? [
-    {
-      label: 'Download File',
-      icon: <Download className="w-4 h-4" />,
-      onClick: () => {
-        if (fileDownloadTarget.id) {
-          window.system.downloadFile(fileDownloadTarget.id, fileDownloadTarget.name)
-        }
-      }
-    }
-  ] : [
-    {
-      label: 'Summarize',
-      icon: <Sparkles className="w-4 h-4" />,
-      onClick: handleSummarize
-    },
-    {
-      label: 'Explain',
-      icon: <Info className="w-4 h-4" />,
-      onClick: handleExplain
-    },
-    ...(contentType === 'assignment' ? [{
-      label: 'Create Task List',
-      icon: <FileText className="w-4 h-4" />,
-      onClick: handleTasks
-    }] : [])
-  ]
+  const menuItems: ContextMenuItem[] = fileDownloadTarget
+    ? [
+        {
+          label: 'Download File',
+          icon: <Download className="w-4 h-4" />,
+          onClick: () => {
+            if (fileDownloadTarget.id) {
+              window.system.downloadFile(fileDownloadTarget.id, fileDownloadTarget.name)
+            }
+          },
+        },
+      ]
+    : [
+        {
+          label: 'Summarize',
+          icon: <Sparkles className="w-4 h-4" />,
+          onClick: handleSummarize,
+        },
+        {
+          label: 'Explain',
+          icon: <Info className="w-4 h-4" />,
+          onClick: handleExplain,
+        },
+        ...(contentType === 'assignment'
+          ? [
+              {
+                label: 'Create Task List',
+                icon: <FileText className="w-4 h-4" />,
+                onClick: handleTasks,
+              },
+            ]
+          : []),
+      ]
 
   const openInCanvasUrl = useMemo(() => {
     const baseUrl = data.baseUrl
@@ -203,7 +278,7 @@ export const CanvasContentView: React.FC<Props> = ({
 
   const pinId = `${contentType}:${contentId}`
   const isPinned = useMemo(() => {
-    return data.pinnedItems?.some(i => i.id === pinId)
+    return data.pinnedItems?.some((i) => i.id === pinId)
   }, [data.pinnedItems, pinId])
 
   const togglePin = async () => {
@@ -264,7 +339,13 @@ export const CanvasContentView: React.FC<Props> = ({
           {/* Secondary Toolbar for Navigation */}
           {canGoBack && (
             <div className="flex items-center px-4 py-2 border-b border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
-              <Button variant="ghost" size="sm" onClick={onBack} className="w-8 h-8 p-0 justify-center rounded-full app-no-drag" title="Back">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onBack}
+                className="w-8 h-8 p-0 justify-center rounded-full app-no-drag"
+                title="Back"
+              >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             </div>
@@ -312,7 +393,10 @@ export const CanvasContentView: React.FC<Props> = ({
           <button
             type="button"
             className="w-full px-3 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2"
-            onClick={async () => { setMoreOpen(false); await openInCanvas() }}
+            onClick={async () => {
+              setMoreOpen(false)
+              await openInCanvas()
+            }}
             disabled={!openInCanvasUrl}
           >
             <ExternalLink className="w-4 h-4" />
@@ -321,7 +405,10 @@ export const CanvasContentView: React.FC<Props> = ({
           <button
             type="button"
             className="w-full px-3 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2"
-            onClick={async () => { setMoreOpen(false); await openInNewWindow() }}
+            onClick={async () => {
+              setMoreOpen(false)
+              await openInNewWindow()
+            }}
           >
             <SquareArrowOutUpRight className="w-4 h-4" />
             Open in New Window
@@ -357,29 +444,66 @@ export const CanvasContentView: React.FC<Props> = ({
                       <SkeletonText lines={10} />
                     </div>
                   )}
-                  {error && (
-                    <div className="text-red-600 text-sm mb-4">{error}</div>
-                  )}
+                  {error && <div className="text-red-600 text-sm mb-4">{error}</div>}
                   {!loading && !error && contentType === 'page' && pageQ.data?.body && (
-                    <HtmlContent html={pageQ.data.body} className="rich-html" onNavigate={onNavigate} />
+                    <HtmlContent
+                      html={pageQ.data.body}
+                      className="rich-html"
+                      onNavigate={onNavigate}
+                    />
                   )}
                   {!loading && !error && contentType === 'assignment' && assignQ.data && (
                     <AssignmentSubmitPanel
                       courseId={courseId}
                       assignmentRestId={contentId}
                       assignment={assignQ.data}
-                      submission={submissionQ.data}
+                      submission={submissionQ.data || assignQ.data.submission || null}
+                      discussion={
+                        isDiscussionAssignment && discussionTopic
+                          ? {
+                              title: discussionTopic.title,
+                              onOpen: () =>
+                                actions.onOpenDiscussion(
+                                  courseId,
+                                  discussionTopic.id,
+                                  discussionTopic.title,
+                                ),
+                            }
+                          : undefined
+                      }
                     />
                   )}
-                  {!loading && !error && contentType === 'assignment' && assignQ.data?.description && (
-                    <HtmlContent html={assignQ.data.description} className="rich-html" onNavigate={onNavigate} />
+                  {!loading && !error && contentType === 'assignment' && submissionError && (
+                    <div className="mb-4 text-xs text-amber-600 dark:text-amber-400">
+                      Submission details could not be loaded. The assignment content is still
+                      available.
+                    </div>
                   )}
+                  {!loading &&
+                    !error &&
+                    contentType === 'assignment' &&
+                    assignQ.data?.description && (
+                      <HtmlContent
+                        html={assignQ.data.description}
+                        className="rich-html"
+                        onNavigate={onNavigate}
+                      />
+                    )}
                   {!loading && !error && contentType === 'announcement' && annQ.data?.message && (
-                    <HtmlContent html={annQ.data.message} className="rich-html" onNavigate={onNavigate} />
+                    <HtmlContent
+                      html={annQ.data.message}
+                      className="rich-html"
+                      onNavigate={onNavigate}
+                    />
                   )}
-                  {!loading && !error && ((contentType === 'page' && !pageQ.data?.body) || (contentType === 'assignment' && !assignQ.data?.description)) && (
-                    <div className="text-slate-500 dark:text-neutral-400 text-sm">No content available</div>
-                  )}
+                  {!loading &&
+                    !error &&
+                    ((contentType === 'page' && !pageQ.data?.body) ||
+                      (contentType === 'assignment' && !assignQ.data?.description)) && (
+                      <div className="text-slate-500 dark:text-neutral-400 text-sm">
+                        No content available
+                      </div>
+                    )}
                 </div>
               </div>
             </div>
@@ -388,7 +512,10 @@ export const CanvasContentView: React.FC<Props> = ({
           <ContextMenu
             items={menuItems}
             position={menuPos}
-            onClose={() => { setMenuPos(null); setFileDownloadTarget(null) }}
+            onClose={() => {
+              setMenuPos(null)
+              setFileDownloadTarget(null)
+            }}
           />
         </div>
       )}
