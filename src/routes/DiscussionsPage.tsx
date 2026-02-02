@@ -134,13 +134,13 @@ export default function DiscussionsPage() {
             <input 
               type="text" 
               placeholder="Search all courses..." 
-              className="w-full sm:w-64 pl-9 pr-3 py-1.5 text-xs sm:text-sm bg-slate-100 dark:bg-neutral-800 border-none rounded-md focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-500"
+              className="w-full sm:w-64 pl-9 pr-3 py-1.5 text-xs sm:text-sm border border-gray-300 dark:border-neutral-700 rounded-control bg-white/90 dark:bg-neutral-900 focus:ring-2 focus:ring-[var(--app-accent)]/30 focus:border-[var(--app-accent)] outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <select
-            className="rounded-control border px-2 py-1 text-xs sm:text-sm bg-white/90 dark:bg-neutral-900 max-w-[160px] sm:max-w-none"
+            className="rounded-control border border-gray-300 dark:border-neutral-700 px-2 py-1 text-xs sm:text-sm bg-white/90 dark:bg-neutral-900 max-w-[160px] sm:max-w-none"
             value={courseFilter}
             onChange={(e) => setCourseFilter(e.target.value)}
           >

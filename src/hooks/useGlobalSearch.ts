@@ -1,11 +1,11 @@
 /**
  * Global Search Hook
- * 
+ *
  * Provides search functionality and proactively fetches data for visible courses.
  * Also triggers embedding indexing for semantic/deep search.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { searchManager, type SearchResult } from '../utils/searchIndex'
 import { useCourses } from './useCanvasQueries'
@@ -42,7 +42,7 @@ async function triggerEmbeddingIndex(data: {
     }> = []
 
     const getCourseName = (courseId: string): string => {
-      const course = data.courses.find(c => String(c.id) === courseId)
+      const course = data.courses.find((c) => String(c.id) === courseId)
       return course?.name || course?.course_code || 'Unknown Course'
     }
 
@@ -65,16 +65,14 @@ async function triggerEmbeddingIndex(data: {
     // Process assignments
     for (const [courseId, assignments] of data.courseAssignments) {
       const courseName = getCourseName(courseId)
-        for (const assignment of assignments || []) {
-          const url: string | undefined = assignment.htmlUrl || assignment.html_url
-          const id = assignment._id != null
-            ? String(assignment._id)
-            : extractAssignmentIdFromUrl(url)
+      for (const assignment of assignments || []) {
+        const url: string | undefined = assignment.htmlUrl || assignment.html_url
+        const id = assignment._id != null ? String(assignment._id) : extractAssignmentIdFromUrl(url)
 
-          if (!id) continue
+        if (!id) continue
 
-          // Enhance content for better snippets
-          let content = assignment.description || ''
+        // Enhance content for better snippets
+        let content = assignment.description || ''
 
         const parts = []
         if (assignment.due_at || assignment.dueAt) {
@@ -107,7 +105,8 @@ async function triggerEmbeddingIndex(data: {
         const fileId = String(file.id)
         const name = file.display_name || file.filename || file.name || 'File'
         const parts: string[] = []
-        if (file.updated_at) parts.push(`Updated: ${new Date(file.updated_at).toLocaleDateString()}`)
+        if (file.updated_at)
+          parts.push(`Updated: ${new Date(file.updated_at).toLocaleDateString()}`)
         if (file.size) parts.push(`Size: ${Math.round(Number(file.size) / 1024)} KB`)
         if (file.content_type) parts.push(`Type: ${file.content_type}`)
         const content = parts.join(' · ')
@@ -141,7 +140,10 @@ async function triggerEmbeddingIndex(data: {
         const moduleItems = module.moduleItemsConnection?.nodes || module.items || []
         for (const item of moduleItems) {
           const pageUrl = item.pageUrl
-          if (pageUrl && (item.__typename === 'PageModuleItem' || String(item.__typename || '').includes('Page'))) {
+          if (
+            pageUrl &&
+            (item.__typename === 'PageModuleItem' || String(item.__typename || '').includes('Page'))
+          ) {
             pageSlugs.add(String(pageUrl))
           }
         }
@@ -153,16 +155,18 @@ async function triggerEmbeddingIndex(data: {
       const pageBatchSize = 5
       for (let i = 0; i < slugs.length; i += pageBatchSize) {
         const batch = slugs.slice(i, i + pageBatchSize)
-        await Promise.all(batch.map(async (slug) => {
-          try {
-            const res = await window.canvas.getCoursePage?.(courseId, slug)
-            if (res?.ok && res.data) {
-              pageBodyBySlug.set(slug, res.data.body || '')
+        await Promise.all(
+          batch.map(async (slug) => {
+            try {
+              const res = await window.canvas.getCoursePage?.(courseId, slug)
+              if (res?.ok && res.data) {
+                pageBodyBySlug.set(slug, res.data.body || '')
+              }
+            } catch {
+              // ignore
             }
-          } catch {
-            // ignore
-          }
-        }))
+          }),
+        )
       }
 
       for (const module of modules || []) {
@@ -193,7 +197,10 @@ async function triggerEmbeddingIndex(data: {
           }
 
           // If this module item links to an Assignment, index the assignment (prefer assignment description)
-          if (contentId && (typename === 'AssignmentModuleItem' || typename.includes('Assignment'))) {
+          if (
+            contentId &&
+            (typename === 'AssignmentModuleItem' || typename.includes('Assignment'))
+          ) {
             const assignment = assignmentById.get(contentId)
             if (assignment) {
               let content = assignment.description || ''
@@ -247,9 +254,11 @@ async function triggerEmbeddingIndex(data: {
 
     console.log(`[Search] Indexing ${items.length} items for embeddings...`)
     const result = await window.embedding.index(items)
-    
+
     if (result.ok && result.data) {
-      console.log(`[Search] Embedding index complete: ${result.data.indexed} indexed, ${result.data.skipped} skipped`)
+      console.log(
+        `[Search] Embedding index complete: ${result.data.indexed} indexed, ${result.data.skipped} skipped`,
+      )
     } else if (result.error) {
       console.warn('[Search] Embedding indexing failed:', result.error)
     }
@@ -271,7 +280,7 @@ async function triggerFileAutoIndex(data: {
   }
 
   const getCourseName = (courseId: string): string => {
-    const course = data.courses.find(c => String(c.id) === courseId)
+    const course = data.courses.find((c) => String(c.id) === courseId)
     return course?.name || course?.course_code || 'Unknown Course'
   }
 
@@ -288,18 +297,18 @@ async function triggerFileAutoIndex(data: {
 
   for (const [courseId, files] of data.courseFiles) {
     const courseName = getCourseName(courseId)
-    
+
     for (const file of files || []) {
       const fileName = file.display_name || file.filename || file.name || ''
       const fileSize = Number(file.size || 0)
       const ext = fileName.split('.').pop()?.toLowerCase() || ''
-      
+
       // Tier 1: Auto-index small files
       // - Text files (any size)
       // - PDF <=500KB (~10 pages)
       // - DOCX <=50KB
       let shouldAutoIndex = false
-      
+
       if (['txt', 'md', 'markdown', 'text'].includes(ext)) {
         shouldAutoIndex = true
       } else if (ext === 'pdf' && fileSize <= 500 * 1024) {
@@ -307,7 +316,7 @@ async function triggerFileAutoIndex(data: {
       } else if (ext === 'docx' && fileSize <= 50 * 1024) {
         shouldAutoIndex = true
       }
-      
+
       if (shouldAutoIndex) {
         filesToIndex.push({
           fileId: String(file.id),
@@ -333,7 +342,7 @@ async function triggerFileAutoIndex(data: {
   ;(async () => {
     let indexed = 0
     let failed = 0
-    
+
     for (const file of filesToIndex) {
       try {
         const result = await window.embedding?.indexFile?.(
@@ -343,9 +352,9 @@ async function triggerFileAutoIndex(data: {
           file.fileName,
           file.fileSize,
           file.updatedAt,
-          file.url
+          file.url,
         )
-        
+
         if (result?.ok && result.data) {
           if (result.data.chunks > 0) {
             indexed++
@@ -354,15 +363,15 @@ async function triggerFileAutoIndex(data: {
           console.warn(`[Search] Failed to index ${file.fileName}:`, result.error)
           failed++
         }
-        
+
         // Small delay between files to avoid blocking
-        await new Promise(r => setTimeout(r, 100))
+        await new Promise((r) => setTimeout(r, 100))
       } catch (e) {
         console.warn(`[Search] Error indexing ${file.fileName}:`, e)
         failed++
       }
     }
-    
+
     if (indexed > 0 || failed > 0) {
       console.log(`[Search] File auto-indexing complete: ${indexed} indexed, ${failed} failed`)
     }
@@ -380,7 +389,9 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
-  
+  const [isPendingSearch, setIsPendingSearch] = useState(false)
+  const wasReadyRef = useRef(searchManager.isReady)
+
   // Embedding status tracking
   const [embeddingStatus, setEmbeddingStatus] = useState<{
     ready: boolean
@@ -394,7 +405,7 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
   const visibleCourses = useMemo(() => {
     if (!courses?.length) return []
     const hiddenIds = new Set(data?.sidebar?.hiddenCourseIds?.map(String) || [])
-    return courses.filter(c => !hiddenIds.has(String(c.id)))
+    return courses.filter((c) => !hiddenIds.has(String(c.id)))
   }, [courses, data?.sidebar?.hiddenCourseIds])
 
   // Listen for ready state
@@ -436,11 +447,12 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
 
   // Proactively fetch and build index for visible courses (only when enabled)
   useEffect(() => {
-    if (!enabled || !visibleCourses?.length || searchManager.isReady || searchManager.isBuilding) return
+    if (!enabled || !visibleCourses?.length || searchManager.isReady || searchManager.isBuilding)
+      return
 
     const timer = setTimeout(async () => {
       setIsBuilding(true)
-      
+
       const courseAssignments = new Map<string, any[]>()
       const courseAnnouncements = new Map<string, any[]>()
       const courseFiles = new Map<string, any[]>()
@@ -448,62 +460,86 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
 
       // Fetch data for each visible course in parallel (batched)
       const batchSize = 3 // Fetch 3 courses at a time to avoid overwhelming the API
-      
+
       for (let i = 0; i < visibleCourses.length; i += batchSize) {
         const batch = visibleCourses.slice(i, i + batchSize)
-        
-        await Promise.all(batch.map(async (course) => {
-          const courseId = String(course.id)
-          
-          try {
-            // Fetch assignments
-            let assignments = queryClient.getQueryData(['course-assignments', courseId, 200]) as any[] | undefined
-            if (!assignments) {
-              const res = await window.canvas.listAssignmentsWithSubmission(courseId, 200)
-              if (res?.ok && res.data) {
-                assignments = res.data
-                queryClient.setQueryData(['course-assignments', courseId, 200], assignments)
+
+        await Promise.all(
+          batch.map(async (course) => {
+            const courseId = String(course.id)
+
+            try {
+              // Fetch assignments
+              let assignments = queryClient.getQueryData(['course-assignments', courseId, 200]) as
+                | any[]
+                | undefined
+              if (!assignments) {
+                const res = await window.canvas.listAssignmentsWithSubmission(courseId, 200)
+                if (res?.ok && res.data) {
+                  assignments = res.data
+                  queryClient.setQueryData(['course-assignments', courseId, 200], assignments)
+                }
               }
-            }
-            if (assignments) courseAssignments.set(courseId, assignments)
-            
-            // Fetch modules (includes module items)
-            let modules = queryClient.getQueryData(['course-modules', courseId, 'v2']) as any[] | undefined
-            if (!modules) {
-              const res = await window.canvas.listCourseModulesGql(courseId, 20, 50)
-              if (res?.ok && res.data) {
-                modules = res.data
-                queryClient.setQueryData(['course-modules', courseId, 'v2'], modules)
+              if (assignments) courseAssignments.set(courseId, assignments)
+
+              // Fetch modules (includes module items)
+              let modules = queryClient.getQueryData(['course-modules', courseId, 'v2']) as
+                | any[]
+                | undefined
+              if (!modules) {
+                const res = await window.canvas.listCourseModulesGql(courseId, 20, 50)
+                if (res?.ok && res.data) {
+                  modules = res.data
+                  queryClient.setQueryData(['course-modules', courseId, 'v2'], modules)
+                }
               }
-            }
-            if (modules) courseModules.set(courseId, modules)
-            
-            // Fetch announcements
-            let announcements = queryClient.getQueryData(['course-announcements', courseId, 50]) as any[] | undefined
-            if (!announcements) {
-              const res = await window.canvas.listCourseAnnouncements?.(courseId, 50)
-              if (res?.ok && res.data) {
-                announcements = res.data
-                queryClient.setQueryData(['course-announcements', courseId, 50], announcements)
+              if (modules) courseModules.set(courseId, modules)
+
+              // Fetch announcements
+              let announcements = queryClient.getQueryData([
+                'course-announcements',
+                courseId,
+                50,
+              ]) as any[] | undefined
+              if (!announcements) {
+                const res = await window.canvas.listCourseAnnouncements?.(courseId, 50)
+                if (res?.ok && res.data) {
+                  announcements = res.data
+                  queryClient.setQueryData(['course-announcements', courseId, 50], announcements)
+                }
               }
-            }
-            if (announcements) courseAnnouncements.set(courseId, announcements)
-            
-            // Fetch files
-            let files = queryClient.getQueryData(['course-files', courseId, 100, 'updated_at', 'desc']) as any[] | undefined
-            if (!files) {
-              const res = await window.canvas.listCourseFiles?.(courseId, 100, 'updated_at', 'desc')
-              if (res?.ok && res.data) {
-                files = res.data
-                queryClient.setQueryData(['course-files', courseId, 100, 'updated_at', 'desc'], files)
+              if (announcements) courseAnnouncements.set(courseId, announcements)
+
+              // Fetch files
+              let files = queryClient.getQueryData([
+                'course-files',
+                courseId,
+                100,
+                'updated_at',
+                'desc',
+              ]) as any[] | undefined
+              if (!files) {
+                const res = await window.canvas.listCourseFiles?.(
+                  courseId,
+                  100,
+                  'updated_at',
+                  'desc',
+                )
+                if (res?.ok && res.data) {
+                  files = res.data
+                  queryClient.setQueryData(
+                    ['course-files', courseId, 100, 'updated_at', 'desc'],
+                    files,
+                  )
+                }
               }
+              if (files) courseFiles.set(courseId, files)
+            } catch (e) {
+              // Silently skip failed courses
+              console.warn(`Failed to fetch data for course ${courseId}:`, e)
             }
-            if (files) courseFiles.set(courseId, files)
-          } catch (e) {
-            // Silently skip failed courses
-            console.warn(`Failed to fetch data for course ${courseId}:`, e)
-          }
-        }))
+          }),
+        )
       }
 
       await searchManager.buildIndex({
@@ -513,12 +549,12 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
         courseFiles,
         courseModules,
       })
-      
+
       setIsReady(true)
       setIsBuilding(false)
 
-    // Trigger embedding indexing in background (non-blocking)
-    if (flags.embeddingsEnabled) {
+      // Trigger embedding indexing in background (non-blocking)
+      if (flags.embeddingsEnabled) {
         triggerEmbeddingIndex({
           courses: visibleCourses,
           courseAssignments,
@@ -526,7 +562,7 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
           courseFiles,
           courseModules,
         })
-        
+
         // Also trigger Tier 1 auto-indexing for small files
         triggerFileAutoIndex({
           courses: visibleCourses,
@@ -545,7 +581,7 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
       setResults([])
       return
     }
-    
+
     setIsSearching(true)
     try {
       const searchResults = await searchManager.search(q, 20)
@@ -562,15 +598,27 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
   useEffect(() => {
     if (!query.trim()) {
       setResults([])
+      setIsPendingSearch(false)
       return
     }
-    
+
+    setIsPendingSearch(true)
     const timer = setTimeout(() => {
+      setIsPendingSearch(false)
       search(query)
     }, 150) // 150ms debounce
-    
+
     return () => clearTimeout(timer)
   }, [query, search])
+
+  // Retry search when index becomes ready (if user typed while building)
+  useEffect(() => {
+    if (isReady && !wasReadyRef.current && query.trim()) {
+      // Index just became ready and we have a pending query - retry it
+      search(query)
+    }
+    wasReadyRef.current = isReady
+  }, [isReady, query, search])
 
   const clearSearch = useCallback(() => {
     setQuery('')
@@ -580,53 +628,58 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
   // Rebuild index with fresh data (force refetch)
   const rebuildIndex = useCallback(async () => {
     if (!visibleCourses?.length) return
-    
+
     searchManager.clear()
     setIsReady(false)
     setIsBuilding(true)
-    
+
     const courseAssignments = new Map<string, any[]>()
     const courseAnnouncements = new Map<string, any[]>()
     const courseFiles = new Map<string, any[]>()
     const courseModules = new Map<string, any[]>()
 
     const batchSize = 3
-    
+
     for (let i = 0; i < visibleCourses.length; i += batchSize) {
       const batch = visibleCourses.slice(i, i + batchSize)
-      
-      await Promise.all(batch.map(async (course) => {
-        const courseId = String(course.id)
-        
-        try {
-          // Force fetch (ignore cache)
-          const [assignRes, modRes, annRes, fileRes] = await Promise.all([
-            window.canvas.listAssignmentsWithSubmission(courseId, 200),
-            window.canvas.listCourseModulesGql(courseId, 20, 50),
-            window.canvas.listCourseAnnouncements?.(courseId, 50),
-            window.canvas.listCourseFiles?.(courseId, 100, 'updated_at', 'desc'),
-          ])
-          
-          if (assignRes?.ok && assignRes.data) {
-            courseAssignments.set(courseId, assignRes.data)
-            queryClient.setQueryData(['course-assignments', courseId, 200], assignRes.data)
+
+      await Promise.all(
+        batch.map(async (course) => {
+          const courseId = String(course.id)
+
+          try {
+            // Force fetch (ignore cache)
+            const [assignRes, modRes, annRes, fileRes] = await Promise.all([
+              window.canvas.listAssignmentsWithSubmission(courseId, 200),
+              window.canvas.listCourseModulesGql(courseId, 20, 50),
+              window.canvas.listCourseAnnouncements?.(courseId, 50),
+              window.canvas.listCourseFiles?.(courseId, 100, 'updated_at', 'desc'),
+            ])
+
+            if (assignRes?.ok && assignRes.data) {
+              courseAssignments.set(courseId, assignRes.data)
+              queryClient.setQueryData(['course-assignments', courseId, 200], assignRes.data)
+            }
+            if (modRes?.ok && modRes.data) {
+              courseModules.set(courseId, modRes.data)
+              queryClient.setQueryData(['course-modules', courseId, 'v2'], modRes.data)
+            }
+            if (annRes?.ok && annRes.data) {
+              courseAnnouncements.set(courseId, annRes.data)
+              queryClient.setQueryData(['course-announcements', courseId, 50], annRes.data)
+            }
+            if (fileRes?.ok && fileRes.data) {
+              courseFiles.set(courseId, fileRes.data)
+              queryClient.setQueryData(
+                ['course-files', courseId, 100, 'updated_at', 'desc'],
+                fileRes.data,
+              )
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch data for course ${courseId}:`, e)
           }
-          if (modRes?.ok && modRes.data) {
-            courseModules.set(courseId, modRes.data)
-            queryClient.setQueryData(['course-modules', courseId, 'v2'], modRes.data)
-          }
-          if (annRes?.ok && annRes.data) {
-            courseAnnouncements.set(courseId, annRes.data)
-            queryClient.setQueryData(['course-announcements', courseId, 50], annRes.data)
-          }
-          if (fileRes?.ok && fileRes.data) {
-            courseFiles.set(courseId, fileRes.data)
-            queryClient.setQueryData(['course-files', courseId, 100, 'updated_at', 'desc'], fileRes.data)
-          }
-        } catch (e) {
-          console.warn(`Failed to fetch data for course ${courseId}:`, e)
-        }
-      }))
+        }),
+      )
     }
 
     await searchManager.buildIndex({
@@ -636,33 +689,48 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
       courseFiles,
       courseModules,
     })
-    
+
     setIsReady(true)
     setIsBuilding(false)
 
     // Trigger embedding indexing in background (non-blocking)
-      if (flags.embeddingsEnabled) {
-        triggerEmbeddingIndex({
-          courses: visibleCourses,
-          courseAssignments,
-          courseAnnouncements,
-          courseFiles,
-          courseModules,
-        })
-      }
+    if (flags.embeddingsEnabled) {
+      triggerEmbeddingIndex({
+        courses: visibleCourses,
+        courseAssignments,
+        courseAnnouncements,
+        courseFiles,
+        courseModules,
+      })
+    }
   }, [visibleCourses, queryClient, flags.embeddingsEnabled])
- 
-  return useMemo(() => ({
-    query,
-    setQuery,
-    results,
-    isReady,
-    isBuilding,
-    isSearching,
-    search,
-    clearSearch,
-    rebuildIndex,
-    indexSize: searchManager.indexSize,
-    embeddingStatus,
-  }), [query, results, isReady, isBuilding, isSearching, search, clearSearch, rebuildIndex, embeddingStatus])
+
+  return useMemo(
+    () => ({
+      query,
+      setQuery,
+      results,
+      isReady,
+      isBuilding,
+      isSearching,
+      isPendingSearch,
+      search,
+      clearSearch,
+      rebuildIndex,
+      indexSize: searchManager.indexSize,
+      embeddingStatus,
+    }),
+    [
+      query,
+      results,
+      isReady,
+      isBuilding,
+      isSearching,
+      isPendingSearch,
+      search,
+      clearSearch,
+      rebuildIndex,
+      embeddingStatus,
+    ],
+  )
 }

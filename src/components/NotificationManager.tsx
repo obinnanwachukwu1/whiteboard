@@ -80,24 +80,6 @@ export function NotificationManager() {
     queryClient.invalidateQueries({ queryKey: ['app-config'] })
   }
 
-  // Debug: log notification state on mount
-  useEffect(() => {
-    console.log('[Notifications] State:', {
-      enabled: settings.enabled,
-      permission: Notification.permission,
-      notifyDueAssignments: settings.notifyDueAssignments,
-      notifyNewGrades: settings.notifyNewGrades,
-      notifyNewAnnouncements: settings.notifyNewAnnouncements,
-      lastChecked: settings.lastChecked,
-    })
-  }, [
-    settings.enabled,
-    settings.notifyDueAssignments,
-    settings.notifyNewGrades,
-    settings.notifyNewAnnouncements,
-    settings.lastChecked,
-  ])
-
   // Request permission on mount if enabled
   useEffect(() => {
     if (settings.enabled && !permissionRequested.current && Notification.permission === 'default') {

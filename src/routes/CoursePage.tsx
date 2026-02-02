@@ -200,7 +200,7 @@ export default function CoursePage() {
 
         // Queue a small number of highest-likelihood tabs. The prefetch queue
         // has its own rate guard/backoff.
-        const maxWarm = 4
+        const maxWarm = 6  // Increased to include grades and people tabs
         for (const t of warmOrder.slice(0, maxWarm)) {
           enqueuePrefetch(() => prefetchCourseTab(queryClient, id, t))
         }

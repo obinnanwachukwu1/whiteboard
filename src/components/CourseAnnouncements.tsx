@@ -2,7 +2,7 @@ import React from 'react'
 // no Card wrapper; rendered within page container
 // import { Button } from './ui/Button'
 import { Megaphone, MoreVertical } from 'lucide-react'
-import { Dropdown } from './ui/Dropdown'
+import { Dropdown, DropdownItem } from './ui/Dropdown'
 import { useCourseAnnouncementsInfinite } from '../hooks/useCanvasQueries'
 import { ListItemRow } from './ui/ListItemRow'
 import { SkeletonList } from './Skeleton'
@@ -16,9 +16,9 @@ type Props = {
   onOpen: (topicId: string, title: string) => void
 }
 
-const AnnouncementItem: React.FC<{ 
-  a: any, 
-  onOpen: (id: string, title: string) => void 
+const AnnouncementItem: React.FC<{
+  a: any
+  onOpen: (id: string, title: string) => void
   courseId: string | number
   menuOpenId: string | null
   setMenuOpenId: (id: string | null) => void
@@ -36,7 +36,7 @@ const AnnouncementItem: React.FC<{
       if (!res?.ok) throw new Error(res?.error || 'Failed')
       return res.data
     },
-    staleTime: 1000 * 60 * 5
+    staleTime: 1000 * 60 * 5,
   })
 
   return (
@@ -51,17 +51,34 @@ const AnnouncementItem: React.FC<{
         a?.html_url ? (
           <>
             <button
-              onClick={(e) => { e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : menuId) }}
+              onClick={(e) => {
+                e.stopPropagation()
+                setMenuOpenId(isMenuOpen ? null : menuId)
+              }}
               className={`inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ${isMenuOpen ? 'opacity-100' : ''}`}
               aria-label="More options"
-              ref={(el) => { anchorEls.current.set(menuId, el) }}
+              ref={(el) => {
+                anchorEls.current.set(menuId, el)
+              }}
             >
               <MoreVertical className="w-4 h-4" />
             </button>
-            <Dropdown open={isMenuOpen} onOpenChange={(o) => setMenuOpenId(o ? menuId : null)} align="right" offsetY={32} anchorEl={anchorEls.current.get(menuId)}>
-              <button className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); (await import('../utils/openExternal')).openExternal(a.html_url!) }}>
+            <Dropdown
+              open={isMenuOpen}
+              onOpenChange={(o) => setMenuOpenId(o ? menuId : null)}
+              align="right"
+              offsetY={32}
+              anchorEl={anchorEls.current.get(menuId)}
+            >
+              <DropdownItem
+                onClick={async (e) => {
+                  e.stopPropagation()
+                  setMenuOpenId(null)
+                  ;(await import('../utils/openExternal')).openExternal(a.html_url!)
+                }}
+              >
                 Open in Canvas
-              </button>
+              </DropdownItem>
             </Dropdown>
           </>
         ) : undefined
@@ -73,7 +90,8 @@ const AnnouncementItem: React.FC<{
 const MAX_RENDER = 200
 
 export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
-  const { data, isLoading, error, hasNextPage, isFetchingNextPage, fetchNextPage } = useCourseAnnouncementsInfinite(courseId, 10)
+  const { data, isLoading, error, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useCourseAnnouncementsInfinite(courseId, 10)
   const allItems = React.useMemo(() => (data?.pages || []).flat(), [data])
   // Track whether user wants to see all items
   const [showAll, setShowAll] = React.useState(false)
@@ -97,12 +115,15 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
   React.useEffect(() => {
     const el = sentinelRef.current
     if (!el) return
-    const obs = new IntersectionObserver((entries) => {
-      const [entry] = entries
-      if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
-        fetchNextPage()
-      }
-    }, { rootMargin: '200px 0px' })
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries
+        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage()
+        }
+      },
+      { rootMargin: '200px 0px' },
+    )
     obs.observe(el)
     return () => obs.disconnect()
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
@@ -111,7 +132,7 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
   React.useEffect(() => {
     if (!list || list.length === 0) return
     const top5 = list.slice(0, 5)
-    
+
     top5.forEach((a: any) => {
       enqueuePrefetch(async () => {
         await queryClient.prefetchQuery({
@@ -121,7 +142,7 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
             if (!res?.ok) throw new Error(res?.error || 'Failed')
             return res.data
           },
-          staleTime: 1000 * 60 * 5
+          staleTime: 1000 * 60 * 5,
         })
       })
     })
@@ -130,11 +151,17 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-3 shrink-0">
-        <h3 className="m-0 text-slate-900 dark:text-slate-100 text-base font-semibold">Announcements</h3>
+        <h3 className="m-0 text-slate-900 dark:text-slate-100 text-base font-semibold">
+          Announcements
+        </h3>
       </div>
-      
+
       <div className="flex-1 overflow-y-auto min-h-0 p-4">
-        {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
+        {error && (
+          <div className="text-red-600 text-sm mb-2">
+            {String((error as any)?.message || error)}
+          </div>
+        )}
         {isLoading && <SkeletonList count={6} hasAvatar variant="row" />}
         {!isLoading && list && list.length === 0 && (
           <div className="text-slate-500 dark:text-neutral-400 text-sm">No announcements</div>
@@ -143,8 +170,8 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
           <ul className="list-none m-0 p-0 space-y-3">
             {list.map((a: any) => (
               <li key={String(a.id)}>
-                <AnnouncementItem 
-                  a={a} 
+                <AnnouncementItem
+                  a={a}
                   courseId={courseId}
                   onOpen={onOpen}
                   menuOpenId={menuOpenId}

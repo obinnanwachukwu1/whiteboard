@@ -21,7 +21,7 @@ type Props = {
   assignment: AssignmentRestDetail
   submission?: SubmissionDetail | null
   discussion?: {
-    title?: string
+    title: string
     onOpen: () => void
   }
 }
@@ -108,6 +108,12 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({
     if (!target) return
     try {
       await window.system.openExternal(target)
+    } catch {}
+  }
+
+  const openDiscussion = () => {
+    try {
+      discussion?.onOpen()
     } catch {}
   }
 
@@ -252,25 +258,29 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({
                 </div>
               )}
 
-              {!locked && !attempting && discussion?.onOpen && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={discussion.onOpen}
-                  className="h-8 px-3 text-xs font-medium bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 shadow-sm"
-                >
-                  Open Discussion
-                </Button>
-              )}
-              {!locked && !attempting && !discussion?.onOpen && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setAttempting(true)}
-                  className="h-8 px-3 text-xs font-medium bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 shadow-sm"
-                >
-                  New Attempt
-                </Button>
+              {!locked && !attempting && (
+                <div className="flex items-center gap-2">
+                  {discussion?.onOpen && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={openDiscussion}
+                      className="h-8 px-3 text-xs font-medium bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 shadow-sm gap-2"
+                    >
+                      Open discussion
+                    </Button>
+                  )}
+                  {!discussion && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setAttempting(true)}
+                      className="h-8 px-3 text-xs font-medium bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 shadow-sm"
+                    >
+                      New Attempt
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -279,13 +289,11 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({
             <div className="mt-2 pt-3 border-t border-neutral-200 dark:border-neutral-800">
               <div className="flex items-center gap-2 mb-1.5">
                 <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
-                  Feedback
+                  {latestSubmissionComment.author_name || 'Instructor Feedback'}
                 </span>
                 <span className="text-[10px] text-neutral-400">
-                  {(latestSubmissionComment.author_name || 'Instructor') +
-                    (latestSubmissionComment.created_at
-                      ? ` · ${new Date(latestSubmissionComment.created_at).toLocaleDateString()}`
-                      : '')}
+                  {latestSubmissionComment.created_at &&
+                    new Date(latestSubmissionComment.created_at).toLocaleDateString()}
                 </span>
               </div>
               <p className="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-wrap">
@@ -323,31 +331,33 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({
     )
   }
 
-  if (!canSubmitInApp) {
-    const status = renderSubmissionStatus()
-    if (status) return <div className="mb-8">{status}</div>
-    if (discussion?.onOpen) {
-      return (
-        <div className="mb-8 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 p-4">
-          <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-            Discussion
+  if (discussion && !canSubmitInApp) {
+    return (
+      <div className="mb-8">
+        {renderSubmissionStatus()}
+        {!hasSubmission && (
+          <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 p-6 text-center">
+            <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">
+              Discussion Assignment
+            </h3>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4 max-w-sm mx-auto">
+              This assignment is a discussion topic. Post a reply to submit.
+            </p>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={discussion.onOpen}
+              className="gap-2 border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800"
+            >
+              Open Discussion
+            </Button>
           </div>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-            This assignment is submitted via a discussion post.
-          </p>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={discussion.onOpen}
-            className="mt-3 h-8 px-3 text-xs font-medium bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 shadow-sm"
-          >
-            Open Discussion
-          </Button>
-        </div>
-      )
-    }
-    return null
+        )}
+      </div>
+    )
   }
+
+  if (!canSubmitInApp) return null
 
   // If already submitted and not attempting a new one, just show status
   if (hasSubmission && !attempting) {

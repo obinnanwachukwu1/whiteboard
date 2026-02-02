@@ -1,6 +1,6 @@
 import React from 'react'
 import { MoreVertical, GripVertical } from 'lucide-react'
-import { Dropdown } from '../ui/Dropdown'
+import { Dropdown, DropdownItem } from '../ui/Dropdown'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
@@ -29,8 +29,14 @@ export const SidebarCourseRow: React.FC<SidebarCourseRowProps> = ({
   onPrefetch,
   onHoverLeave,
 }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: String(course.id) })
-  const style: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.7 : 1 }
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: String(course.id),
+  })
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.7 : 1,
+  }
   const btnRef = React.useRef<HTMLButtonElement | null>(null)
 
   return (
@@ -41,7 +47,12 @@ export const SidebarCourseRow: React.FC<SidebarCourseRowProps> = ({
       onMouseEnter={onPrefetch}
       onMouseLeave={onHoverLeave}
     >
-      <div className="absolute left-1 top-1/2 -translate-y-1/2 p-1 cursor-grab text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100" {...attributes} {...listeners} aria-label="Drag course">
+      <div
+        className="absolute left-1 top-1/2 -translate-y-1/2 p-1 cursor-grab text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+        {...attributes}
+        {...listeners}
+        aria-label="Drag course"
+      >
         <GripVertical className="w-4 h-4" />
       </div>
       <button
@@ -69,9 +80,16 @@ export const SidebarCourseRow: React.FC<SidebarCourseRowProps> = ({
       >
         <MoreVertical className="w-4 h-4" />
       </button>
-      <Dropdown open={moreOpen} onOpenChange={(o) => { if (!o) onMore() }} align="right" offsetY={32} anchorRef={btnRef}>
-        <button
-          className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+      <Dropdown
+        open={moreOpen}
+        onOpenChange={(o) => {
+          if (!o) onMore()
+        }}
+        align="right"
+        offsetY={32}
+        anchorRef={btnRef}
+      >
+        <DropdownItem
           onClick={(e) => {
             e.stopPropagation()
             onMore()
@@ -79,7 +97,7 @@ export const SidebarCourseRow: React.FC<SidebarCourseRowProps> = ({
           }}
         >
           Hide from sidebar
-        </button>
+        </DropdownItem>
       </Dropdown>
     </div>
   )

@@ -2,7 +2,6 @@ import React from 'react'
 
 type Props = {
   name: string
-  email?: string
   avatar?: string
   isWin: boolean
   menuOpen: boolean
@@ -12,7 +11,6 @@ type Props = {
 
 export const AccountButton: React.FC<Props> = ({
   name,
-  email,
   avatar,
   isWin,
   menuOpen,
@@ -35,9 +33,10 @@ export const AccountButton: React.FC<Props> = ({
           alt={name}
         />
       )}
-      <div className={`flex flex-col leading-tight ${isWin ? 'items-start text-left' : 'items-end text-right'}`}>
+      <div
+        className={`flex flex-col leading-tight ${isWin ? 'items-start text-left' : 'items-end text-right'}`}
+      >
         <div className="font-medium text-sm">{name}</div>
-        {email && <div className="text-[11px] text-slate-500 dark:text-neutral-400">{email}</div>}
       </div>
     </button>
   )

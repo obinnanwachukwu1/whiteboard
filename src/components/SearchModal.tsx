@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { useGlobalSearch } from '../hooks/useGlobalSearch'
 import { useAppData, useAppFlags } from '../context/AppContext'
-import { useAIPanel } from '../context/AIPanelContext'
+import { useAIPanelActions } from '../context/AIPanelContext'
 import { coordinateSearch } from '../utils/coordinator'
 import type { SearchResult, SearchResultType } from '../utils/searchIndex'
 
@@ -94,7 +94,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const navigate = useNavigate()
   const flags = useAppFlags()
   const data = useAppData()
-  const aiPanel = useAIPanel()
+  const aiPanel = useAIPanelActions()
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -103,9 +103,9 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
     query,
     setQuery,
     results: standardResults,
-    isReady,
     isBuilding,
     isSearching: isStandardSearching,
+    isPendingSearch,
     clearSearch,
   } = useGlobalSearch({ enabled: isOpen })
 
@@ -367,16 +367,11 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
-              deepSearchActive
-                ? 'Deep Search...'
-                : isReady
-                  ? 'Search courses, assignments, files...'
-                  : 'Building search index...'
+              deepSearchActive ? 'Deep Search...' : 'Search courses, assignments, files...'
             }
-            disabled={!isReady && !isBuilding}
             className="flex-1 bg-transparent text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-neutral-500 text-base outline-none disabled:opacity-50"
           />
-          {(isSearching || isBuilding) && (
+          {(isSearching || isBuilding || isPendingSearch) && (
             <Loader2 className="w-4 h-4 text-slate-400 animate-spin shrink-0" />
           )}
           <button
@@ -390,16 +385,20 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
         {/* Results List */}
         <div ref={listRef} className="max-h-[50vh] overflow-y-auto">
           {/* Empty State */}
-          {!isSearching && query.trim() && results.length === 0 && (
-            <div className="px-4 py-8 text-center text-slate-500 dark:text-neutral-400">
-              <p className="text-sm font-medium">No results found</p>
-              <p className="text-xs mt-1">
-                {deepSearchActive
-                  ? 'Try rephrasing your query.'
-                  : 'Use Deep Search or Ask AI below.'}
-              </p>
-            </div>
-          )}
+          {!isSearching &&
+            !isPendingSearch &&
+            !isBuilding &&
+            query.trim() &&
+            results.length === 0 && (
+              <div className="px-4 py-8 text-center text-slate-500 dark:text-neutral-400">
+                <p className="text-sm font-medium">No results found</p>
+                <p className="text-xs mt-1">
+                  {deepSearchActive
+                    ? 'Try rephrasing your query.'
+                    : 'Use Deep Search or Ask AI below.'}
+                </p>
+              </div>
+            )}
 
           {/* Result Items */}
           {results.map((result, index) => (

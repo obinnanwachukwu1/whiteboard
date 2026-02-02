@@ -1,9 +1,16 @@
 import React, { useMemo, useState } from 'react'
 import { requestIdle } from '../../utils/prefetchQueue'
-import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core'
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core'
 import { restrictToVerticalAxis, restrictToWindowEdges } from '@dnd-kit/modifiers'
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
-import { useRenderTrace } from '../../hooks/useRenderTrace'
 import { SidebarNavItem } from './SidebarNavItem'
 import { SidebarCourseRow } from './SidebarCourseRow'
 
@@ -19,7 +26,14 @@ type Props = {
   courses: Course[]
   activeCourseId?: string | number | null
   sidebar?: SidebarConfig
-  current?: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions' | 'course' | 'allCourses'
+  current?:
+    | 'dashboard'
+    | 'announcements'
+    | 'assignments'
+    | 'grades'
+    | 'discussions'
+    | 'course'
+    | 'allCourses'
   onSelectDashboard: () => void
   onSelectAnnouncements?: () => void
   onSelectAssignments?: () => void
@@ -29,27 +43,38 @@ type Props = {
   onOpenAllCourses: () => void
   onHideCourse: (courseId: string | number) => void
   onPrefetchCourse?: (courseId: string | number) => void
-  onPrefetchNav?: (tab: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions') => void
+  onPrefetchNav?: (
+    tab: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions',
+  ) => void
   onReorder?: (nextOrder: Array<string | number>) => void
 }
 
-export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, current = 'dashboard', onSelectDashboard, onSelectAnnouncements, onSelectAssignments, onSelectGrades, onSelectDiscussions, onSelectCourse, onOpenAllCourses, onHideCourse, onPrefetchCourse, onPrefetchNav, onReorder }) => {
+export const Sidebar: React.FC<Props> = ({
+  courses,
+  activeCourseId,
+  sidebar,
+  current = 'dashboard',
+  onSelectDashboard,
+  onSelectAnnouncements,
+  onSelectAssignments,
+  onSelectGrades,
+  onSelectDiscussions,
+  onSelectCourse,
+  onOpenAllCourses,
+  onHideCourse,
+  onPrefetchCourse,
+  onPrefetchNav,
+  onReorder,
+}) => {
   const [menuOpenId, setMenuOpenId] = useState<string | number | null>(null)
   const [, setDragId] = useState<string | number | null>(null)
   const hoverTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const courseHoverTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastHoveredCourseId = React.useRef<string | number | null>(null)
 
-  useRenderTrace('Sidebar', {
-    coursesCount: courses.length,
-    activeCourseId: activeCourseId ?? null,
-    current,
-    menuOpenId,
-    hiddenCount: sidebar?.hiddenCourseIds?.length ?? 0,
-    orderCount: sidebar?.order?.length ?? 0,
-  })
-
-  const handleNavHover = (tab: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions') => {
+  const handleNavHover = (
+    tab: 'dashboard' | 'announcements' | 'assignments' | 'grades' | 'discussions',
+  ) => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current)
     hoverTimer.current = setTimeout(() => {
       requestIdle(() => onPrefetchNav?.(tab))
@@ -93,11 +118,11 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
   const labelFor = (c: Course) => sidebar?.customNames?.[String(c.id)] || c.course_code || c.name
 
   return (
-    <aside
-      className="w-64 min-w-[16rem] text-slate-900 dark:text-slate-100 p-4 overflow-y-auto overflow-x-hidden flex flex-col"
-    >
+    <aside className="w-64 min-w-[16rem] text-slate-900 dark:text-slate-100 p-4 overflow-y-auto overflow-x-hidden flex flex-col">
       <div className="mb-4">
-        <div className="font-semibold mb-2 text-[11px] uppercase tracking-wide text-brand/70">At A Glance</div>
+        <div className="font-semibold mb-2 text-[11px] uppercase tracking-wide text-brand/70">
+          At A Glance
+        </div>
         <nav className="flex flex-col">
           <SidebarNavItem
             to="/dashboard"
@@ -143,7 +168,9 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
       </div>
 
       <div className="mb-2">
-        <div className="font-semibold mb-2 text-[11px] uppercase tracking-wide text-brand/70">Courses</div>
+        <div className="font-semibold mb-2 text-[11px] uppercase tracking-wide text-brand/70">
+          Courses
+        </div>
         <DndContext
           modifiers={[restrictToVerticalAxis, restrictToWindowEdges]}
           sensors={useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))}
@@ -161,12 +188,17 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
             const existing = (sidebar?.order || []).map(String)
             const existingRest = existing.filter((id) => !nextVisible.includes(id))
             const allIds = courses.map((c) => String(c.id))
-            const remaining = allIds.filter((id) => !nextVisible.includes(id) && !existingRest.includes(id))
+            const remaining = allIds.filter(
+              (id) => !nextVisible.includes(id) && !existingRest.includes(id),
+            )
             const finalOrder = [...nextVisible, ...existingRest, ...remaining]
             onReorder?.(finalOrder)
           }}
         >
-          <SortableContext items={orderedVisibleCourses.map((c) => String(c.id))} strategy={verticalListSortingStrategy}>
+          <SortableContext
+            items={orderedVisibleCourses.map((c) => String(c.id))}
+            strategy={verticalListSortingStrategy}
+          >
             <nav className="flex flex-col gap-1">
               {orderedVisibleCourses.map((c) => (
                 <SidebarCourseRow
@@ -187,7 +219,7 @@ export const Sidebar: React.FC<Props> = ({ courses, activeCourseId, sidebar, cur
         </DndContext>
       </div>
 
-      <div className="mt-auto pt-2">
+      <div className="mt-auto pt-2 flex flex-col">
         <SidebarNavItem
           to="/all-courses"
           label="All Courses"

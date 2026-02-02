@@ -1,7 +1,7 @@
 import React from 'react'
 // no Card wrapper; rendered within page container
 import { MoreVertical, EyeOff, Link as LinkIcon } from 'lucide-react'
-import { Dropdown } from './ui/Dropdown'
+import { Dropdown, DropdownItem } from './ui/Dropdown'
 import { useCourseTabs } from '../hooks/useCanvasQueries'
 import { ListItemRow } from './ui/ListItemRow'
 import { MetadataBadge } from './ui/MetadataBadge'
@@ -150,16 +150,17 @@ export const CourseLinks: React.FC<Props> = ({ courseId, onNavigate }) => {
                             offsetY={40}
                             anchorEl={anchorEls.current.get(menuId)}
                           >
-                            <button
-                              className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                            <DropdownItem
                               onClick={async (e) => {
                                 e.stopPropagation()
                                 setMenuOpenId(null)
                                 ;(await import('../utils/openExternal')).openExternal(url)
                               }}
                             >
-                              {type === 'external' || type === 'external_tool' ? 'Open in Browser' : 'Open in Canvas'}
-                            </button>
+                              {type === 'external' || type === 'external_tool'
+                                ? 'Open in Browser'
+                                : 'Open in Canvas'}
+                            </DropdownItem>
                           </Dropdown>
                         </>
                       ) : undefined

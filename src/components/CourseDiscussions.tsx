@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { MessageCircle, MoreVertical, Pin, Lock, Search, Filter } from 'lucide-react'
-import { Dropdown } from './ui/Dropdown'
+import { Dropdown, DropdownItem } from './ui/Dropdown'
 import { useCourseDiscussions } from '../hooks/useCanvasQueries'
 import { ListItemRow } from './ui/ListItemRow'
 import { SkeletonList } from './Skeleton'
@@ -97,8 +97,7 @@ const DiscussionItemRow: React.FC<{
               offsetY={32}
               anchorEl={anchorEls.current.get(menuId)}
             >
-              <button
-                className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+              <DropdownItem
                 onClick={async (e) => {
                   e.stopPropagation()
                   setMenuOpenId(null)
@@ -106,7 +105,7 @@ const DiscussionItemRow: React.FC<{
                 }}
               >
                 Open in Canvas
-              </button>
+              </DropdownItem>
             </Dropdown>
           </>
         ) : undefined

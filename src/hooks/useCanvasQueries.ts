@@ -625,6 +625,10 @@ export function useCourseUsers(
     },
     enabled: courseId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 10, // 10 min cache - users don't change often
+    gcTime: 1000 * 60 * 60 * 2, // Keep in cache for 2 hours
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     ...options,
   })
 }
@@ -650,6 +654,10 @@ export function useCourseGroups(
     },
     enabled: courseId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 10, // 10 min cache
+    gcTime: 1000 * 60 * 60 * 2, // Keep in cache for 2 hours
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     ...options,
   })
 }
@@ -671,6 +679,10 @@ export function useMyGroups(
       return res.data || []
     },
     staleTime: 1000 * 60 * 10, // 10 min cache
+    gcTime: 1000 * 60 * 60 * 2, // Keep in cache for 2 hours
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     ...options,
   })
 }

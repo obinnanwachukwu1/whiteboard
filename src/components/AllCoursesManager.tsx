@@ -1,10 +1,9 @@
 import React, { useCallback, useMemo, useState, useRef } from 'react'
 import { Button } from './ui/Button'
-import { Badge } from './ui/Badge'
-import { Eye, EyeOff, RotateCcw, MoreVertical } from 'lucide-react'
-import { Dropdown } from './ui/Dropdown'
-import { Card } from './ui/Card'
+import { Eye, EyeOff, Pencil, RotateCcw } from 'lucide-react'
 import { useAppActions } from '../context/AppContext'
+import { useCourseImages } from '../hooks/useCourseImages'
+import { courseHueFor } from '../utils/colorHelpers'
 
 type Course = { id: number | string; name: string; course_code?: string }
 
@@ -22,10 +21,19 @@ type Props = {
 
 export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange }) => {
   const actions = useAppActions()
+  const { courseImageUrl } = useCourseImages()
   const hiddenSet = useMemo(() => new Set(sidebar.hiddenCourseIds || []), [sidebar.hiddenCourseIds])
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
-  const btnRef = useRef<HTMLButtonElement | null>(null)
+  const sortedCourses = useMemo(() => {
+    return [...courses].sort((a, b) => {
+      const aHidden = hiddenSet.has(a.id)
+      const bHidden = hiddenSet.has(b.id)
+      if (aHidden !== bHidden) return aHidden ? 1 : -1
+      return 0
+    })
+  }, [courses, hiddenSet])
   const [editingId, setEditingId] = useState<string | null>(null)
+  const failedImages = useRef<Set<string>>(new Set())
+  const [, forceUpdate] = useState(0)
 
   const toggleVisibility = useCallback(async (courseId: string | number, show: boolean) => {
     const hidden = new Set(sidebar.hiddenCourseIds || [])
@@ -45,8 +53,6 @@ export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange 
     await window.settings.set?.({ sidebar: next })
   }, [sidebar, onChange])
 
-  // Dropdown handles outside click/Escape
-
   const resetName = useCallback(async (courseId: string | number) => {
     const custom = { ...(sidebar.customNames || {}) }
     delete custom[String(courseId)]
@@ -57,35 +63,68 @@ export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange 
 
   return (
     <div className="space-y-4">
-      <h1 className="mt-0 mb-2 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">All Courses</h1>
-      <div className="text-slate-500 dark:text-neutral-400 text-sm">Show/hide and rename courses. Drag to reorder directly in the sidebar.</div>
+      <h1 className="mt-0 mb-4 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">All Courses</h1>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {courses.map((c) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {sortedCourses.map((c) => {
           const idKey = String(c.id)
           const custom = sidebar.customNames?.[idKey] || ''
           const hidden = hiddenSet.has(c.id)
-          const open = menuOpenId === idKey
+          const imageUrl = courseImageUrl(c.id)
+          const imageFailed = failedImages.current.has(idKey)
+          const showImage = imageUrl && !imageFailed
+          const hue = courseHueFor(c.id, c.name)
+          const bannerGradient = `linear-gradient(135deg, hsl(${hue}, 70%, 55%), hsl(${(hue + 30) % 360}, 80%, 45%))`
+
           return (
-            <Card
+            <div
               key={idKey}
-              className="relative min-h-40 flex flex-col justify-between cursor-pointer hover:bg-slate-50/60 dark:hover:bg-neutral-800/40 transition-colors"
-              role="button"
-              tabIndex={0}
-              onClick={(e) => { if (editingId === idKey) { e.preventDefault(); return } actions.onOpenCourse(c.id) }}
-              onKeyDown={(e) => { if (editingId === idKey) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); actions.onOpenCourse(c.id) } }}
+              className={`
+                relative rounded-xl overflow-hidden
+                bg-white/70 dark:bg-neutral-900/70
+                ring-1 ring-gray-200/80 dark:ring-neutral-700/80
+                shadow-card
+                transition-all duration-150
+                hover:bg-[var(--accent-100)] dark:hover:bg-[var(--accent-100)]
+                hover:ring-[var(--accent-300)] dark:hover:ring-[var(--accent-300)]
+                ${hidden ? 'opacity-60' : ''}
+              `}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-xs text-slate-500 dark:text-neutral-400 mb-1">
-                    <Badge tone="brand">{c.course_code || 'COURSE'}</Badge>
-                  </div>
+              {/* Course Banner */}
+              <div
+                className="h-24 relative cursor-pointer"
+                style={{ background: bannerGradient }}
+                onClick={() => actions.onOpenCourse(c.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); actions.onOpenCourse(c.id) } }}
+              >
+                {showImage && (
+                  <>
+                    <img
+                      src={imageUrl}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onError={() => {
+                        failedImages.current.add(idKey)
+                        forceUpdate((n) => n + 1)
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                  </>
+                )}
+              </div>
+
+              {/* Content */}
+              <div className="p-4">
+                {/* Course Name / Edit Input */}
+                <div className="mb-3 min-h-[2.5rem]">
                   {editingId === idKey ? (
-                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-2">
                       <input
                         autoFocus
-                        className="w-full rounded-control border px-2 py-1 bg-white/90 dark:bg-neutral-900"
-                        value={custom}
+                        className="flex-1 rounded-lg border border-slate-200 dark:border-neutral-700 px-3 py-1.5 text-sm bg-white dark:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand/30"
+                        defaultValue={custom || c.name}
                         onChange={(e) => setCustomName(c.id, e.target.value)}
                         onBlur={() => setEditingId(null)}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditingId(null) }}
@@ -96,44 +135,62 @@ export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange 
                           size="sm"
                           variant="ghost"
                           onMouseDown={(e) => e.preventDefault()}
-                          onClick={(e) => { e.stopPropagation(); resetName(c.id) }}
-                          title="Reset name"
+                          onClick={() => resetName(c.id)}
+                          title="Reset to original"
                         >
-                          <RotateCcw className="w-3 h-3" />
+                          <RotateCcw className="w-3.5 h-3.5" />
                         </Button>
                       )}
                     </div>
                   ) : (
-                    <>
-                      <div className="font-semibold whitespace-normal break-words leading-snug" title={c.name}>{custom || c.name}</div>
-                        {custom && (
-                        <div className="text-xs text-slate-500 dark:text-neutral-400 whitespace-normal break-words" title={c.name}>Original: {c.name}</div>
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => actions.onOpenCourse(c.id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); actions.onOpenCourse(c.id) } }}
+                    >
+                      <div className="font-semibold text-sm text-slate-900 dark:text-slate-100 leading-snug line-clamp-2">
+                        {custom || c.name}
+                      </div>
+                      {custom && (
+                        <div className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 truncate">
+                          {c.name}
+                        </div>
                       )}
-                    </>
+                      {c.course_code && !custom && (
+                        <div className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
+                          {c.course_code}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-                <div className="app-no-drag relative" onClick={(e) => e.stopPropagation()}>
-                  <Button ref={open ? (btnRef as any) : undefined} size="sm" variant="ghost" onClick={() => setMenuOpenId(open ? null : idKey)} aria-expanded={open} aria-haspopup="menu" title="Options">
-                    <MoreVertical className="w-4 h-4" />
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className={`hover:bg-[var(--accent-200)] dark:hover:bg-[var(--accent-200)] ${editingId === idKey ? 'bg-[var(--accent-200)] dark:bg-[var(--accent-200)]' : ''}`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setEditingId(editingId === idKey ? null : idKey)}
+                    title="Rename"
+                  >
+                    <Pencil className="w-4 h-4" />
                   </Button>
-                  <Dropdown open={open} onOpenChange={(o) => setMenuOpenId(o ? idKey : null)} align="right" offsetY={32} className="min-w-[220px]" anchorEl={btnRef.current}>
-                    <button
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
-                      onClick={() => { setEditingId(idKey); setMenuOpenId(null) }}
-                    >
-                      Edit display name
-                    </button>
-                    <button
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2"
-                      onClick={() => { toggleVisibility(c.id, hidden); setMenuOpenId(null) }}
-                    >
-                      {hidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                      <span>{hidden ? 'Show in sidebar' : 'Hide from sidebar'}</span>
-                    </button>
-                  </Dropdown>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="hover:bg-[var(--accent-200)] dark:hover:bg-[var(--accent-200)]"
+                    onClick={() => toggleVisibility(c.id, hidden)}
+                    title={hidden ? 'Show in sidebar' : 'Hide from sidebar'}
+                  >
+                    {hidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                  </Button>
                 </div>
               </div>
-            </Card>
+            </div>
           )
         })}
       </div>

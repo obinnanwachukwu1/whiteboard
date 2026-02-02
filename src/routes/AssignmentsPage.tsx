@@ -82,7 +82,7 @@ const KanbanCard = React.memo(function KanbanCard({
           handleOpen()
         }
       }}
-      className={`group rounded-lg ring-1 ${item._isPastDue ? 'ring-red-200 dark:ring-red-900/50 bg-red-50/50 dark:bg-red-950/20' : 'ring-gray-200 dark:ring-neutral-800 bg-white dark:bg-neutral-900'} p-2.5 cursor-pointer hover:ring-[var(--app-accent)] active:cursor-grabbing transition-colors duration-150`}
+      className={`group rounded-lg ring-1 ${item._isPastDue ? 'ring-red-200 dark:ring-red-900/50 bg-red-50/50 dark:bg-red-950/20' : 'ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 hover:ring-[var(--app-accent-hover)] hover:bg-[var(--app-accent-bg)]'} p-2.5 cursor-pointer active:cursor-grabbing transition-colors duration-150 ease-out`}
     >
       <div className="flex items-start gap-2.5">
         <CourseAvatar
@@ -286,21 +286,21 @@ export default function AssignmentsPage() {
           <div className="inline-flex rounded-control ring-1 ring-black/10 dark:ring-white/10 overflow-hidden flex-shrink-0">
             <button
               title="Board view"
-              className={`p-1.5 sm:p-2 ${view === 'kanban' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white/80 dark:bg-neutral-900/60 text-slate-700 dark:text-neutral-300 hover:bg-slate-100/70 dark:hover:bg-neutral-800/60'}`}
+              className={`p-1.5 sm:p-2 ${view === 'kanban' ? 'bg-[var(--app-accent-bg)] text-[var(--app-accent)]' : 'bg-white/80 dark:bg-neutral-900/60 text-slate-700 dark:text-neutral-300 hover:bg-slate-100/70 dark:hover:bg-neutral-800/60'}`}
               onClick={() => setView('kanban')}
             >
               <Columns3 className="w-4 h-4" />
             </button>
             <button
               title="Calendar view"
-              className={`p-1.5 sm:p-2 ${view === 'calendar' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white/80 dark:bg-neutral-900/60 text-slate-700 dark:text-neutral-300 hover:bg-slate-100/70 dark:hover:bg-neutral-800/60'}`}
+              className={`p-1.5 sm:p-2 ${view === 'calendar' ? 'bg-[var(--app-accent-bg)] text-[var(--app-accent)]' : 'bg-white/80 dark:bg-neutral-900/60 text-slate-700 dark:text-neutral-300 hover:bg-slate-100/70 dark:hover:bg-neutral-800/60'}`}
               onClick={() => setView('calendar')}
             >
               <Calendar className="w-4 h-4" />
             </button>
           </div>
           <select
-            className="rounded-control border px-2 py-1.5 text-xs sm:text-sm bg-white/90 dark:bg-neutral-900 min-w-0 flex-1 sm:flex-none sm:w-auto truncate"
+            className="rounded-control border border-gray-300 dark:border-neutral-700 px-2 py-1.5 text-xs sm:text-sm bg-white/90 dark:bg-neutral-900 min-w-0 flex-1 sm:flex-none sm:w-auto truncate"
             value={courseFilter}
             onChange={(e) => setCourseFilter(e.target.value)}
           >
@@ -752,10 +752,10 @@ const CalendarView: React.FC<{
                           openItem(it)
                         }
                       }}
-                      className={`rounded-card ring-1 bg-white/70 dark:bg-neutral-900/70 px-3 py-2.5 cursor-pointer transition-all ${
+                      className={`rounded-card ring-1 bg-white/70 dark:bg-neutral-900/70 px-3 py-2.5 cursor-pointer transition-colors duration-150 ease-out ${
                         isOverdue
                           ? 'ring-red-200 dark:ring-red-900/50 hover:ring-red-300 dark:hover:ring-red-800'
-                          : 'ring-gray-200 dark:ring-neutral-800 hover:ring-[var(--app-accent)]'
+                          : 'ring-gray-200 dark:ring-neutral-800 hover:ring-[var(--app-accent-hover)] hover:bg-[var(--app-accent-bg)]'
                       }`}
                     >
                       <div className="flex items-center gap-2.5">

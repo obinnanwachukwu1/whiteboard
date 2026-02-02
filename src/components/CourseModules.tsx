@@ -1,11 +1,24 @@
 import React from 'react'
-import { FileText, File, MessageSquare, Link as LinkIcon, BookOpen, MoreVertical, Sparkles, ChevronDown, ChevronRight, Pin, ExternalLink, SquareArrowOutUpRight } from 'lucide-react'
-import { Dropdown } from './ui/Dropdown'
+import {
+  FileText,
+  File,
+  MessageSquare,
+  Link as LinkIcon,
+  BookOpen,
+  MoreVertical,
+  Sparkles,
+  ChevronDown,
+  ChevronRight,
+  Pin,
+  ExternalLink,
+  SquareArrowOutUpRight,
+} from 'lucide-react'
+import { Dropdown, DropdownItem } from './ui/Dropdown'
 import { useCourseModules } from '../hooks/useCanvasQueries'
 import type { CanvasModule, CanvasModuleItem, CanvasFile } from '../types/canvas'
 import { ListItemRow } from './ui/ListItemRow'
 import { MetadataBadge } from './ui/MetadataBadge'
-import { useAIPanel } from '../context/AIPanelContext'
+import { useAIPanelActions } from '../context/AIPanelContext'
 import { useAppData, useAppFlags, useAppActions } from '../context/AppContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePrefetchOnHover } from '../hooks/usePrefetchOnHover'
@@ -60,7 +73,7 @@ function useModuleItemPrefetch(courseId: string | number, it: CanvasModuleItem) 
     queryKey,
     queryFn,
     enabled,
-    staleTime: 1000 * 60 * 5
+    staleTime: 1000 * 60 * 5,
   })
 }
 
@@ -81,15 +94,31 @@ const ModuleItemRow: React.FC<{
   aiPanel: any
   isPinned: boolean
   onTogglePin: () => void
-}> = ({ it, courseId, courseName, baseUrl, icon, title, kind, onClick, isMenuOpen, menuId, setMenuOpenId, anchorEls, aiEnabled, aiPanel, isPinned, onTogglePin }) => {
+}> = ({
+  it,
+  courseId,
+  courseName,
+  baseUrl,
+  icon,
+  title,
+  kind,
+  onClick,
+  isMenuOpen,
+  menuId,
+  setMenuOpenId,
+  anchorEls,
+  aiEnabled,
+  aiPanel,
+  isPinned,
+  onTogglePin,
+}) => {
   const hoverHandlers = useModuleItemPrefetch(courseId, it)
 
   // Determine if this item can be opened in CanvasContentView (and thus new window)
-  const canOpenInApp = (
+  const canOpenInApp =
     (it.__typename === 'PageModuleItem' && it.pageUrl) ||
     (it.__typename === 'AssignmentModuleItem' && it.contentId) ||
     (it.__typename === 'FileModuleItem' && it.contentId)
-  )
 
   // Get the content type and ID for building Canvas URL and opening in new window
   const getContentInfo = (): { type: 'page' | 'assignment' | 'file'; contentId: string } | null => {
@@ -107,9 +136,15 @@ const ModuleItemRow: React.FC<{
 
   const contentInfo = getContentInfo()
 
-  const openInCanvasUrl = baseUrl && contentInfo
-    ? canvasContentUrl({ baseUrl, courseId, type: contentInfo.type, contentId: contentInfo.contentId })
-    : it.htmlUrl
+  const openInCanvasUrl =
+    baseUrl && contentInfo
+      ? canvasContentUrl({
+          baseUrl,
+          courseId,
+          type: contentInfo.type,
+          contentId: contentInfo.contentId,
+        })
+      : it.htmlUrl
 
   const handleOpenInCanvas = async () => {
     setMenuOpenId(null)
@@ -139,69 +174,95 @@ const ModuleItemRow: React.FC<{
       menuOpen={isMenuOpen}
       onClick={onClick}
       menu={
-        (
-          <>
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : menuId) }}
-              className={`inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ${isMenuOpen ? 'opacity-100' : ''}`}
-              aria-label="More options"
-              ref={(el) => { anchorEls.current.set(menuId, el) }}
+        <>
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setMenuOpenId(isMenuOpen ? null : menuId)
+            }}
+            className={`inline-flex items-center p-1 rounded text-slate-500 hover:text-slate-800 dark:text-neutral-200 dark:hover:text-neutral-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ${isMenuOpen ? 'opacity-100' : ''}`}
+            aria-label="More options"
+            ref={(el) => {
+              anchorEls.current.set(menuId, el)
+            }}
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
+          <Dropdown
+            open={isMenuOpen}
+            onOpenChange={(o) => setMenuOpenId(o ? menuId : null)}
+            align="right"
+            offsetY={32}
+            anchorEl={anchorEls.current.get(menuId)}
+          >
+            <DropdownItem
+              onClick={(e) => {
+                e.stopPropagation()
+                onTogglePin()
+              }}
+              icon={<Pin className="w-4 h-4" />}
             >
-              <MoreVertical className="w-4 h-4" />
-            </button>
-            <Dropdown open={isMenuOpen} onOpenChange={(o) => setMenuOpenId(o ? menuId : null)} align="right" offsetY={32} anchorEl={anchorEls.current.get(menuId)}>
-              <button
-                className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
-                onClick={(e) => { e.stopPropagation(); onTogglePin() }}
+              {isPinned ? 'Unpin from Dashboard' : 'Pin to Dashboard'}
+            </DropdownItem>
+            {openInCanvasUrl && (
+              <DropdownItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleOpenInCanvas()
+                }}
+                icon={<ExternalLink className="w-4 h-4" />}
               >
-                <Pin className="w-4 h-4" />
-                {isPinned ? 'Unpin from Dashboard' : 'Pin to Dashboard'}
-              </button>
-              {openInCanvasUrl && (
-                <button
-                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
-                  onClick={(e) => { e.stopPropagation(); handleOpenInCanvas() }}
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  {it.__typename === 'ExternalUrlModuleItem' ? 'Open in Browser' : 'Open in Canvas'}
-                </button>
-              )}
-              {canOpenInApp && (
-                <button
-                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
-                  onClick={(e) => { e.stopPropagation(); handleOpenInNewWindow() }}
-                >
-                  <SquareArrowOutUpRight className="w-4 h-4" />
-                  Open in New Window
-                </button>
-              )}
-              {aiEnabled && (
-                <button
-                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 text-indigo-600 dark:text-indigo-400"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setMenuOpenId(null)
-                    aiPanel.open(`Explain this module item: "${title}"`, 'ask-ai', true)
-                  }}
-                >
-                  <Sparkles className="w-4 h-4" />
-                  Explain
-                </button>
-              )}
-            </Dropdown>
-          </>
-        )
+                {it.__typename === 'ExternalUrlModuleItem' ? 'Open in Browser' : 'Open in Canvas'}
+              </DropdownItem>
+            )}
+            {canOpenInApp && (
+              <DropdownItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleOpenInNewWindow()
+                }}
+                icon={<SquareArrowOutUpRight className="w-4 h-4" />}
+              >
+                Open in New Window
+              </DropdownItem>
+            )}
+            {aiEnabled && it.__typename === 'PageModuleItem' && it.pageUrl && (
+              <DropdownItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setMenuOpenId(null)
+                  aiPanel.openExplainPage({
+                    courseId,
+                    courseName,
+                    pageUrl: it.pageUrl!,
+                    title,
+                  })
+                }}
+                icon={<Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />}
+                className="text-indigo-600 dark:text-indigo-400"
+              >
+                Explain
+              </DropdownItem>
+            )}
+          </Dropdown>
+        </>
       }
     />
   )
 }
 
-export const CourseModules: React.FC<Props> = ({ courseId, courseName, onOpenExternal, onOpenContent }) => {
+export const CourseModules: React.FC<Props> = ({
+  courseId,
+  courseName,
+  onOpenExternal,
+  onOpenContent,
+}) => {
   const { data: modules = null, isLoading, error } = useCourseModules(courseId)
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
   const [expandedModules, setExpandedModules] = React.useState<Set<string>>(new Set())
   const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
-  const aiPanel = useAIPanel()
+  const aiPanel = useAIPanelActions()
   const data = useAppData()
   const flags = useAppFlags()
   const actions = useAppActions()
@@ -221,7 +282,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, courseName, onOpenExt
   }, [modules, courseId])
 
   const toggleModule = React.useCallback((moduleId: string) => {
-    setExpandedModules(prev => {
+    setExpandedModules((prev) => {
       const next = new Set(prev)
       if (next.has(moduleId)) {
         next.delete(moduleId)
@@ -234,13 +295,13 @@ export const CourseModules: React.FC<Props> = ({ courseId, courseName, onOpenExt
 
   const expandAll = React.useCallback(() => {
     if (!modules || !Array.isArray(modules)) return
-    const allIds = (modules as CanvasModule[]).map(m => String(m._id || m.id))
+    const allIds = (modules as CanvasModule[]).map((m) => String(m._id || m.id))
     setExpandedModules(new Set(allIds))
   }, [modules])
 
   const allExpanded = React.useMemo(() => {
     if (!modules || !Array.isArray(modules) || modules.length === 0) return false
-    return (modules as CanvasModule[]).every(m => expandedModules.has(String(m._id || m.id)))
+    return (modules as CanvasModule[]).every((m) => expandedModules.has(String(m._id || m.id)))
   }, [modules, expandedModules])
 
   // Lightweight proactive prefetch: grab meta + content for a few top items.
@@ -306,7 +367,12 @@ export const CourseModules: React.FC<Props> = ({ courseId, courseName, onOpenExt
       return
     }
     if (it.__typename === 'AssignmentModuleItem' && it.contentId) {
-      onOpenContent?.({ courseId, contentType: 'assignment', contentId: String(it.contentId), title })
+      onOpenContent?.({
+        courseId,
+        contentType: 'assignment',
+        contentId: String(it.contentId),
+        title,
+      })
       return
     }
     if (it.__typename === 'FileModuleItem' && it.contentId) {
@@ -315,10 +381,20 @@ export const CourseModules: React.FC<Props> = ({ courseId, courseName, onOpenExt
         const fileData = res.data as CanvasFile
         const fileName = fileData?.display_name || fileData?.filename || title
         const contentType = fileData?.content_type || ''
-        const isViewableFile = /\.(pdf|docx?|pptx?|xlsx?|jpe?g|png|gif|webp|bmp|svg|avif|mp3|wav|ogg|m4a|aac|mp4|webm|mov|m4v)$/i.test(fileName)
-          || /^(application\/(pdf|vnd\.openxmlformats-officedocument|vnd\.ms-)|image\/|audio\/|video\/)/i.test(contentType)
+        const isViewableFile =
+          /\.(pdf|docx?|pptx?|xlsx?|jpe?g|png|gif|webp|bmp|svg|avif|mp3|wav|ogg|m4a|aac|mp4|webm|mov|m4v)$/i.test(
+            fileName,
+          ) ||
+          /^(application\/(pdf|vnd\.openxmlformats-officedocument|vnd\.ms-)|image\/|audio\/|video\/)/i.test(
+            contentType,
+          )
         if (isViewableFile) {
-          onOpenContent?.({ courseId, contentType: 'file', contentId: String(it.contentId), title: fileName })
+          onOpenContent?.({
+            courseId,
+            contentType: 'file',
+            contentId: String(it.contentId),
+            title: fileName,
+          })
         } else {
           const url = fileData?.url as string | undefined
           if (url) await openExternal(url)
@@ -329,7 +405,10 @@ export const CourseModules: React.FC<Props> = ({ courseId, courseName, onOpenExt
 
     // Handle other module item types
     if (it.__typename === 'DiscussionModuleItem' && it.contentId) {
-      const url = new URL(`/courses/${courseId}/discussion_topics/${it.contentId}`, data.baseUrl).toString()
+      const url = new URL(
+        `/courses/${courseId}/discussion_topics/${it.contentId}`,
+        data.baseUrl,
+      ).toString()
       await openExternal(url)
       return
     }
@@ -352,24 +431,45 @@ export const CourseModules: React.FC<Props> = ({ courseId, courseName, onOpenExt
         const meta = res.data as any
         const type = String(meta?.type || '').toLowerCase()
         if (type === 'page' && meta?.page_url) {
-          onOpenContent?.({ courseId, contentType: 'page', contentId: String(meta.page_url), title })
+          onOpenContent?.({
+            courseId,
+            contentType: 'page',
+            contentId: String(meta.page_url),
+            title,
+          })
           return
         }
         if (type === 'assignment' && meta?.content_id != null) {
-          onOpenContent?.({ courseId, contentType: 'assignment', contentId: String(meta.content_id), title })
+          onOpenContent?.({
+            courseId,
+            contentType: 'assignment',
+            contentId: String(meta.content_id),
+            title,
+          })
           return
         }
         if (type === 'file' && meta?.content_id != null) {
-          onOpenContent?.({ courseId, contentType: 'file', contentId: String(meta.content_id), title })
+          onOpenContent?.({
+            courseId,
+            contentType: 'file',
+            contentId: String(meta.content_id),
+            title,
+          })
           return
         }
         if (type === 'discussion' && meta?.content_id != null) {
-          const url = new URL(`/courses/${courseId}/discussion_topics/${meta.content_id}`, data.baseUrl).toString()
+          const url = new URL(
+            `/courses/${courseId}/discussion_topics/${meta.content_id}`,
+            data.baseUrl,
+          ).toString()
           await openExternal(url)
           return
         }
         if (type === 'quiz' && meta?.content_id != null) {
-          const url = new URL(`/courses/${courseId}/quizzes/${meta.content_id}`, data.baseUrl).toString()
+          const url = new URL(
+            `/courses/${courseId}/quizzes/${meta.content_id}`,
+            data.baseUrl,
+          ).toString()
           await openExternal(url)
           return
         }
@@ -386,25 +486,39 @@ export const CourseModules: React.FC<Props> = ({ courseId, courseName, onOpenExt
 
   const iconFor = (n: CanvasModuleItem) => {
     switch (n?.__typename) {
-      case 'AssignmentModuleItem': return <FileText className="w-4 h-4" />
-      case 'PageModuleItem': return <BookOpen className="w-4 h-4" />
-      case 'FileModuleItem': return <File className="w-4 h-4" />
-      case 'DiscussionModuleItem': return <MessageSquare className="w-4 h-4" />
-      case 'ExternalUrlModuleItem': return <LinkIcon className="w-4 h-4" />
-      case 'QuizModuleItem': return <FileText className="w-4 h-4" />
-      default: return <FileText className="w-4 h-4" />
+      case 'AssignmentModuleItem':
+        return <FileText className="w-4 h-4" />
+      case 'PageModuleItem':
+        return <BookOpen className="w-4 h-4" />
+      case 'FileModuleItem':
+        return <File className="w-4 h-4" />
+      case 'DiscussionModuleItem':
+        return <MessageSquare className="w-4 h-4" />
+      case 'ExternalUrlModuleItem':
+        return <LinkIcon className="w-4 h-4" />
+      case 'QuizModuleItem':
+        return <FileText className="w-4 h-4" />
+      default:
+        return <FileText className="w-4 h-4" />
     }
   }
 
   const labelFor = (n: CanvasModuleItem) => {
     switch (n?.__typename) {
-      case 'AssignmentModuleItem': return 'Assignment'
-      case 'PageModuleItem': return 'Page'
-      case 'FileModuleItem': return 'File'
-      case 'DiscussionModuleItem': return 'Discussion'
-      case 'ExternalUrlModuleItem': return 'Link'
-      case 'QuizModuleItem': return 'Quiz'
-      default: return 'Item'
+      case 'AssignmentModuleItem':
+        return 'Assignment'
+      case 'PageModuleItem':
+        return 'Page'
+      case 'FileModuleItem':
+        return 'File'
+      case 'DiscussionModuleItem':
+        return 'Discussion'
+      case 'ExternalUrlModuleItem':
+        return 'Link'
+      case 'QuizModuleItem':
+        return 'Quiz'
+      default:
+        return 'Item'
     }
   }
 
@@ -421,9 +535,13 @@ export const CourseModules: React.FC<Props> = ({ courseId, courseName, onOpenExt
           </button>
         )}
       </div>
-      
+
       <div className="flex-1 overflow-y-auto min-h-0 p-4">
-        {error && <div className="text-red-600 text-sm mb-2">{String((error as any)?.message || error)}</div>}
+        {error && (
+          <div className="text-red-600 text-sm mb-2">
+            {String((error as any)?.message || error)}
+          </div>
+        )}
         {isLoading && <SkeletonList count={6} hasAvatar variant="row" />}
         {!isLoading && modules && modules.length === 0 && (
           <div className="text-slate-500 dark:text-neutral-400 text-sm">No modules</div>
@@ -434,7 +552,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, courseName, onOpenExt
               const moduleId = String(m._id || m.id)
               const isExpanded = expandedModules.has(moduleId)
               const itemCount = m?.moduleItemsConnection?.nodes?.length ?? 0
-              
+
               return (
                 <div key={moduleId}>
                   {/* Module header - clickable to toggle */}
@@ -452,7 +570,7 @@ export const CourseModules: React.FC<Props> = ({ courseId, courseName, onOpenExt
                     </span>
                     <span className="text-xs text-slate-400">{itemCount} items</span>
                   </button>
-                  
+
                   {/* Module items - only rendered when expanded */}
                   {isExpanded && itemCount > 0 && (
                     <ul className="list-none m-0 p-0 space-y-3 ml-5">
@@ -463,7 +581,10 @@ export const CourseModules: React.FC<Props> = ({ courseId, courseName, onOpenExt
                         const isMenuOpen = menuOpenId === menuId
 
                         // Calculate pinId based on item type
-                        const getPinInfo = (): { type: 'page' | 'assignment' | 'file'; contentId: string } | null => {
+                        const getPinInfo = (): {
+                          type: 'page' | 'assignment' | 'file'
+                          contentId: string
+                        } | null => {
                           if (it.__typename === 'PageModuleItem' && it.pageUrl) {
                             return { type: 'page', contentId: it.pageUrl }
                           }
@@ -476,7 +597,9 @@ export const CourseModules: React.FC<Props> = ({ courseId, courseName, onOpenExt
                           return null
                         }
                         const pinInfo = getPinInfo()
-                        const pinId = pinInfo ? `${pinInfo.type}:${pinInfo.contentId}` : `module-item:${it._id}`
+                        const pinId = pinInfo
+                          ? `${pinInfo.type}:${pinInfo.contentId}`
+                          : `module-item:${it._id}`
                         const isPinned = data.pinnedItems?.some((i) => i.id === pinId) ?? false
 
                         const handleTogglePin = () => {

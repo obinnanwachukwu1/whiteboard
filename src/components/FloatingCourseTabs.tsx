@@ -1,6 +1,7 @@
 import React, { useRef, useState, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { BookOpen, Megaphone, FileText, Percent, Link as LinkIcon } from 'lucide-react'
+import { useAIPanelState } from '../context/AIPanelContext'
 
 export type CourseTabKey = 'home' | 'wiki' | 'syllabus' | 'announcements' | 'discussions' | 'files' | 'modules' | 'links' | 'assignments' | 'grades' | 'people'
 
@@ -23,6 +24,8 @@ const defaultTabs: TabDesc[] = [
 
 // Sidebar width constant (matches Sidebar.tsx)
 const SIDEBAR_WIDTH = 256
+// AI panel width (360px) + margin (16px)
+const AI_PANEL_WIDTH = 376
 // Approximate width per tab with label: icon (16px) + gap (8px) + label (~80px) + padding (24px) ≈ 120px
 const LABEL_TAB_WIDTH = 120
 
@@ -34,6 +37,7 @@ export const FloatingCourseTabs: React.FC<Props> = ({ current, onChange, anchorI
   const containerRef = useRef<HTMLDivElement>(null)
   const hoverTimer = useRef<any>(null)
   const anchorObserver = useRef<ResizeObserver | null>(null)
+  const aiPanelState = useAIPanelState()
 
   const tabList = tabs || defaultTabs
 
@@ -51,8 +55,9 @@ export const FloatingCourseTabs: React.FC<Props> = ({ current, onChange, anchorI
   // Calculate position and collapsed state synchronously before paint
   useLayoutEffect(() => {
     const compute = () => {
-      // Calculate collapsed state
-      const availableWidth = window.innerWidth - SIDEBAR_WIDTH - 80
+      // Calculate collapsed state, accounting for AI panel if open
+      const aiPanelOffset = aiPanelState.isOpen ? AI_PANEL_WIDTH : 0
+      const availableWidth = window.innerWidth - SIDEBAR_WIDTH - 80 - aiPanelOffset
       const fullWidthWithLabels = tabList.length * LABEL_TAB_WIDTH
       setCollapsed(fullWidthWithLabels > availableWidth)
 
@@ -96,7 +101,7 @@ export const FloatingCourseTabs: React.FC<Props> = ({ current, onChange, anchorI
       if (anchorObserver.current && anchorEl) anchorObserver.current.unobserve(anchorEl)
       anchorObserver.current = null
     }
-  }, [anchorId, tabList.length])
+  }, [anchorId, tabList.length, aiPanelState.isOpen])
 
   // Use portal to escape backdrop-filter containing block from Card
   const content = (

@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react'
-import { useRenderTrace } from '../hooks/useRenderTrace'
 import { generatePatternCSS } from '../utils/patterns'
 import type { ThemeSettings, PatternId } from '../utils/theme'
 import { ACCENT_PRESETS } from '../utils/theme'
@@ -11,18 +10,6 @@ interface BackgroundLayerProps {
 export function BackgroundLayer({ settings }: BackgroundLayerProps) {
   const { theme, accentPreset, backgroundMode, background } = settings
   const dark = theme === 'dark'
-
-  useRenderTrace('BackgroundLayer', {
-    theme,
-    accentPreset,
-    backgroundMode,
-    type: background.type,
-    patternId: background.patternId ?? null,
-    imageUrl: background.imageUrl ?? null,
-    blur: background.blur,
-    opacity: background.opacity,
-    overlay: background.overlay,
-  })
 
   // Get accent HSL values
   const accentHSL = useMemo(() => {

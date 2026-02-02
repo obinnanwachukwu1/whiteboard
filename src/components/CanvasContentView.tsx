@@ -25,10 +25,10 @@ import {
 } from '../hooks/useCanvasQueries'
 import { FullscreenContainer } from './FullscreenContainer'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
-import { useAIPanel } from '../context/AIPanelContext'
+import { useAIPanelActions } from '../context/AIPanelContext'
 import { useAppActions, useAppData, useAppFlags } from '../context/AppContext'
 import { Skeleton, SkeletonText } from './Skeleton'
-import { Dropdown } from './ui/Dropdown'
+import { Dropdown, DropdownItem } from './ui/Dropdown'
 import { openExternal } from '../utils/openExternal'
 import { canvasContentUrl } from '../utils/canvasContentUrl'
 import { AssignmentSubmitPanel } from './assignment/AssignmentSubmitPanel'
@@ -67,7 +67,7 @@ export const CanvasContentView: React.FC<Props> = ({
   const data = useAppData()
   const flags = useAppFlags()
   const actions = useAppActions()
-  const aiPanel = useAIPanel()
+  const aiPanel = useAIPanelActions()
   const moreBtnRef = useRef<HTMLButtonElement>(null)
   const [moreOpen, setMoreOpen] = useState(false)
 
@@ -382,37 +382,28 @@ export const CanvasContentView: React.FC<Props> = ({
         </Button>
 
         <Dropdown open={moreOpen} onOpenChange={setMoreOpen} anchorRef={moreBtnRef as any}>
-          <button
-            type="button"
-            className="w-full px-3 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2"
-            onClick={togglePin}
-          >
-            <Pin className="w-4 h-4" />
+          <DropdownItem onClick={togglePin} icon={<Pin className="w-4 h-4" />}>
             {isPinned ? 'Unpin from Dashboard' : 'Pin to Dashboard'}
-          </button>
-          <button
-            type="button"
-            className="w-full px-3 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2"
+          </DropdownItem>
+          <DropdownItem
             onClick={async () => {
               setMoreOpen(false)
               await openInCanvas()
             }}
             disabled={!openInCanvasUrl}
+            icon={<ExternalLink className="w-4 h-4" />}
           >
-            <ExternalLink className="w-4 h-4" />
             Open in Canvas
-          </button>
-          <button
-            type="button"
-            className="w-full px-3 py-2 text-sm text-left hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2"
+          </DropdownItem>
+          <DropdownItem
             onClick={async () => {
               setMoreOpen(false)
               await openInNewWindow()
             }}
+            icon={<SquareArrowOutUpRight className="w-4 h-4" />}
           >
-            <SquareArrowOutUpRight className="w-4 h-4" />
             Open in New Window
-          </button>
+          </DropdownItem>
         </Dropdown>
       </div>
     )
