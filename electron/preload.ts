@@ -268,23 +268,64 @@ if (process.isMainFrame) {
 
   // AI Helpers
   contextBridge.exposeInMainWorld('ai', {
-    chat: (messages: any[], max_tokens?: number) =>
-      ipcRenderer.invoke('ai:chat', { messages, max_tokens }),
-    chatStream: (messages: any[], onChunk: (content: string) => void) => {
+    chat: (
+      messages: any[],
+      opts?:
+        | number
+        | {
+            max_tokens?: number
+            response_format?: any
+            tools?: any
+            tool_choice?: any
+            temperature?: number
+            top_p?: number
+          },
+    ) => {
+      const payload: any = { messages }
+      if (typeof opts === 'number') {
+        payload.max_tokens = opts
+      } else if (opts && typeof opts === 'object') {
+        payload.max_tokens = opts.max_tokens
+        if (opts.response_format) payload.response_format = opts.response_format
+        if (opts.tools) payload.tools = opts.tools
+        if (opts.tool_choice) payload.tool_choice = opts.tool_choice
+        if (typeof opts.temperature === 'number') payload.temperature = opts.temperature
+        if (typeof opts.top_p === 'number') payload.top_p = opts.top_p
+      }
+      return ipcRenderer.invoke('ai:chat', payload)
+    },
+    chatStream: (
+      messages: any[],
+      onChunk: (content: string) => void,
+      onDone?: () => void,
+      onError?: (error: string) => void,
+    ) => {
       const id = Math.random().toString(36).substring(7)
 
       const chunkHandler = (_: any, data: { id: string; content: string }) => {
         if (data.id === id) onChunk(data.content)
       }
 
+      const doneHandler = (_: any, data: { id: string }) => {
+        if (data.id === id) onDone?.()
+      }
+
+      const errorHandler = (_: any, data: { id: string; error: string }) => {
+        if (data.id === id) onError?.(data.error)
+      }
+
       // We can also listen for done/error to clean up automatically if we wanted,
       // but the caller is responsible for calling the returned cleanup function.
 
       ipcRenderer.on('ai:stream:chunk', chunkHandler)
+      ipcRenderer.on('ai:stream:done', doneHandler)
+      ipcRenderer.on('ai:stream:error', errorHandler)
       ipcRenderer.send('ai:chat-stream', { id, messages })
 
       return () => {
         ipcRenderer.removeListener('ai:stream:chunk', chunkHandler)
+        ipcRenderer.removeListener('ai:stream:done', doneHandler)
+        ipcRenderer.removeListener('ai:stream:error', errorHandler)
         ipcRenderer.send('ai:chat-cancel', { id })
       }
     },

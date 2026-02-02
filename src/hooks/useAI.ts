@@ -170,12 +170,34 @@ export const useAI = () => {
     })
   }
 
+  /**
+   * General streaming chat - calls onUpdate with accumulated text as chunks arrive.
+   * Returns a cleanup function to cancel the stream.
+   */
+  const streamChat = (
+    messages: AIMessage[],
+    onUpdate: (text: string) => void,
+    opts?: { onDone?: () => void; onError?: (error: string) => void },
+  ): (() => void) => {
+    let accumulated = ''
+    return window.ai.chatStream(
+      messages,
+      (chunk: string) => {
+        accumulated += chunk
+        onUpdate(accumulated)
+      },
+      opts?.onDone,
+      opts?.onError,
+    )
+  }
+
   return {
     chat,
     summarize,
     streamSummarize,
     explainPriority,
     streamExplainPriority,
+    streamChat,
     loading,
     error,
   }

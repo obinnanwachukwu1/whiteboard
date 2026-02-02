@@ -289,9 +289,23 @@ interface Window {
   ai: {
     chat: (
       messages: any[],
-      max_tokens?: number,
+      opts?:
+        | number
+        | {
+            max_tokens?: number
+            response_format?: any
+            tools?: any
+            tool_choice?: any
+            temperature?: number
+            top_p?: number
+          },
     ) => Promise<{ ok: boolean; choices?: any[]; error?: any }>
-    chatStream: (messages: any[], onChunk: (content: string) => void) => () => void
+    chatStream: (
+      messages: any[],
+      onChunk: (content: string) => void,
+      onDone?: () => void,
+      onError?: (error: string) => void,
+    ) => () => void
   }
   embedding: {
     search: (

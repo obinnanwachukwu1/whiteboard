@@ -242,18 +242,44 @@ export class AIManager {
       this.cancelRequest(id)
     })
 
-    ipcMain.handle('ai:chat', async (_, { messages, max_tokens = 500 }) => {
+    ipcMain.handle('ai:chat', async (_event, req) => {
       // Check if process is running and ready
       if (!this.process || !this.isReady) {
         return { ok: false, error: 'AI features are disabled or not available.' }
       }
 
-      return this.sendRequest({
+      const clampInt = (value: any, fallback: number, min: number, max: number) => {
+        const n = Number(value)
+        if (!Number.isFinite(n)) return fallback
+        return Math.max(min, Math.min(max, Math.round(n)))
+      }
+
+      const {
+        messages,
+        max_tokens = 500,
+        response_format,
+        tools,
+        tool_choice,
+        temperature,
+        top_p,
+      } = (req as any) ?? {}
+
+      const maxTokensSafe = clampInt(max_tokens, 500, 1, 1200)
+
+      const payload: any = {
         model: 'ondevice',
         messages,
-        max_tokens,
+        max_tokens: maxTokensSafe,
         stream: false,
-      })
+      }
+
+      if (response_format) payload.response_format = response_format
+      if (tools) payload.tools = tools
+      if (tool_choice) payload.tool_choice = tool_choice
+      if (typeof temperature === 'number') payload.temperature = temperature
+      if (typeof top_p === 'number') payload.top_p = top_p
+
+      return this.sendRequest(payload)
     })
 
     // Streaming IPC handler
