@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { QueryClient } from '@tanstack/react-query'
-import { computeResolvedTabs, hasFilesFromTabs } from '../../utils/courseTabs'
+import { computeResolvedTabs, getExtraCourseLinks, hasFilesFromTabs } from '../../utils/courseTabs'
 import type { ResolvedTab } from '../../types/ui'
 
 type Params = {
@@ -27,7 +27,7 @@ export function useCourseTabsState({
   const hasHome = defaultView === 'wiki'
   const hasFilesViaTabs = hasFilesFromTabs(tabsData as any)
   const hasFiles = hasFilesViaTabs || (Array.isArray(filesProbeData) && filesProbeData.length > 0)
-  const hasLinks = Array.isArray(tabsData) && (tabsData as any[]).length > 0
+  const hasLinks = getExtraCourseLinks(tabsData as any).length > 0
 
   useEffect(() => {
     const base = computeResolvedTabs(infoData || null, (tabsData as any[]) || [], hasFiles)

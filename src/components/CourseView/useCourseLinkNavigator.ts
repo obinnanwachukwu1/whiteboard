@@ -31,10 +31,47 @@ export function useCourseLinkNavigator({
         const u = new URL(href)
         const originMatch = baseUrl ? u.origin === new URL(baseUrl).origin : false
         const path = u.pathname
+        const onlyAnnouncements = u.searchParams.get('only_announcements') === '1'
         const parts = path.split('/').filter(Boolean)
         const idxCourse = parts.indexOf('courses')
         const cid = idxCourse >= 0 && parts[idxCourse + 1] ? parts[idxCourse + 1] : null
         const withinCurrent = cid && String(cid) === String(courseId)
+        const courseSection = idxCourse >= 0 ? parts[idxCourse + 2] : null
+        const courseSectionHasItem = idxCourse >= 0 && !!parts[idxCourse + 3]
+
+        const openCourseRoot = () => {
+          if (!cid) return false
+          if (withinCurrent) {
+            if (onNavigateCourse) onNavigateCourse(cid)
+            else onChangeTab('home')
+          } else {
+            onNavigateCourse?.(cid)
+          }
+          return true
+        }
+
+        const openCourseSection = () => {
+          if (!cid || !courseSection || courseSectionHasItem) return false
+          const sectionMap: Record<string, CourseTabKey> = {
+            announcements: 'announcements',
+            discussion_topics: onlyAnnouncements ? 'announcements' : 'discussions',
+            discussions: 'discussions',
+            modules: 'modules',
+            assignments: 'assignments',
+            grades: 'grades',
+            files: 'files',
+            pages: 'home',
+            wiki: 'home',
+            people: 'people',
+            users: 'people',
+            syllabus: 'syllabus',
+          }
+          const tab = sectionMap[String(courseSection).toLowerCase()]
+          if (!tab) return false
+          if (withinCurrent) onChangeTab(tab)
+          else onNavigateCourse?.(cid)
+          return true
+        }
 
         const openAssignment = () => {
           const idx = parts.indexOf('assignments')
@@ -111,6 +148,14 @@ export function useCourseLinkNavigator({
         if (!isInternal) {
           ;(await import('../../utils/openExternal')).openExternal(href)
           return
+        }
+
+        if (idxCourse >= 0 && !courseSection) {
+          if (openCourseRoot()) return
+        }
+
+        if (idxCourse >= 0 && courseSection && !courseSectionHasItem) {
+          if (openCourseSection()) return
         }
 
         if (path.includes('/modules/items/')) {

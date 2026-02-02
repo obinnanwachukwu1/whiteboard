@@ -119,7 +119,7 @@ export const CourseTabContent: React.FC<Props> = ({
 
       {activeTab === 'links' && (
         <div className="flex-1 flex flex-col overflow-hidden">
-          <CourseLinks courseId={courseId} />
+          <CourseLinks courseId={courseId} onNavigate={onNavigate} />
         </div>
       )}
 
