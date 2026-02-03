@@ -59,6 +59,50 @@ function copyPdfJsAssets(): Plugin {
   }
 }
 
+// Plugin to copy docx viewer assets to the output directory
+function copyDocxViewerAssets(): Plugin {
+  return {
+    name: 'copy-docxviewer-assets',
+    writeBundle() {
+      const outDir = path.resolve(__dirname, 'dist/docxviewer')
+
+      if (!fs.existsSync(outDir)) {
+        fs.mkdirSync(outDir, { recursive: true })
+      }
+
+      // Copy our custom files from public/docxviewer
+      const publicDocxViewer = path.resolve(__dirname, 'public/docxviewer')
+      if (fs.existsSync(publicDocxViewer)) {
+        for (const file of fs.readdirSync(publicDocxViewer)) {
+          fs.copyFileSync(path.join(publicDocxViewer, file), path.join(outDir, file))
+        }
+      }
+
+      // Copy runtime dependencies from node_modules
+      const jszipSrc = path.resolve(__dirname, 'node_modules/jszip/dist/jszip.min.js')
+      if (fs.existsSync(jszipSrc)) {
+        fs.copyFileSync(jszipSrc, path.join(outDir, 'jszip.min.js'))
+      }
+
+      const docxPreviewSrc = path.resolve(
+        __dirname,
+        'node_modules/docx-preview/dist/docx-preview.min.js',
+      )
+      if (fs.existsSync(docxPreviewSrc)) {
+        fs.copyFileSync(docxPreviewSrc, path.join(outDir, 'docx-preview.min.js'))
+      }
+
+      const docxPreviewMapSrc = path.resolve(
+        __dirname,
+        'node_modules/docx-preview/dist/docx-preview.min.js.map',
+      )
+      if (fs.existsSync(docxPreviewMapSrc)) {
+        fs.copyFileSync(docxPreviewMapSrc, path.join(outDir, 'docx-preview.min.js.map'))
+      }
+    },
+  }
+}
+
 // Ensure preload stays valid CJS (no ESM export tokens)
 function fixPreloadCjsExport(): Plugin {
   return {
@@ -167,6 +211,7 @@ export default defineConfig(({ command }) => {
       react(),
       tailwindcss(),
       copyPdfJsAssets(),
+      copyDocxViewerAssets(),
       electron([
         // Main process
         {
