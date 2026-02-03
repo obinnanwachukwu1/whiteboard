@@ -1,0 +1,397 @@
+:root {
+  --docx-page-max-width: 960px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* Light mode default - matches bg-gray-100 */
+  background: #f3f4f6;
+  font-family: var(
+    --wb-font,
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    "Noto Sans",
+    sans-serif
+  );
+  color: #0f172a;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Dark mode via class (set by React) */
+html.dark,
+html.dark body {
+  /* Matches dark:bg-neutral-800 */
+  background: #262626;
+  color: #f8fafc;
+}
+
+/* Fallback: system preference if no class set */
+@media (prefers-color-scheme: dark) {
+  html:not(.light),
+  html:not(.light) body {
+    background: #262626;
+  }
+}
+
+#viewerContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: auto;
+  background: #f3f4f6;
+  /* GPU acceleration for smooth scrolling */
+  transform: translateZ(0);
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto;
+}
+
+html.dark #viewerContainer {
+  background: #262626;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not(.light) #viewerContainer {
+    background: #262626;
+  }
+}
+
+/* In-view status overlays (match public/pdfviewer/pdfViewer.html) */
+#loadingIndicator,
+#errorMessage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 50;
+  pointer-events: none;
+  text-align: center;
+  color: #64748b;
+  background: rgba(243, 244, 246, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+html.dark #loadingIndicator,
+html.dark #errorMessage {
+  color: #cbd5e1;
+  background: rgba(23, 23, 23, 0.75);
+}
+
+#errorMessage {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+html.dark #errorMessage {
+  color: #f87171;
+}
+
+/* Floating toolbar inside the viewer (match public/pdfviewer/pdfViewer.html) */
+#wbToolbar {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(229, 231, 235, 1);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.14);
+  color: #0f172a;
+  user-select: none;
+  -webkit-user-select: none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font: 400 13px/18px
+    var(
+      --wb-font,
+      Inter,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      "Helvetica Neue",
+      Arial,
+      "Noto Sans",
+      sans-serif
+    );
+}
+
+#wbToolbar * {
+  box-sizing: border-box;
+}
+
+.wb-nav,
+.wb-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+html.dark #wbToolbar {
+  background: rgba(23, 23, 23, 0.92);
+  border-color: rgba(64, 64, 64, 1);
+  color: #f8fafc;
+}
+
+.wb-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(229, 231, 235, 1);
+  margin: 0 2px;
+}
+
+html.dark .wb-divider {
+  background: rgba(64, 64, 64, 1);
+}
+
+.wb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.wb-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+html.dark .wb-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.wb-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.wb-btn.wb-active {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+html.dark .wb-btn.wb-active {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.wb-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.wb-page {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: rgba(100, 116, 139, 1);
+  line-height: 18px;
+}
+
+html.dark .wb-page {
+  color: rgba(163, 163, 163, 1);
+}
+
+#wbPageInput {
+  width: 42px;
+  padding: 2px 6px;
+  text-align: center;
+  font-size: 13px;
+  border-radius: 8px;
+  border: 1px solid rgba(209, 213, 219, 1);
+  background: transparent;
+  color: inherit;
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+  line-height: 18px;
+  font: inherit;
+}
+
+html.dark #wbPageInput {
+  border-color: rgba(82, 82, 82, 1);
+}
+
+#wbZoomLabel {
+  min-width: 60px;
+  padding: 4px 10px;
+  font-size: 13px;
+  border-radius: 10px;
+}
+
+/* Keep the zoom label aligned with icon buttons */
+#wbZoomLabel.wb-btn {
+  padding: 6px 10px;
+}
+
+#wbZoomWrap {
+  position: relative;
+}
+
+#wbZoomMenu {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%);
+  min-width: 140px;
+  border-radius: 12px;
+  border: 1px solid rgba(229, 231, 235, 1);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+  padding: 6px;
+  z-index: 70;
+  font: inherit;
+}
+
+html.dark #wbZoomMenu {
+  border-color: rgba(64, 64, 64, 1);
+  background: rgba(30, 30, 30, 0.98);
+}
+
+.wb-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+  font: inherit;
+}
+
+.wb-menu-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+html.dark .wb-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Docx content styling */
+#docxMount {
+  min-height: 100%;
+}
+
+#docxScaleOuter {
+  position: relative;
+  width: 100%;
+}
+
+#docxScaleInner {
+  width: 100%;
+  transform-origin: top left;
+}
+
+.docx-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  width: 100%;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 32px 0;
+  padding-bottom: 96px; /* keep last page visible above toolbar */
+  background: transparent !important;
+  min-height: 100%;
+}
+
+.docx {
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: clamp(18px, 4vw, 48px);
+  width: 100%;
+  max-width: var(--docx-page-max-width);
+  box-sizing: border-box;
+}
+
+.docx img,
+.docx svg,
+.docx canvas,
+.docx video,
+.docx iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+.docx table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.docx * {
+  max-width: 100%;
+}
+
+.docx table td,
+.docx table th {
+  border: 1px solid #e5e7eb;
+  padding: 8px;
+}
+
+html.dark .docx {
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
+}
+
+/* Hand tool mode */
+#viewerContainer.wb-grab {
+  cursor: grab;
+}
+
+#viewerContainer.wb-grab:active {
+  cursor: grabbing;
+}
+
+#viewerContainer.wb-grab #docxMount {
+  user-select: none;
+  -webkit-user-select: none;
+}

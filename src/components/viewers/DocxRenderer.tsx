@@ -1,8 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { renderAsync as renderDocx } from 'docx-preview'
-import './docx-preview.css'
-import ViewerFrame from './ViewerFrame'
-import DocxToolbar from './DocxToolbar'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useAppActions } from '../../context/AppContext'
+import { useAIPanelActions, useAIPanelState } from '../../context/AIPanelContext'
 
 type Props = {
   url: string
@@ -11,112 +9,197 @@ type Props = {
   onDownload?: () => void
 }
 
+type ViewerState = {
+  currentPage: number
+  totalPages: number
+  zoom: number
+  isReady: boolean
+  isLoading: boolean
+  error: string | null
+}
+
+type DocxEvent = {
+  type: string
+  [key: string]: any
+}
+
 const DocxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDownload }) => {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [zoom, setZoom] = useState(1)
-  const [totalPages, setTotalPages] = useState(0)
-  const [currentPage, setCurrentPage] = useState(1)
+  const appActions = useAppActions()
+  const aiPanel = useAIPanelActions()
+  const aiPanelState = useAIPanelState()
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const lastLoadedUrlRef = useRef<string | null>(null)
 
+  const [viewerState, setViewerState] = useState<ViewerState>({
+    currentPage: 1,
+    totalPages: 0,
+    zoom: 1,
+    isReady: false,
+    isLoading: true,
+    error: null,
+  })
+
+  const sendCommand = useCallback((command: { type: string; [key: string]: unknown }) => {
+    const win = iframeRef.current?.contentWindow
+    if (!win) return
+    try {
+      win.postMessage(command, '*')
+    } catch {}
+  }, [])
+
+  // Avoid expensive refits while the AI panel animates its width (match PDF viewer behavior).
+  const lastAiOpenRef = useRef<boolean>(aiPanelState.isOpen)
+  useLayoutEffect(() => {
+    if (!viewerState.isReady) return
+    if (lastAiOpenRef.current === aiPanelState.isOpen) return
+    lastAiOpenRef.current = aiPanelState.isOpen
+    sendCommand({ type: 'SUSPEND_FIT_ON_RESIZE', ms: 400 })
+  }, [aiPanelState.isOpen, sendCommand, viewerState.isReady])
+
+  // Handle events from the iframe viewer
   useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const resp = await fetch(url)
-        if (!resp.ok) throw new Error('Failed to fetch file')
-        const blob = await resp.blob()
-        if (cancelled || !containerRef.current) return
-        
-        containerRef.current.innerHTML = ''
-        await renderDocx(blob, containerRef.current, undefined, {
-          inWrapper: true,
-          breakPages: true,
-          ignoreLastRenderedPageBreak: false,
-        })
+    const handler = (event: MessageEvent) => {
+      const src = iframeRef.current?.contentWindow
+      if (!src || event.source !== src) return
 
-        // Detect pages
-        const pages = containerRef.current.querySelectorAll<HTMLElement>('.docx')
-        setTotalPages(pages.length)
-        setCurrentPage(1)
-      } catch (e: any) {
-        if (!cancelled) setError(e.message)
-      }
-    })()
-    return () => { cancelled = true }
-  }, [url])
+      const data = event.data as DocxEvent
+      if (!data || typeof data !== 'object' || typeof data.type !== 'string') return
 
-  // Apply zoom (Chromium supports CSS zoom and it affects layout/scroll correctly)
-  useEffect(() => {
-    const root = containerRef.current
-    if (!root) return
-    const target = (root.querySelector('.docx-wrapper') as HTMLElement | null) ?? root
-    ;(target.style as any).zoom = `${Math.round(zoom * 100)}%`
-  }, [zoom])
-
-  // Track current page based on scroll
-  useEffect(() => {
-    const scroller = scrollRef.current
-    const root = containerRef.current
-    if (!scroller || !root) return
-
-    const onScroll = () => {
-      const pages = Array.from(root.querySelectorAll<HTMLElement>('.docx'))
-      if (!pages.length) return
-      const sr = scroller.getBoundingClientRect()
-      let best = 0
-      let bestDist = Number.POSITIVE_INFINITY
-      for (let i = 0; i < pages.length; i++) {
-        const pr = pages[i].getBoundingClientRect()
-        const dist = Math.abs(pr.top - sr.top)
-        if (dist < bestDist) {
-          bestDist = dist
-          best = i
+      switch (data.type) {
+        case 'READY': {
+          setViewerState((prev) => ({ ...prev, isReady: true }))
+          // Ensure viewer theme matches app
+          try {
+            const isDark = document.documentElement.classList.contains('dark')
+            sendCommand({ type: 'SET_THEME', theme: isDark ? 'dark' : 'light' })
+          } catch {}
+          // Ensure viewer typography matches app
+          try {
+            const fontFamily = window.getComputedStyle(document.body).fontFamily
+            sendCommand({ type: 'SET_APP_STYLE', fontFamily })
+          } catch {}
+          if (url && lastLoadedUrlRef.current !== url) {
+            sendCommand({ type: 'LOAD_DOCX', url })
+            lastLoadedUrlRef.current = url
+          }
+          break
         }
+
+        case 'LOADING_STARTED':
+          setViewerState((prev) => ({ ...prev, isLoading: true, error: null }))
+          break
+
+        case 'DOC_LOADED':
+          setViewerState((prev) => ({
+            ...prev,
+            isLoading: false,
+            totalPages: Number(data.pageCount) || 0,
+            currentPage: Number(data.page) || 1,
+            zoom: typeof data.zoom === 'number' ? data.zoom : prev.zoom,
+            error: null,
+          }))
+          break
+
+        case 'PAGE_CHANGED':
+          setViewerState((prev) => ({
+            ...prev,
+            currentPage: Number(data.page) || prev.currentPage,
+            totalPages: Number(data.total) || prev.totalPages,
+          }))
+          break
+
+        case 'ZOOM_CHANGED':
+          setViewerState((prev) => ({ ...prev, zoom: typeof data.zoom === 'number' ? data.zoom : prev.zoom }))
+          break
+
+        case 'ERROR':
+          setViewerState((prev) => ({
+            ...prev,
+            isLoading: false,
+            error: String(data.message || 'Unknown error'),
+          }))
+          break
+
+        case 'DOWNLOAD_REQUESTED':
+          onDownload?.()
+          break
+
+        case 'COPY':
+          if (data.text) {
+            ;(async () => {
+              try {
+                const sys = (window as any).system
+                if (sys?.copyText) {
+                  const res = await sys.copyText(String(data.text))
+                  if (res?.ok) return
+                }
+              } catch {}
+              try {
+                await navigator.clipboard.writeText(String(data.text))
+              } catch {}
+            })()
+          }
+          break
+
+        case 'SHORTCUT':
+          if ((data as any).action === 'search') appActions.onOpenSearch()
+          if ((data as any).action === 'ai') aiPanel.open()
+          break
       }
-      setCurrentPage(best + 1)
     }
 
-    scroller.addEventListener('scroll', onScroll, { passive: true })
-    onScroll()
-    return () => scroller.removeEventListener('scroll', onScroll as any)
-  }, [totalPages])
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [aiPanel, appActions, onDownload, sendCommand, url])
 
-  const goToPage = (page: number) => {
-    const root = containerRef.current
-    if (!root) return
-    const pages = Array.from(root.querySelectorAll<HTMLElement>('.docx'))
-    const el = pages[page - 1]
-    if (!el) return
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
+  // Load DOCX when URL changes and viewer is ready
+  useEffect(() => {
+    if (!viewerState.isReady || !url) return
+    if (lastLoadedUrlRef.current === url) return
+
+    setViewerState((prev) => ({ ...prev, isLoading: true, error: null }))
+    sendCommand({ type: 'LOAD_DOCX', url })
+    lastLoadedUrlRef.current = url
+  }, [viewerState.isReady, url, sendCommand])
+
+  // Watch for theme changes and update viewer
+  useEffect(() => {
+    if (!viewerState.isReady) return
+    const observer = new MutationObserver(() => {
+      const isDark = document.documentElement.classList.contains('dark')
+      sendCommand({ type: 'SET_THEME', theme: isDark ? 'dark' : 'light' })
+    })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [viewerState.isReady, sendCommand])
 
   return (
-    <ViewerFrame
-      className={className}
-      padding="default"
-      contentRef={scrollRef}
-      toolbar={
-        <DocxToolbar
-          currentPage={currentPage}
-          totalPages={totalPages}
-          zoom={zoom}
-          onPrevPage={() => goToPage(Math.max(1, currentPage - 1))}
-          onNextPage={() => goToPage(Math.min(totalPages || 1, currentPage + 1))}
-          onGoToPage={goToPage}
-          onZoomChange={setZoom}
-          onDownload={onDownload}
-          disableDownload={!onDownload}
-        />
-      }
-    >
-      <div
-        ref={containerRef}
-        className="w-full"
+    <div className={`relative flex flex-col h-full min-h-0 overflow-hidden ${className}`}>
+      <iframe
+        ref={iframeRef}
+        src="docx-viewer://docxViewer.html"
+        className="flex-1 min-h-0 w-full border-0 bg-gray-100 dark:bg-neutral-800"
         style={{ minHeight: isFullscreen ? '100%' : undefined }}
+        title="DOCX Viewer"
+        sandbox="allow-scripts allow-same-origin"
       />
-      {error && <div className="text-red-600 text-sm mt-4">{error}</div>}
-    </ViewerFrame>
+
+      {viewerState.isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50/70 dark:bg-neutral-900/70">
+          <div className="text-sm font-medium text-slate-500 dark:text-neutral-400">
+            Rendering DOCX...
+          </div>
+        </div>
+      )}
+
+      {viewerState.error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50/70 dark:bg-neutral-900/70">
+          <div className="text-red-600 dark:text-red-400 text-sm text-center p-4">
+            {viewerState.error}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

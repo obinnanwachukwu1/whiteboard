@@ -206,6 +206,15 @@ protocol.registerSchemesAsPrivileged([
     },
   },
   {
+    scheme: 'docx-viewer',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
+  {
     scheme: 'canvas-file',
     privileges: {
       standard: true,
@@ -503,7 +512,13 @@ function createWindow() {
       // Allow dev server
       if (allowedOrigins.has(parsed.origin)) return true
       // Allow internal schemes
-      if (parsed.protocol === 'pdf-viewer:' || parsed.protocol === 'canvas-file:') return true
+      if (
+        parsed.protocol === 'pdf-viewer:' ||
+        parsed.protocol === 'docx-viewer:' ||
+        parsed.protocol === 'canvas-file:'
+      ) {
+        return true
+      }
       return false
     } catch {
       return false
@@ -995,6 +1010,66 @@ app.whenReady().then(async () => {
     }
 
     console.log(`[pdf-viewer] Serving: ${resolvedPath}`)
+    return net.fetch(pathToFileURL(resolvedPath).toString())
+  })
+
+  // Register custom protocol for DOCX viewer assets
+  // Serves files from public/docxviewer (dev) or dist/docxviewer (production)
+  protocol.handle('docx-viewer', (req) => {
+    const url = req.url.replace(/^docx-viewer:\/\//, '')
+    let filePath = decodeURIComponent(url)
+
+    // Normalize: strip trailing slashes
+    filePath = filePath.replace(/\/+$/, '')
+
+    // Strip docxviewer.html/ prefix from relative resource paths
+    filePath = filePath.replace(/^docxviewer\.html\//i, '')
+
+    // Normalize known files to correct case
+    if (filePath.toLowerCase() === 'docxviewer.html') {
+      filePath = 'docxViewer.html'
+    }
+
+    console.log(`[docx-viewer] Request: ${url} -> ${filePath}`)
+
+    // Security: only allow specific file extensions
+    const allowedExtensions = ['.html', '.js', '.css', '.svg', '.gif', '.png', '.map']
+    const ext = path.extname(filePath).toLowerCase()
+    if (!allowedExtensions.includes(ext)) {
+      console.warn(`[docx-viewer] Blocked disallowed file type: ${filePath}`)
+      return new Response('Forbidden', { status: 403 })
+    }
+
+    // Determine base path based on dev/production mode
+    let resolvedPath: string
+    if (VITE_DEV_SERVER_URL) {
+      // Development: serve from node_modules and public
+      if (filePath.startsWith('docx-preview.')) {
+        resolvedPath = path.join(process.env.APP_ROOT, 'node_modules', 'docx-preview', 'dist', filePath)
+      } else if (filePath.startsWith('jszip.')) {
+        resolvedPath = path.join(process.env.APP_ROOT, 'node_modules', 'jszip', 'dist', filePath)
+      } else {
+        resolvedPath = path.join(process.env.APP_ROOT, 'public', 'docxviewer', filePath)
+      }
+    } else {
+      // Production: serve from dist/docxviewer
+      resolvedPath = path.join(RENDERER_DIST, 'docxviewer', filePath)
+    }
+
+    // Security: ensure resolved path is within allowed directory
+    const allowedBase = VITE_DEV_SERVER_URL ? process.env.APP_ROOT : RENDERER_DIST
+    if (!resolvedPath.startsWith(allowedBase)) {
+      console.warn(`[docx-viewer] Blocked request outside allowed dir: ${resolvedPath}`)
+      return new Response('Forbidden', { status: 403 })
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(resolvedPath)) {
+      console.error(`[docx-viewer] File not found: ${resolvedPath}`)
+      return new Response('Not Found', { status: 404 })
+    }
+
+    console.log(`[docx-viewer] Serving: ${resolvedPath}`)
     return net.fetch(pathToFileURL(resolvedPath).toString())
   })
 

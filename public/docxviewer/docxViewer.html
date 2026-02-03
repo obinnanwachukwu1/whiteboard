@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DOCX Viewer</title>
+    <link rel="stylesheet" href="./docxviewer.css" />
+  </head>
+  <body>
+    <div id="loadingIndicator" class="hidden">Loading DOCX...</div>
+    <div id="errorMessage" class="hidden"></div>
+
+    <div id="viewerContainer" aria-label="Document Viewer">
+      <div id="docxMount"></div>
+    </div>
+
+    <div id="wbToolbar" aria-label="DOCX controls">
+      <div class="wb-nav">
+        <button class="wb-btn" id="wbPrev" type="button" title="Previous page" aria-label="Previous page">
+          <svg class="wb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+
+        <form id="wbPageForm" class="wb-page" autocomplete="off">
+          <input id="wbPageInput" type="text" inputmode="numeric" aria-label="Current page" />
+          <span>/</span>
+          <span id="wbPageTotal">–</span>
+        </form>
+
+        <button class="wb-btn" id="wbNext" type="button" title="Next page" aria-label="Next page">
+          <svg class="wb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+
+      <div class="wb-divider" aria-hidden="true"></div>
+
+      <div id="wbZoom" class="wb-zoom">
+        <button class="wb-btn" id="wbZoomOut" type="button" title="Zoom out" aria-label="Zoom out">
+          <svg class="wb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/><line x1="8" x2="14" y1="11" y2="11"/></svg>
+        </button>
+
+        <div id="wbZoomWrap">
+          <button class="wb-btn" id="wbZoomLabel" type="button" aria-label="Zoom level">100%</button>
+          <div id="wbZoomMenu" class="hidden" role="menu" aria-label="Zoom presets"></div>
+        </div>
+
+        <button class="wb-btn" id="wbZoomIn" type="button" title="Zoom in" aria-label="Zoom in">
+          <svg class="wb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/><line x1="11" x2="11" y1="8" y2="14"/><line x1="8" x2="14" y1="11" y2="11"/></svg>
+        </button>
+      </div>
+
+      <div class="wb-divider" aria-hidden="true"></div>
+
+      <button class="wb-btn" id="wbHand" type="button" title="Hand tool" aria-label="Hand tool">
+        <svg class="wb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+      </button>
+
+      <div class="wb-divider" aria-hidden="true"></div>
+
+      <button class="wb-btn" id="wbDownload" type="button" title="Download" aria-label="Download">
+        <svg class="wb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>
+      </button>
+    </div>
+
+    <!-- Dependencies (served from docx-viewer:// in production) -->
+    <script src="./jszip.min.js"></script>
+    <script src="./docx-preview.min.js"></script>
+    <script src="./bridge.js"></script>
+  </body>
+</html>
