@@ -221,6 +221,12 @@ let tray: Tray | null = null
 let isQuitting = false
 let appConfig: AppConfig = { ...DEFAULT_CONFIG }
 
+function devToolsEnabled(): boolean {
+  // Allow devtools in packaged builds only when explicitly requested.
+  // Useful for debugging production-only issues without shipping devtools by default.
+  return !app.isPackaged || process.env.WB_DEVTOOLS === '1'
+}
+
 function safeContentType(
   t: any,
 ): 'page' | 'assignment' | 'announcement' | 'discussion' | 'file' | null {
@@ -440,6 +446,7 @@ function createWindow() {
       contextIsolation: true,
       sandbox: true,
       backgroundThrottling: false, // Don't throttle when window loses focus (smoother animations)
+      devTools: devToolsEnabled(),
     },
   })
 
@@ -522,8 +529,8 @@ function createWindow() {
     win?.webContents.send('main-process-message', new Date().toLocaleString())
   })
 
-  // Block DevTools keyboard shortcuts in production
-  if (app.isPackaged) {
+  // Block DevTools keyboard shortcuts in production unless explicitly enabled.
+  if (app.isPackaged && !devToolsEnabled()) {
     win.webContents.on('before-input-event', (event, input) => {
       // Block Cmd+Option+I (Mac) / Ctrl+Shift+I (Windows/Linux)
       if (input.type === 'keyDown') {
@@ -535,6 +542,17 @@ function createWindow() {
         if (isDevToolsShortcut) {
           event.preventDefault()
         }
+      }
+    })
+  }
+
+  // Open devtools automatically when enabled via env.
+  if (devToolsEnabled() && app.isPackaged) {
+    win.webContents.once('did-finish-load', () => {
+      try {
+        win?.webContents.openDevTools({ mode: 'detach' })
+      } catch {
+        // ignore
       }
     })
   }
@@ -609,6 +627,7 @@ app.on('activate', () => {
 // Menu configuration
 function createAppMenu() {
   const isMac = process.platform === 'darwin'
+  const allowDevTools = devToolsEnabled()
 
   const template: Electron.MenuItemConstructorOptions[] = [
     // { role: 'appMenu' }
@@ -680,8 +699,8 @@ function createAppMenu() {
     {
       label: 'View',
       submenu: [
-        // Only show dev tools in development
-        ...(!app.isPackaged
+        // Only show dev tools when enabled
+        ...(allowDevTools
           ? [
               { role: 'reload' } as Electron.MenuItemConstructorOptions,
               { role: 'forceReload' } as Electron.MenuItemConstructorOptions,

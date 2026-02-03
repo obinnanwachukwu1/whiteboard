@@ -7,6 +7,7 @@ import { pipeline } from 'node:stream/promises'
 import { createWriteStream } from 'node:fs'
 import { Readable } from 'node:stream'
 import { normalizeWin32Path } from './pathUtils'
+import { assertNormalizedAssignmentDev, normalizeAssignmentFromRest } from './assignmentNormalization'
 
 // Uploads: use node-friendly multipart form
 // (Types provided via a local d.ts in electron/form-data.d.ts)
@@ -14,7 +15,6 @@ import type FormDataType from 'form-data'
 
 const DEFAULT_BASE_URL = 'https://gatech.instructure.com'
 const API_PREFIX = '/api/v1'
-const GQL_PATH = '/api/graphql'
 
 export class CanvasError extends Error {}
 
@@ -414,66 +414,25 @@ export class CanvasClient {
     return this.paginate<any>(`/courses/${courseId}/enrollments`, p)
   }
 
-  // GraphQL
-  async graphql(query: string, variables?: Record<string, any>, operationName?: string) {
-    const url = `${this.baseUrl}${GQL_PATH}`
-    const payload: any = { query }
-    if (variables) payload.variables = variables
-    if (operationName) payload.operationName = operationName
-    const resp = await this.request({ method: 'POST', url, data: payload })
-    const data = resp.data
-    if (data && data.errors && data.errors.length) {
-      throw new CanvasError(JSON.stringify(data.errors, null, 2))
-    }
-    return data
-  }
-
-  async graphqlPaginate(
-    query: string,
-    variables: Record<string, any>,
-    extract: (payload: any) => { nodes: any[]; endCursor?: string | null; hasNextPage?: boolean },
-    afterKey = 'after',
-  ): Promise<any[]> {
-    const varsLocal = { ...variables }
-    let cursor: string | null | undefined = varsLocal[afterKey]
-    const all: any[] = []
-    while (true) {
-      varsLocal[afterKey] = cursor
-      const payload = await this.graphql(query, varsLocal)
-      const { nodes, endCursor, hasNextPage } = extract(payload)
-      all.push(...nodes)
-      if (!hasNextPage || !endCursor) break
-      cursor = endCursor
-    }
-    return all
-  }
-
   async listCourseAssignmentsGql(courseRestId: string | number, first = 100) {
-    const query = `
-      query Assignments($id: ID!, $first: Int = 100, $after: String) {
-        course(id: $id) {
-          _id
-          name
-          assignmentsConnection(first: $first, after: $after) {
-            nodes { id _id name dueAt state pointsPossible submissionTypes htmlUrl submission { submittedAt workflowState } }
-            pageInfo { endCursor hasNextPage }
-          }
-        }
-      }
-    `
-    const nodes = await this.graphqlPaginate(
-      query,
-      { id: String(courseRestId), first },
-      (payload) => {
-        const conn = payload?.data?.course?.assignmentsConnection
-        return {
-          nodes: conn?.nodes ?? [],
-          endCursor: conn?.pageInfo?.endCursor ?? null,
-          hasNextPage: conn?.pageInfo?.hasNextPage ?? false,
-        }
-      },
+    const limit = Math.max(0, Math.floor(Number(first) || 0))
+    if (limit === 0) return []
+
+    const perPage = Math.min(100, limit)
+    const maxPages = Math.max(1, Math.ceil(limit / perPage))
+    const raw = await this.paginate<any>(
+      `/courses/${courseRestId}/assignments`,
+      { per_page: perPage, 'include[]': ['submission'] },
+      maxPages,
     )
-    return nodes
+    const rawLimited = raw.slice(0, limit)
+    const normalized = rawLimited.map((a) => normalizeAssignmentFromRest(a))
+
+    for (let i = 0; i < Math.min(5, normalized.length); i++) {
+      assertNormalizedAssignmentDev(normalized[i])
+    }
+
+    return normalized
   }
 
   async listCourseModulesGql(courseRestId: string | number, _first = 20, _itemsFirst = 50) {

@@ -16,12 +16,12 @@ function copyPdfJsAssets(): Plugin {
     writeBundle() {
       const pdfJsDir = path.resolve(__dirname, 'node_modules/pdfjs-dist')
       const outDir = path.resolve(__dirname, 'dist/pdfviewer')
-      
+
       // Ensure output directory exists
       if (!fs.existsSync(outDir)) {
         fs.mkdirSync(outDir, { recursive: true })
       }
-      
+
       // Copy pdf.js core files
       const filesToCopy = [
         { src: 'build/pdf.js', dest: 'pdf.js' },
@@ -29,7 +29,7 @@ function copyPdfJsAssets(): Plugin {
         { src: 'web/pdf_viewer.js', dest: 'pdf_viewer.js' },
         { src: 'web/pdf_viewer.css', dest: 'pdf_viewer.css' },
       ]
-      
+
       for (const file of filesToCopy) {
         const srcPath = path.join(pdfJsDir, file.src)
         const destPath = path.join(outDir, file.dest)
@@ -37,7 +37,7 @@ function copyPdfJsAssets(): Plugin {
           fs.copyFileSync(srcPath, destPath)
         }
       }
-      
+
       // Copy cmaps directory for CJK support
       const cmapsSrc = path.join(pdfJsDir, 'cmaps')
       const cmapsDest = path.join(outDir, 'cmaps')
@@ -47,7 +47,7 @@ function copyPdfJsAssets(): Plugin {
           fs.copyFileSync(path.join(cmapsSrc, file), path.join(cmapsDest, file))
         }
       }
-      
+
       // Copy our custom files from public/pdfviewer
       const publicPdfViewer = path.resolve(__dirname, 'public/pdfviewer')
       if (fs.existsSync(publicPdfViewer)) {
@@ -55,7 +55,7 @@ function copyPdfJsAssets(): Plugin {
           fs.copyFileSync(path.join(publicPdfViewer, file), path.join(outDir, file))
         }
       }
-    }
+    },
   }
 }
 
@@ -71,14 +71,24 @@ function fixPreloadCjsExport(): Plugin {
 
       let updated = src
 
-      // Some builds incorrectly leave ESM import in the CJS preload output.
-      // Electron loads preloads as classic scripts, so this must be `require`.
-      const electronImportRegex = /^import\s+\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s+from\s+['"]electron['"];?\s*$/m
+      // Some builds incorrectly leave an ESM `import ... from "electron"` in a .cjs preload.
+      // In sandboxed preloads, Electron executes the script as classic CJS, so `import` will crash.
+      // Convert any `import { ... } from "electron"` (including aliased specifiers) to `require`.
+      const electronImportRegex = /\bimport\s+\{([^}]+)\}\s+from\s+['"]electron['"];?/g
       if (electronImportRegex.test(updated)) {
-        updated = updated.replace(
-          electronImportRegex,
-          'const { contextBridge, ipcRenderer } = require("electron");',
-        )
+        updated = updated.replace(electronImportRegex, (_m, inner) => {
+          const parts = String(inner)
+            .split(',')
+            .map((p) => p.trim())
+            .filter(Boolean)
+            .map((p) => {
+              // Rollup can emit `contextBridge as t` when minifying.
+              const m = p.match(/^([A-Za-z_$][\w$]*)\s+as\s+([A-Za-z_$][\w$]*)$/)
+              if (!m) return p
+              return `${m[1]}: ${m[2]}`
+            })
+          return `const { ${parts.join(', ')} } = require("electron");`
+        })
       }
 
       const exportDefaultRegex = /export default ([a-zA-Z0-9_$]+)\(\);/
