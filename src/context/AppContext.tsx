@@ -1,5 +1,6 @@
 import React from 'react'
 import type { SidebarConfig } from '../components/Sidebar'
+import type { ThemeSettings } from '../utils/theme'
 
 export type AppFlagsValue = {
   aiEnabled: boolean
@@ -112,5 +113,62 @@ export const AppDataActionsContext = React.createContext<AppDataActionsValue | n
 export function useAppDataActions(): AppDataActionsValue {
   const ctx = React.useContext(AppDataActionsContext)
   if (!ctx) throw new Error('useAppDataActions must be used within AppDataActionsContext.Provider')
+  return ctx
+}
+
+export type NotificationSettings = {
+  enabled: boolean
+  notifyDueAssignments: boolean
+  notifyNewGrades: boolean
+  notifyNewAnnouncements: boolean
+}
+
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  enabled: true,
+  notifyDueAssignments: true,
+  notifyNewGrades: true,
+  notifyNewAnnouncements: true,
+}
+
+export type GpaRow = { min: number; gpa: number }
+
+export const DEFAULT_GPA_MAPPING: GpaRow[] = [
+  { min: 93, gpa: 4.0 },
+  { min: 90, gpa: 3.7 },
+  { min: 87, gpa: 3.3 },
+  { min: 83, gpa: 3.0 },
+  { min: 80, gpa: 2.7 },
+  { min: 77, gpa: 2.3 },
+  { min: 73, gpa: 2.0 },
+  { min: 70, gpa: 1.7 },
+  { min: 67, gpa: 1.3 },
+  { min: 60, gpa: 1.0 },
+  { min: 0, gpa: 0.0 },
+]
+
+export type GpaSettings = {
+  priorTotals: { credits: string; gpa: string }
+  mapping: GpaRow[]
+}
+
+export const DEFAULT_GPA_SETTINGS: GpaSettings = {
+  priorTotals: { credits: '', gpa: '' },
+  mapping: DEFAULT_GPA_MAPPING,
+}
+
+export type AppPreferencesValue = {
+  themeSettings: ThemeSettings
+  notificationSettings: NotificationSettings
+  setNotificationSettings: (partial: Partial<NotificationSettings>) => Promise<void>
+  gpaSettings: GpaSettings
+  setGpaSettings: (partial: Partial<GpaSettings>) => Promise<void>
+}
+
+export const AppPreferencesContext = React.createContext<AppPreferencesValue | null>(null)
+
+export function useAppPreferences(): AppPreferencesValue {
+  const ctx = React.useContext(AppPreferencesContext)
+  if (!ctx)
+    throw new Error('useAppPreferences must be used within AppPreferencesContext.Provider')
   return ctx
 }

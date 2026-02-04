@@ -1,61 +1,12 @@
-import React from 'react'
 import { SettingsSection } from './SettingsSection'
 import { SettingsRow, Toggle } from './SettingsRow'
-
-type NotifSettings = {
-  enabled: boolean
-  notifyDueAssignments: boolean
-  notifyNewGrades: boolean
-  notifyNewAnnouncements: boolean
-}
+import { useAppPreferences } from '../../context/AppContext'
 
 export function NotificationSettings() {
-  const [settings, setSettings] = React.useState<NotifSettings>({
-    enabled: true,
-    notifyDueAssignments: true,
-    notifyNewGrades: true,
-    notifyNewAnnouncements: true,
-  })
+  const { notificationSettings: settings, setNotificationSettings } = useAppPreferences()
 
-  // Load saved settings
-  React.useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const cfg = await window.settings.get?.()
-        const data = (cfg?.ok ? (cfg.data as any) : {}) || {}
-        const notif = data.userSettings?.notifications || {}
-        if (!mounted) return
-        setSettings({
-          enabled: notif.enabled ?? true,
-          notifyDueAssignments: notif.notifyDueAssignments ?? true,
-          notifyNewGrades: notif.notifyNewGrades ?? true,
-          notifyNewAnnouncements: notif.notifyNewAnnouncements ?? true,
-        })
-      } catch {}
-    })()
-    return () => { mounted = false }
-  }, [])
-
-  const persist = React.useCallback(async (partial: Partial<NotifSettings>) => {
-    try {
-      const cfg = await window.settings.get?.()
-      const data = (cfg?.ok ? (cfg.data as any) : {}) || {}
-      const currentAll = data.userSettings || {}
-      const currentNotif = currentAll.notifications || {}
-      const next = { ...currentNotif, ...partial }
-      await window.settings.set?.({
-        userSettings: {
-          ...currentAll,
-          notifications: next,
-        },
-      })
-    } catch {}
-  }, [])
-
-  const update = (partial: Partial<NotifSettings>) => {
-    setSettings((prev) => ({ ...prev, ...partial }))
-    persist(partial)
+  const update = (partial: Partial<typeof settings>) => {
+    setNotificationSettings(partial).catch(() => {})
     // Request permission when enabling
     if (partial.enabled && Notification.permission === 'default') {
       Notification.requestPermission()

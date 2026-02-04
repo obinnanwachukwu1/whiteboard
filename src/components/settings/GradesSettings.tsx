@@ -1,7 +1,7 @@
 import React from 'react'
 import { SettingsSection } from './SettingsSection'
 import { SettingsRow, Select, TextInput, ActionButton } from './SettingsRow'
-import { useAppData } from '../../context/AppContext'
+import { useAppData, useAppPreferences } from '../../context/AppContext'
 
 type GpaRow = { min: number; gpa: number }
 
@@ -52,117 +52,69 @@ function detectScaleType(mapping: GpaRow[]): ScaleType {
 
 export function GradesSettings() {
   const data = useAppData()
+  const { gpaSettings, setGpaSettings } = useAppPreferences()
   const userKey = React.useMemo(() => {
     const uid = (data?.profile as any)?.id
     return data?.baseUrl && uid ? `${data.baseUrl}|${uid}` : null
   }, [data?.baseUrl, (data?.profile as any)?.id])
 
-  const [prior, setPrior] = React.useState({ credits: '', gpa: '' })
-  const [gpaMap, setGpaMap] = React.useState<GpaRow[]>(PRESETS.plusMinus)
-  const [scaleType, setScaleType] = React.useState<ScaleType>('plusMinus')
-  const [showCustom, setShowCustom] = React.useState(false)
+  const [customOverride, setCustomOverride] = React.useState(false)
 
-  // Load saved settings
+  const prior = gpaSettings.priorTotals
+  const gpaMap = gpaSettings.mapping
+
+  const detectedScale = React.useMemo(() => detectScaleType(gpaMap), [gpaMap])
+  const scaleType: ScaleType = customOverride ? 'custom' : detectedScale
+  const showCustom = customOverride || detectedScale === 'custom'
+
   React.useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const cfg = await window.settings.get?.()
-        const data = (cfg?.ok ? (cfg.data as any) : {}) || {}
-        const per = userKey ? (data.userSettings?.[userKey] || {}) : {}
-        const gpa = (per?.gpa || data.gpa || {}) as any
-        if (!mounted) return
-
-        if (gpa.priorTotals) {
-          setPrior({
-            credits: String(gpa.priorTotals.credits ?? ''),
-            gpa: String(gpa.priorTotals.gpa ?? ''),
-          })
-        }
-
-        if (Array.isArray(gpa.mapping) && gpa.mapping.length) {
-          const mapping = gpa.mapping
-            .map((r: any) => ({ min: Number(r.min ?? 0), gpa: Number(r.gpa ?? 0) }))
-            .filter((r: any) => Number.isFinite(r.min) && Number.isFinite(r.gpa))
-            .sort((a: any, b: any) => b.min - a.min)
-          setGpaMap(mapping)
-          const detected = detectScaleType(mapping)
-          setScaleType(detected)
-          setShowCustom(detected === 'custom')
-        }
-      } catch {}
-    })()
-    return () => { mounted = false }
+    setCustomOverride(false)
   }, [userKey])
 
-  const persist = React.useCallback(async (partial: { priorTotals?: { credits: string; gpa: string }; mapping?: GpaRow[] }) => {
-    try {
-      const cfg = await window.settings.get?.()
-      const data = (cfg?.ok ? (cfg.data as any) : {}) || {}
-      const map = (data.userSettings || {}) as Record<string, any>
-      if (userKey) {
-        const cur = map[userKey] || {}
-        const nextGpa = { ...(cur.gpa || {}), ...partial }
-        map[userKey] = { ...cur, gpa: nextGpa }
-        await window.settings.set?.({ userSettings: map })
-      } else {
-        const nextGpa = { ...(data.gpa || {}), ...partial }
-        await window.settings.set?.({ gpa: nextGpa } as any)
-      }
-    } catch {}
-  }, [userKey])
+  const persist = React.useCallback(
+    (partial: { priorTotals?: { credits: string; gpa: string }; mapping?: GpaRow[] }) => {
+      setGpaSettings(partial).catch(() => {})
+    },
+    [setGpaSettings],
+  )
 
   const handleScaleChange = (type: ScaleType) => {
-    setScaleType(type)
     if (type === 'custom') {
-      setShowCustom(true)
-    } else {
-      setShowCustom(false)
-      const newMapping = PRESETS[type]
-      setGpaMap(newMapping)
-      persist({ mapping: newMapping })
+      setCustomOverride(true)
+      return
     }
+    setCustomOverride(false)
+    const newMapping = PRESETS[type]
+    persist({ mapping: newMapping })
   }
 
   const updatePrior = (field: 'credits' | 'gpa', value: string) => {
     const cleaned = value.replace(/[^0-9.]/g, '')
     const next = { ...prior, [field]: cleaned }
-    setPrior(next)
     persist({ priorTotals: next })
   }
 
   const updateRow = (index: number, field: 'min' | 'gpa', value: string) => {
     const v = Number(value.replace(/[^0-9.]/g, ''))
-    setGpaMap((prev) => {
-      const next = [...prev]
-      next[index] = { ...next[index], [field]: Number.isFinite(v) ? v : 0 }
-      next.sort((a, b) => b.min - a.min)
-      persist({ mapping: next })
-      return next
-    })
+    const next = [...gpaMap]
+    next[index] = { ...next[index], [field]: Number.isFinite(v) ? v : 0 }
+    next.sort((a, b) => b.min - a.min)
+    persist({ mapping: next })
   }
 
   const addRow = () => {
-    setGpaMap((prev) => {
-      const next = [...prev, { min: 85, gpa: 3.5 }].sort((a, b) => b.min - a.min)
-      persist({ mapping: next })
-      return next
-    })
+    const next = [...gpaMap, { min: 85, gpa: 3.5 }].sort((a, b) => b.min - a.min)
+    persist({ mapping: next })
   }
 
   const removeRow = (index: number) => {
-    setGpaMap((prev) => {
-      const next = prev.filter((_, i) => i !== index)
-      persist({ mapping: next })
-      return next
-    })
+    const next = gpaMap.filter((_, i) => i !== index)
+    persist({ mapping: next })
   }
 
   const resetToPreset = () => {
     const newMapping = PRESETS.plusMinus
-    setGpaMap(newMapping)
-    setScaleType('plusMinus')
-    setShowCustom(false)
+    setCustomOverride(false)
     persist({ mapping: newMapping })
   }
 

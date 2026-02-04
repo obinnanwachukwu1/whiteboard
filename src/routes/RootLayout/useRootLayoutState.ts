@@ -8,6 +8,12 @@ import {
   type AppActionsValue,
   type AppDataValue,
   type AppDataActionsValue,
+  type AppPreferencesValue,
+  type NotificationSettings,
+  type GpaSettings,
+  DEFAULT_NOTIFICATION_SETTINGS,
+  DEFAULT_GPA_SETTINGS,
+  DEFAULT_GPA_MAPPING,
 } from '../../context/AppContext'
 import { useCourses, useDueAssignments, useProfile } from '../../hooks/useCanvasQueries'
 import { useWindowControlsOverlayInsets } from '../../hooks/useWindowControlsOverlayInsets'
@@ -56,6 +62,13 @@ export function useRootLayoutState() {
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   const { themeSettings, setThemeSettings } = useRootLayoutTheme()
+  const [notificationSettings, setNotificationSettingsState] = useState<NotificationSettings>(() => ({
+    ...DEFAULT_NOTIFICATION_SETTINGS,
+  }))
+  const [gpaSettings, setGpaSettingsState] = useState<GpaSettings>(() => ({
+    priorTotals: { ...DEFAULT_GPA_SETTINGS.priorTotals },
+    mapping: DEFAULT_GPA_MAPPING.map((row) => ({ ...row })),
+  }))
 
   const { pinnedItems, setPinnedItems } = useDashboardSettings()
 
@@ -165,6 +178,57 @@ export function useRootLayoutState() {
     setPrivateModeAcknowledgedState,
   })
 
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const cfg = await window.settings.get?.()
+        const data = (cfg?.ok ? (cfg.data as any) : {}) || {}
+        const notif = data.userSettings?.notifications || {}
+        if (!mounted) return
+        setNotificationSettingsState({
+          ...DEFAULT_NOTIFICATION_SETTINGS,
+          ...notif,
+        })
+      } catch {}
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const cfg = await window.settings.get?.()
+        const data = (cfg?.ok ? (cfg.data as any) : {}) || {}
+        const per = userKey ? data.userSettings?.[userKey] || {} : {}
+        const gpa = (per?.gpa || data.gpa || {}) as any
+        if (!mounted) return
+
+        const priorTotals = gpa.priorTotals
+          ? {
+              credits: String(gpa.priorTotals.credits ?? ''),
+              gpa: String(gpa.priorTotals.gpa ?? ''),
+            }
+          : { ...DEFAULT_GPA_SETTINGS.priorTotals }
+
+        const mapping = Array.isArray(gpa.mapping) && gpa.mapping.length
+          ? gpa.mapping
+              .map((row: any) => ({ min: Number(row.min ?? 0), gpa: Number(row.gpa ?? 0) }))
+              .filter((row: any) => Number.isFinite(row.min) && Number.isFinite(row.gpa))
+              .sort((a: any, b: any) => b.min - a.min)
+          : DEFAULT_GPA_MAPPING.map((row) => ({ ...row }))
+
+        setGpaSettingsState({ priorTotals, mapping })
+      } catch {}
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [userKey])
+
   // Toast errors
   useEffect(() => {
     if (profileQ.error)
@@ -231,6 +295,50 @@ export function useRootLayoutState() {
           await window.settings.set?.({ userSettings: map })
         } else {
           await window.settings.set?.(partial as any)
+        }
+      } catch {}
+    },
+    [userKey],
+  )
+
+  const setNotificationSettings = useCallback(
+    async (partial: Partial<NotificationSettings>) => {
+      setNotificationSettingsState((prev) => ({ ...prev, ...partial }))
+      try {
+        const cfg = await window.settings.get?.()
+        const data = (cfg?.ok ? (cfg.data as any) : {}) || {}
+        const currentAll = data.userSettings || {}
+        const currentNotif = currentAll.notifications || {}
+        const next = { ...DEFAULT_NOTIFICATION_SETTINGS, ...currentNotif, ...partial }
+        await window.settings.set?.({
+          userSettings: {
+            ...currentAll,
+            notifications: next,
+          },
+        })
+      } catch {}
+    },
+    [],
+  )
+
+  const setGpaSettings = useCallback(
+    async (partial: Partial<GpaSettings>) => {
+      setGpaSettingsState((prev) => ({
+        priorTotals: partial.priorTotals ?? prev.priorTotals,
+        mapping: partial.mapping ?? prev.mapping,
+      }))
+      try {
+        const cfg = await window.settings.get?.()
+        const data = (cfg?.ok ? (cfg.data as any) : {}) || {}
+        const map = (data.userSettings || {}) as Record<string, any>
+        if (userKey) {
+          const cur = map[userKey] || {}
+          const nextGpa = { ...(cur.gpa || {}), ...partial }
+          map[userKey] = { ...cur, gpa: nextGpa }
+          await window.settings.set?.({ userSettings: map })
+        } else {
+          const nextGpa = { ...(data.gpa || {}), ...partial }
+          await window.settings.set?.({ gpa: nextGpa } as any)
         }
       } catch {}
     },
@@ -715,6 +823,17 @@ export function useRootLayoutState() {
     ],
   )
 
+  const preferencesContext: AppPreferencesValue = useMemo(
+    () => ({
+      themeSettings,
+      notificationSettings,
+      setNotificationSettings,
+      gpaSettings,
+      setGpaSettings,
+    }),
+    [themeSettings, notificationSettings, setNotificationSettings, gpaSettings, setGpaSettings],
+  )
+
   const actionsContext: AppActionsValue = useMemo(
     () => ({
       onOpenCourse,
@@ -880,6 +999,7 @@ export function useRootLayoutState() {
       aiCourses,
       flagsContext,
       settingsContext,
+      preferencesContext,
       actionsContext,
       dataContext,
       dataActionsContext,

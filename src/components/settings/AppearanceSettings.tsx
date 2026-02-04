@@ -1,20 +1,18 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { SettingsSection } from './SettingsSection'
 import { SettingsRow, SegmentedControl } from './SettingsRow'
 import { ImageDropZone } from './ImageDropZone'
 import { PatternPicker } from './PatternPicker'
 import {
   applyThemeTokens,
-  normalizeThemeSettings,
   getPresetSwatchColor,
   ACCENT_PRESETS,
-  DEFAULT_THEME_SETTINGS,
   type ThemeSettings,
   type AccentPreset,
   type PatternId,
 } from '../../utils/theme'
 import { extractAccentColor } from '../../utils/colorExtraction'
-import { useAppData } from '../../context/AppContext'
+import { useAppData, useAppPreferences } from '../../context/AppContext'
 
 // Group presets by color family for better organization
 const PRESET_GROUPS: { label: string; presets: AccentPreset[] }[] = [
@@ -27,76 +25,13 @@ const PRESET_GROUPS: { label: string; presets: AccentPreset[] }[] = [
 
 export function AppearanceSettings() {
   const data = useAppData()
-  const [settings, setSettings] = useState<ThemeSettings>(DEFAULT_THEME_SETTINGS)
+  const { themeSettings: settings } = useAppPreferences()
   const [isExtracting, setIsExtracting] = useState(false)
   const DEFAULT_IMAGE_BLUR = 12
-
-  // Load saved settings on mount
-  useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const cfg = await window.settings.get?.()
-        if (!mounted || !cfg?.ok) return
-
-        const data = cfg.data as any
-
-        if (data?.themeConfig) {
-          // Use new theme config
-          const normalized = normalizeThemeSettings(data.themeConfig)
-          if (normalized) {
-            setSettings(normalized)
-            // Keep cache/tokens in sync with the durable config.
-            // (No-op if already applied during bootstrap.)
-            applyThemeTokens(normalized)
-          } else {
-            // If the file has stale/invalid data, fall back to defaults to keep the UI usable.
-            setSettings(DEFAULT_THEME_SETTINGS)
-          }
-        } else {
-          // Migrate from legacy settings
-          const theme = data?.theme || 'light'
-          const legacyAccent = data?.accent || 'default'
-
-          // Map legacy accent to preset
-          const legacyMap: Record<string, AccentPreset> = {
-            default: 'slate',
-            red: 'red',
-            orange: 'orange',
-            yellow: 'yellow',
-            green: 'green',
-            blue: 'blue',
-            indigo: 'indigo',
-            violet: 'violet',
-          }
-
-          const newSettings: ThemeSettings = {
-            theme,
-            accentPreset: legacyMap[legacyAccent] || 'slate',
-            backgroundMode: 'accent',
-            background: {
-              type: 'solid',
-              blur: 0,
-              opacity: 100,
-              overlay: 0,
-            },
-          }
-
-          setSettings(newSettings)
-          // Apply and save the migrated settings
-          applyThemeTokens(newSettings)
-        }
-      } catch {}
-    })()
-    return () => {
-      mounted = false
-    }
-  }, [])
 
   // Save and apply settings
   const saveSettings = useCallback(
     async (newSettings: ThemeSettings) => {
-      setSettings(newSettings)
       applyThemeTokens(newSettings)
 
       // Dispatch event so other components (like BackgroundLayer) can update

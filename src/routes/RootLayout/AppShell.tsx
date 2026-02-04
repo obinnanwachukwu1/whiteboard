@@ -6,11 +6,13 @@ import {
   AppActionsContext,
   AppDataContext,
   AppDataActionsContext,
+  AppPreferencesContext,
   type AppFlagsValue,
   type AppSettingsValue,
   type AppActionsValue,
   type AppDataValue,
   type AppDataActionsValue,
+  type AppPreferencesValue,
 } from '../../context/AppContext'
 import { AIPanelProvider } from '../../context/AIPanelContext'
 import { BackgroundLayer } from '../../components/BackgroundLayer'
@@ -41,6 +43,7 @@ type Props = {
   aiCourses: any[]
   flagsContext: AppFlagsValue
   settingsContext: AppSettingsValue
+  preferencesContext: AppPreferencesValue
   actionsContext: AppActionsValue
   dataContext: AppDataValue
   dataActionsContext: AppDataActionsValue
@@ -218,13 +221,15 @@ export function AppShell(props: Props) {
   return (
     <AppFlagsContext.Provider value={props.flagsContext}>
       <AppSettingsContext.Provider value={props.settingsContext}>
-        <AppActionsContext.Provider value={props.actionsContext}>
-          <AppDataContext.Provider value={props.dataContext}>
-            <AppDataActionsContext.Provider value={props.dataActionsContext}>
-              <AppShellInner {...props} />
-            </AppDataActionsContext.Provider>
-          </AppDataContext.Provider>
-        </AppActionsContext.Provider>
+        <AppPreferencesContext.Provider value={props.preferencesContext}>
+          <AppActionsContext.Provider value={props.actionsContext}>
+            <AppDataContext.Provider value={props.dataContext}>
+              <AppDataActionsContext.Provider value={props.dataActionsContext}>
+                <AppShellInner {...props} />
+              </AppDataActionsContext.Provider>
+            </AppDataContext.Provider>
+          </AppActionsContext.Provider>
+        </AppPreferencesContext.Provider>
       </AppSettingsContext.Provider>
     </AppFlagsContext.Provider>
   )
