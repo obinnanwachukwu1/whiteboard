@@ -16,6 +16,7 @@ import {
   formatWeightDisplay,
   type AssignmentGroupData,
 } from '../utils/assignmentWeight'
+import { isSubmissionSubmitted } from '../utils/submissionState'
 
 /**
  * Extended ranked assignment with display-ready fields.
@@ -221,10 +222,7 @@ export function usePriorityAssignments(options?: {
         courseName: item.course_name,
         pointsPossible: item.pointsPossible ?? null,
         effectiveWeight,
-        isSubmitted:
-          Boolean(item.submission?.submittedAt) ||
-          item.submission?.workflowState === 'submitted' ||
-          item.submission?.workflowState === 'graded',
+        isSubmitted: isSubmissionSubmitted(item.submission),
         htmlUrl: item.htmlUrl,
       }
     })

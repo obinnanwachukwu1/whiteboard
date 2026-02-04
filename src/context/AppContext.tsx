@@ -4,7 +4,13 @@ import type { SidebarConfig } from '../components/Sidebar'
 export type AppFlagsValue = {
   aiEnabled: boolean
   embeddingsEnabled: boolean
+  privateModeEnabled: boolean
+  privateModeAcknowledged: boolean
+  encryptionEnabled: boolean
   prefetchEnabled: boolean
+  reduceEffectsEnabled: boolean
+  externalEmbedsEnabled: boolean
+  externalMediaEnabled: boolean
   pdfGestureZoomEnabled: boolean
   verbose: boolean
 }
@@ -19,9 +25,14 @@ export function useAppFlags(): AppFlagsValue {
 
 export type AppSettingsValue = {
   setPrefetchEnabled: (v: boolean) => Promise<void>
+  setReduceEffectsEnabled: (v: boolean) => Promise<void>
+  setExternalEmbedsEnabled: (v: boolean) => Promise<void>
+  setExternalMediaEnabled: (v: boolean) => Promise<void>
   setPdfGestureZoomEnabled: (v: boolean) => Promise<void>
   setEmbeddingsEnabled: (v: boolean) => Promise<void>
   setAiEnabled: (v: boolean) => Promise<void>
+  setPrivateModeEnabled: (v: boolean) => Promise<void>
+  setEncryptionEnabled: (v: boolean) => Promise<void>
   setVerbose: (v: boolean) => Promise<void>
 }
 

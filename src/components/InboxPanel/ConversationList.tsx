@@ -4,6 +4,7 @@ import { useConversations } from '../../hooks/useCanvasQueries'
 import { useUpdateConversation } from '../../hooks/useCanvasMutations'
 import type { Conversation, ConversationScope } from '../../types/canvas'
 import { usePrefetchOnHover } from '../../hooks/usePrefetchOnHover'
+import { useAppFlags } from '../../context/AppContext'
 import { SkeletonList } from '../Skeleton'
 import { formatRelativeTime, getParticipantNames } from './utils'
 
@@ -20,6 +21,7 @@ const ConversationRow: React.FC<ConversationRowProps> = ({
   onSelect,
   updateMutation,
 }) => {
+  const { prefetchEnabled, privateModeEnabled } = useAppFlags()
   const hoverHandlers = usePrefetchOnHover({
     queryKey: ['conversation', String(conv.id)],
     queryFn: async () => {
@@ -27,6 +29,7 @@ const ConversationRow: React.FC<ConversationRowProps> = ({
       if (!res?.ok) throw new Error(res?.error || 'Failed to load conversation')
       return res.data
     },
+    enabled: prefetchEnabled && !privateModeEnabled,
     staleTime: 1000 * 60 * 2,
   })
 

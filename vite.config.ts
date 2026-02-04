@@ -24,9 +24,9 @@ function copyPdfJsAssets(): Plugin {
 
       // Copy pdf.js core files
       const filesToCopy = [
-        { src: 'build/pdf.js', dest: 'pdf.js' },
-        { src: 'build/pdf.worker.js', dest: 'pdf.worker.js' },
-        { src: 'web/pdf_viewer.js', dest: 'pdf_viewer.js' },
+        { src: 'build/pdf.mjs', dest: 'pdf.mjs' },
+        { src: 'build/pdf.worker.mjs', dest: 'pdf.worker.mjs' },
+        { src: 'web/pdf_viewer.mjs', dest: 'pdf_viewer.mjs' },
         { src: 'web/pdf_viewer.css', dest: 'pdf_viewer.css' },
       ]
 
@@ -45,6 +45,16 @@ function copyPdfJsAssets(): Plugin {
         fs.mkdirSync(cmapsDest, { recursive: true })
         for (const file of fs.readdirSync(cmapsSrc)) {
           fs.copyFileSync(path.join(cmapsSrc, file), path.join(cmapsDest, file))
+        }
+      }
+
+      // Copy viewer images (loading icon, etc.)
+      const imagesSrc = path.join(pdfJsDir, 'web', 'images')
+      const imagesDest = path.join(outDir, 'images')
+      if (fs.existsSync(imagesSrc) && !fs.existsSync(imagesDest)) {
+        fs.mkdirSync(imagesDest, { recursive: true })
+        for (const file of fs.readdirSync(imagesSrc)) {
+          fs.copyFileSync(path.join(imagesSrc, file), path.join(imagesDest, file))
         }
       }
 

@@ -27,7 +27,7 @@ export const AISidePanelInput = forwardRef<HTMLInputElement, Props>(
     }
 
     return (
-      <div className="px-4 py-3 border-t border-gray-200/50 dark:border-neutral-700/50">
+      <div className="px-4 py-3">
         <form onSubmit={handleSubmit} className="flex items-center">
           <div className="flex-1 relative">
             <input

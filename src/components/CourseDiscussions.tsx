@@ -9,6 +9,7 @@ import type { DiscussionTopic } from '../types/canvas'
 import { useQueryClient } from '@tanstack/react-query'
 import { enqueuePrefetch } from '../utils/prefetchQueue'
 import { usePrefetchOnHover } from '../hooks/usePrefetchOnHover'
+import { useAppFlags } from '../context/AppContext'
 
 type Props = {
   courseId: string | number
@@ -25,6 +26,7 @@ const DiscussionItemRow: React.FC<{
   anchorEls: React.MutableRefObject<Map<string, HTMLElement | null>>
   timeAgo: (date?: string) => string
 }> = ({ d, courseId, onOpen, isMenuOpen, menuId, setMenuOpenId, anchorEls, timeAgo }) => {
+  const { prefetchEnabled, privateModeEnabled } = useAppFlags()
   const lastActivity = d.last_reply_at || d.posted_at
   const replyCount = d.discussion_subentry_count || 0
   const unreadCount = d.unread_count || 0
@@ -37,6 +39,7 @@ const DiscussionItemRow: React.FC<{
       if (!res?.ok) throw new Error(res?.error || 'Failed')
       return res.data
     },
+    enabled: prefetchEnabled && !privateModeEnabled,
     staleTime: 1000 * 60 * 5,
   })
 
@@ -115,6 +118,7 @@ const DiscussionItemRow: React.FC<{
 }
 
 export const CourseDiscussions: React.FC<Props> = ({ courseId, onOpen }) => {
+  const { prefetchEnabled, privateModeEnabled } = useAppFlags()
   const [searchTerm, setSearchTerm] = useState('')
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -140,6 +144,7 @@ export const CourseDiscussions: React.FC<Props> = ({ courseId, onOpen }) => {
 
   // Auto-prefetch top 5
   React.useEffect(() => {
+    if (!prefetchEnabled || privateModeEnabled) return
     if (!list || list.length === 0) return
     const top5 = list.slice(0, 5)
 
@@ -156,7 +161,7 @@ export const CourseDiscussions: React.FC<Props> = ({ courseId, onOpen }) => {
         })
       })
     })
-  }, [list, courseId, queryClient])
+  }, [list, courseId, queryClient, prefetchEnabled, privateModeEnabled])
 
   // Format time ago
   const timeAgo = (dateStr?: string) => {

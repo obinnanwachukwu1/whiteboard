@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { normalizeThemeSettings, type ThemeSettings } from '../../utils/theme'
+import { setEncryptionEnabledFlag } from '../../utils/secureStorage'
 import { isSameThemeSettings } from './theme'
 
 type Params = {
@@ -12,9 +13,15 @@ type Params = {
   setSidebarCfg: (next: any) => void
   setCourseImagesState: (next: Record<string, string>) => void
   setPrefetchEnabledState: (next: boolean) => void
+  setReduceEffectsEnabledState: (next: boolean) => void
+  setExternalEmbedsEnabledState: (next: boolean) => void
+  setExternalMediaEnabledState: (next: boolean) => void
   setPdfGestureZoomEnabledState: (next: boolean) => void
   setEmbeddingsEnabledState: (next: boolean) => void
   setAiEnabledState: (next: boolean) => void
+  setPrivateModeEnabledState: (next: boolean) => void
+  setPrivateModeAcknowledgedState: (next: boolean) => void
+  setEncryptionEnabledState: (next: boolean) => void
   setVerboseState: (next: boolean) => void
   setCachedCourses: (next: any[]) => void
   setCachedDue: (next: any[]) => void
@@ -32,9 +39,15 @@ export function useRootLayoutBootstrap({
   setSidebarCfg,
   setCourseImagesState,
   setPrefetchEnabledState,
+  setReduceEffectsEnabledState,
+  setExternalEmbedsEnabledState,
+  setExternalMediaEnabledState,
   setPdfGestureZoomEnabledState,
   setEmbeddingsEnabledState,
   setAiEnabledState,
+  setPrivateModeEnabledState,
+  setPrivateModeAcknowledgedState,
+  setEncryptionEnabledState,
   setVerboseState,
   setCachedCourses,
   setCachedDue,
@@ -46,6 +59,11 @@ export function useRootLayoutBootstrap({
       const cfg = await window.settings.get()
       const data = (cfg.ok ? (cfg.data as any) : {}) as any
       if (data?.baseUrl) setBaseUrl(data.baseUrl)
+      const privateMode = Boolean(data?.privateModeEnabled)
+      try {
+        if (privateMode) localStorage.setItem('wb-private-mode', '1')
+        else localStorage.removeItem('wb-private-mode')
+      } catch {}
 
       try {
         const fileTheme = data?.themeConfig ? normalizeThemeSettings(data.themeConfig) : null
@@ -59,26 +77,40 @@ export function useRootLayoutBootstrap({
         const key = `${url}|${data.lastUserId}`
         if (data?.userSidebars?.[key]) setSidebarCfg(data.userSidebars[key])
       }
-      if (data?.courseImages) {
+      if (!privateMode && data?.courseImages) {
         const url = data.baseUrl || baseUrl
         setCourseImagesState(data.courseImages[url] || {})
       }
       if (typeof data?.prefetchEnabled === 'boolean')
         setPrefetchEnabledState(!!data.prefetchEnabled)
+      if (typeof data?.reduceEffectsEnabled === 'boolean')
+        setReduceEffectsEnabledState(!!data.reduceEffectsEnabled)
+      if (typeof data?.externalEmbedsEnabled === 'boolean')
+        setExternalEmbedsEnabledState(!!data.externalEmbedsEnabled)
+      if (typeof data?.externalMediaEnabled === 'boolean')
+        setExternalMediaEnabledState(!!data.externalMediaEnabled)
       if (typeof data?.pdfGestureZoomEnabled === 'boolean')
         setPdfGestureZoomEnabledState(!!data.pdfGestureZoomEnabled)
       if (typeof data?.embeddingsEnabled === 'boolean')
         setEmbeddingsEnabledState(!!data.embeddingsEnabled)
       if (typeof data?.aiEnabled === 'boolean') setAiEnabledState(!!data.aiEnabled)
+      if (typeof data?.privateModeEnabled === 'boolean')
+        setPrivateModeEnabledState(!!data.privateModeEnabled)
+      if (typeof data?.privateModeAcknowledged === 'boolean')
+        setPrivateModeAcknowledgedState(!!data.privateModeAcknowledged)
+      const encEnabled =
+        typeof data?.encryptionEnabled === 'boolean' ? !!data.encryptionEnabled : false
+      setEncryptionEnabledState(encEnabled)
+      setEncryptionEnabledFlag(encEnabled)
       if (typeof data?.verbose === 'boolean') setVerboseState(!!data.verbose)
-      if (Array.isArray(data?.cachedCourses)) {
+      if (!privateMode && Array.isArray(data?.cachedCourses)) {
         setCachedCourses(data.cachedCourses || [])
         queryClient.setQueryData(
           ['courses', { enrollment_state: 'active' }],
           data.cachedCourses || [],
         )
       }
-      if (Array.isArray(data?.cachedDue)) {
+      if (!privateMode && Array.isArray(data?.cachedDue)) {
         setCachedDue(data.cachedDue || [])
         queryClient.setQueryData(['due-assignments'], data.cachedDue || [])
       }

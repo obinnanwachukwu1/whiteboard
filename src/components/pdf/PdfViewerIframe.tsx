@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useFileBytes, useFileMeta } from '../../hooks/useCanvasQueries'
-import { useAppActions } from '../../context/AppContext'
-import { useAIPanelActions, useAIPanelState } from '../../context/AIPanelContext'
+import { useAppActions, useAppFlags } from '../../context/AppContext'
+import { useAIPanelActions } from '../../context/AIPanelContext'
 
 type Props = {
   fileId: string | number
@@ -34,7 +34,7 @@ export const PdfViewerIframe: React.FC<Props> = ({
 }) => {
   const appActions = useAppActions()
   const aiPanel = useAIPanelActions()
-  const aiPanelState = useAIPanelState()
+  const { aiEnabled, embeddingsEnabled, privateModeEnabled } = useAppFlags()
   const fileUrlQ = useFileBytes(fileId)
   const fileMetaQ = useFileMeta(fileId)
 
@@ -57,11 +57,28 @@ export const PdfViewerIframe: React.FC<Props> = ({
     error: null,
   })
 
+  const parentOrigin = React.useMemo(() => {
+    if (typeof window === 'undefined') return ''
+    return window.location.origin || ''
+  }, [])
+
+  const iframeSrc = React.useMemo(() => {
+    if (!parentOrigin) return 'pdf-viewer://pdfViewer.html'
+    return `pdf-viewer://pdfViewer.html?parentOrigin=${encodeURIComponent(parentOrigin)}`
+  }, [parentOrigin])
+
   const sendCommand = useCallback((command: { type: string; [key: string]: any }) => {
     const win = iframeRef.current?.contentWindow
     if (!win) return
+    let targetOrigin = '*'
     try {
-      win.postMessage(command, '*')
+      const src = iframeRef.current?.src
+      if (src) {
+        targetOrigin = new URL(src).origin
+      }
+    } catch {}
+    try {
+      win.postMessage(command, targetOrigin)
     } catch {}
   }, [])
 
@@ -75,21 +92,19 @@ export const PdfViewerIframe: React.FC<Props> = ({
     [sendCommand],
   )
 
-  // Avoid expensive pdf.js refits while the AI panel animates its width.
-  // This keeps the PDF scale stable during open/close and removes jank.
-  const lastAiOpenRef = useRef<boolean>(aiPanelState.isOpen)
-  useLayoutEffect(() => {
-    if (!viewerState.isReady) return
-    if (lastAiOpenRef.current === aiPanelState.isOpen) return
-    lastAiOpenRef.current = aiPanelState.isOpen
-    sendCommand({ type: 'SUSPEND_FIT_ON_RESIZE', ms: 400 })
-  }, [aiPanelState.isOpen, sendCommand, viewerState.isReady])
-
   // Handle events from the iframe viewer
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const src = iframeRef.current?.contentWindow
       if (!src || event.source !== src) return
+      try {
+        const expectedOrigin = iframeRef.current?.src
+          ? new URL(iframeRef.current.src).origin
+          : null
+        if (expectedOrigin && event.origin !== expectedOrigin) return
+      } catch {
+        return
+      }
 
       const data = event.data as PdfEvent
       if (!data || typeof data !== 'object' || typeof data.type !== 'string') return
@@ -182,15 +197,29 @@ export const PdfViewerIframe: React.FC<Props> = ({
           break
 
         case 'SHORTCUT':
-          if (data.action === 'search') appActions.onOpenSearch()
-          if (data.action === 'ai') aiPanel.open()
+          if (data.action === 'search' && !privateModeEnabled) appActions.onOpenSearch()
+          if (data.action === 'ai' && aiEnabled && embeddingsEnabled && !privateModeEnabled) {
+            aiPanel.open()
+          }
           break
       }
     }
 
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
-  }, [attemptLoadUrl, fileId, fileMetaQ.data, onPageChange, sendCommand, url, appActions, aiPanel])
+  }, [
+    attemptLoadUrl,
+    fileId,
+    fileMetaQ.data,
+    onPageChange,
+    sendCommand,
+    url,
+    appActions,
+    aiPanel,
+    aiEnabled,
+    embeddingsEnabled,
+    privateModeEnabled,
+  ])
 
   // Load PDF when URL changes (and viewer is ready)
   useEffect(() => {
@@ -231,7 +260,7 @@ export const PdfViewerIframe: React.FC<Props> = ({
     <div className={`relative flex flex-col h-full min-h-0 overflow-hidden ${className}`}>
       <iframe
         ref={iframeRef}
-        src="pdf-viewer://pdfViewer.html"
+        src={iframeSrc}
         className="flex-1 min-h-0 w-full border-0 bg-gray-100 dark:bg-neutral-800"
         style={{ minHeight: fullscreen ? '100%' : undefined }}
         title="PDF Viewer"

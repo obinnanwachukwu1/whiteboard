@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useAppActions } from '../../context/AppContext'
+import { useAppActions, useAppFlags } from '../../context/AppContext'
 import { useAIPanelActions } from '../../context/AIPanelContext'
 
 type Props = {
@@ -28,6 +28,7 @@ type PptxEvent = {
 const PptxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDownload }) => {
   const appActions = useAppActions()
   const aiPanel = useAIPanelActions()
+  const { aiEnabled, embeddingsEnabled, privateModeEnabled } = useAppFlags()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [viewerState, setViewerState] = useState<ViewerState>({
     currentSlide: 1,
@@ -132,15 +133,31 @@ const PptxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDo
           break
 
         case 'SHORTCUT':
-          if ((data as any).action === 'search') appActions.onOpenSearch()
-          if ((data as any).action === 'ai') aiPanel.open()
+          if ((data as any).action === 'search' && !privateModeEnabled) appActions.onOpenSearch()
+          if (
+            (data as any).action === 'ai' &&
+            aiEnabled &&
+            embeddingsEnabled &&
+            !privateModeEnabled
+          ) {
+            aiPanel.open()
+          }
           break
       }
     }
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [url, sendCommand, onDownload, appActions, aiPanel])
+  }, [
+    url,
+    sendCommand,
+    onDownload,
+    appActions,
+    aiPanel,
+    aiEnabled,
+    embeddingsEnabled,
+    privateModeEnabled,
+  ])
 
   /**
    * Load PPTX when URL changes and viewer is ready

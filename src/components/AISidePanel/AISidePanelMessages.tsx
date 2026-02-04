@@ -9,9 +9,9 @@ import {
   File,
   ChevronRight,
   ChevronDown,
-  Link2,
+  Paperclip,
 } from 'lucide-react'
-import type { ChatMessage, SearchResultItem } from '../../context/AIPanelContext'
+import type { AIAttachmentChip, ChatMessage, SearchResultItem } from '../../context/AIPanelContext'
 import { MarkdownMessage } from './MarkdownMessage'
 
 function ThinkingBar() {
@@ -141,8 +141,8 @@ export const AISidePanelMessages = memo(function AISidePanelMessages({
             <div key={msg.id}>
               <MessageBubble role={msg.role} content={msg.content} status={msg.status} />
 
-              {msg.role === 'user' && msg.attachment?.kind === 'page' && (
-                <AttachmentPill attachment={msg.attachment} />
+              {msg.role === 'user' && msg.attachments && msg.attachments.length > 0 && (
+                <AttachmentList attachments={msg.attachments} />
               )}
 
               {msg.role === 'assistant' &&
@@ -254,10 +254,10 @@ const ReferencesList = memo(function ReferencesList({
   results: SearchResultItem[]
   onResultClick?: (result: SearchResultItem) => void
 }) {
-  if (!results.length) return null
-
   const [open, setOpen] = useState(false)
   const displayResults = results.slice(0, 6)
+
+  if (!results.length) return null
 
   return (
     <div className="mt-3 space-y-1.5">
@@ -279,21 +279,36 @@ const ReferencesList = memo(function ReferencesList({
   )
 })
 
-const AttachmentPill = memo(function AttachmentPill({
-  attachment,
-}: {
-  attachment: NonNullable<ChatMessage['attachment']>
-}) {
-  if (!attachment || attachment.kind !== 'page') return null
-
+const AttachmentList = memo(function AttachmentList({ attachments }: { attachments: AIAttachmentChip[] }) {
   return (
     <div className="mt-1 flex justify-end">
-      <div className="max-w-[85%] ml-8 px-2 py-1 rounded-md bg-[color:var(--accent-100)] dark:bg-[color:var(--accent-50)] ring-1 ring-[color:var(--accent-200)] dark:ring-[color:var(--accent-200)]">
-        <div className="flex items-center gap-1.5 text-[10px] leading-tight text-[color:var(--accent-800)] dark:text-[color:var(--accent-900)]">
-          <Link2 className="w-3 h-3 opacity-80" />
-          <span className="truncate">{attachment.title}</span>
-        </div>
+      <div className="max-w-[85%] ml-8 flex flex-wrap gap-1">
+        {attachments.map((a) => (
+          <AttachmentPill key={a.id} title={a.title} subtitle={a.courseName} />
+        ))}
       </div>
+    </div>
+  )
+})
+
+const AttachmentPill = memo(function AttachmentPill({
+  title,
+  subtitle,
+}: {
+  title: string
+  subtitle?: string
+}) {
+  return (
+    <div className="px-2 py-1 rounded-md bg-[color:var(--accent-100)] dark:bg-[color:var(--accent-50)] ring-1 ring-[color:var(--accent-200)] dark:ring-[color:var(--accent-200)]">
+      <div className="flex items-center gap-1.5 text-[10px] leading-tight text-[color:var(--accent-800)] dark:text-[color:var(--accent-900)]">
+        <Paperclip className="w-3 h-3 opacity-80" />
+        <span className="truncate">{title}</span>
+      </div>
+      {subtitle && (
+        <div className="text-[9px] leading-tight text-[color:var(--accent-700)] dark:text-[color:var(--accent-800)] truncate opacity-80">
+          {subtitle}
+        </div>
+      )}
     </div>
   )
 })

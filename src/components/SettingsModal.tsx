@@ -2,6 +2,7 @@ import { Modal } from './ui/Modal'
 import {
   AppearanceSettings,
   FeaturesSettings,
+  PrivacySettings,
   NotificationSettings,
   GradesSettings,
   AccountSettings,
@@ -20,6 +21,7 @@ export function SettingsModal({ isOpen, onClose }: Props) {
       <div className="space-y-6 max-h-[75vh] overflow-y-auto pr-1 pb-1">
         <AppearanceSettings />
         <FeaturesSettings />
+        <PrivacySettings />
         <NotificationSettings />
         <GradesSettings />
         <AccountSettings />

@@ -458,8 +458,12 @@
     </button>
   </div>
   
-  <script src="./pdf.js"></script>
-  <script src="./pdf_viewer.js"></script>
+  <script type="module">
+    import * as pdfjsLib from './pdf.mjs';
+    import * as pdfjsViewer from './pdf_viewer.mjs';
+    window.pdfjsLib = pdfjsLib;
+    window.pdfjsViewer = pdfjsViewer;
+  </script>
   <script src="./bridge.js"></script>
 </body>
 </html>

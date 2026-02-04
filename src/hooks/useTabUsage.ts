@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { getJson, setJson } from '../utils/secureStorage'
 
 const STORAGE_KEY = 'whiteboard_tab_usage'
 
@@ -10,10 +11,7 @@ export function useTabUsage() {
   // Load stats on mount
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) {
-        setStats(JSON.parse(raw))
-      }
+      setStats(getJson<UsageStats>(STORAGE_KEY, {}))
     } catch (e) {
       console.warn('Failed to load tab usage stats', e)
     }
@@ -36,7 +34,7 @@ export function useTabUsage() {
       }
 
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+        setJson(STORAGE_KEY, next)
       } catch (_e) {
         // ignore quota errors
       }

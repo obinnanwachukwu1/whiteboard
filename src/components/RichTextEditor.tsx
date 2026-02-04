@@ -5,6 +5,7 @@ import Link from '@tiptap/extension-link'
 import Underline from '@tiptap/extension-underline'
 import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
+import { getItem, removeItem, setItem } from '../utils/secureStorage'
 import {
   Bold,
   Italic,
@@ -82,7 +83,7 @@ export const RichTextEditor: React.FC<Props> = ({
   // Load draft from localStorage on mount
   if (draftKey && initialContentRef.current === null) {
     try {
-      const saved = localStorage.getItem(DRAFT_PREFIX + draftKey)
+      const saved = getItem(DRAFT_PREFIX + draftKey)
       initialContentRef.current = saved && saved !== '<p></p>' ? saved : ''
     } catch {
       initialContentRef.current = ''
@@ -158,9 +159,9 @@ export const RichTextEditor: React.FC<Props> = ({
           try {
             const html = editor.getHTML()
             if (html && html !== '<p></p>') {
-              localStorage.setItem(DRAFT_PREFIX + draftKey, html)
+              setItem(DRAFT_PREFIX + draftKey, html)
             } else {
-              localStorage.removeItem(DRAFT_PREFIX + draftKey)
+              removeItem(DRAFT_PREFIX + draftKey)
             }
           } catch {
             // Ignore storage errors
@@ -207,7 +208,7 @@ export const RichTextEditor: React.FC<Props> = ({
   const clearDraft = useCallback(() => {
     if (draftKey) {
       try {
-        localStorage.removeItem(DRAFT_PREFIX + draftKey)
+        removeItem(DRAFT_PREFIX + draftKey)
       } catch {
         // Ignore
       }

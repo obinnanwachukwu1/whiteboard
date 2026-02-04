@@ -15,6 +15,7 @@ import {
 } from '../utils/coordinator'
 import type { ContentType } from '../utils/coordinator'
 import { extractAssignmentIdFromUrl } from '../utils/urlHelpers'
+import { stripHtmlToText } from '../utils/stripHtmlToText'
 import { useAI, type AIMessage } from '../hooks/useAI'
 import { usePriorityAssignments } from '../hooks/usePriorityAssignments'
 
@@ -39,7 +40,11 @@ export interface ConversationTurn {
   content: string
 }
 
+type AttachmentSlot = 'view' | 'manual'
+
 type PageAttachment = {
+  id: string
+  slot: AttachmentSlot
   kind: 'page'
   courseId: string | number
   courseName?: string
@@ -48,7 +53,23 @@ type PageAttachment = {
   contentText?: string
 }
 
-export type AIAttachment = PageAttachment
+type SyllabusAttachment = {
+  id: string
+  slot: AttachmentSlot
+  kind: 'syllabus'
+  courseId: string | number
+  courseName?: string
+  title: string
+  contentText?: string
+}
+
+export type AIAttachment = PageAttachment | SyllabusAttachment
+
+export type AIAttachmentChip = {
+  id: string
+  title: string
+  courseName?: string
+}
 
 export type ChatMessageStatus = 'streaming' | 'done' | 'error'
 
@@ -58,7 +79,7 @@ export type ChatMessage = {
   content: string
   status: ChatMessageStatus
   references?: SearchResultItem[] | null
-  attachment?: AIAttachment | null
+  attachments?: AIAttachmentChip[] | null
 }
 
 export interface AIPanelState {
@@ -69,7 +90,9 @@ export interface AIPanelState {
   isLoading: boolean
   error: string | null
   autoSubmit: boolean
-  activeAttachment: AIAttachment | null
+  attachments: AIAttachment[]
+  contextOffer: AIAttachment | null
+  followContextOffer: boolean
   // Chat messages (user + assistant)
   messages: ChatMessage[]
 }
@@ -82,6 +105,11 @@ interface AIPanelContextValue extends AIPanelState {
     pageUrl: string
     title: string
   }) => void
+  setContextOffer: (offer: AIAttachment | null) => void
+  startFollowContextOffer: () => void
+  cancelFollowContextOffer: () => void
+  removeAttachment: (attachmentId: string) => void
+  clearAttachments: () => void
   close: () => void
   toggle: () => void
   setMode: (mode: AIMode) => void
@@ -101,20 +129,61 @@ const defaultState: AIPanelState = {
   isLoading: false,
   error: null,
   autoSubmit: false,
-  activeAttachment: null,
+  attachments: [],
+  contextOffer: null,
+  followContextOffer: false,
   messages: [],
 }
 
-function stripHtmlToText(html: string): string {
-  try {
-    const doc = new DOMParser().parseFromString(html, 'text/html')
-    return (doc.body.textContent || '').replace(/\s+/g, ' ').trim()
-  } catch {
-    return String(html || '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
+function toAttachmentChip(a: AIAttachment): AIAttachmentChip {
+  return { id: a.id, title: a.title, courseName: a.courseName }
+}
+
+function upsertViewAttachment(existing: AIAttachment[], next: AIAttachment): AIAttachment[] {
+  const withoutView = existing.filter((a) => a.slot !== 'view')
+  return [...withoutView, { ...next, slot: 'view' }]
+}
+
+function truncateForPrompt(text: string, maxChars: number): string {
+  const t = String(text || '')
+  if (t.length <= maxChars) return t
+  if (maxChars <= 0) return ''
+  const suffix = '\n\n[truncated]'
+  if (maxChars <= suffix.length) return t.slice(0, maxChars)
+  return t.slice(0, maxChars - suffix.length) + suffix
+}
+
+function estimatePromptChars(messages: Array<{ content: string }>): number {
+  return messages.reduce((sum, m) => sum + String(m.content || '').length, 0)
+}
+
+function normalizeAIStreamError(error: string): string {
+  const raw = String(error || '')
+  const lower = raw.toLowerCase()
+  if (
+    lower.includes('socket hang up') ||
+    lower.includes('econnreset') ||
+    lower.includes('empty reply') ||
+    lower.includes('context_length_exceeded') ||
+    lower.includes('context window exceeded')
+  ) {
+    return (
+      'The AI request failed (likely because the prompt was too large). ' +
+      'Try removing attachments, starting a new chat, or asking a narrower question.'
+    )
   }
+  return raw
+}
+
+function isLikelyPromptTooLargeError(error: string): boolean {
+  const lower = String(error || '').toLowerCase()
+  return (
+    lower.includes('socket hang up') ||
+    lower.includes('econnreset') ||
+    lower.includes('empty reply') ||
+    lower.includes('context_length_exceeded') ||
+    lower.includes('context window exceeded')
+  )
 }
 
 type AIPanelActions = {
@@ -125,6 +194,11 @@ type AIPanelActions = {
     pageUrl: string
     title: string
   }) => void
+  setContextOffer: (offer: AIAttachment | null) => void
+  startFollowContextOffer: () => void
+  cancelFollowContextOffer: () => void
+  removeAttachment: (attachmentId: string) => void
+  clearAttachments: () => void
   close: () => void
   toggle: () => void
   setMode: (mode: AIMode) => void
@@ -220,7 +294,7 @@ function xmlEscapeText(value: unknown): string {
 }
 
 function xmlEscapeAttr(value: unknown): string {
-  return xmlEscapeText(value).replace(/\"/g, '&quot;')
+  return xmlEscapeText(value).replace(/"/g, '&quot;')
 }
 
 function xmlEl(tag: string, content: string, attrs?: Record<string, unknown>): string {
@@ -945,13 +1019,17 @@ export function AIPanelProvider({
       const userMessageId = `u_${requestId}`
       const assistantMessageId = `a_${requestId}`
 
-      const activeAttachment = state.activeAttachment
+      const baseAttachments = state.attachments
+      const offer = state.contextOffer
+      const shouldUseOffer = state.followContextOffer && !!offer
+      const attachmentsForTurn = shouldUseOffer && offer ? upsertViewAttachment(baseAttachments, offer) : baseAttachments
+
       const userMessage: ChatMessage = {
         id: userMessageId,
         role: 'user',
         content: trimmedQuery,
         status: 'done',
-        attachment: activeAttachment ? { ...activeAttachment } : null,
+        attachments: attachmentsForTurn.length ? attachmentsForTurn.map(toAttachmentChip) : null,
       }
       const assistantMessage: ChatMessage = {
         id: assistantMessageId,
@@ -967,7 +1045,8 @@ export function AIPanelProvider({
         error: null,
         autoSubmit: false,
         query: '',
-        activeAttachment: null,
+        attachments: attachmentsForTurn,
+        followContextOffer: false,
         messages: [...prev.messages, userMessage, assistantMessage],
       }))
 
@@ -976,7 +1055,6 @@ export function AIPanelProvider({
           // Give the app a moment to populate due assignments (common race on first open).
           const start = Date.now()
           while (dueAssignmentsRef.current.length === 0 && Date.now() - start < 1200) {
-            // eslint-disable-next-line no-await-in-loop
             await new Promise((r) => setTimeout(r, 150))
           }
         }
@@ -984,69 +1062,98 @@ export function AIPanelProvider({
         const coursesNow = coursesRef.current
         let dueAssignmentsNow = dueAssignmentsRef.current
 
-        // If we have an attachment (pages only for now), fetch its content during the "Thinking" phase.
+        // Resolve attachments (fetch missing text) during the "Thinking" phase.
         let attachmentContext = ''
-        let attachmentResult: SearchResultItem | null = null
-        let attachmentForMessage = activeAttachment ? { ...activeAttachment } : null
+        const attachmentResults: SearchResultItem[] = []
 
-        if (activeAttachment?.kind === 'page') {
-          const courseName =
-            activeAttachment.courseName ||
-            coursesNow.find((c: any) => String(c?.id) === String(activeAttachment.courseId))
-              ?.name ||
-            ''
+        if (attachmentsForTurn.length) {
+          const parts: string[] = []
 
-          let contentText = activeAttachment.contentText
-          if (!contentText) {
-            if (!window.canvas?.getCoursePage) {
-              throw new Error('Canvas page API is not available')
+          for (const attachment of attachmentsForTurn) {
+            if (attachment.kind === 'page') {
+              const courseName =
+                attachment.courseName ||
+                coursesNow.find((c: any) => String(c?.id) === String(attachment.courseId))?.name ||
+                ''
+
+              let contentText = attachment.contentText
+              if (!contentText) {
+                if (!window.canvas?.getCoursePage) {
+                  throw new Error('Canvas page API is not available')
+                }
+                const res = await window.canvas.getCoursePage(attachment.courseId, attachment.pageUrl)
+                if (!res?.ok || !res.data) {
+                  throw new Error(res?.error || 'Failed to load page content')
+                }
+                const bodyHtml = String((res.data as any)?.body || '')
+                contentText = stripHtmlToText(bodyHtml).slice(0, 4000)
+              }
+
+              if (!contentText) continue
+
+              parts.push(
+                [
+                  '## Attached Page',
+                  `Title: ${attachment.title}`,
+                  courseName ? `Course: ${courseName}` : '',
+                  'Content:',
+                  contentText,
+                ]
+                  .filter(Boolean)
+                  .join('\n'),
+              )
+
+              attachmentResults.push({
+                id: attachment.id,
+                score: 1,
+                metadata: {
+                  type: 'page',
+                  courseId: String(attachment.courseId),
+                  courseName: courseName || 'Unknown Course',
+                  title: attachment.title,
+                  snippet: contentText.slice(0, 160),
+                  contentHash: 'attachment',
+                },
+              })
+
+              continue
             }
-            const res = await window.canvas.getCoursePage(
-              activeAttachment.courseId,
-              activeAttachment.pageUrl,
-            )
-            if (!res?.ok || !res.data) {
-              throw new Error(res?.error || 'Failed to load page content')
+
+            if (attachment.kind === 'syllabus') {
+              const courseName =
+                attachment.courseName ||
+                coursesNow.find((c: any) => String(c?.id) === String(attachment.courseId))?.name ||
+                ''
+
+              let contentText = attachment.contentText
+              if (!contentText) {
+                if (!window.canvas?.getCourseInfo) {
+                  throw new Error('Canvas course info API is not available')
+                }
+                const res = await window.canvas.getCourseInfo(attachment.courseId)
+                if (!res?.ok || !res.data) {
+                  throw new Error(res?.error || 'Failed to load course info')
+                }
+                const syllabusHtml = String((res.data as any)?.syllabus_body || '')
+                contentText = stripHtmlToText(syllabusHtml).slice(0, 4000)
+              }
+
+              if (!contentText) continue
+
+              parts.push(
+                [
+                  '## Attached Syllabus',
+                  courseName ? `Course: ${courseName}` : '',
+                  'Content:',
+                  contentText,
+                ]
+                  .filter(Boolean)
+                  .join('\n'),
+              )
             }
-            const bodyHtml = String((res.data as any)?.body || '')
-            contentText = stripHtmlToText(bodyHtml).slice(0, 4000)
           }
 
-          if (contentText) {
-            attachmentForMessage = {
-              ...activeAttachment,
-              courseName,
-              contentText,
-            }
-
-            updateMessage(userMessageId, (msg) => ({
-              ...msg,
-              attachment: attachmentForMessage,
-            }))
-
-            attachmentContext = [
-              '## Attached Page',
-              `Title: ${activeAttachment.title}`,
-              courseName ? `Course: ${courseName}` : '',
-              'Content:',
-              contentText,
-            ]
-              .filter(Boolean)
-              .join('\n')
-
-            attachmentResult = {
-              id: `page:${String(activeAttachment.courseId)}:${String(activeAttachment.pageUrl)}`,
-              score: 1,
-              metadata: {
-                type: 'page',
-                courseId: String(activeAttachment.courseId),
-                courseName: courseName || 'Unknown Course',
-                title: activeAttachment.title,
-                snippet: contentText.slice(0, 160),
-                contentHash: 'attachment',
-              },
-            }
-          }
+          attachmentContext = parts.filter(Boolean).join('\n\n')
         }
 
         // Pass 1: Coordinate
@@ -1058,7 +1165,6 @@ export function AIPanelProvider({
         if (mergedNeeds.assignments) {
           const start = Date.now()
           while (dueAssignmentsRef.current.length === 0 && Date.now() - start < 1200) {
-            // eslint-disable-next-line no-await-in-loop
             await new Promise((r) => setTimeout(r, 150))
           }
           dueAssignmentsNow = dueAssignmentsRef.current
@@ -1095,26 +1201,27 @@ export function AIPanelProvider({
         // Semantic search is only helpful for content questions (pages/files/modules).
         // For assignment due/planning questions it adds unrelated noise (exams, files, etc.).
         if (plan.intent === 'content_qa' || mergedNeeds.contentSearch) {
-          const forcedCourseIds =
-            activeAttachment?.kind === 'page' ? [String(activeAttachment.courseId)] : undefined
-          const forcedTypes: ContentType[] | undefined =
-            activeAttachment?.kind === 'page' ? ['page'] : undefined
-          const semanticQuery =
-            activeAttachment?.kind === 'page' ? activeAttachment.title : plan.rewrittenQuery
+          const primaryPageAttachment = [...attachmentsForTurn]
+            .reverse()
+            .find((a): a is PageAttachment => a.kind === 'page')
+
+          const forcedCourseIds = primaryPageAttachment
+            ? [String(primaryPageAttachment.courseId)]
+            : undefined
+          const forcedTypes: ContentType[] | undefined = primaryPageAttachment ? ['page'] : undefined
+          const semanticQuery = primaryPageAttachment
+            ? primaryPageAttachment.title
+            : plan.rewrittenQuery
 
           const searchResult = await window.embedding.search(semanticQuery, 8, {
             courseIds: forcedCourseIds ?? plan.filters?.courseIds,
             types: forcedTypes ?? plan.filters?.types,
-            minScore: activeAttachment?.kind === 'page' ? 0.35 : 0.25,
+            minScore: primaryPageAttachment ? 0.35 : 0.25,
             dedupe: true,
           })
           if (searchResult.ok) {
             references = (searchResult.data || []).slice(0, 5)
           }
-        }
-
-        if (attachmentResult) {
-          references = [attachmentResult, ...references.filter((r) => r.id !== attachmentResult.id)]
         }
 
         if (plan.intent === 'planning' || plan.intent === 'due_date') {
@@ -1179,9 +1286,9 @@ export function AIPanelProvider({
 
         // If we have the dashboard-ranked priority list, include it for planning.
         // This avoids the model "guessing" priority.
-        const priorityContext = (() => {
-          if (plan.intent !== 'planning') return ''
-          if (!priorityItems.length && !alsoDueItems.length) return ''
+          const priorityContext = (() => {
+            if (plan.intent !== 'planning') return ''
+            if (!priorityItems.length && !alsoDueItems.length) return ''
 
           const formatDueHuman = (dueAt: string): string => {
             const d = new Date(dueAt)
@@ -1216,110 +1323,170 @@ export function AIPanelProvider({
               xmlEl('Priority', priorityNodes.join(''), { count: String(priorityNodes.length) }),
             )
           }
-          if (alsoNodes.length) {
-            parts.push(xmlEl('AlsoDue', alsoNodes.join(''), { count: String(alsoNodes.length) }))
+            if (alsoNodes.length) {
+              parts.push(xmlEl('AlsoDue', alsoNodes.join(''), { count: String(alsoNodes.length) }))
+            }
+            return xmlEl('PriorityContext', parts.join(''), { authoritative: 'true' })
+          })()
+
+          const semanticContext = references
+            .map(
+              (r) =>
+                `[${r.metadata.type}] ${r.metadata.title} (${r.metadata.courseName}): ${r.metadata.snippet}`,
+            )
+            .join('\n\n')
+
+          const systemPrompt = buildSystemPrompt(plan.intent, {
+            userName: userNameRef.current,
+            pinnedCourses: pinnedCoursesRef.current,
+          })
+          const fewShotExamples = buildFewShotExamples(plan.intent)
+
+          const MAX_PROMPT_CHARS = 15000
+
+          let historyMessagesForPrompt = buildPromptHistory(state.messages)
+          let attachmentContextForPrompt = attachmentContext
+          let structuredContextForPrompt = structuredContext
+          let priorityContextForPrompt = priorityContext
+          let semanticContextForPrompt = semanticContext
+
+          const buildFullContext = () => {
+            return [
+              attachmentContextForPrompt,
+              structuredContextForPrompt,
+              priorityContextForPrompt,
+              semanticContextForPrompt
+                ? '## Related Content (Semantic Search)\n' + semanticContextForPrompt
+                : '',
+            ]
+              .filter(Boolean)
+              .join('\n\n')
           }
-          return xmlEl('PriorityContext', parts.join(''), { authoritative: 'true' })
+
+          const buildUserPrompt = () => {
+            const fullContext = buildFullContext()
+            return fullContext
+              ? `Context:\n${fullContext}\n\nQuestion: ${trimmedQuery}`
+              : `Question: ${trimmedQuery}`
+          }
+
+          const buildMessagesForPrompt = () => {
+            const userPrompt = buildUserPrompt()
+            return [
+              { role: 'system', content: systemPrompt },
+              ...fewShotExamples,
+              ...historyMessagesForPrompt,
+              { role: 'user', content: userPrompt },
+            ] as Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+          }
+
+          let messages = buildMessagesForPrompt()
+          for (const trim of [
+            () => {
+              if (historyMessagesForPrompt.length) historyMessagesForPrompt = []
+            },
+            () => {
+              if (semanticContextForPrompt) semanticContextForPrompt = ''
+            },
+            () => {
+              if (priorityContextForPrompt) priorityContextForPrompt = ''
+            },
+            () => {
+              structuredContextForPrompt = truncateForPrompt(structuredContextForPrompt, 2600)
+            },
+            () => {
+              attachmentContextForPrompt = truncateForPrompt(attachmentContextForPrompt, 6000)
+            },
+          ]) {
+            if (estimatePromptChars(messages) <= MAX_PROMPT_CHARS) break
+            trim()
+            messages = buildMessagesForPrompt()
+          }
+
+          if (import.meta.env.DEV) {
+            try {
+              if (localStorage.getItem('wb.ai.debugPrompt') === '1') {
+                // NOTE: This may contain sensitive course content; keep it opt-in.
+                console.log('[ai:userPrompt]', buildUserPrompt())
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          const fallbackResults = candidates.length > 0 ? candidates : references
+          const attachmentResultIds = new Set(attachmentResults.map((r) => r.id))
+          const finalResults =
+            attachmentResults.length > 0
+              ? [
+                  ...attachmentResults,
+                  ...fallbackResults.filter((r) => !attachmentResultIds.has(r.id)),
+                ]
+              : fallbackResults
+
+        updateMessage(assistantMessageId, (msg) => ({ ...msg, references: finalResults }))
+
+        const retryUserPrompt = (() => {
+          const retryContext = [
+            truncateForPrompt(attachmentContext, 3000),
+            truncateForPrompt(structuredContext, 2000),
+          ]
+            .filter(Boolean)
+            .join('\n\n')
+          return retryContext
+            ? `Context:\n${retryContext}\n\nQuestion: ${trimmedQuery}`
+            : `Question: ${trimmedQuery}`
         })()
 
-        const semanticContext = references
-          .filter((r) => (attachmentResult ? r.id !== attachmentResult.id : true))
-          .map(
-            (r) =>
-              `[${r.metadata.type}] ${r.metadata.title} (${r.metadata.courseName}): ${r.metadata.snippet}`,
-          )
-          .join('\n\n')
-
-        const fullContext = [
-          attachmentContext,
-          structuredContext,
-          priorityContext,
-          semanticContext ? '## Related Content (Semantic Search)\n' + semanticContext : '',
-        ]
-          .filter(Boolean)
-          .join('\n\n')
-
-        const systemPrompt = buildSystemPrompt(plan.intent, {
-          userName: userNameRef.current,
-          pinnedCourses: pinnedCoursesRef.current,
-        })
-        const fewShotExamples = buildFewShotExamples(plan.intent)
-
-        const historyMessages = buildPromptHistory(state.messages)
-
-        const userPrompt = fullContext
-          ? `Context:\n${fullContext}\n\nQuestion: ${trimmedQuery}`
-          : `Question: ${trimmedQuery}`
-
-        if (import.meta.env.DEV) {
-          try {
-            if (localStorage.getItem('wb.ai.debugPrompt') === '1') {
-              // NOTE: This may contain sensitive course content; keep it opt-in.
-              console.log('[ai:userPrompt]', userPrompt)
-            }
-          } catch {
-            // ignore
-          }
-        }
-
-        const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+        const retryMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
           { role: 'system', content: systemPrompt },
           ...fewShotExamples,
-          ...historyMessages,
-          {
-            role: 'user',
-            content: userPrompt,
-          },
+          { role: 'user', content: retryUserPrompt },
         ]
 
-        const finalResults = attachmentResult
-          ? [
-              attachmentResult,
-              ...(candidates.length > 0 ? candidates : references).filter(
-                (r) => r.id !== attachmentResult.id,
-              ),
-            ]
-          : candidates.length > 0
-            ? candidates
-            : references
+        let didRetry = false
 
-        updateMessage(assistantMessageId, (msg) => ({
-          ...msg,
-          references: finalResults,
-        }))
+        const onUpdate = (text: string) => {
+          if (activeRequestIdRef.current !== requestId) return
+          updateMessage(assistantMessageId, (msg) => ({
+            ...msg,
+            content: text,
+            status: 'streaming',
+          }))
+        }
 
-        const cleanup = streamChat(
-          messages as AIMessage[],
-          (text: string) => {
-            if (activeRequestIdRef.current !== requestId) return
-            updateMessage(assistantMessageId, (msg) => ({
-              ...msg,
-              content: text,
-              status: 'streaming',
-            }))
-          },
-          {
-            onDone: () => {
-              if (activeRequestIdRef.current !== requestId) return
-              updateMessage(assistantMessageId, (msg) => ({
-                ...msg,
-                status: 'done',
-              }))
-              setState((prev) => ({ ...prev, isLoading: false }))
-              streamCleanupRef.current = null
-            },
-            onError: (err) => {
-              if (activeRequestIdRef.current !== requestId) return
-              updateMessage(assistantMessageId, (msg) => ({
-                ...msg,
-                status: 'error',
-              }))
-              setState((prev) => ({ ...prev, isLoading: false, error: err }))
-              streamCleanupRef.current = null
-            },
-          },
-        )
+        const onDone = () => {
+          if (activeRequestIdRef.current !== requestId) return
+          updateMessage(assistantMessageId, (msg) => ({ ...msg, status: 'done' }))
+          setState((prev) => ({ ...prev, isLoading: false }))
+          streamCleanupRef.current = null
+        }
 
+        const onError = (err: string) => {
+          if (activeRequestIdRef.current !== requestId) return
+
+          if (!didRetry && isLikelyPromptTooLargeError(err)) {
+            didRetry = true
+            updateMessage(assistantMessageId, (msg) => ({ ...msg, content: '', status: 'streaming' }))
+            const retryCleanup = streamChat(retryMessages as AIMessage[], onUpdate, {
+              onDone,
+              onError: (e2) => {
+                if (activeRequestIdRef.current !== requestId) return
+                updateMessage(assistantMessageId, (msg) => ({ ...msg, status: 'error' }))
+                setState((prev) => ({ ...prev, isLoading: false, error: normalizeAIStreamError(e2) }))
+                streamCleanupRef.current = null
+              },
+            })
+            streamCleanupRef.current = retryCleanup
+            return
+          }
+
+          updateMessage(assistantMessageId, (msg) => ({ ...msg, status: 'error' }))
+          setState((prev) => ({ ...prev, isLoading: false, error: normalizeAIStreamError(err) }))
+          streamCleanupRef.current = null
+        }
+
+        const cleanup = streamChat(messages as AIMessage[], onUpdate, { onDone, onError })
         streamCleanupRef.current = cleanup
       } catch (e) {
         setState((prev) => ({
@@ -1329,18 +1496,20 @@ export function AIPanelProvider({
         }))
       }
     },
-    [
-      embeddingsEnabled,
-      aiEnabled,
-      dueAssignments,
-      courses,
-      state.messages,
-      state.activeAttachment,
-      streamChat,
-      buildPromptHistory,
-      updateMessage,
-    ],
-  )
+      [
+        embeddingsEnabled,
+        aiEnabled,
+        dueAssignments,
+        courses,
+        state.messages,
+        state.attachments,
+        state.contextOffer,
+        state.followContextOffer,
+        streamChat,
+        buildPromptHistory,
+        updateMessage,
+      ],
+    )
 
   const submit = useCallback(async () => {
     await runSubmit(state.query)
@@ -1353,22 +1522,21 @@ export function AIPanelProvider({
     [runSubmit],
   )
 
-  const open = useCallback((query?: string, mode?: AIMode, autoSubmit = false) => {
-    setState((prev) => ({
-      ...prev,
-      isOpen: true,
-      query: query ?? prev.query,
-      mode: mode ?? prev.mode,
-      autoSubmit,
-      ...(query ? { activeAttachment: null } : {}),
-      // Ensure auto-submit always runs from a clean state
-      ...(autoSubmit ? { error: null, isLoading: false } : {}),
-      // Clear error when opening with a new query
-      ...(query && query !== prev.query ? { error: null } : {}),
-    }))
-  }, [])
+    const open = useCallback((query?: string, mode?: AIMode, autoSubmit = false) => {
+      setState((prev) => ({
+        ...prev,
+        isOpen: true,
+        query: query ?? prev.query,
+        mode: mode ?? prev.mode,
+        autoSubmit,
+        // Ensure auto-submit always runs from a clean state
+        ...(autoSubmit ? { error: null, isLoading: false } : {}),
+        // Clear error when opening with a new query
+        ...(query && query !== prev.query ? { error: null } : {}),
+      }))
+    }, [])
 
-  const openExplainPage = useCallback(
+    const openExplainPage = useCallback(
     ({
       courseId,
       courseName,
@@ -1379,33 +1547,77 @@ export function AIPanelProvider({
       courseName?: string
       pageUrl: string
       title: string
-    }) => {
+      }) => {
       if (streamCleanupRef.current) {
         streamCleanupRef.current()
         streamCleanupRef.current = null
       }
 
-      setState((prev) => ({
-        ...prev,
-        isOpen: true,
-        // Explain should always start a fresh chat
-        messages: [],
-        mode: 'ask-ai',
-        query: `Explain the attached page "${title}". Summarize it and list key takeaways.`,
-        autoSubmit: true,
-        error: null,
-        isLoading: false,
-        activeAttachment: {
-          kind: 'page',
-          courseId,
-          courseName,
-          title,
-          pageUrl,
-        },
-      }))
-    },
-    [],
-  )
+        setState((prev) => ({
+          ...prev,
+          isOpen: true,
+          // Explain should always start a fresh chat
+          messages: [],
+          mode: 'ask-ai',
+          query: `Explain the attached page "${title}". Summarize it and list key takeaways.`,
+          autoSubmit: true,
+          error: null,
+          isLoading: false,
+          attachments: [
+            {
+              id: `page:${String(courseId)}:${String(pageUrl)}`,
+              slot: 'manual',
+              kind: 'page',
+              courseId,
+              courseName,
+              title,
+              pageUrl,
+            },
+          ],
+          followContextOffer: false,
+        }))
+      },
+      [],
+    )
+
+  const setContextOffer = useCallback((offer: AIAttachment | null) => {
+    setState((prev) => {
+      const current = prev.contextOffer
+      if (!offer && !current) return prev
+      if (
+        offer &&
+        current &&
+        offer.id === current.id &&
+        offer.kind === current.kind &&
+        offer.title === current.title &&
+        offer.courseId === current.courseId &&
+        offer.courseName === current.courseName &&
+        offer.contentText === current.contentText
+      ) {
+        return prev
+      }
+      return { ...prev, contextOffer: offer }
+    })
+  }, [])
+
+    const startFollowContextOffer = useCallback(() => {
+      setState((prev) => ({ ...prev, followContextOffer: true }))
+    }, [])
+
+    const cancelFollowContextOffer = useCallback(() => {
+      setState((prev) => ({ ...prev, followContextOffer: false }))
+    }, [])
+
+  const removeAttachment = useCallback((attachmentId: string) => {
+    setState((prev) => ({
+      ...prev,
+      attachments: prev.attachments.filter((a) => a.id !== attachmentId),
+    }))
+  }, [])
+
+  const clearAttachments = useCallback(() => {
+    setState((prev) => ({ ...prev, attachments: [] }))
+  }, [])
 
   const close = useCallback(() => {
     setState((prev) => ({ ...prev, isOpen: false }))
@@ -1427,37 +1639,39 @@ export function AIPanelProvider({
     setState((prev) => ({ ...prev, position }))
   }, [])
 
-  const clear = useCallback(() => {
+    const clear = useCallback(() => {
     if (streamCleanupRef.current) {
       streamCleanupRef.current()
       streamCleanupRef.current = null
     }
-    setState((prev) => ({
-      ...prev,
-      query: '',
-      error: null,
-      isLoading: false,
-      autoSubmit: false,
-      activeAttachment: null,
-      messages: [],
-    }))
-  }, [])
+      setState((prev) => ({
+        ...prev,
+        query: '',
+        error: null,
+        isLoading: false,
+        autoSubmit: false,
+        attachments: [],
+        followContextOffer: false,
+        messages: [],
+      }))
+    }, [])
 
-  const clearHistory = useCallback(() => {
+    const clearHistory = useCallback(() => {
     if (streamCleanupRef.current) {
       streamCleanupRef.current()
       streamCleanupRef.current = null
     }
-    setState((prev) => ({
-      ...prev,
-      messages: [],
-      query: '',
-      error: null,
-      isLoading: false,
-      autoSubmit: false,
-      activeAttachment: null,
-    }))
-  }, [])
+      setState((prev) => ({
+        ...prev,
+        messages: [],
+        query: '',
+        error: null,
+        isLoading: false,
+        autoSubmit: false,
+        attachments: [],
+        followContextOffer: false,
+      }))
+    }, [])
 
   // NOTE: legacy submit() implementation removed.
   // `runSubmit()` is the single source of truth for sending messages.
@@ -1486,6 +1700,11 @@ export function AIPanelProvider({
     () => ({
       open,
       openExplainPage,
+      setContextOffer,
+      startFollowContextOffer,
+      cancelFollowContextOffer,
+      removeAttachment,
+      clearAttachments,
       close,
       toggle,
       setMode,
@@ -1499,6 +1718,11 @@ export function AIPanelProvider({
     [
       open,
       openExplainPage,
+      setContextOffer,
+      startFollowContextOffer,
+      cancelFollowContextOffer,
+      removeAttachment,
+      clearAttachments,
       close,
       toggle,
       setMode,

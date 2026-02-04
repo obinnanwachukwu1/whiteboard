@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { getJson, setJson } from '../utils/secureStorage'
 
 /**
  * Dashboard settings hook for managing user preferences.
@@ -46,10 +47,8 @@ const DEFAULT_SETTINGS: DashboardSettings = {
  */
 function loadSettings(): DashboardSettings {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (!stored) return DEFAULT_SETTINGS
-    
-    const parsed = JSON.parse(stored)
+    const parsed = getJson<any>(STORAGE_KEY, null)
+    if (!parsed || typeof parsed !== 'object') return DEFAULT_SETTINGS
     
     // Validate and merge with defaults
     return {
@@ -80,7 +79,7 @@ function loadSettings(): DashboardSettings {
  */
 function saveSettings(settings: DashboardSettings): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+    setJson(STORAGE_KEY, settings)
   } catch {
     // Ignore storage errors
   }

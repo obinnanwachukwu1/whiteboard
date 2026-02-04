@@ -260,8 +260,41 @@ if (process.isMainFrame) {
     }) => ipcRenderer.invoke('app:pickFiles', opts),
     downloadFile: (fileId: string | number, suggestedName?: string) =>
       ipcRenderer.invoke('app:downloadFile', fileId, suggestedName),
+    clearTempCache: () => ipcRenderer.invoke('app:clearTempCache'),
     writeClipboard: (text: string) => ipcRenderer.invoke('app:writeClipboard', text),
     copyText: (text: string) => ipcRenderer.invoke('app:copyText', text),
+  })
+
+  // Secure storage helpers (sync, backed by OS keychain via main process)
+  contextBridge.exposeInMainWorld('secureStorage', {
+    isAvailable: () => {
+      try {
+        return Boolean(ipcRenderer.sendSync('secureStorage:isAvailable'))
+      } catch {
+        return false
+      }
+    },
+    isEncryptionAvailable: () => {
+      try {
+        return Boolean(ipcRenderer.sendSync('secureStorage:isAvailable'))
+      } catch {
+        return false
+      }
+    },
+    encrypt: (value: string) => {
+      try {
+        return ipcRenderer.sendSync('secureStorage:encrypt', String(value)) ?? null
+      } catch {
+        return null
+      }
+    },
+    decrypt: (payload: string) => {
+      try {
+        return ipcRenderer.sendSync('secureStorage:decrypt', String(payload)) ?? null
+      } catch {
+        return null
+      }
+    },
   })
 
   // (PDF/PPTX viewers run in iframes; no viewer bridge exposed.)

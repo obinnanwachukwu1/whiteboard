@@ -2,6 +2,7 @@ import React from 'react'
 import { useQueryClient, useQueries } from '@tanstack/react-query'
 import { useActivityAnnouncements } from './useCanvasQueries'
 import { useCourseImages } from './useCourseImages'
+import { useAppFlags } from '../context/AppContext'
 import { calculateCourseGrades, toAssignmentInputsFromRest } from '../utils/gradeCalc'
 import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
 import { extractCourseIdFromUrl } from '../utils/urlHelpers'
@@ -44,6 +45,7 @@ type UseDashboardDataProps = {
 }
 
 export function useDashboardData({ courses, sidebar, due, loading }: UseDashboardDataProps) {
+  const { privateModeEnabled } = useAppFlags()
   const queryClient = useQueryClient()
   const { courseImageUrl, persistImages } = useCourseImages()
   const lastFeedbackRef = React.useRef<FeedbackItem[]>([])
@@ -144,6 +146,7 @@ export function useDashboardData({ courses, sidebar, due, loading }: UseDashboar
 
   // 4. Prefetch Images (Low priority)
   React.useEffect(() => {
+    if (privateModeEnabled) return
     const allIds = new Set<string | number>()
     orderedVisibleCourses.forEach((c) => allIds.add(c.id))
     due?.forEach((d) => { if (d?.course_id != null) allIds.add(d.course_id) })
@@ -186,7 +189,7 @@ export function useDashboardData({ courses, sidebar, due, loading }: UseDashboar
         })
       })
     })
-  }, [orderedVisibleCourses, due, annsQ.data, queryClient, persistImages])
+  }, [orderedVisibleCourses, due, annsQ.data, queryClient, persistImages, privateModeEnabled])
 
   // 5. Derived Stats
   const avgGrade = React.useMemo(() => {

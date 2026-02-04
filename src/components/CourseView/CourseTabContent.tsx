@@ -10,6 +10,8 @@ import { CourseDiscussions } from '../CourseDiscussions'
 import { CoursePeople } from '../CoursePeople'
 import { HtmlContent } from '../HtmlContent'
 import { Skeleton, SkeletonText } from '../Skeleton'
+import { useOptionalAIPanelActions } from '../../context/AIPanelContext'
+import { stripHtmlToText } from '../../utils/stripHtmlToText'
 
 type Detail = {
   contentType: 'page' | 'assignment' | 'file' | 'announcement' | 'discussion'
@@ -42,6 +44,32 @@ export const CourseTabContent: React.FC<Props> = ({
   onOpenDetail,
   onNavigate,
 }) => {
+  const aiPanel = useOptionalAIPanelActions()
+  const syllabusHtml = hasSyllabus ? String(infoQ.data?.syllabus_body || '') : ''
+
+  React.useEffect(() => {
+    if (!aiPanel) return
+
+    if (activeTab !== 'syllabus' || !hasSyllabus || !syllabusHtml.trim()) {
+      aiPanel.setContextOffer(null)
+      return
+    }
+
+    aiPanel.setContextOffer({
+      id: `syllabus:${String(courseId)}`,
+      slot: 'view',
+      kind: 'syllabus',
+      courseId,
+      courseName,
+      title: 'Syllabus',
+      contentText: stripHtmlToText(syllabusHtml).slice(0, 4000),
+    })
+
+    return () => {
+      aiPanel.setContextOffer(null)
+    }
+  }, [aiPanel, activeTab, courseId, courseName, hasSyllabus, syllabusHtml])
+
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {activeTab === 'home' && (

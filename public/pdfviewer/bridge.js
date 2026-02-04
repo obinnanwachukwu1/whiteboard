@@ -10,12 +10,72 @@
 (function() {
   'use strict';
   
-  // Get references to pdf.js globals
-  const pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
-  const pdfjsViewer = window.pdfjsViewer || window['pdfjs-dist/web/pdf_viewer'];
-  
-  // Configure pdf.js worker
-  pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.js';
+  // Get references to pdf.js globals (lazy-loaded below if needed)
+  let pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+  let pdfjsViewer = window.pdfjsViewer || window['pdfjs-dist/web/pdf_viewer'];
+  const params = new URLSearchParams(window.location.search || '');
+  const parentOriginParam = params.get('parentOrigin') || '';
+
+  const allowedParentOrigins = new Set();
+  if (parentOriginParam) {
+    allowedParentOrigins.add(parentOriginParam);
+  }
+  try {
+    if (window.location.ancestorOrigins && window.location.ancestorOrigins.length) {
+      for (const origin of window.location.ancestorOrigins) {
+        if (origin) allowedParentOrigins.add(origin);
+      }
+    }
+  } catch {}
+  try {
+    if (document.referrer) {
+      const refOrigin = new URL(document.referrer).origin;
+      if (refOrigin) allowedParentOrigins.add(refOrigin);
+    }
+  } catch {}
+
+  function isParentOriginAllowed(origin) {
+    if (!origin) return false;
+    if (allowedParentOrigins.has(origin)) return true;
+    // Treat file:// and opaque null origins as equivalent when explicitly allowed.
+    if (origin === 'null' && allowedParentOrigins.has('file://')) return true;
+    if (origin === 'file://' && allowedParentOrigins.has('null')) return true;
+    return false;
+  }
+
+  const parentOriginForPostMessage = (() => {
+    try {
+      if (window.location.ancestorOrigins && window.location.ancestorOrigins.length > 0) {
+        return window.location.ancestorOrigins[0];
+      }
+    } catch {}
+    if (parentOriginParam) return parentOriginParam;
+    try {
+      if (document.referrer) {
+        return new URL(document.referrer).origin;
+      }
+    } catch {}
+    return '*';
+  })();
+
+  async function ensurePdfJsLoaded() {
+    if (!pdfjsLib) {
+      try {
+        window.pdfjsLib = await import('./pdf.mjs');
+      } catch (e) {
+        console.error('[PDFBridge] Failed to import pdf.mjs:', e);
+      }
+      pdfjsLib = window.pdfjsLib;
+    }
+    if (!pdfjsViewer) {
+      try {
+        window.pdfjsViewer = await import('./pdf_viewer.mjs');
+      } catch (e) {
+        console.error('[PDFBridge] Failed to import pdf_viewer.mjs:', e);
+      }
+      pdfjsViewer = window.pdfjsViewer;
+    }
+  }
   
   // Viewer state
   let pdfViewer = null;
@@ -323,7 +383,8 @@
       // Fallback for iframe + postMessage (and dev without preload)
       try {
         if (window.parent && window.parent !== window) {
-          window.parent.postMessage({ type, ...payload }, '*');
+          const targetOrigin = parentOriginForPostMessage || '*';
+          window.parent.postMessage({ type, ...payload }, targetOrigin);
           return;
         }
       } catch {}
@@ -359,7 +420,8 @@
   /**
    * Initialize the PDF viewer
    */
-  function initViewer() {
+  async function initViewer() {
+    await ensurePdfJsLoaded();
     if (!pdfjsLib || !pdfjsViewer) {
       const message = 'PDF.js viewer assets failed to load';
       showError(message);
@@ -368,6 +430,8 @@
     }
 
     try {
+      // Configure pdf.js worker
+      pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.mjs';
       // Create EventBus - the central event system for pdf.js
       eventBus = new pdfjsViewer.EventBus();
     
@@ -988,6 +1052,8 @@
   
   // Also listen for postMessage (fallback/dev mode)
   window.addEventListener('message', function(event) {
+    if (event.source !== window.parent) return;
+    if (allowedParentOrigins.size > 0 && !isParentOriginAllowed(event.origin)) return;
     if (event.data && event.data.type) {
       handleCommand(event.data);
     }

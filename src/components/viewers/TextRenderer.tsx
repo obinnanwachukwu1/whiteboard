@@ -19,6 +19,11 @@ const TextRenderer: React.FC<Props> = ({ url, ext, className = '', isFullscreen,
     let cancelled = false
     ;(async () => {
       try {
+        // Only fetch local/opaque URLs. Canvas content should be accessed via canvas-file://.
+        const parsed = new URL(url)
+        if (!['canvas-file:', 'blob:', 'data:'].includes(parsed.protocol)) {
+          throw new Error('Blocked non-local URL')
+        }
         const resp = await fetch(url)
         if (!resp.ok) throw new Error('Failed')
         const text = await resp.text()

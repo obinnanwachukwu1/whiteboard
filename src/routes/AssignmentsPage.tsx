@@ -1,4 +1,5 @@
 import React from 'react'
+import { getJson, setJson } from '../utils/secureStorage'
 import { useAppActions, useAppData } from '../context/AppContext'
 import { useDueAssignments } from '../hooks/useCanvasQueries'
 import {
@@ -160,9 +161,7 @@ export default function AssignmentsPage() {
 
   const [kanban, setKanban] = React.useState<Record<string, KanbanStatus>>(() => {
     try {
-      const raw = localStorage.getItem(LS_KANBAN)
-      if (!raw) return {}
-      const obj = JSON.parse(raw)
+      const obj = getJson<any>(LS_KANBAN, null)
       return typeof obj === 'object' && obj ? obj : {}
     } catch {
       return {}
@@ -170,7 +169,7 @@ export default function AssignmentsPage() {
   })
   React.useEffect(() => {
     try {
-      localStorage.setItem(LS_KANBAN, JSON.stringify(kanban))
+      setJson(LS_KANBAN, kanban)
     } catch {}
   }, [kanban])
   const setStatus = (id: string, status: KanbanStatus) =>

@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react'
 import { courseHueFor } from '../utils/colorHelpers'
 import { isImagePreloaded, markImagePreloaded, preloadImage } from '../utils/imagePreload'
+import { tryParseUrl } from '../utils/urlPolicy'
 
 type Props = {
   courseId: string | number
@@ -12,7 +13,16 @@ type Props = {
 }
 
 export const CourseAvatar: React.FC<Props> = ({ courseId, courseName, src, className = '', style, size }) => {
-  const [loaded, setLoaded] = useState(() => (src ? isImagePreloaded(src) : false))
+  const effectiveSrc = React.useMemo(() => {
+    if (!src) return undefined
+    const parsed = tryParseUrl(src)
+    if (!parsed) return undefined
+    if (['http:', 'https:', 'data:', 'blob:', 'canvas-file:'].includes(parsed.protocol)) {
+      return src
+    }
+    return undefined
+  }, [src])
+  const [loaded, setLoaded] = useState(() => (effectiveSrc ? isImagePreloaded(effectiveSrc) : false))
 
   // Deterministic color generation
   const hVal = courseHueFor(courseId, courseName || String(courseId))
@@ -21,35 +31,35 @@ export const CourseAvatar: React.FC<Props> = ({ courseId, courseName, src, class
 
   // Best-effort sync check before paint (helps avoid first-frame fallback when cached)
   useLayoutEffect(() => {
-    if (!src) return
+    if (!effectiveSrc) return
 
-    if (isImagePreloaded(src)) {
+    if (isImagePreloaded(effectiveSrc)) {
       if (!loaded) setLoaded(true)
       return
     }
 
     const img = new Image()
-    img.src = src
+    img.src = effectiveSrc
     if (img.complete && img.naturalWidth > 0) {
-      markImagePreloaded(src)
+      markImagePreloaded(effectiveSrc)
       if (!loaded) setLoaded(true)
     }
-  }, [src, loaded])
+  }, [effectiveSrc, loaded])
 
   useEffect(() => {
-    if (!src) {
+    if (!effectiveSrc) {
       setLoaded(false)
       return
     }
 
-    if (isImagePreloaded(src)) {
+    if (isImagePreloaded(effectiveSrc)) {
       setLoaded(true)
       return
     }
 
     let cancelled = false
     setLoaded(false)
-    preloadImage(src)
+    preloadImage(effectiveSrc)
       .then(() => {
         if (!cancelled) setLoaded(true)
       })
@@ -59,7 +69,7 @@ export const CourseAvatar: React.FC<Props> = ({ courseId, courseName, src, class
     return () => {
       cancelled = true
     }
-  }, [src])
+  }, [effectiveSrc])
 
   const finalStyle = {
     ...style,
@@ -73,13 +83,14 @@ export const CourseAvatar: React.FC<Props> = ({ courseId, courseName, src, class
       className={`relative overflow-hidden shrink-0 aspect-square rounded-full flex items-center justify-center ${className}`}
       style={finalStyle}
     >
-      {src && (
+      {effectiveSrc && (
         <img
-          src={src}
+          src={effectiveSrc}
           alt=""
           className={`absolute inset-0 w-full h-full object-cover ${
             loaded ? 'opacity-100' : 'opacity-0'
           }`}
+          referrerPolicy="no-referrer"
         />
       )}
     </div>

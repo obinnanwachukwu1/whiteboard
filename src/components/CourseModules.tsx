@@ -40,6 +40,7 @@ type Props = {
 }
 
 function useModuleItemPrefetch(courseId: string | number, it: CanvasModuleItem) {
+  const flags = useAppFlags()
   const enabled = !!(
     (it.__typename === 'PageModuleItem' && it.pageUrl) ||
     (it.__typename === 'AssignmentModuleItem' && it.contentId)
@@ -72,7 +73,7 @@ function useModuleItemPrefetch(courseId: string | number, it: CanvasModuleItem) 
   return usePrefetchOnHover({
     queryKey,
     queryFn,
-    enabled,
+    enabled: enabled && flags.prefetchEnabled && !flags.privateModeEnabled,
     staleTime: 1000 * 60 * 5,
   })
 }
@@ -307,6 +308,7 @@ export const CourseModules: React.FC<Props> = ({
   // Lightweight proactive prefetch: grab meta + content for a few top items.
   // Keeps UX snappy (less "Loading…") while avoiding the old module-items fanout.
   React.useEffect(() => {
+    if (!flags.prefetchEnabled || flags.privateModeEnabled) return
     if (!modules || !Array.isArray(modules) || modules.length === 0) return
     const key = `${courseId}`
     if (autoPrefetchedRef.current === key) return
@@ -351,7 +353,7 @@ export const CourseModules: React.FC<Props> = ({
         if (count >= 3) break
       }
     })
-  }, [modules, courseId, queryClient])
+  }, [modules, courseId, queryClient, flags.prefetchEnabled, flags.privateModeEnabled])
 
   async function openItem(it: CanvasModuleItem, title: string) {
     const openExternal = async (url: string) => {

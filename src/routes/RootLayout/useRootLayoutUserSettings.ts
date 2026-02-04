@@ -5,14 +5,24 @@ type Params = {
   userKey: string | null
   setSidebarCfg: (next: SidebarConfig) => void
   setPrefetchEnabledState: (next: boolean) => void
+  setReduceEffectsEnabledState: (next: boolean) => void
+  setExternalEmbedsEnabledState: (next: boolean) => void
+  setExternalMediaEnabledState: (next: boolean) => void
   setPdfGestureZoomEnabledState: (next: boolean) => void
+  setPrivateModeEnabledState: (next: boolean) => void
+  setPrivateModeAcknowledgedState: (next: boolean) => void
 }
 
 export function useRootLayoutUserSettings({
   userKey,
   setSidebarCfg,
   setPrefetchEnabledState,
+  setReduceEffectsEnabledState,
+  setExternalEmbedsEnabledState,
+  setExternalMediaEnabledState,
   setPdfGestureZoomEnabledState,
+  setPrivateModeEnabledState,
+  setPrivateModeAcknowledgedState,
 }: Params) {
   useEffect(() => {
     ;(async () => {
@@ -33,17 +43,53 @@ export function useRootLayoutUserSettings({
         if (perSettings) {
           if (typeof perSettings.prefetchEnabled === 'boolean')
             setPrefetchEnabledState(!!perSettings.prefetchEnabled)
+          if (typeof perSettings.reduceEffectsEnabled === 'boolean')
+            setReduceEffectsEnabledState(!!perSettings.reduceEffectsEnabled)
+          if (typeof perSettings.externalEmbedsEnabled === 'boolean')
+            setExternalEmbedsEnabledState(!!perSettings.externalEmbedsEnabled)
+          if (typeof perSettings.externalMediaEnabled === 'boolean')
+            setExternalMediaEnabledState(!!perSettings.externalMediaEnabled)
           if (typeof perSettings.pdfGestureZoomEnabled === 'boolean')
             setPdfGestureZoomEnabledState(!!perSettings.pdfGestureZoomEnabled)
+          if (typeof perSettings.privateModeEnabled === 'boolean')
+            setPrivateModeEnabledState(!!perSettings.privateModeEnabled)
+          if (typeof perSettings.privateModeAcknowledged === 'boolean')
+            setPrivateModeAcknowledgedState(!!perSettings.privateModeAcknowledged)
         } else {
           const next: any = {}
           if (typeof data?.prefetchEnabled === 'boolean') {
             next.prefetchEnabled = !!data.prefetchEnabled
             setPrefetchEnabledState(!!data.prefetchEnabled)
           }
+          if (typeof data?.reduceEffectsEnabled === 'boolean') {
+            next.reduceEffectsEnabled = !!data.reduceEffectsEnabled
+            setReduceEffectsEnabledState(!!data.reduceEffectsEnabled)
+          }
+          if (typeof data?.externalEmbedsEnabled === 'boolean') {
+            next.externalEmbedsEnabled = !!data.externalEmbedsEnabled
+            setExternalEmbedsEnabledState(!!data.externalEmbedsEnabled)
+          } else {
+            next.externalEmbedsEnabled = false
+            setExternalEmbedsEnabledState(false)
+          }
+          if (typeof data?.externalMediaEnabled === 'boolean') {
+            next.externalMediaEnabled = !!data.externalMediaEnabled
+            setExternalMediaEnabledState(!!data.externalMediaEnabled)
+          } else {
+            next.externalMediaEnabled = false
+            setExternalMediaEnabledState(false)
+          }
           if (typeof data?.pdfGestureZoomEnabled === 'boolean') {
             next.pdfGestureZoomEnabled = !!data.pdfGestureZoomEnabled
             setPdfGestureZoomEnabledState(!!data.pdfGestureZoomEnabled)
+          }
+          if (typeof data?.privateModeEnabled === 'boolean') {
+            next.privateModeEnabled = !!data.privateModeEnabled
+            setPrivateModeEnabledState(!!data.privateModeEnabled)
+          }
+          if (typeof data?.privateModeAcknowledged === 'boolean') {
+            next.privateModeAcknowledged = !!data.privateModeAcknowledged
+            setPrivateModeAcknowledgedState(!!data.privateModeAcknowledged)
           }
           if (data?.pdfZoom && typeof data.pdfZoom === 'object') next.pdfZoom = data.pdfZoom
           if (Object.keys(next).length) {

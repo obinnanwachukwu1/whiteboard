@@ -14,6 +14,7 @@ import { CourseDetailView } from './CourseDetailView'
 import { CourseTabContent } from './CourseTabContent'
 import { useCourseTabsState } from './useCourseTabsState'
 import { useCourseLinkNavigator } from './useCourseLinkNavigator'
+import { useAppFlags } from '../../context/AppContext'
 
 type Detail = {
   contentType: 'page' | 'assignment' | 'file' | 'announcement' | 'discussion'
@@ -48,6 +49,7 @@ export const CourseView: React.FC<Props> = ({
   onNavigateCourse,
 }) => {
   const queryClient = useQueryClient()
+  const { prefetchEnabled, privateModeEnabled } = useAppFlags()
   const [currentFolderId, setCurrentFolderId] = React.useState<string | null>(null)
 
   const infoQ = useCourseInfo(courseId)
@@ -94,7 +96,10 @@ export const CourseView: React.FC<Props> = ({
           onClearDetail()
           onChangeTab(t)
         }}
-        onHover={(t) => prefetchCourseTab(queryClient, courseId, t)}
+        onHover={(t) => {
+          if (!prefetchEnabled || privateModeEnabled) return
+          prefetchCourseTab(queryClient, courseId, t)
+        }}
         skeletonLeft={skeletonLeft}
       />
 

@@ -1,12 +1,14 @@
 /**
  * Priority score calculation for ranking assignments.
  * 
- * Formula: priority = (effectiveWeight × urgencyMultiplier) + statusWeight
+ * Formula: priority = dueSoonBoost + (effectiveWeight × urgencyMultiplier) + statusWeight
  * 
  * Where:
  * - effectiveWeight = assignment's % of final grade (0-100)
  * - urgencyMultiplier = 3 (≤24h), 2 (≤48h), 1.5 (≤72h), 1 (>72h)
  * - statusWeight = 0 if submitted, 100 if not submitted
+ * - dueSoonBoost = 0 normally; large boost when due within 24h (or past due) so
+ *   near-term deadlines outrank far-future high-stakes work.
  */
 
 export type PriorityAssignment = {
@@ -88,13 +90,23 @@ export function calculatePriorityScore(assignment: PriorityAssignment): RankedAs
   const weight = assignment.effectiveWeight ?? 0
   
   // Status weight: 100 if not submitted, 0 if submitted
-  // This ensures unsubmitted assignments always rank higher
+  // This strongly biases the list toward unsubmitted assignments
   const statusWeight = assignment.isSubmitted ? 0 : 100
+
+  // Any unsubmitted item due within 24 hours (or past due) should be the top priority,
+  // regardless of grade weight.
+  // Max of the non-boosted score is ~500 (100 * 4 + 100), so 1000 is a safe separator.
+  const dueSoonBoost =
+    !assignment.isSubmitted && hours !== null && hours <= 24
+      ? hours < 0
+        ? 2000 // Past due outranks "due soon"
+        : 1000 // Due within 24h outranks later items
+      : 0
   
   // Final priority score
-  // The statusWeight ensures unsubmitted items always beat submitted ones
+  // The statusWeight biases unsubmitted items upward
   // The weight * urgency gives ranking among unsubmitted items
-  const priorityScore = (weight * urgency) + statusWeight
+  const priorityScore = dueSoonBoost + (weight * urgency) + statusWeight
   
   return {
     ...assignment,

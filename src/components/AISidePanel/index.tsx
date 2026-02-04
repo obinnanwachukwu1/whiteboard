@@ -7,6 +7,7 @@ import {
 import { useAppActions } from '../../context/AppContext'
 import { extractAnnouncementIdFromUrl, extractAssignmentIdFromUrl } from '../../utils/urlHelpers'
 import { AISidePanelHeader } from './AISidePanelHeader'
+import { AISidePanelContextBar } from './AISidePanelContextBar'
 import { AISidePanelInput } from './AISidePanelInput'
 import { AISidePanelMessages } from './AISidePanelMessages'
 
@@ -37,7 +38,7 @@ export const AISidePanel: React.FC<Props> = ({ className = '' }) => {
     } else if (rendered) {
       // Start close animation
       setIsClosing(true)
-      const t = setTimeout(() => {
+      const t = window.setTimeout(() => {
         setRendered(false)
         setIsClosing(false)
       }, ANIMATION_DURATION)
@@ -132,6 +133,18 @@ export const AISidePanel: React.FC<Props> = ({ className = '' }) => {
 
   if (!rendered) return null
 
+  const pinnedView = panelState.attachments.find((a) => a.slot === 'view') || null
+  const offer = panelState.contextOffer
+  const offerIsPinnedView = !!(pinnedView && offer && pinnedView.id === offer.id)
+  const offerDisabled = !offer || offerIsPinnedView
+  const offerLabel = offerIsPinnedView ? 'Content Attached' : 'Attach content'
+  const draft = panelState.followContextOffer && offer ? offer : null
+  const handleOfferClick = () => {
+    if (offerDisabled) return
+    if (panelState.followContextOffer) return
+    panelActions.startFollowContextOffer()
+  }
+
   return (
     // Outer wrapper: animates width, clips content, vertical padding for spacing
     <div
@@ -166,6 +179,15 @@ export const AISidePanel: React.FC<Props> = ({ className = '' }) => {
           scrollToBottomNonce={scrollNonce}
           onExamplePromptClick={handleExamplePromptClick}
           onResultClick={handleResultClick}
+        />
+
+        <AISidePanelContextBar
+          offerLabel={offerLabel}
+          offerDisabled={offerDisabled}
+          draftTitle={draft?.title}
+          draftSubtitle={draft?.courseName}
+          onOfferClick={handleOfferClick}
+          onCancelDraft={panelActions.cancelFollowContextOffer}
         />
 
         <AISidePanelInput

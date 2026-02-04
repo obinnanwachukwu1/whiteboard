@@ -54,6 +54,7 @@ export function AuthLoadingScreen() {
       {themeSettings && <BackgroundLayer settings={themeSettings} />}
       {/* Glass layer - picks up accent color if theme is loaded */}
       <div
+        data-glass-layer
         className="absolute inset-0 z-[5] pointer-events-none"
         style={{ backgroundColor: 'var(--app-accent-bg, transparent)' }}
         aria-hidden="true"

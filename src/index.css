@@ -879,3 +879,78 @@ html {
   background: linear-gradient(90deg, #262626 0%, #3f3f46 50%, #262626 100%);
   background-size: 200% 100%;
 }
+
+/* ============ Reduce Effects Mode ============ */
+/* Toggle via: document.documentElement.dataset.reduceEffects = '1' */
+
+:root[data-reduce-effects='1'] {
+  /* Make “glass”/accent surfaces opaque to reduce GPU blending work. */
+  --glass-bg: rgb(255 255 255);
+  --glass-hover: rgb(248 250 252);
+  --glass-active: rgb(241 245 249);
+  --glass-border: rgb(226 232 240);
+
+  --app-accent-bg: rgb(255 255 255);
+  --app-accent-hover: rgb(241 245 249);
+  --app-accent-bg-dark: rgb(18 18 18);
+}
+
+:root.dark[data-reduce-effects='1'] {
+  --glass-bg: rgb(18 18 18);
+  --glass-hover: rgb(23 23 23);
+  --glass-active: rgb(38 38 38);
+  --glass-border: rgb(64 64 64);
+
+  --app-accent-bg: rgb(18 18 18);
+  --app-accent-hover: rgb(38 38 38);
+}
+
+/* Make transitions instant + disable blur filters. */
+:root[data-reduce-effects='1'] * {
+  transition-duration: 0ms !important;
+  transition-delay: 0ms !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Remove expensive shadows. */
+:root[data-reduce-effects='1'] .shadow-card {
+  box-shadow: none;
+}
+:root[data-reduce-effects='1'] [class*='shadow-'] {
+  box-shadow: none !important;
+}
+
+/* Disable decorative/expensive animations (keep functional ones like spinners). */
+:root[data-reduce-effects='1'] .animate-gradient,
+:root[data-reduce-effects='1'] .animate-float,
+:root[data-reduce-effects='1'] .animate-float-slow,
+:root[data-reduce-effects='1'] .animate-float-delayed,
+:root[data-reduce-effects='1'] .skeleton-shimmer {
+  animation: none !important;
+}
+
+/* Prevent dark-mode inputs with both bg-white/* and dark:bg-* classes from being forced white. */
+:root[data-reduce-effects='1'] [class*='bg-white/'] {
+  background-color: var(--glass-bg) !important;
+}
+
+:root.dark[data-reduce-effects='1'] [class*='dark:bg-neutral-900'] {
+  background-color: rgb(18 18 18) !important;
+}
+:root.dark[data-reduce-effects='1'] [class*='dark:bg-neutral-800'] {
+  background-color: rgb(38 38 38) !important;
+}
+
+/* Reduce background image effects and extra overlays/layers. */
+:root[data-reduce-effects='1'] [data-bg-layer='base'] {
+  filter: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+}
+:root[data-reduce-effects='1'] [data-bg-layer='overlay'] {
+  display: none !important;
+}
+:root[data-reduce-effects='1'] [data-glass-layer] {
+  display: none !important;
+}

@@ -82,6 +82,7 @@ export function BackgroundLayer({ settings }: BackgroundLayerProps) {
     <>
       {/* Base background layer - z-0, content will be above at z-10 */}
       <div
+        data-bg-layer="base"
         className="fixed inset-0 z-0 pointer-events-none"
         style={{
           ...backgroundStyle,
@@ -96,6 +97,7 @@ export function BackgroundLayer({ settings }: BackgroundLayerProps) {
       {/* Overlay tint layer (for images) */}
       {showImageEffects && overlayOpacity > 0 && (
         <div
+          data-bg-layer="overlay"
           className="fixed inset-0 z-[1] pointer-events-none"
           style={{
             backgroundColor: dark

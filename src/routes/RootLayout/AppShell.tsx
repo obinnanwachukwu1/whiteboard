@@ -153,6 +153,7 @@ function AppShellInner(props: Props) {
           <BackgroundLayer settings={props.themeSettings} />
           {/* Global glass layer - provides consistent blur/tint across entire app */}
           <div
+            data-glass-layer
             className="fixed inset-0 z-[5] pointer-events-none"
             style={{ backgroundColor: 'var(--app-accent-bg)' }}
             aria-hidden="true"

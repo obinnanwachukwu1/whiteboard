@@ -10,6 +10,7 @@ import { MetadataBadge } from './ui/MetadataBadge'
 import { useQueryClient } from '@tanstack/react-query'
 import { enqueuePrefetch } from '../utils/prefetchQueue'
 import { usePrefetchOnHover } from '../hooks/usePrefetchOnHover'
+import { useAppFlags } from '../context/AppContext'
 
 type Props = {
   courseId: string | number
@@ -24,6 +25,7 @@ const AnnouncementItem: React.FC<{
   setMenuOpenId: (id: string | null) => void
   anchorEls: React.MutableRefObject<Map<string, HTMLElement | null>>
 }> = ({ a, onOpen, courseId, menuOpenId, setMenuOpenId, anchorEls }) => {
+  const { prefetchEnabled, privateModeEnabled } = useAppFlags()
   const posted = a?.posted_at ? new Date(a.posted_at).toLocaleString() : ''
   const menuId = String(a.id)
   const isMenuOpen = menuOpenId === menuId
@@ -36,6 +38,7 @@ const AnnouncementItem: React.FC<{
       if (!res?.ok) throw new Error(res?.error || 'Failed')
       return res.data
     },
+    enabled: prefetchEnabled && !privateModeEnabled,
     staleTime: 1000 * 60 * 5,
   })
 
@@ -90,6 +93,7 @@ const AnnouncementItem: React.FC<{
 const MAX_RENDER = 200
 
 export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
+  const { prefetchEnabled, privateModeEnabled } = useAppFlags()
   const { data, isLoading, error, hasNextPage, isFetchingNextPage, fetchNextPage } =
     useCourseAnnouncementsInfinite(courseId, 10)
   const allItems = React.useMemo(() => (data?.pages || []).flat(), [data])
@@ -130,6 +134,7 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
 
   // Prefetch top 5 announcements automatically
   React.useEffect(() => {
+    if (!prefetchEnabled || privateModeEnabled) return
     if (!list || list.length === 0) return
     const top5 = list.slice(0, 5)
 
@@ -146,7 +151,7 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
         })
       })
     })
-  }, [list && list.length > 0]) // Only run when list loads
+  }, [list && list.length > 0, prefetchEnabled, privateModeEnabled]) // Only run when list loads
 
   return (
     <div className="flex flex-col h-full">

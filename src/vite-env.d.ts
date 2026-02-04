@@ -54,10 +54,12 @@ declare global {
           accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'
           themeConfig?: ThemeConfig
           prefetchEnabled?: boolean
+          reduceEffectsEnabled?: boolean
           cachedCourses?: any[]
           cachedDue?: any[]
           queryCache?: any
           courseImages?: Record<string, Record<string, string>>
+          courseImageAllowlist?: string[]
           sidebar?: {
             hiddenCourseIds?: Array<string | number>
             customNames?: Record<string, string>
@@ -70,6 +72,9 @@ declare global {
           lastUserId?: string
           embeddingsEnabled?: boolean
           aiEnabled?: boolean
+          privateModeEnabled?: boolean
+          privateModeAcknowledged?: boolean
+          encryptionEnabled?: boolean
         }
         error?: string
       }>
@@ -81,10 +86,12 @@ declare global {
           accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'
           themeConfig?: ThemeConfig
           prefetchEnabled?: boolean
+          reduceEffectsEnabled?: boolean
           cachedCourses?: any[]
           cachedDue?: any[]
           queryCache?: any
           courseImages?: Record<string, Record<string, string>>
+          courseImageAllowlist?: string[]
           sidebar?: {
             hiddenCourseIds?: Array<string | number>
             customNames?: Record<string, string>
@@ -97,6 +104,9 @@ declare global {
           lastUserId?: string
           embeddingsEnabled?: boolean
           aiEnabled?: boolean
+          privateModeEnabled?: boolean
+          privateModeAcknowledged?: boolean
+          encryptionEnabled?: boolean
         }>,
       ) => Promise<{ ok: boolean; data?: any; error?: string }>
     }
@@ -466,6 +476,13 @@ declare global {
         fileId: string | number,
         suggestedName?: string,
       ) => Promise<{ ok: boolean; data?: string; error?: string }>
+      clearTempCache: () => Promise<{ ok: boolean; data?: { removed: number }; error?: string }>
+    }
+    secureStorage: {
+      isAvailable: () => boolean
+      isEncryptionAvailable?: () => boolean
+      encrypt: (value: string) => string | null
+      decrypt: (payload: string) => string | null
     }
     electron: {
       onMainProcessMessage: (callback: (message: string) => void) => void

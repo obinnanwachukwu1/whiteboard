@@ -77,7 +77,15 @@ function useQueryPersistence(client: QueryClient) {
       if (params.searchTerm || params.filterBy || params.scope || params.orderBy) return false
       return params.maxPages === 2 && keys.every((k) => k === 'maxPages')
     }
+    const isPrivateMode = () => {
+      try {
+        return localStorage.getItem('wb-private-mode') === '1'
+      } catch {
+        return false
+      }
+    }
     const flush = () => {
+      if (isPrivateMode()) return
       try {
         const snap = dehydrate(client, {
           shouldDehydrateQuery: (q) => {
@@ -93,7 +101,10 @@ function useQueryPersistence(client: QueryClient) {
           if (typeof ric === 'function') ric(cb)
           else setTimeout(cb, 500)
         }
-        schedule(() => { window.settings.set({ queryCache: snap as any }).catch(() => {}) })
+        schedule(() => {
+          if (isPrivateMode()) return
+          window.settings.set({ queryCache: snap as any }).catch(() => {})
+        })
       } catch {}
     }
     const onChange = () => {

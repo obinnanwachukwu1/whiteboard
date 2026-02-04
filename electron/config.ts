@@ -47,6 +47,8 @@ export type AppConfig = {
   queryCache?: any
   // Persisted course images by baseUrl → { courseId: imageUrl }
   courseImages?: Record<string, Record<string, string>>
+  // Optional allowlist of course image hostnames (suffix match)
+  courseImageAllowlist?: string[]
   sidebar?: {
     hiddenCourseIds?: Array<string | number>
     customNames?: Record<string, string>
@@ -58,6 +60,9 @@ export type AppConfig = {
   pdfZoom?: Record<string, number>
   lastUserId?: string
   aiEnabled?: boolean
+  privateModeEnabled?: boolean
+  privateModeAcknowledged?: boolean
+  encryptionEnabled?: boolean
 }
 
 export const DEFAULT_BACKGROUND_SETTINGS: BackgroundSettings = {
@@ -86,6 +91,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   cachedDue: [],
   queryCache: undefined,
   courseImages: {},
+  courseImageAllowlist: ['inscloudgate.net'],
   sidebar: {
     hiddenCourseIds: [],
     customNames: {},
@@ -95,6 +101,9 @@ export const DEFAULT_CONFIG: AppConfig = {
   userSidebars: {},
   pdfGestureZoomEnabled: true,
   pdfZoom: {},
+  privateModeEnabled: false,
+  privateModeAcknowledged: false,
+  encryptionEnabled: false,
 }
 
 const CONFIG_FILE = 'whiteboard.v2.enc'

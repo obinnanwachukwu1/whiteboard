@@ -17,6 +17,7 @@ import { useRootLayoutNavigation } from './useRootLayoutNavigation'
 import { useRootLayoutTheme } from './useRootLayoutTheme'
 import { useRootLayoutBootstrap } from './useRootLayoutBootstrap'
 import { useRootLayoutUserSettings } from './useRootLayoutUserSettings'
+import { setEncryptionEnabledFlag } from '../../utils/secureStorage'
 
 export function useRootLayoutState() {
   useWindowControlsOverlayInsets()
@@ -31,9 +32,15 @@ export function useRootLayoutState() {
   const [loading, setLoading] = useState(false)
   const [showToken, setShowToken] = useState(false)
   const [prefetchEnabled, setPrefetchEnabledState] = useState(true)
+  const [reduceEffectsEnabled, setReduceEffectsEnabledState] = useState(false)
+  const [externalEmbedsEnabled, setExternalEmbedsEnabledState] = useState(false)
+  const [externalMediaEnabled, setExternalMediaEnabledState] = useState(false)
   const [pdfGestureZoomEnabled, setPdfGestureZoomEnabledState] = useState(true)
   const [embeddingsEnabled, setEmbeddingsEnabledState] = useState(true)
   const [aiEnabled, setAiEnabledState] = useState(false)
+  const [privateModeEnabled, setPrivateModeEnabledState] = useState(false)
+  const [privateModeAcknowledged, setPrivateModeAcknowledgedState] = useState(false)
+  const [encryptionEnabled, setEncryptionEnabledState] = useState(false)
   const [verbose, setVerboseState] = useState(false)
   const [cachedCourses, setCachedCourses] = useState<any[] | null>(null)
   const [cachedDue, setCachedDue] = useState<any[] | null>(null)
@@ -59,20 +66,38 @@ export function useRootLayoutState() {
     return h.startsWith('#/content') && h.includes('embed=1')
   }, [])
 
-  const onOpenSearch = useCallback(() => setSearchOpen(true), [])
-  const onToggleSearch = useCallback(() => setSearchOpen((prev) => !prev), [])
+  const onOpenSearch = useCallback(() => {
+    if (privateModeEnabled) return
+    setSearchOpen(true)
+  }, [privateModeEnabled])
+  const onToggleSearch = useCallback(() => {
+    if (privateModeEnabled) return
+    setSearchOpen((prev) => !prev)
+  }, [privateModeEnabled])
 
   // Global Cmd+K / Ctrl+K keyboard shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        if (privateModeEnabled) return
         e.preventDefault()
         onToggleSearch()
       }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onToggleSearch])
+  }, [onToggleSearch, privateModeEnabled])
+
+  useEffect(() => {
+    if (privateModeEnabled && searchOpen) setSearchOpen(false)
+  }, [privateModeEnabled, searchOpen])
+
+  useEffect(() => {
+    try {
+      if (privateModeEnabled) localStorage.setItem('wb-private-mode', '1')
+      else localStorage.removeItem('wb-private-mode')
+    } catch {}
+  }, [privateModeEnabled])
 
   // Listen for native menu actions (Settings...)
   useEffect(() => {
@@ -112,9 +137,15 @@ export function useRootLayoutState() {
     setSidebarCfg,
     setCourseImagesState,
     setPrefetchEnabledState,
+    setReduceEffectsEnabledState,
+    setExternalEmbedsEnabledState,
+    setExternalMediaEnabledState,
     setPdfGestureZoomEnabledState,
     setEmbeddingsEnabledState,
     setAiEnabledState,
+    setPrivateModeEnabledState,
+    setPrivateModeAcknowledgedState,
+    setEncryptionEnabledState,
     setVerboseState,
     setCachedCourses,
     setCachedDue,
@@ -126,7 +157,12 @@ export function useRootLayoutState() {
     userKey,
     setSidebarCfg,
     setPrefetchEnabledState,
+    setReduceEffectsEnabledState,
+    setExternalEmbedsEnabledState,
+    setExternalMediaEnabledState,
     setPdfGestureZoomEnabledState,
+    setPrivateModeEnabledState,
+    setPrivateModeAcknowledgedState,
   })
 
   // Toast errors
@@ -157,18 +193,20 @@ export function useRootLayoutState() {
 
   // Local memory snapshots for initial paint + persistence
   useEffect(() => {
+    if (privateModeEnabled) return
     if (Array.isArray(coursesQ.data) && coursesQ.data.length) {
       setCachedCourses(coursesQ.data)
       window.settings.set({ cachedCourses: coursesQ.data }).catch(() => {})
     }
-  }, [coursesQ.data])
+  }, [coursesQ.data, privateModeEnabled])
 
   useEffect(() => {
+    if (privateModeEnabled) return
     if (Array.isArray(dueQ.data)) {
       setCachedDue(dueQ.data)
       window.settings.set({ cachedDue: dueQ.data }).catch(() => {})
     }
-  }, [dueQ.data])
+  }, [dueQ.data, privateModeEnabled])
 
   const saveUserSidebar = useCallback(
     async (next: SidebarConfig) => {
@@ -199,10 +237,93 @@ export function useRootLayoutState() {
     [userKey],
   )
 
+  const clearLocalCaches = useCallback(async () => {
+    try {
+      await window.embedding?.clear?.()
+    } catch {}
+
+    try {
+      await window.system?.clearTempCache?.()
+    } catch {}
+
+    try {
+      const keys: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i)
+        if (k) keys.push(k)
+      }
+      for (const k of keys) {
+        if (
+          k === 'kanbanStatusByAssignment' ||
+          k === 'whiteboard:read-announcements' ||
+          k === 'whiteboard:dashboard-settings' ||
+          k === 'whiteboard_tab_usage' ||
+          k === 'wb-theme-cache-v1' ||
+          k === 'app-theme' ||
+          k.startsWith('whiteboard-draft-')
+        ) {
+          localStorage.removeItem(k)
+        }
+      }
+    } catch {}
+
+    try {
+      await window.settings.set?.({
+        queryCache: undefined,
+        cachedCourses: undefined,
+        cachedDue: undefined,
+        courseImages: undefined,
+      })
+    } catch {}
+
+    try {
+      queryClient.clear()
+    } catch {}
+
+    setCachedCourses([])
+    setCachedDue([])
+    setCourseImagesState({})
+  }, [queryClient, setCachedCourses, setCachedDue, setCourseImagesState])
+
+  const clearedForPrivateModeRef = useRef(false)
+  useEffect(() => {
+    if (privateModeEnabled) {
+      if (clearedForPrivateModeRef.current) return
+      clearedForPrivateModeRef.current = true
+      void clearLocalCaches()
+      return
+    }
+    clearedForPrivateModeRef.current = false
+  }, [privateModeEnabled, clearLocalCaches])
+
   const setPrefetchEnabledPersisted = useCallback(
     async (v: boolean) => {
       setPrefetchEnabledState(v)
       await saveUserSettings({ prefetchEnabled: v })
+    },
+    [saveUserSettings],
+  )
+
+  const setReduceEffectsEnabledPersisted = useCallback(
+    async (v: boolean) => {
+      setReduceEffectsEnabledState(v)
+      await saveUserSettings({ reduceEffectsEnabled: v })
+    },
+    [saveUserSettings],
+  )
+
+  const setExternalEmbedsEnabledPersisted = useCallback(
+    async (v: boolean) => {
+      setExternalEmbedsEnabledState(v)
+      await saveUserSettings({ externalEmbedsEnabled: v })
+    },
+    [saveUserSettings],
+  )
+
+  const setExternalMediaEnabledPersisted = useCallback(
+    async (v: boolean) => {
+      setExternalMediaEnabledState(v)
+      await saveUserSettings({ externalMediaEnabled: v })
     },
     [saveUserSettings],
   )
@@ -260,11 +381,100 @@ export function useRootLayoutState() {
     [saveUserSettings],
   )
 
+  const setEncryptionEnabledPersisted = useCallback(
+    async (v: boolean) => {
+      setEncryptionEnabledState(v)
+      setEncryptionEnabledFlag(v)
+      try {
+        await window.settings.set?.({ encryptionEnabled: v })
+      } catch {}
+      await clearLocalCaches()
+    },
+    [clearLocalCaches],
+  )
+
+  const setPrivateModeEnabledPersisted = useCallback(
+    async (v: boolean) => {
+      setPrivateModeEnabledState(v)
+
+      if (v) {
+        await setEncryptionEnabledPersisted(true)
+        const restore = {
+          prefetchEnabled,
+          embeddingsEnabled,
+          aiEnabled,
+        }
+        setPrivateModeAcknowledgedState(true)
+        setPrefetchEnabledState(false)
+        setEmbeddingsEnabledState(false)
+        setAiEnabledState(false)
+        try {
+          await window.settings.set?.({
+            prefetchEnabled: false,
+            embeddingsEnabled: false,
+            aiEnabled: false,
+            privateModeEnabled: true,
+            privateModeAcknowledged: true,
+          })
+        } catch {}
+        await saveUserSettings({
+          privateModeRestore: restore,
+          prefetchEnabled: false,
+          embeddingsEnabled: false,
+          aiEnabled: false,
+          privateModeEnabled: true,
+          privateModeAcknowledged: true,
+        })
+        return
+      }
+
+      let restore: { prefetchEnabled?: boolean; embeddingsEnabled?: boolean; aiEnabled?: boolean } | null =
+        null
+      try {
+        const cfg = await window.settings.get?.()
+        const data = (cfg?.ok ? (cfg.data as any) : {}) as any
+        const per = userKey ? data?.userSettings?.[userKey] : null
+        restore = (per?.privateModeRestore || data?.privateModeRestore) ?? null
+      } catch {}
+
+      if (restore && typeof restore === 'object') {
+        const nextPrefetch =
+          typeof restore.prefetchEnabled === 'boolean' ? restore.prefetchEnabled : prefetchEnabled
+        const nextEmbeddings =
+          typeof restore.embeddingsEnabled === 'boolean'
+            ? restore.embeddingsEnabled
+            : embeddingsEnabled
+        const nextAi =
+          typeof restore.aiEnabled === 'boolean' ? restore.aiEnabled : aiEnabled
+
+        await setPrefetchEnabledPersisted(nextPrefetch)
+        await setEmbeddingsEnabledPersisted(nextEmbeddings)
+        if (nextEmbeddings) {
+          await setAiEnabledPersisted(nextAi)
+        }
+      }
+
+      await saveUserSettings({ privateModeEnabled: false })
+    },
+    [
+      saveUserSettings,
+      prefetchEnabled,
+      embeddingsEnabled,
+      aiEnabled,
+      userKey,
+      setPrefetchEnabledPersisted,
+      setEmbeddingsEnabledPersisted,
+      setAiEnabledPersisted,
+      setEncryptionEnabledPersisted,
+    ],
+  )
+
   const onOpenSettings = useCallback(() => setSettingsOpen(true), [])
 
   const setCourseImages = useCallback(
     async (map: Record<string, string>) => {
       setCourseImagesState(map)
+      if (privateModeEnabled) return
       try {
         const cfg = await window.settings.get?.()
         const data = (cfg?.ok ? (cfg.data as any) : {}) as any
@@ -273,7 +483,7 @@ export function useRootLayoutState() {
         await window.settings.set?.({ courseImages: next })
       } catch {}
     },
-    [baseUrl],
+    [baseUrl, privateModeEnabled],
   )
 
   const onOpenCourse = useCallback(
@@ -443,30 +653,64 @@ export function useRootLayoutState() {
     ],
   )
 
+  useEffect(() => {
+    const root = document.documentElement
+    if (reduceEffectsEnabled) root.dataset.reduceEffects = '1'
+    else delete root.dataset.reduceEffects
+  }, [reduceEffectsEnabled])
+
   const flagsContext: AppFlagsValue = useMemo(
     () => ({
       aiEnabled,
       embeddingsEnabled,
+      privateModeEnabled,
+      privateModeAcknowledged,
+      encryptionEnabled,
       prefetchEnabled,
+      reduceEffectsEnabled,
+      externalEmbedsEnabled,
+      externalMediaEnabled,
       pdfGestureZoomEnabled,
       verbose,
     }),
-    [aiEnabled, embeddingsEnabled, prefetchEnabled, pdfGestureZoomEnabled, verbose],
+    [
+      aiEnabled,
+      embeddingsEnabled,
+      privateModeEnabled,
+      privateModeAcknowledged,
+      encryptionEnabled,
+      prefetchEnabled,
+      reduceEffectsEnabled,
+      externalEmbedsEnabled,
+      externalMediaEnabled,
+      pdfGestureZoomEnabled,
+      verbose,
+    ],
   )
 
   const settingsContext: AppSettingsValue = useMemo(
     () => ({
       setPrefetchEnabled: setPrefetchEnabledPersisted,
+      setReduceEffectsEnabled: setReduceEffectsEnabledPersisted,
+      setExternalEmbedsEnabled: setExternalEmbedsEnabledPersisted,
+      setExternalMediaEnabled: setExternalMediaEnabledPersisted,
       setPdfGestureZoomEnabled: setPdfGestureZoomEnabledPersisted,
       setEmbeddingsEnabled: setEmbeddingsEnabledPersisted,
       setAiEnabled: setAiEnabledPersisted,
+      setPrivateModeEnabled: setPrivateModeEnabledPersisted,
+      setEncryptionEnabled: setEncryptionEnabledPersisted,
       setVerbose: setVerbosePersisted,
     }),
     [
       setPrefetchEnabledPersisted,
+      setReduceEffectsEnabledPersisted,
+      setExternalEmbedsEnabledPersisted,
+      setExternalMediaEnabledPersisted,
       setPdfGestureZoomEnabledPersisted,
       setEmbeddingsEnabledPersisted,
       setAiEnabledPersisted,
+      setPrivateModeEnabledPersisted,
+      setEncryptionEnabledPersisted,
       setVerbosePersisted,
     ],
   )

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useAppFlags } from '../../context/AppContext'
 import { enqueuePrefetch } from '../../utils/prefetchQueue'
 import { extractAssignmentIdFromUrl, extractCourseIdFromUrl } from '../../utils/urlHelpers'
 import type { QueryClient } from '@tanstack/react-query'
@@ -13,10 +14,12 @@ type Params = {
 }
 
 export function useDashboardPrefetch({ assignments, activityItems, queryClient }: Params) {
+  const { prefetchEnabled, privateModeEnabled } = useAppFlags()
   const prefetchedAssignments = useRef<Set<string>>(new Set())
   const prefetchedAnnouncements = useRef<Set<string>>(new Set())
 
   useEffect(() => {
+    if (!prefetchEnabled || privateModeEnabled) return
     if (!assignments.length) return
     const top = assignments.slice(0, 5)
     for (const a of top) {
@@ -38,9 +41,10 @@ export function useDashboardPrefetch({ assignments, activityItems, queryClient }
         })
       }
     }
-  }, [assignments, queryClient])
+  }, [assignments, queryClient, prefetchEnabled, privateModeEnabled])
 
   useEffect(() => {
+    if (!prefetchEnabled || privateModeEnabled) return
     if (!activityItems.length) return
     const anns = activityItems.filter((i) => i.type === 'announcement').slice(0, 5)
     for (const a of anns) {
@@ -64,5 +68,5 @@ export function useDashboardPrefetch({ assignments, activityItems, queryClient }
         }
       }
     }
-  }, [activityItems, queryClient])
+  }, [activityItems, queryClient, prefetchEnabled, privateModeEnabled])
 }

@@ -32,7 +32,7 @@ export const MarkdownMessage = memo(function MarkdownMessage({
       try {
         const rawHtml = await marked.parse(normalize(markdownToRender), { async: true })
         setHtml(String(rawHtml || ''))
-      } catch (e) {
+      } catch {
         // Fallback: render as plain text in a <pre>-like block.
         const escaped = normalize(markdownToRender)
           .replace(/&/g, '&amp;')

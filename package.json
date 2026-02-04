@@ -19,7 +19,10 @@
   },
   "pnpm": {
     "overrides": {
-      "canvas": "3.2.1"
+      "canvas": "3.2.1",
+      "@isaacs/brace-expansion": "5.0.1",
+      "seroval": "^1.4.1",
+      "tar": "^7.5.7"
     },
     "onlyBuiltDependencies": [
       "electron",
@@ -43,7 +46,6 @@
     "@tanstack/react-query": "^5.85.5",
     "@tanstack/react-query-devtools": "^5.85.5",
     "@tanstack/react-router": "^1.131.28",
-    "@tanstack/router-devtools": "^1.131.28",
     "@tiptap/extension-image": "^3.18.0",
     "@tiptap/extension-link": "^3.18.0",
     "@tiptap/extension-placeholder": "^3.18.0",
@@ -67,12 +69,11 @@
     "marked": "^12.0.2",
     "onnxruntime-common": "1.23.2",
     "onnxruntime-node": "^1.23.2",
-    "pdfjs-dist": "^3.11.174",
+    "pdfjs-dist": "^5.4.624",
     "postinstall": "^0.11.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "unpdf": "^1.4.0",
-    "xlsx": "^0.18.5",
     "zod": "^4.0.17"
   },
   "devDependencies": {
@@ -83,6 +84,7 @@
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
     "@vitejs/plugin-react": "^5.1.2",
+    "@tanstack/router-devtools": "^1.131.28",
     "@welldone-software/why-did-you-render": "^10.0.1",
     "autoprefixer": "^10.4.21",
     "electron": "^40.1.0",

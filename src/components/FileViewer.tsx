@@ -1,4 +1,5 @@
 import React, { Suspense, useEffect, useRef, useCallback } from 'react'
+import { useAppFlags } from '../context/AppContext'
 import { useFileMeta, useFileBytes } from '../hooks/useCanvasQueries'
 import { PdfViewer } from './pdf'
 import ViewerFrame from './viewers/ViewerFrame'
@@ -6,7 +7,6 @@ import ViewerToolbar from './viewers/ViewerToolbar'
 
 // Lazy load heavy dependencies
 const DocxRenderer = React.lazy(() => import('./viewers/DocxRenderer'))
-const XlsxRenderer = React.lazy(() => import('./viewers/XlsxRenderer'))
 const PptxRenderer = React.lazy(() => import('./viewers/PptxRenderer'))
 const TextRenderer = React.lazy(() => import('./viewers/TextRenderer'))
 
@@ -33,6 +33,7 @@ export const FileViewer: React.FC<Props> = ({
   courseId,
   courseName,
 }) => {
+  const { embeddingsEnabled, privateModeEnabled } = useAppFlags()
   const metaQ = useFileMeta(fileId)
   const fileUrlQ = useFileBytes(fileId) // Returns canvas-file:// URL
   const hasTriggeredIndexing = useRef(false)
@@ -47,6 +48,7 @@ export const FileViewer: React.FC<Props> = ({
 
   // Tier 2: On-open indexing - trigger indexing when user opens a file
   useEffect(() => {
+    if (privateModeEnabled || !embeddingsEnabled) return
     if (!metaQ.data || !courseId || hasTriggeredIndexing.current) return
 
     // Only index PDF and DOCX files (other formats not supported yet)
@@ -80,7 +82,19 @@ export const FileViewer: React.FC<Props> = ({
       .catch((err) => {
         console.warn(`[FileViewer] Tier 2 indexing error:`, err)
       })
-  }, [metaQ.data, courseId, courseName, fileId, name, fileSize, updatedAt, remoteUrl, ext])
+  }, [
+    metaQ.data,
+    courseId,
+    courseName,
+    fileId,
+    name,
+    fileSize,
+    updatedAt,
+    remoteUrl,
+    ext,
+    embeddingsEnabled,
+    privateModeEnabled,
+  ])
 
   // Use the local downloaded URL if available, otherwise fallback to remote
   const localUrl = fileUrlQ.data
@@ -93,7 +107,7 @@ export const FileViewer: React.FC<Props> = ({
     ['mp4', 'webm', 'ogg', 'mov', 'm4v'].includes(ext) || contentType?.startsWith('video/')
   const isDocx = ext === 'docx'
   const isDoc = ext === 'doc'
-  const isXlsx = ext === 'xlsx' || ext === 'xls' || ext === 'csv'
+  const isXlsx = ext === 'xlsx' || ext === 'xls'
   const isPptx = ext === 'pptx' || ext === 'ppt'
   // Removed 'txt' and 'text/' start check to prevent .py/.tex from auto-opening
   const isTextLike = ['json', 'xml', 'html', 'md', 'csv'].includes(ext)
@@ -190,8 +204,7 @@ export const FileViewer: React.FC<Props> = ({
       )
     }
   } else if ((isDocx || isXlsx || isPptx || isDoc) && !localUrl && remoteUrl) {
-    // Fallback to Office Viewer if local download failed or pending
-    const viewer = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(remoteUrl)}`
+    // Do not send files to third-party viewers. Require download instead.
     body = (
       <ViewerFrame
         className={className}
@@ -203,18 +216,12 @@ export const FileViewer: React.FC<Props> = ({
           />
         }
       >
-        <div
-          className="overflow-hidden border border-gray-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-900"
-          style={{ height: '100%' }}
-        >
-          <iframe
-            src={viewer}
-            className="w-full h-full"
-            style={{ border: 'none' }}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-            title={name || 'Document viewer'}
-          />
-        </div>
+        {renderFallback(
+          <div className="flex flex-col items-center gap-3">
+            <div>Preview unavailable for this file type.</div>
+            <div>Download to view it locally.</div>
+          </div>,
+        )}
       </ViewerFrame>
     )
   } else if (isDocx && localUrl) {
@@ -232,18 +239,6 @@ export const FileViewer: React.FC<Props> = ({
           isFullscreen={isFullscreen}
           onDownload={handleDownload}
         />
-      </Suspense>
-    )
-  } else if (isXlsx && localUrl) {
-    body = (
-      <Suspense
-        fallback={
-          <div className="h-full p-4">
-            <LoadingSkeleton />
-          </div>
-        }
-      >
-        <XlsxRenderer url={localUrl} className={className} onDownload={handleDownload} />
       </Suspense>
     )
   } else if (isPptx && localUrl) {

@@ -107,7 +107,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
     isSearching: isStandardSearching,
     isPendingSearch,
     clearSearch,
-  } = useGlobalSearch({ enabled: isOpen })
+  } = useGlobalSearch({ enabled: isOpen && !flags.privateModeEnabled })
 
   // Deep Search State
   const [isDeepSearching, setIsDeepSearching] = useState(false)
@@ -141,6 +141,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
   // Execute Deep Search
   const handleDeepSearch = async () => {
     if (!query.trim() || isDeepSearching) return
+    if (flags.privateModeEnabled || !flags.embeddingsEnabled || !window.embedding) return
 
     setIsDeepSearching(true)
     setDeepSearchActive(true)
@@ -186,6 +187,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
   // Handle Ask AI
   const handleAskAI = () => {
+    if (flags.privateModeEnabled || !flags.aiEnabled) return
     onClose()
     clearSearch()
     aiPanel.open(query.trim(), 'ask-ai', true)

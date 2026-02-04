@@ -11,6 +11,7 @@ import {
   dialog,
   clipboard,
   session,
+  safeStorage,
 } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
@@ -760,6 +761,51 @@ function createAppMenu() {
 }
 
 app.whenReady().then(async () => {
+  const buildContentSecurityPolicy = () => {
+    const isDev = !!VITE_DEV_SERVER_URL
+    const scriptSrc = isDev
+      ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
+      : "script-src 'self'"
+    const connectSrc = isDev
+      ? "connect-src 'self' ws: http: https: canvas-file:"
+      : "connect-src 'self' canvas-file:"
+    return [
+      "default-src 'self'",
+      "base-uri 'none'",
+      scriptSrc,
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: canvas-file: https: blob:",
+      "media-src 'self' canvas-file: https: blob:",
+      "font-src 'self' data:",
+      connectSrc,
+      "frame-src 'self' https: pdf-viewer: docx-viewer:",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "worker-src 'self' blob:",
+    ].join('; ')
+  }
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    try {
+      if (details.resourceType !== 'mainFrame') {
+        callback({ responseHeaders: details.responseHeaders })
+        return
+      }
+      const url = details.url || ''
+      const devOrigin = VITE_DEV_SERVER_URL ? new URL(VITE_DEV_SERVER_URL).origin : null
+      const isAppDocument = url.startsWith('file://') || (devOrigin && url.startsWith(devOrigin))
+      if (!isAppDocument) {
+        callback({ responseHeaders: details.responseHeaders })
+        return
+      }
+      const headers = details.responseHeaders || {}
+      headers['Content-Security-Policy'] = [buildContentSecurityPolicy()]
+      callback({ responseHeaders: headers })
+    } catch {
+      callback({ responseHeaders: details.responseHeaders })
+    }
+  })
+
   // SECURITY: Deny all permission requests except notifications
   session.defaultSession.setPermissionRequestHandler(
     (_webContents: any, permission: any, callback: any) => {
@@ -940,7 +986,8 @@ app.whenReady().then(async () => {
   // Serves files from public/pdfviewer (dev) or dist/pdfviewer (production)
   protocol.handle('pdf-viewer', (req) => {
     const url = req.url.replace(/^pdf-viewer:\/\//, '')
-    let filePath = decodeURIComponent(url)
+    const withoutQuery = url.split('?')[0].split('#')[0]
+    let filePath = decodeURIComponent(withoutQuery)
 
     // Normalize: strip trailing slashes
     filePath = filePath.replace(/\/+$/, '')
@@ -957,7 +1004,7 @@ app.whenReady().then(async () => {
     console.log(`[pdf-viewer] Request: ${url} -> ${filePath}`)
 
     // Security: only allow specific file extensions
-    const allowedExtensions = ['.html', '.js', '.css', '.bcmap', '.svg', '.gif', '.png']
+    const allowedExtensions = ['.html', '.js', '.mjs', '.css', '.bcmap', '.svg', '.gif', '.png', '.map']
     const ext = path.extname(filePath).toLowerCase()
     if (!allowedExtensions.includes(ext)) {
       console.warn(`[pdf-viewer] Blocked disallowed file type: ${filePath}`)
@@ -972,7 +1019,7 @@ app.whenReady().then(async () => {
         resolvedPath = path.join(process.env.APP_ROOT, 'public', 'pdfviewer', filePath)
       } else if (filePath.startsWith('cmaps/')) {
         resolvedPath = path.join(process.env.APP_ROOT, 'node_modules', 'pdfjs-dist', filePath)
-      } else if (filePath === 'pdf.js' || filePath === 'pdf.worker.js') {
+      } else if (filePath === 'pdf.mjs' || filePath === 'pdf.worker.mjs') {
         resolvedPath = path.join(
           process.env.APP_ROOT,
           'node_modules',
@@ -980,7 +1027,15 @@ app.whenReady().then(async () => {
           'build',
           filePath,
         )
-      } else if (filePath === 'pdf_viewer.js' || filePath === 'pdf_viewer.css') {
+      } else if (filePath === 'pdf_viewer.mjs' || filePath === 'pdf_viewer.css') {
+        resolvedPath = path.join(
+          process.env.APP_ROOT,
+          'node_modules',
+          'pdfjs-dist',
+          'web',
+          filePath,
+        )
+      } else if (filePath.startsWith('images/')) {
         resolvedPath = path.join(
           process.env.APP_ROOT,
           'node_modules',
@@ -1143,6 +1198,41 @@ app.whenReady().then(async () => {
   }
 
   createWindow()
+})
+
+// IPC handlers for secure storage (sync, backed by OS keychain)
+ipcMain.on('secureStorage:isAvailable', (event) => {
+  try {
+    event.returnValue = Boolean(safeStorage?.isEncryptionAvailable?.())
+  } catch {
+    event.returnValue = false
+  }
+})
+
+ipcMain.on('secureStorage:encrypt', (event, value: string) => {
+  try {
+    if (!safeStorage?.isEncryptionAvailable?.()) {
+      event.returnValue = null
+      return
+    }
+    const buf = safeStorage.encryptString(String(value))
+    event.returnValue = buf.toString('base64')
+  } catch {
+    event.returnValue = null
+  }
+})
+
+ipcMain.on('secureStorage:decrypt', (event, payload: string) => {
+  try {
+    if (!safeStorage?.isEncryptionAvailable?.()) {
+      event.returnValue = null
+      return
+    }
+    const buf = Buffer.from(String(payload), 'base64')
+    event.returnValue = safeStorage.decryptString(buf)
+  } catch {
+    event.returnValue = null
+  }
 })
 
 // IPC handlers for Canvas actions
@@ -1814,7 +1904,57 @@ ipcMain.handle('canvas:getFileBytes', async (_evt, fileId: string | number) => {
 
 ipcMain.handle('canvas:cacheCourseImage', async (_evt, courseId: string | number, url: string) => {
   try {
-    const path = await svcDownloadCourseImage(courseId, url)
+    if (appConfig?.privateModeEnabled) {
+      return { ok: false, error: 'Private Mode is enabled' }
+    }
+    const normalizeHosts = (list: string[]) =>
+      list.map((h) => String(h || '').trim().toLowerCase()).filter(Boolean)
+    const hostAllowed = (host: string, allowHosts: string[]) =>
+      allowHosts.some((entry) => host === entry || host.endsWith(`.${entry}`))
+
+    const isPrivateHost = (host: string) => {
+      if (host === 'localhost' || host === '::1') return true
+      if (/^127\./.test(host)) return true
+      if (/^10\./.test(host)) return true
+      if (/^192\.168\./.test(host)) return true
+      if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) return true
+      if (/^169\.254\./.test(host)) return true
+      if (host.startsWith('fe80:') || host.startsWith('fc00:') || host.startsWith('fd00:'))
+        return true
+      return false
+    }
+    let parsed: URL
+    try {
+      parsed = new URL(url)
+    } catch {
+      return { ok: false, error: 'Invalid URL' }
+    }
+    if (parsed.protocol !== 'https:') {
+      return { ok: false, error: 'Only https URLs are allowed' }
+    }
+    if (isPrivateHost(parsed.hostname)) {
+      return { ok: false, error: 'Private network URLs are not allowed' }
+    }
+    const defaults = ['inscloudgate.net']
+    const cfgList = Array.isArray(appConfig?.courseImageAllowlist)
+      ? appConfig.courseImageAllowlist
+      : []
+    const envList =
+      process.env.WB_COURSE_IMAGE_ALLOWLIST?.split(',').map((v) => v.trim()).filter(Boolean) || []
+    let baseHost = ''
+    try {
+      baseHost = new URL(appConfig?.baseUrl || DEFAULT_CONFIG.baseUrl).hostname
+    } catch {}
+    const allowHosts = Array.from(
+      new Set(normalizeHosts([...defaults, ...cfgList, ...envList, baseHost].filter(Boolean))),
+    )
+    if (!allowHosts.length) {
+      return { ok: false, error: 'No allowed hosts configured for course images' }
+    }
+    if (!hostAllowed(parsed.hostname.toLowerCase(), allowHosts)) {
+      return { ok: false, error: 'Image host is not in allowlist' }
+    }
+    const path = await svcDownloadCourseImage(courseId, url, { allowHosts })
     const fileUrl = pathToFileURL(path)
       .toString()
       .replace(/^file:/, 'canvas-file:')
@@ -1951,8 +2091,13 @@ ipcMain.handle(
 
 ipcMain.handle('canvas:resolveUrl', async (_evt, url: string) => {
   try {
-    // Security check: only allow base URL or http(s)
     if (!url.startsWith('http')) return { ok: false, error: 'Invalid URL' }
+    const target = new URL(url)
+    const base = new URL((appConfig?.baseUrl || DEFAULT_CONFIG.baseUrl).replace(/\/$/, ''))
+    if (target.origin !== base.origin) {
+      // Never resolve non-Canvas origins in main; avoid leaking auth on redirects.
+      return { ok: true, data: url }
+    }
 
     const data = await svcResolveUrl(url)
     return { ok: true, data }
@@ -2077,6 +2222,22 @@ ipcMain.handle(
   },
 )
 
+ipcMain.handle('app:clearTempCache', async () => {
+  try {
+    const tempDir = normalizeWin32Path(app.getPath('temp'))
+    const entries = await fs.promises.readdir(tempDir)
+    const targets = entries.filter(
+      (name) => name.startsWith('canvas-') || name.startsWith('course-image-'),
+    )
+    await Promise.all(
+      targets.map((name) => fs.promises.unlink(path.join(tempDir, name)).catch(() => {})),
+    )
+    return { ok: true, data: { removed: targets.length } }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
 ipcMain.handle('app:copyText', async (_evt, text: string) => {
   try {
     if (typeof text !== 'string') {
@@ -2178,6 +2339,8 @@ ipcMain.handle(
 ipcMain.handle('embedding:clear', async (): Promise<{ ok: boolean; error?: string }> => {
   try {
     await embeddingManager.clear()
+    // Also clear file indexing metadata so "rebuild" truly reindexes files.
+    fileMetaStore.clear()
     return { ok: true }
   } catch (e: any) {
     return { ok: false, error: String(e?.message || e) }

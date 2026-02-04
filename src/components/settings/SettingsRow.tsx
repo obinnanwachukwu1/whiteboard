@@ -6,24 +6,38 @@ type Props = {
   children: React.ReactNode
   indent?: boolean
   disabled?: boolean
+  disabledReason?: string
   className?: string
 }
 
-export function SettingsRow({ label, description, children, indent, disabled, className = '' }: Props) {
+export function SettingsRow({
+  label,
+  description,
+  children,
+  indent,
+  disabled,
+  disabledReason,
+  className = '',
+}: Props) {
   return (
     <div
       className={`
-        flex items-center justify-between gap-4 px-4 py-3
+        relative flex items-center justify-between gap-4 px-4 py-3
         border-b border-gray-100 dark:border-neutral-800 last:border-b-0
         transition-colors duration-150
         ${indent ? 'pl-8 bg-slate-50/50 dark:bg-neutral-800/30' : ''}
-        ${disabled ? 'opacity-50 pointer-events-none' : ''}
+        ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+        ${disabledReason ? 'group' : ''}
         ${className}
       `}
     >
       <div className="flex-1 min-w-0">
-        <div className={`font-medium text-sm ${disabled ? 'text-slate-400 dark:text-neutral-500' : 'text-slate-900 dark:text-slate-100'}`}>
-          {label}
+        <div
+          className={`flex items-center gap-1.5 font-medium text-sm ${
+            disabled ? 'text-slate-400 dark:text-neutral-500' : 'text-slate-900 dark:text-slate-100'
+          }`}
+        >
+          <span>{label}</span>
         </div>
         {description && (
           <div className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
@@ -31,8 +45,13 @@ export function SettingsRow({ label, description, children, indent, disabled, cl
           </div>
         )}
       </div>
-      <div className="shrink-0 flex items-center">
+      <div className="shrink-0 flex items-center relative">
         {children}
+        {disabledReason && (
+          <div className="pointer-events-none absolute right-0 top-0 z-[200] -translate-y-full whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+            {disabledReason}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -7,8 +7,26 @@ import { Loader2, Database, HardDrive } from 'lucide-react'
 
 export function AdvancedSettings() {
   const queryClient = useQueryClient()
-  const { embeddingsEnabled, prefetchEnabled, verbose } = useAppFlags()
-  const { setPrefetchEnabled, setVerbose } = useAppSettings()
+  const {
+    embeddingsEnabled,
+    prefetchEnabled,
+    reduceEffectsEnabled,
+    externalEmbedsEnabled,
+    externalMediaEnabled,
+    privateModeEnabled,
+    verbose,
+  } = useAppFlags()
+  const {
+    setPrefetchEnabled,
+    setReduceEffectsEnabled,
+    setExternalEmbedsEnabled,
+    setExternalMediaEnabled,
+    setVerbose,
+  } = useAppSettings()
+
+  const privateDisabledReason = privateModeEnabled
+    ? 'Disabled because Private Mode is on.'
+    : undefined
 
   const [rebuildingEmbeddings, setRebuildingEmbeddings] = React.useState(false)
   const [aiStatus, setAiStatus] = React.useState<{
@@ -44,8 +62,42 @@ export function AdvancedSettings() {
   }, [embeddingsEnabled])
 
   const onClearCache = async () => {
-    if (!window.confirm('This will clear all offline data and force a full reload. Continue?')) return
+    if (
+      !window.confirm(
+        'This will clear local cached data (including drafts, offline cache, and Deep Search index) and force a full reload. Continue?',
+      )
+    )
+      return
     try {
+      try {
+        await window.embedding?.clear?.()
+      } catch {}
+
+      try {
+        await window.system?.clearTempCache?.()
+      } catch {}
+
+      try {
+        const keys: string[] = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i)
+          if (k) keys.push(k)
+        }
+        for (const k of keys) {
+          if (
+            k === 'kanbanStatusByAssignment' ||
+            k === 'whiteboard:read-announcements' ||
+            k === 'whiteboard:dashboard-settings' ||
+            k === 'whiteboard_tab_usage' ||
+            k === 'wb-theme-cache-v1' ||
+            k === 'app-theme' ||
+            k.startsWith('whiteboard-draft-')
+          ) {
+            localStorage.removeItem(k)
+          }
+        }
+      } catch {}
+
       await window.settings.set?.({
         queryCache: undefined,
         cachedCourses: undefined,
@@ -77,11 +129,38 @@ export function AdvancedSettings() {
       <SettingsRow
         label="Prefetch Data"
         description="Speed up navigation by preloading courses"
+        disabled={privateModeEnabled}
+        disabledReason={privateDisabledReason}
       >
         <Toggle
           checked={prefetchEnabled}
           onChange={setPrefetchEnabled}
+          disabled={privateModeEnabled}
         />
+      </SettingsRow>
+
+      <SettingsRow
+        label="Reduce Effects"
+        description="Disable translucency, shadows, and most transitions for smoother UI"
+      >
+        <Toggle
+          checked={reduceEffectsEnabled}
+          onChange={setReduceEffectsEnabled}
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        label="Allow External Embeds"
+        description="Enable embedded iframes from non-Canvas sites inside rich content (less private)"
+      >
+        <Toggle checked={externalEmbedsEnabled} onChange={setExternalEmbedsEnabled} />
+      </SettingsRow>
+
+      <SettingsRow
+        label="Allow External Media"
+        description="Show images/audio/video from non-Canvas sites inside rich content (may allow tracking)"
+      >
+        <Toggle checked={externalMediaEnabled} onChange={setExternalMediaEnabled} />
       </SettingsRow>
 
       <SettingsRow

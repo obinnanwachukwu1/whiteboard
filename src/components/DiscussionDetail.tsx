@@ -8,6 +8,8 @@ import { RichTextEditor } from './RichTextEditor'
 import { FullscreenContainer } from './FullscreenContainer'
 import type { DiscussionEntry, DiscussionParticipant } from '../types/canvas'
 import { SkeletonText } from './Skeleton'
+import { useAppData, useAppFlags } from '../context/AppContext'
+import { isSafeMediaSrc } from '../utils/urlPolicy'
 
 // Helper to check if the current user has replied in a thread
 function containsUserReply(entry: DiscussionEntry, myId: string): boolean {
@@ -33,6 +35,11 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, topicId, title, on
   const isWin =
     (typeof navigator !== 'undefined' && /windows/i.test(navigator.userAgent)) ||
     (typeof navigator !== 'undefined' && typeof (navigator as any).platform === 'string' && /^win/i.test((navigator as any).platform))
+
+  const appData = useAppData()
+  const { externalMediaEnabled } = useAppFlags()
+  const safeAvatarUrl = (raw?: string | null) =>
+    raw && isSafeMediaSrc(raw, appData.baseUrl, externalMediaEnabled) ? raw : undefined
 
   const { data: topic, isLoading: topicLoading } = useDiscussion(courseId, topicId)
   const { data: view, isLoading: viewLoading, refetch } = useDiscussionView(courseId, topicId)
@@ -170,11 +177,12 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, topicId, title, on
         >
           {/* Author header */}
           <div className="flex items-center gap-3 mb-3">
-            {participant?.avatar_image_url ? (
+            {safeAvatarUrl(participant?.avatar_image_url) ? (
               <img
-                src={participant.avatar_image_url}
+                src={safeAvatarUrl(participant?.avatar_image_url)}
                 alt=""
                 className="w-8 h-8 rounded-full ring-1 ring-black/5 dark:ring-white/10"
+                referrerPolicy="no-referrer"
               />
             ) : (
               <div className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
@@ -250,8 +258,13 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, topicId, title, on
         {topic.message && (
           <div className="mb-8 p-5 md:p-6 rounded-2xl bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 shadow-sm">
             <div className="flex items-center gap-3 mb-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
-              {topic.author?.avatar_image_url ? (
-                <img src={topic.author.avatar_image_url} alt="" className="w-10 h-10 rounded-full ring-1 ring-black/5 dark:ring-white/10" />
+              {safeAvatarUrl(topic.author?.avatar_image_url) ? (
+                <img
+                  src={safeAvatarUrl(topic.author?.avatar_image_url)}
+                  alt=""
+                  className="w-10 h-10 rounded-full ring-1 ring-black/5 dark:ring-white/10"
+                  referrerPolicy="no-referrer"
+                />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center">
                   <User className="w-5 h-5 text-neutral-500 dark:text-neutral-400" />

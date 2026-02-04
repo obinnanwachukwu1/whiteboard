@@ -1,4 +1,3 @@
-/// <reference types="@welldone-software/why-did-you-render" />
 import React from 'react'
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore

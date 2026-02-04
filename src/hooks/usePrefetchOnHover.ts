@@ -1,5 +1,6 @@
-import { useRef, useCallback, useEffect } from 'react'
+import { useRef, useCallback, useEffect, useContext } from 'react'
 import { useQueryClient, type FetchQueryOptions } from '@tanstack/react-query'
+import { AppFlagsContext } from '../context/AppContext'
 
 type PrefetchOptions = FetchQueryOptions & {
   delay?: number // ms to wait before triggering prefetch (default 150)
@@ -15,6 +16,9 @@ export function usePrefetchOnHover(options: PrefetchOptions) {
   const queryClient = useQueryClient()
   const timerRef = useRef<any>(null)
   const { delay = 150, enabled = true, ...queryOptions } = options
+  const flags = useContext(AppFlagsContext)
+  const globalEnabled = flags ? flags.prefetchEnabled && !flags.privateModeEnabled : true
+  const effectiveEnabled = enabled && globalEnabled
 
   // Clear timer on unmount
   useEffect(() => {
@@ -24,7 +28,7 @@ export function usePrefetchOnHover(options: PrefetchOptions) {
   }, [])
 
   const onMouseEnter = useCallback(() => {
-    if (!enabled) return
+    if (!effectiveEnabled) return
     if (timerRef.current) clearTimeout(timerRef.current)
     
     // Check if already in cache to avoid setting up a timer unnecessarily?
@@ -36,7 +40,7 @@ export function usePrefetchOnHover(options: PrefetchOptions) {
         // ignore errors
       })
     }, delay)
-  }, [queryClient, delay, enabled, queryOptions])
+  }, [queryClient, delay, effectiveEnabled, queryOptions])
 
   const onMouseLeave = useCallback(() => {
     if (timerRef.current) {

@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react'
 import { HtmlContent } from '../HtmlContent'
 import { SkeletonList } from '../Skeleton'
+import { useAppData, useAppFlags } from '../../context/AppContext'
+import { isSafeMediaSrc } from '../../utils/urlPolicy'
 
 type Message = {
   id: string | number
@@ -29,6 +31,8 @@ export const MessageList = React.memo(function MessageList({
   hasConversation,
 }: Props) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const appData = useAppData()
+  const { externalMediaEnabled } = useAppFlags()
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -43,11 +47,20 @@ export const MessageList = React.memo(function MessageList({
       )}
       {messages.map((msg) => {
         const author = participantsMap.get(String(msg.author_id))
+        const avatarUrl =
+          author?.avatar_url && isSafeMediaSrc(author.avatar_url, appData.baseUrl, externalMediaEnabled)
+            ? author.avatar_url
+            : undefined
         return (
           <div key={msg.id} className="flex gap-3">
             <div className="flex-shrink-0">
-              {author?.avatar_url ? (
-                <img src={author.avatar_url} alt={author.name} className="w-8 h-8 rounded-full" />
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={author?.name}
+                  className="w-8 h-8 rounded-full"
+                  referrerPolicy="no-referrer"
+                />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-neutral-700 flex items-center justify-center text-xs font-medium">
                   {(author?.name || '?')[0].toUpperCase()}

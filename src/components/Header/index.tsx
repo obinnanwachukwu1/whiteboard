@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useAppActions } from '../../context/AppContext'
+import { useAppActions, useAppFlags } from '../../context/AppContext'
 import { InboxButton } from '../InboxButton'
 import { SearchButton } from './SearchButton'
 import { AccountButton } from './AccountButton'
@@ -13,6 +13,7 @@ type Props = {
 
 export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) => {
   const actions = useAppActions()
+  const { privateModeEnabled } = useAppFlags()
   const name = profile?.short_name || profile?.name || 'Whiteboard'
   const avatar = profile?.avatar_url
   const isWin =
@@ -67,7 +68,9 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
     >
       <div className="flex items-center gap-3" />
       <div className={`flex items-center ${isWin ? 'gap-2' : 'gap-3'} app-no-drag relative`}>
-        {!isWin && onOpenSearch && <SearchButton isWin={false} onClick={onOpenSearch} />}
+        {!privateModeEnabled && !isWin && onOpenSearch && (
+          <SearchButton isWin={false} onClick={onOpenSearch} />
+        )}
         {!isWin && onOpenInbox && <InboxButton onClick={onOpenInbox} />}
         <AccountButton
           name={name}
@@ -78,7 +81,9 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
           nameBtnRef={nameBtnRef}
         />
         {isWin && onOpenInbox && <InboxButton onClick={onOpenInbox} />}
-        {isWin && onOpenSearch && <SearchButton isWin onClick={onOpenSearch} />}
+        {!privateModeEnabled && isWin && onOpenSearch && (
+          <SearchButton isWin onClick={onOpenSearch} />
+        )}
         <AccountMenu
           menuOpen={menuOpen}
           setMenuOpen={setMenuOpen}

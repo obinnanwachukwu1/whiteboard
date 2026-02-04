@@ -384,6 +384,8 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
   const { data: courses } = useCourses()
   const flags = useAppFlags()
   const data = useAppData()
+  const searchEnabled = enabled && !flags.privateModeEnabled
+  const embeddingEnabled = searchEnabled && flags.embeddingsEnabled
   const [isReady, setIsReady] = useState(searchManager.isReady)
   const [isBuilding, setIsBuilding] = useState(searchManager.isBuilding)
   const [query, setQuery] = useState('')
@@ -400,6 +402,15 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
     memoryUsedMB: number
     memoryLimitMB: number
   }>({ ready: false, modelDownloaded: false, itemCount: 0, memoryUsedMB: 0, memoryLimitMB: 300 })
+
+  useEffect(() => {
+    if (!flags.privateModeEnabled) return
+    searchManager.clear()
+    setIsReady(false)
+    setIsBuilding(false)
+    setQuery('')
+    setResults([])
+  }, [flags.privateModeEnabled])
 
   // Get visible (pinned) courses - exclude hidden ones
   const visibleCourses = useMemo(() => {
@@ -418,7 +429,7 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
 
   // Poll embedding status periodically (only when enabled)
   useEffect(() => {
-    if (!window.embedding || !enabled) return
+    if (!window.embedding || !embeddingEnabled) return
 
     const fetchStatus = async () => {
       try {
@@ -443,11 +454,11 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
     // Poll every 5 seconds to check for status changes
     const interval = setInterval(fetchStatus, 5000)
     return () => clearInterval(interval)
-  }, [enabled])
+  }, [embeddingEnabled])
 
   // Proactively fetch and build index for visible courses (only when enabled)
   useEffect(() => {
-    if (!enabled || !visibleCourses?.length || searchManager.isReady || searchManager.isBuilding)
+    if (!searchEnabled || !visibleCourses?.length || searchManager.isReady || searchManager.isBuilding)
       return
 
     const timer = setTimeout(async () => {
@@ -554,7 +565,7 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
       setIsBuilding(false)
 
       // Trigger embedding indexing in background (non-blocking)
-      if (flags.embeddingsEnabled) {
+      if (embeddingEnabled) {
         triggerEmbeddingIndex({
           courses: visibleCourses,
           courseAssignments,
@@ -572,7 +583,7 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
     }, 1500) // 1.5 second delay after courses load
 
     return () => clearTimeout(timer)
-  }, [enabled, visibleCourses, queryClient, flags.embeddingsEnabled])
+  }, [searchEnabled, visibleCourses, queryClient, embeddingEnabled])
 
   // Perform search
   const search = useCallback(async (q: string) => {
@@ -694,7 +705,7 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
     setIsBuilding(false)
 
     // Trigger embedding indexing in background (non-blocking)
-    if (flags.embeddingsEnabled) {
+    if (embeddingEnabled) {
       triggerEmbeddingIndex({
         courses: visibleCourses,
         courseAssignments,
@@ -703,7 +714,7 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
         courseModules,
       })
     }
-  }, [visibleCourses, queryClient, flags.embeddingsEnabled])
+  }, [visibleCourses, queryClient, embeddingEnabled])
 
   return useMemo(
     () => ({

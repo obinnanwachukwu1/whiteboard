@@ -1,6 +1,8 @@
+import { getJson, setJson, removeItem } from './secureStorage'
+
 /**
  * localStorage helpers for tracking read announcements.
- * 
+ *
  * Read announcements are hidden from the dashboard but still visible
  * (grayed out) on the /announcements page.
  */
@@ -12,10 +14,7 @@ const STORAGE_KEY = 'whiteboard:read-announcements'
  */
 export function getReadAnnouncementIds(): Set<string> {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (!stored) return new Set()
-    
-    const parsed = JSON.parse(stored)
+    const parsed = getJson<any>(STORAGE_KEY, null)
     if (!Array.isArray(parsed)) return new Set()
     
     return new Set(parsed.map(String))
@@ -85,7 +84,7 @@ export function markAllAnnouncementsRead(announcementIds: Array<string | number>
  */
 export function clearReadAnnouncementHistory(): void {
   try {
-    localStorage.removeItem(STORAGE_KEY)
+    removeItem(STORAGE_KEY)
   } catch {
     // Ignore storage errors
   }
@@ -120,7 +119,7 @@ export function pruneReadAnnouncementHistory(maxEntries = 500): void {
 function saveReadAnnouncementIds(ids: Set<string>): void {
   try {
     const arr = Array.from(ids)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(arr))
+    setJson(STORAGE_KEY, arr)
   } catch {
     // Ignore storage errors (quota exceeded, etc.)
   }

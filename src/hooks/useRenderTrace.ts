@@ -28,14 +28,11 @@ export function useRenderTrace(name: string, values: TraceValues) {
     if (prev) {
       const changes = diffValues(prev, values)
       if (Object.keys(changes).length > 0) {
-        // eslint-disable-next-line no-console
         console.log(`[trace] ${name} render #${renderCount.current}`, changes)
       } else {
-        // eslint-disable-next-line no-console
         console.log(`[trace] ${name} render #${renderCount.current} (no prop changes)`)
       }
     } else {
-      // eslint-disable-next-line no-console
       console.log(`[trace] ${name} first render`)
     }
 

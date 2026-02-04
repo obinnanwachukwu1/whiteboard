@@ -5,7 +5,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { createWriteStream } from 'node:fs'
-import { Readable } from 'node:stream'
+import { Readable, Transform } from 'node:stream'
 import { normalizeWin32Path } from './pathUtils'
 import { assertNormalizedAssignmentDev, normalizeAssignmentFromRest } from './assignmentNormalization'
 
@@ -64,6 +64,29 @@ function safeLog(obj: any): string {
   }
 }
 
+const ALLOWED_IMAGE_CONTENT_TYPES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+])
+
+const DEFAULT_COURSE_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+
+function normalizeHostList(hosts: string[] | undefined): string[] {
+  if (!hosts) return []
+  return hosts
+    .map((h) => String(h || '').trim().toLowerCase())
+    .filter((h) => !!h)
+}
+
+function isHostAllowed(host: string, allowHosts: string[]): boolean {
+  if (!host) return false
+  const h = host.toLowerCase()
+  return allowHosts.some((entry) => h === entry || h.endsWith(`.${entry}`))
+}
+
 export interface CanvasClientOptions {
   token: string
   baseUrl?: string
@@ -101,6 +124,16 @@ export class CanvasClient {
       timeout: this.timeoutMs,
       validateStatus: () => true, // we'll handle errors
     })
+  }
+
+  private isCanvasOrigin(url: string): boolean {
+    try {
+      const base = new URL(this.baseUrl)
+      const target = new URL(url)
+      return base.origin === target.origin
+    } catch {
+      return false
+    }
   }
 
   private async request<T = any>(config: AxiosRequestConfig): Promise<AxiosResponse<T>> {
@@ -686,17 +719,28 @@ export class CanvasClient {
   }
 
   async resolveModuleItemUrl(url: string): Promise<string> {
-    const target = this.url(url)
+    let current = this.url(url)
     try {
-      const resp = await this.axios.get(target, {
-        maxRedirects: 5,
-        validateStatus: (status) => status >= 200 && status < 400,
-      })
-      // In Node.js axios, the final URL is in resp.request.res.responseUrl
-      const finalUrl = (resp.request as any)?.res?.responseUrl
-      return finalUrl || target
+      for (let i = 0; i < 5; i++) {
+        const headers: Record<string, string> = {}
+        if (this.isCanvasOrigin(current)) {
+          headers['Authorization'] = this.axios.defaults.headers['Authorization'] as string
+        }
+        const resp = await fetch(current, { method: 'GET', headers, redirect: 'manual' })
+        if (resp.status >= 300 && resp.status < 400) {
+          const loc = resp.headers.get('location')
+          if (!loc) break
+          const next = new URL(loc, current).toString()
+          if (!this.isCanvasOrigin(next)) return next
+          current = next
+          continue
+        }
+        if (resp.status >= 200 && resp.status < 400) return current
+        return current
+      }
+      return current
     } catch (_e) {
-      return target
+      return current
     }
   }
 
@@ -735,7 +779,11 @@ export class CanvasClient {
     return this.downloadUrlToPath(url, destPath)
   }
 
-  async downloadCourseImage(courseId: string | number, imageUrl: string): Promise<string> {
+  async downloadCourseImage(
+    courseId: string | number,
+    imageUrl: string,
+    opts?: { allowHosts?: string[]; maxBytes?: number },
+  ): Promise<string> {
     const tempDir = normalizeWin32Path(app.getPath('temp'))
     // Create a stable filename for the course image so we can cache it
     const ext = path.extname(new URL(imageUrl).pathname) || '.jpg'
@@ -745,32 +793,102 @@ export class CanvasClient {
       return destPath
     }
 
-    return this.downloadUrlToPath(imageUrl, destPath)
+    return this.downloadImageToPath(imageUrl, destPath, opts)
+  }
+
+  private async downloadImageToPath(
+    url: string,
+    destPath: string,
+    opts?: { allowHosts?: string[]; maxBytes?: number },
+  ): Promise<string> {
+    const allowHosts = normalizeHostList(opts?.allowHosts)
+    if (allowHosts.length === 0) {
+      throw new Error('No allowed hosts configured for course image download')
+    }
+    const maxBytes = opts?.maxBytes ?? DEFAULT_COURSE_IMAGE_MAX_BYTES
+    let current = url
+    for (let i = 0; i < 5; i++) {
+      let parsed: URL
+      try {
+        parsed = new URL(current)
+      } catch {
+        throw new Error('Invalid course image URL')
+      }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error('Unsupported image URL protocol')
+      }
+      if (!isHostAllowed(parsed.hostname, allowHosts)) {
+        throw new Error('Image host is not in allowlist')
+      }
+
+      const headers: Record<string, string> = {}
+      if (this.isCanvasOrigin(current)) {
+        headers['Authorization'] = this.axios.defaults.headers['Authorization'] as string
+      }
+      const resp = await fetch(current, { method: 'GET', headers, redirect: 'manual' })
+      if (resp.status >= 300 && resp.status < 400) {
+        const loc = resp.headers.get('location')
+        if (!loc) throw new Error('Redirect response missing Location header')
+        current = new URL(loc, current).toString()
+        continue
+      }
+      if (!resp.ok) throw new Error(`Failed to fetch image: ${resp.statusText}`)
+      if (!resp.body) throw new Error('No response body')
+
+      const contentType = resp.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
+      if (!contentType || !ALLOWED_IMAGE_CONTENT_TYPES.has(contentType)) {
+        throw new Error(`Unsupported image content type: ${contentType || 'unknown'}`)
+      }
+
+      const contentLength = resp.headers.get('content-length')
+      if (contentLength) {
+        const size = Number(contentLength)
+        if (Number.isFinite(size) && size > maxBytes) {
+          throw new Error(`Image exceeds max size (${maxBytes} bytes)`)
+        }
+      }
+
+      let bytes = 0
+      const limiter = new Transform({
+        transform(chunk, _enc, cb) {
+          bytes += chunk.length
+          if (bytes > maxBytes) {
+            cb(new Error(`Image exceeds max size (${maxBytes} bytes)`))
+            return
+          }
+          cb(null, chunk)
+        },
+      })
+
+      const fileStream = createWriteStream(destPath)
+      await pipeline(Readable.fromWeb(resp.body as any), limiter, fileStream)
+      return destPath
+    }
+    throw new Error('Too many redirects while downloading image')
   }
 
   private async downloadUrlToPath(url: string, destPath: string): Promise<string> {
-    // Determine if we need auth headers.
-    // If it's a Canvas API URL, yes. If it's an S3 signed URL (redirect), usually no.
-    // However, Axios follows redirects.
-    // Safe bet: try fetching. If it's a direct download URL from API, it needs auth.
-    // If it's a public URL, auth won't hurt usually, unless it's S3.
-    // But often image_download_url is just the API endpoint that redirects.
+    let current = url
+    for (let i = 0; i < 5; i++) {
+      const headers: Record<string, string> = {}
+      if (this.isCanvasOrigin(current)) {
+        headers['Authorization'] = this.axios.defaults.headers['Authorization'] as string
+      }
+      const resp = await fetch(current, { method: 'GET', headers, redirect: 'manual' })
+      if (resp.status >= 300 && resp.status < 400) {
+        const loc = resp.headers.get('location')
+        if (!loc) throw new Error('Redirect response missing Location header')
+        current = new URL(loc, current).toString()
+        continue
+      }
+      if (!resp.ok) throw new Error(`Failed to fetch file: ${resp.statusText}`)
+      if (!resp.body) throw new Error('No response body')
 
-    // We use fetch here to stream.
-    // We need to pass the Authorization header if it's the API root.
-    const headers: Record<string, string> = {}
-    if (url.startsWith(this.baseUrl)) {
-      headers['Authorization'] = this.axios.defaults.headers['Authorization'] as string
+      const fileStream = createWriteStream(destPath)
+      await pipeline(Readable.fromWeb(resp.body as any), fileStream)
+      return destPath
     }
-
-    const response = await fetch(url, { headers })
-    if (!response.ok) throw new Error(`Failed to fetch file: ${response.statusText}`)
-    if (!response.body) throw new Error('No response body')
-
-    const fileStream = createWriteStream(destPath)
-    await pipeline(Readable.fromWeb(response.body as any), fileStream)
-
-    return destPath
+    throw new Error('Too many redirects while downloading file')
   }
 
   async getFileBytes(fileId: string | number) {
@@ -1070,7 +1188,22 @@ export async function initCanvas(config: {
   baseUrl?: string
   verbose?: boolean
 }): Promise<{ insecure: boolean }> {
-  currentBaseUrl = (config.baseUrl || DEFAULT_BASE_URL).replace(/\/$/, '')
+  const rawBase = (config.baseUrl || DEFAULT_BASE_URL).trim()
+  let parsed: URL
+  try {
+    parsed = new URL(rawBase)
+  } catch {
+    throw new CanvasError('Invalid Canvas base URL.')
+  }
+  const allowInsecure =
+    process.env.WB_ALLOW_INSECURE === '1' ||
+    parsed.hostname === 'localhost' ||
+    parsed.hostname === '127.0.0.1' ||
+    parsed.hostname === '::1'
+  if (parsed.protocol !== 'https:' && !allowInsecure) {
+    throw new CanvasError('Canvas base URL must use https://')
+  }
+  currentBaseUrl = parsed.origin.replace(/\/$/, '')
   let insecure = false
   if (config.token) {
     const r = await setToken(currentBaseUrl, config.token)
@@ -1280,8 +1413,12 @@ export async function downloadFile(fileId: string | number) {
   return ensureClient().downloadFile(fileId)
 }
 
-export async function downloadCourseImage(courseId: string | number, url: string) {
-  return ensureClient().downloadCourseImage(courseId, url)
+export async function downloadCourseImage(
+  courseId: string | number,
+  url: string,
+  opts?: { allowHosts?: string[]; maxBytes?: number },
+) {
+  return ensureClient().downloadCourseImage(courseId, url, opts)
 }
 
 export async function getFileBytes(fileId: string | number) {

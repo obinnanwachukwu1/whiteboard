@@ -33,7 +33,7 @@ function normalizeLineStreaming(line: string): string {
   if (indent.length === 0) {
     const labelOnlyBold = rest.match(/^\*\*([^*\n]{1,60})\*\*:?\s*$/)
     const labelOnlyBoldWithColonInside = rest.match(/^\*\*([^*\n]{1,60}):\*\*\s*$/)
-    const labelOnlyPlain = rest.match(/^([A-Za-z][A-Za-z0-9 /&()\-]{0,60}):\s*$/)
+    const labelOnlyPlain = rest.match(/^([A-Za-z][A-Za-z0-9 /&()-]{0,60}):\s*$/)
 
     const rawLabel = (
       labelOnlyBoldWithColonInside?.[1] ||
@@ -63,9 +63,9 @@ function normalizeLineFinal(line: string): string {
   // Note: handle bold headers where the colon may be inside the **...**.
   const labelOnlyBold = rest.match(/^\*\*([^*\n]{1,60})\*\*\s*$/)
   const labelOnlyBoldWithColon = rest.match(/^\*\*([^*\n]{1,60}):\*\*\s*$/)
-  const labelOnlyPlain = rest.match(/^([A-Za-z][A-Za-z0-9 /&()\-]{0,60}):\s*$/)
+  const labelOnlyPlain = rest.match(/^([A-Za-z][A-Za-z0-9 /&()-]{0,60}):\s*$/)
   const inlineBold = rest.match(/^\*\*([^*\n]{1,60})\*\*:?\s+(\S[\s\S]*)$/)
-  const inlinePlain = rest.match(/^([A-Za-z][A-Za-z0-9 /&()\-]{0,60}):\s+(\S[\s\S]*)$/)
+  const inlinePlain = rest.match(/^([A-Za-z][A-Za-z0-9 /&()-]{0,60}):\s+(\S[\s\S]*)$/)
 
   const rawLabel = (
     labelOnlyBoldWithColon?.[1] ||

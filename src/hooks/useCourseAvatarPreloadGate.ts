@@ -1,4 +1,5 @@
 import React from 'react'
+import { useAppFlags } from '../context/AppContext'
 import { useCourseImages } from './useCourseImages'
 import { preloadImage } from '../utils/imagePreload'
 
@@ -11,7 +12,9 @@ export function useCourseAvatarPreloadGate(
   courseIds: Array<string | number | undefined | null>,
   opts: Options = {},
 ) {
+  const flags = useAppFlags()
   const enabled = opts.enabled ?? true
+  const effectiveEnabled = enabled && flags.prefetchEnabled && !flags.privateModeEnabled
   const once = opts.once ?? true
   const { prefetchCourseImage } = useCourseImages()
 
@@ -27,10 +30,10 @@ export function useCourseAvatarPreloadGate(
 
   const key = uniqIds.join('|')
   const everReadyRef = React.useRef(false)
-  const [ready, setReady] = React.useState(() => (!enabled ? true : uniqIds.length === 0))
+  const [ready, setReady] = React.useState(() => (!effectiveEnabled ? true : uniqIds.length === 0))
 
   React.useEffect(() => {
-    if (!enabled) {
+    if (!effectiveEnabled) {
       everReadyRef.current = true
       setReady(true)
       return
@@ -71,7 +74,7 @@ export function useCourseAvatarPreloadGate(
     return () => {
       cancelled = true
     }
-  }, [key, enabled, once])
+  }, [key, effectiveEnabled, once])
 
   return ready
 }

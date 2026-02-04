@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useAppActions } from '../../context/AppContext'
-import { useAIPanelActions, useAIPanelState } from '../../context/AIPanelContext'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useAppActions, useAppFlags } from '../../context/AppContext'
+import { useAIPanelActions } from '../../context/AIPanelContext'
 
 type Props = {
   url: string
@@ -26,7 +26,7 @@ type DocxEvent = {
 const DocxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDownload }) => {
   const appActions = useAppActions()
   const aiPanel = useAIPanelActions()
-  const aiPanelState = useAIPanelState()
+  const { aiEnabled, embeddingsEnabled, privateModeEnabled } = useAppFlags()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const lastLoadedUrlRef = useRef<string | null>(null)
 
@@ -46,15 +46,6 @@ const DocxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDo
       win.postMessage(command, '*')
     } catch {}
   }, [])
-
-  // Avoid expensive refits while the AI panel animates its width (match PDF viewer behavior).
-  const lastAiOpenRef = useRef<boolean>(aiPanelState.isOpen)
-  useLayoutEffect(() => {
-    if (!viewerState.isReady) return
-    if (lastAiOpenRef.current === aiPanelState.isOpen) return
-    lastAiOpenRef.current = aiPanelState.isOpen
-    sendCommand({ type: 'SUSPEND_FIT_ON_RESIZE', ms: 400 })
-  }, [aiPanelState.isOpen, sendCommand, viewerState.isReady])
 
   // Handle events from the iframe viewer
   useEffect(() => {
@@ -142,15 +133,31 @@ const DocxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDo
           break
 
         case 'SHORTCUT':
-          if ((data as any).action === 'search') appActions.onOpenSearch()
-          if ((data as any).action === 'ai') aiPanel.open()
+          if ((data as any).action === 'search' && !privateModeEnabled) appActions.onOpenSearch()
+          if (
+            (data as any).action === 'ai' &&
+            aiEnabled &&
+            embeddingsEnabled &&
+            !privateModeEnabled
+          ) {
+            aiPanel.open()
+          }
           break
       }
     }
 
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
-  }, [aiPanel, appActions, onDownload, sendCommand, url])
+  }, [
+    aiPanel,
+    appActions,
+    onDownload,
+    sendCommand,
+    url,
+    aiEnabled,
+    embeddingsEnabled,
+    privateModeEnabled,
+  ])
 
   // Load DOCX when URL changes and viewer is ready
   useEffect(() => {

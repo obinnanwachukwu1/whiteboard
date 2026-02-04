@@ -6,6 +6,8 @@ type Props = {
   children: (ctx: { isFullscreen: boolean; enter: () => Promise<void>; exit: () => Promise<void>; toggle: () => Promise<void>; containerRef: React.RefObject<HTMLDivElement> }) => React.ReactNode
 }
 
+const LAYOUT_ANIMATION_NAMES = new Set(['ai-panel-expand', 'ai-panel-collapse'])
+
 export const FullscreenContainer: React.FC<Props> = ({ className = '', children }) => {
   // "Fullscreen" here is an in-app focus mode, not OS / native fullscreen.
   // Render via a portal so focus mode can cover the entire window (header/sidebar
@@ -51,15 +53,44 @@ export const FullscreenContainer: React.FC<Props> = ({ className = '', children 
     const ro = new ResizeObserver(onChange)
     ro.observe(el)
 
+    // Some layout changes move the placeholder without resizing it (e.g. AI side panel
+    // animating width while the content stays at max-width + centered). ResizeObserver
+    // won't fire in that case, so we track those animations explicitly.
+    let animRaf = 0
+    let animUntil = 0
+    const tickAnim = () => {
+      animRaf = 0
+      measure()
+      if (performance.now() < animUntil) {
+        animRaf = requestAnimationFrame(tickAnim)
+      }
+    }
+    const startAnimSync = (ms: number) => {
+      const dur = Number.isFinite(ms) ? Math.max(0, ms) : 0
+      animUntil = Math.max(animUntil, performance.now() + dur)
+      if (!animRaf) animRaf = requestAnimationFrame(tickAnim)
+    }
+    const onAnim = (e: Event) => {
+      const evt = e as AnimationEvent
+      if (!evt?.animationName) return
+      if (!LAYOUT_ANIMATION_NAMES.has(evt.animationName)) return
+      startAnimSync(420)
+    }
+
     window.addEventListener('resize', onChange)
     // Capture phase so we catch scroll in nested containers too.
     window.addEventListener('scroll', onChange, true)
+    document.addEventListener('animationstart', onAnim, true)
+    document.addEventListener('animationend', onAnim, true)
 
     return () => {
       if (raf) cancelAnimationFrame(raf)
+      if (animRaf) cancelAnimationFrame(animRaf)
       ro.disconnect()
       window.removeEventListener('resize', onChange)
       window.removeEventListener('scroll', onChange, true)
+      document.removeEventListener('animationstart', onAnim, true)
+      document.removeEventListener('animationend', onAnim, true)
     }
   }, [measure])
 
