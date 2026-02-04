@@ -18,6 +18,8 @@ import { courseHueFor } from '../utils/colorHelpers'
 import { cleanCourseName } from '../utils/courseName'
 import { AssignmentPopover, useAssignmentPopover } from '../components/AssignmentPopover'
 import type { DueItem } from '../types/canvas'
+import { formatDateTime } from '../utils/dateFormat'
+import { useAIContextOffer } from '../hooks/useAIContextOffer'
 
 function extractIdFromUrl(url?: string, key?: string): string | null {
   if (!url || !key) return null
@@ -147,6 +149,40 @@ export default function AssignmentsPage() {
       courseFilter === 'all' ? true : String(d.course_id) === courseFilter,
     )
   }, [dueQ.data, courseFilter])
+
+  const selectedCourseName = React.useMemo(() => {
+    if (courseFilter === 'all') return 'All Courses'
+    const course = orderedCourses.find((c: any) => String(c.id) === courseFilter)
+    if (!course) return 'Course'
+    return sidebar?.customNames?.[String(course.id)] || course.course_code || course.name
+  }, [courseFilter, orderedCourses, sidebar?.customNames])
+
+  const assignmentsContext = React.useMemo(() => {
+    if (!allDue.length) return ''
+    const sorted = [...allDue].sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt)))
+    return sorted.slice(0, 20).map((d) => {
+      const courseLabel =
+        cleanCourseName(d.course_name || '') || String(d.course_id || 'Course')
+      const dueLabel = d.dueAt ? formatDateTime(d.dueAt) : 'No due date'
+      const points =
+        typeof d.pointsPossible === 'number' ? `, ${d.pointsPossible} pts` : ''
+      return `- ${d.name} — ${courseLabel} (Due: ${dueLabel}${points})`
+    }).join('\n')
+  }, [allDue])
+
+  const assignmentsOffer = React.useMemo(() => {
+    if (!assignmentsContext) return null
+    return {
+      id: `assignments:${courseFilter}`,
+      slot: 'view' as const,
+      kind: 'assignments' as const,
+      title: 'Assignments',
+      courseName: selectedCourseName,
+      contentText: assignmentsContext.slice(0, 4000),
+    }
+  }, [assignmentsContext, courseFilter, selectedCourseName])
+
+  useAIContextOffer(`assignments:${courseFilter}`, assignmentsOffer)
 
   // Image helpers
   React.useEffect(() => {

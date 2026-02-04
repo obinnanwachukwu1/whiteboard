@@ -137,22 +137,33 @@ export const AISidePanelMessages = memo(function AISidePanelMessages({
         </div>
       ) : (
         <div className="px-4 py-4 space-y-4">
-          {messages.map((msg) => (
-            <div key={msg.id}>
-              <MessageBubble role={msg.role} content={msg.content} status={msg.status} />
+          {(() => {
+            const seenAttachmentIds = new Set<string>()
+            return messages.map((msg) => {
+              let attachmentsToShow: AIAttachmentChip[] | null = null
+              if (msg.role === 'user' && msg.attachments && msg.attachments.length > 0) {
+                attachmentsToShow = msg.attachments.filter((a) => !seenAttachmentIds.has(a.id))
+                msg.attachments.forEach((a) => seenAttachmentIds.add(a.id))
+              }
 
-              {msg.role === 'user' && msg.attachments && msg.attachments.length > 0 && (
-                <AttachmentList attachments={msg.attachments} />
-              )}
+              return (
+                <div key={msg.id}>
+                  <MessageBubble role={msg.role} content={msg.content} status={msg.status} />
 
-              {msg.role === 'assistant' &&
-                msg.status !== 'streaming' &&
-                msg.references &&
-                msg.references.length > 0 && (
-                  <ReferencesList results={msg.references} onResultClick={onResultClick} />
-                )}
-            </div>
-          ))}
+                  {msg.role === 'user' && attachmentsToShow && attachmentsToShow.length > 0 && (
+                    <AttachmentList attachments={attachmentsToShow} />
+                  )}
+
+                  {msg.role === 'assistant' &&
+                    msg.status !== 'streaming' &&
+                    msg.references &&
+                    msg.references.length > 0 && (
+                      <ReferencesList results={msg.references} onResultClick={onResultClick} />
+                    )}
+                </div>
+              )
+            })
+          })()}
 
           {error && (
             <div className="flex items-start gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
@@ -299,13 +310,13 @@ const AttachmentPill = memo(function AttachmentPill({
   subtitle?: string
 }) {
   return (
-    <div className="px-2 py-1 rounded-md bg-[color:var(--accent-100)] dark:bg-[color:var(--accent-50)] ring-1 ring-[color:var(--accent-200)] dark:ring-[color:var(--accent-200)]">
-      <div className="flex items-center gap-1.5 text-[10px] leading-tight text-[color:var(--accent-800)] dark:text-[color:var(--accent-900)]">
+    <div className="px-2 py-1 rounded-md bg-[color:var(--accent-100)] dark:bg-[color:var(--accent-50)] ring-1 ring-[color:var(--accent-200)] dark:ring-[color:var(--accent-200)] max-w-full">
+      <div className="flex items-start gap-1.5 text-[10px] leading-tight text-[color:var(--accent-800)] dark:text-[color:var(--accent-900)]">
         <Paperclip className="w-3 h-3 opacity-80" />
-        <span className="truncate">{title}</span>
+        <span className="whitespace-normal break-words">{title}</span>
       </div>
       {subtitle && (
-        <div className="text-[9px] leading-tight text-[color:var(--accent-700)] dark:text-[color:var(--accent-800)] truncate opacity-80">
+        <div className="text-[9px] leading-tight text-[color:var(--accent-700)] dark:text-[color:var(--accent-800)] whitespace-normal break-words opacity-80">
           {subtitle}
         </div>
       )}

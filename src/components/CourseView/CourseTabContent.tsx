@@ -10,7 +10,7 @@ import { CourseDiscussions } from '../CourseDiscussions'
 import { CoursePeople } from '../CoursePeople'
 import { HtmlContent } from '../HtmlContent'
 import { Skeleton, SkeletonText } from '../Skeleton'
-import { useOptionalAIPanelActions } from '../../context/AIPanelContext'
+import { useAIContextOffer } from '../../hooks/useAIContextOffer'
 import { stripHtmlToText } from '../../utils/stripHtmlToText'
 
 type Detail = {
@@ -44,31 +44,38 @@ export const CourseTabContent: React.FC<Props> = ({
   onOpenDetail,
   onNavigate,
 }) => {
-  const aiPanel = useOptionalAIPanelActions()
   const syllabusHtml = hasSyllabus ? String(infoQ.data?.syllabus_body || '') : ''
-
-  React.useEffect(() => {
-    if (!aiPanel) return
-
-    if (activeTab !== 'syllabus' || !hasSyllabus || !syllabusHtml.trim()) {
-      aiPanel.setContextOffer(null)
-      return
-    }
-
-    aiPanel.setContextOffer({
+  const syllabusOffer = React.useMemo(() => {
+    if (activeTab !== 'syllabus' || !hasSyllabus || !syllabusHtml.trim()) return null
+    return {
       id: `syllabus:${String(courseId)}`,
-      slot: 'view',
-      kind: 'syllabus',
+      slot: 'view' as const,
+      kind: 'syllabus' as const,
       courseId,
       courseName,
       title: 'Syllabus',
       contentText: stripHtmlToText(syllabusHtml).slice(0, 4000),
-    })
-
-    return () => {
-      aiPanel.setContextOffer(null)
     }
-  }, [aiPanel, activeTab, courseId, courseName, hasSyllabus, syllabusHtml])
+  }, [activeTab, courseId, courseName, hasSyllabus, syllabusHtml])
+
+  useAIContextOffer(`course-syllabus:${String(courseId)}`, syllabusOffer)
+
+  const homeOffer = React.useMemo(() => {
+    if (activeTab !== 'home' || !frontQ.data?.body) return null
+    const text = stripHtmlToText(String(frontQ.data.body))
+    if (!text.trim()) return null
+    return {
+      id: `course-home:${String(courseId)}`,
+      slot: 'view' as const,
+      kind: 'home' as const,
+      courseId,
+      courseName,
+      title: 'Course Home',
+      contentText: text.slice(0, 4000),
+    }
+  }, [activeTab, courseId, courseName, frontQ.data?.body])
+
+  useAIContextOffer(`course-home:${String(courseId)}`, homeOffer)
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -113,6 +120,7 @@ export const CourseTabContent: React.FC<Props> = ({
         <div className="flex-1 flex flex-col overflow-hidden">
           <CourseAnnouncements
             courseId={courseId}
+            courseName={courseName}
             onOpen={(topicId, title) =>
               onOpenDetail({ contentType: 'announcement', contentId: topicId, title })
             }
@@ -124,6 +132,7 @@ export const CourseTabContent: React.FC<Props> = ({
         <div className="flex-1 flex flex-col overflow-hidden">
           <CourseDiscussions
             courseId={courseId}
+            courseName={courseName}
             onOpen={(topicId, title) =>
               onOpenDetail({ contentType: 'discussion', contentId: topicId, title })
             }
@@ -150,7 +159,7 @@ export const CourseTabContent: React.FC<Props> = ({
 
       {activeTab === 'links' && (
         <div className="flex-1 flex flex-col overflow-hidden">
-          <CourseLinks courseId={courseId} onNavigate={onNavigate} />
+          <CourseLinks courseId={courseId} courseName={courseName} onNavigate={onNavigate} />
         </div>
       )}
 
@@ -174,19 +183,23 @@ export const CourseTabContent: React.FC<Props> = ({
 
       {activeTab === 'assignments' && (
         <div className="flex-1 flex flex-col overflow-hidden">
-          <CourseAssignments courseId={courseId} onOpenDetail={onOpenDetail} />
+          <CourseAssignments
+            courseId={courseId}
+            courseName={courseName}
+            onOpenDetail={onOpenDetail}
+          />
         </div>
       )}
 
       {activeTab === 'grades' && (
         <div className="flex-1 flex flex-col overflow-hidden">
-          <CourseGrades courseId={courseId} />
+          <CourseGrades courseId={courseId} courseName={courseName} />
         </div>
       )}
 
       {activeTab === 'people' && (
         <div className="flex-1 flex flex-col overflow-hidden">
-          <CoursePeople courseId={courseId} />
+          <CoursePeople courseId={courseId} courseName={courseName} />
         </div>
       )}
     </div>

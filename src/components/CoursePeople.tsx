@@ -2,9 +2,11 @@ import React from 'react'
 import { Users, Search, GraduationCap, BookOpen, UserCog, User, UsersRound, ChevronDown, ChevronRight } from 'lucide-react'
 import { useCourseUsers, useCourseGroups, useMyGroups } from '../hooks/useCanvasQueries'
 import type { CanvasUser, CanvasEnrollment, CanvasGroup } from '../types/canvas'
+import { useAIContextOffer } from '../hooks/useAIContextOffer'
 
 type Props = {
   courseId: string | number
+  courseName?: string
 }
 
 // Get primary role from enrollments
@@ -114,7 +116,7 @@ const ROLE_FILTERS = [
 
 type RoleFilter = typeof ROLE_FILTERS[number]['key']
 
-export const CoursePeople: React.FC<Props> = ({ courseId }) => {
+export const CoursePeople: React.FC<Props> = ({ courseId, courseName }) => {
   const { data, isLoading, error } = useCourseUsers(courseId)
   const { data: courseGroups, isLoading: groupsLoading } = useCourseGroups(courseId)
   const { data: myAllGroups } = useMyGroups('Course')
@@ -192,6 +194,54 @@ export const CoursePeople: React.FC<Props> = ({ courseId }) => {
   const totalCount = data?.length || 0
   const filteredCount = processedUsers.instructors.length + processedUsers.tas.length + 
                        processedUsers.students.length + processedUsers.others.length
+
+  const peopleContext = React.useMemo(() => {
+    if (!data || data.length === 0) return ''
+    const parts: string[] = []
+    if (search.trim() || roleFilter !== 'all') {
+      const filters: string[] = []
+      if (search.trim()) filters.push(`Search: "${search.trim()}"`)
+      if (roleFilter !== 'all') filters.push(`Role: ${roleFilter}`)
+      parts.push(`Filters: ${filters.join(' · ')}`)
+    }
+    parts.push(`People: ${filteredCount} of ${totalCount}`)
+    parts.push(
+      `Instructors: ${processedUsers.instructors.length}, ` +
+        `TAs: ${processedUsers.tas.length}, ` +
+        `Students: ${processedUsers.students.length}, ` +
+        `Others: ${processedUsers.others.length}`,
+    )
+
+    const visible = [
+      ...processedUsers.instructors,
+      ...processedUsers.tas,
+      ...processedUsers.students,
+      ...processedUsers.others,
+    ]
+    const lines = visible.slice(0, 15).map((u: any) => {
+      const role = getRoleLabel(u.role || '')
+      return `- ${u.name || u.short_name || 'User'}${role ? ` (${role})` : ''}`
+    })
+    if (lines.length) {
+      parts.push(['People List:', ...lines].join('\n'))
+    }
+    return parts.join('\n')
+  }, [data, search, roleFilter, processedUsers, filteredCount, totalCount])
+
+  const peopleOffer = React.useMemo(() => {
+    if (!peopleContext) return null
+    return {
+      id: `course-people:${String(courseId)}`,
+      slot: 'view' as const,
+      kind: 'people' as const,
+      title: 'People',
+      courseId,
+      courseName,
+      contentText: peopleContext.slice(0, 4000),
+    }
+  }, [peopleContext, courseId, courseName])
+
+  useAIContextOffer(`course-people:${String(courseId)}`, peopleOffer)
 
   return (
     <div className="flex flex-col h-full">

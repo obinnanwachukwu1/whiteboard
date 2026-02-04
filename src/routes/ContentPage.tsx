@@ -153,6 +153,7 @@ export default function ContentPage() {
     return (
       <DiscussionDetail 
         courseId={courseId} 
+        courseName={courseName}
         topicId={view.contentId} 
         title={view.title} 
         onBack={onBack} 

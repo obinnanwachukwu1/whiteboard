@@ -11,9 +11,12 @@ import { useQueryClient } from '@tanstack/react-query'
 import { enqueuePrefetch } from '../utils/prefetchQueue'
 import { usePrefetchOnHover } from '../hooks/usePrefetchOnHover'
 import { useAppFlags } from '../context/AppContext'
+import { formatDateTime } from '../utils/dateFormat'
+import { useAIContextOffer } from '../hooks/useAIContextOffer'
 
 type Props = {
   courseId: string | number
+  courseName?: string
   onOpen: (topicId: string, title: string) => void
 }
 
@@ -92,7 +95,7 @@ const AnnouncementItem: React.FC<{
 
 const MAX_RENDER = 200
 
-export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
+export const CourseAnnouncements: React.FC<Props> = ({ courseId, courseName, onOpen }) => {
   const { prefetchEnabled, privateModeEnabled } = useAppFlags()
   const { data, isLoading, error, hasNextPage, isFetchingNextPage, fetchNextPage } =
     useCourseAnnouncementsInfinite(courseId, 10)
@@ -115,6 +118,30 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, onOpen }) => {
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
   const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
   const queryClient = useQueryClient()
+
+  const announcementContext = React.useMemo(() => {
+    if (!list.length) return ''
+    return list.slice(0, 20).map((a: any) => {
+      const date = formatDateTime(a?.posted_at || a?.postedAt)
+      const dateLabel = date && date !== '—' ? ` (${date})` : ''
+      return `- ${a?.title || 'Announcement'}${dateLabel}`
+    }).join('\n')
+  }, [list])
+
+  const announcementsOffer = React.useMemo(() => {
+    if (!announcementContext) return null
+    return {
+      id: `course-announcements:${String(courseId)}`,
+      slot: 'view' as const,
+      kind: 'announcements' as const,
+      title: 'Announcements',
+      courseId,
+      courseName,
+      contentText: announcementContext.slice(0, 4000),
+    }
+  }, [announcementContext, courseId, courseName])
+
+  useAIContextOffer(`course-announcements:${String(courseId)}`, announcementsOffer)
 
   React.useEffect(() => {
     const el = sentinelRef.current

@@ -22,8 +22,11 @@ describe('isSafeMediaSrc', () => {
     expect(isSafeMediaSrc('javascript:alert(1)', 'https://canvas.test', true)).toBe(false)
   })
 
-  it('blocks relative URLs', () => {
-    expect(isSafeMediaSrc('/foo.png', 'https://canvas.test', true)).toBe(false)
+  it('allows relative URLs when a base origin is provided', () => {
+    expect(isSafeMediaSrc('/foo.png', 'https://canvas.test', false)).toBe(true)
+  })
+
+  it('blocks relative URLs without a base origin', () => {
+    expect(isSafeMediaSrc('/foo.png', '', true)).toBe(false)
   })
 })
-

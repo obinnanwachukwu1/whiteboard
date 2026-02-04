@@ -27,6 +27,8 @@ import { SkeletonList } from './Skeleton'
 import { useAppData, useAppActions } from '../context/AppContext'
 import { canvasContentUrl } from '../utils/canvasContentUrl'
 import { openExternal } from '../utils/openExternal'
+import { formatDateTime } from '../utils/dateFormat'
+import { useAIContextOffer } from '../hooks/useAIContextOffer'
 
 type Props = {
   courseId: string | number
@@ -227,6 +229,65 @@ export const CourseFiles: React.FC<Props> = ({
   }, [listFolders, files])
 
   const showListSkeleton = isLoading || (effectiveCurrent != null && filesQ.isLoading)
+
+  const currentFolderName = React.useMemo(() => {
+    if (!effectiveCurrent) return 'Files'
+    const folder = byId.get(String(effectiveCurrent))
+    if (folder) {
+      const name = String(folder.name || folder.full_name || 'Folder')
+      if (courseRootId && String(folder.id) === courseRootId) return 'Course Files'
+      return name
+    }
+    return 'Files'
+  }, [effectiveCurrent, byId, courseRootId])
+
+  const breadcrumbLabel = React.useMemo(() => {
+    if (!breadcrumb.length) return ''
+    return breadcrumb
+      .map((f: any) => String(f?.name || f?.full_name || ''))
+      .filter(Boolean)
+      .join(' / ')
+  }, [breadcrumb])
+
+  const filesContext = React.useMemo(() => {
+    if (!combinedItems.length) return ''
+    const headerParts = [`Folder: ${currentFolderName}`]
+    if (breadcrumbLabel) headerParts.push(`Path: ${breadcrumbLabel}`)
+    const lines = combinedItems.slice(0, 20).map((item) => {
+      if (item.type === 'folder') {
+        const name = String(item.data?.name || item.data?.full_name || 'Folder')
+        return `- [Folder] ${name}`
+      }
+      const name = String(item.data?.display_name || item.data?.filename || 'File')
+      const typeLabel = fileTypeLabel(name, item.data?.content_type)
+      const sizeLabel = formatBytes(item.data?.size)
+      const updatedLabel = item.data?.updated_at ? formatDateTime(item.data.updated_at) : ''
+      const meta = [
+        typeLabel || '',
+        sizeLabel || '',
+        updatedLabel && updatedLabel !== '—' ? `Updated ${updatedLabel}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')
+      return `- ${name}${meta ? ` (${meta})` : ''}`
+    })
+    return [headerParts.join(' · '), ...lines].filter(Boolean).join('\n')
+  }, [combinedItems, currentFolderName, breadcrumbLabel])
+
+  const filesOffer = React.useMemo(() => {
+    if (!filesContext) return null
+    return {
+      id: `course-files:${String(courseId)}:${String(effectiveCurrent || 'root')}`,
+      slot: 'view' as const,
+      kind: 'files' as const,
+      title: 'Files',
+      courseId,
+      courseName,
+      contentText: filesContext.slice(0, 4000),
+    }
+  }, [filesContext, courseId, courseName, effectiveCurrent])
+
+  useAIContextOffer(`course-files:${String(courseId)}`, filesOffer)
 
   return (
     <div className="flex flex-col h-full">

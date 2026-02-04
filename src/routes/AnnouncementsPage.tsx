@@ -9,6 +9,7 @@ import { SkeletonList } from '../components/Skeleton'
 import { CourseAvatar } from '../components/CourseAvatar'
 import { useCourseImages } from '../hooks/useCourseImages'
 import { useCourseAvatarPreloadGate } from '../hooks/useCourseAvatarPreloadGate'
+import { useAIContextOffer } from '../hooks/useAIContextOffer'
 
 function extractIdFromUrl(url?: string, key?: string): string | null {
   if (!url || !key) return null
@@ -55,6 +56,37 @@ export default function AnnouncementsPage() {
       .filter((x: any) => x.courseId != null)
       .filter((x: any) => (courseFilter === 'all' ? true : String(x.courseId) === courseFilter))
   }, [annsQ.data, orderedCourses, courseFilter, sidebar?.customNames])
+
+  const selectedCourseName = React.useMemo(() => {
+    if (courseFilter === 'all') return 'All Courses'
+    const course = orderedCourses.find((c: any) => String(c.id) === courseFilter)
+    if (!course) return 'Course'
+    return sidebar?.customNames?.[String(course.id)] || course.course_code || course.name
+  }, [courseFilter, orderedCourses, sidebar?.customNames])
+
+  const announcementContext = React.useMemo(() => {
+    if (!list.length) return ''
+    return list.slice(0, 20).map((a: any) => {
+      const date = formatDateTime(a.postedAt)
+      const dateLabel = date && date !== '—' ? ` (${date})` : ''
+      const courseLabel = a.courseName ? ` — ${a.courseName}` : ''
+      return `- ${a.title}${courseLabel}${dateLabel}`
+    }).join('\n')
+  }, [list])
+
+  const announcementsOffer = React.useMemo(() => {
+    if (!announcementContext) return null
+    return {
+      id: `announcements:${courseFilter}`,
+      slot: 'view' as const,
+      kind: 'announcements' as const,
+      title: 'Announcements',
+      courseName: selectedCourseName,
+      contentText: announcementContext.slice(0, 4000),
+    }
+  }, [announcementContext, courseFilter, selectedCourseName])
+
+  useAIContextOffer(`announcements:${courseFilter}`, announcementsOffer)
 
   const imagesReady = useCourseAvatarPreloadGate(
     list.map((a: any) => a.courseId),

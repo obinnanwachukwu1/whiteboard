@@ -10,6 +10,9 @@ import type { DiscussionEntry, DiscussionParticipant } from '../types/canvas'
 import { SkeletonText } from './Skeleton'
 import { useAppData, useAppFlags } from '../context/AppContext'
 import { isSafeMediaSrc } from '../utils/urlPolicy'
+import { stripHtmlToText } from '../utils/stripHtmlToText'
+import { useAIContextOffer } from '../hooks/useAIContextOffer'
+import { formatDateTime } from '../utils/dateFormat'
 
 // Helper to check if the current user has replied in a thread
 function containsUserReply(entry: DiscussionEntry, myId: string): boolean {
@@ -23,6 +26,7 @@ function containsUserReply(entry: DiscussionEntry, myId: string): boolean {
 
 type Props = {
   courseId: string | number
+  courseName?: string
   topicId: string | number
   title?: string
   onBack: () => void
@@ -31,7 +35,7 @@ type Props = {
   canGoBack?: boolean
 }
 
-export const DiscussionDetail: React.FC<Props> = ({ courseId, topicId, title, onBack, onNavigate, isEmbedded, canGoBack }) => {
+export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicId, title, onBack, onNavigate, isEmbedded, canGoBack }) => {
   const isWin =
     (typeof navigator !== 'undefined' && /windows/i.test(navigator.userAgent)) ||
     (typeof navigator !== 'undefined' && typeof (navigator as any).platform === 'string' && /^win/i.test((navigator as any).platform))
@@ -59,6 +63,47 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, topicId, title, on
   const rawEntries = view?.view || []
   const myId = profile?.id ? String(profile.id) : null
   const unreadEntries = view?.unread_entries || []
+
+  const discussionContext = useMemo(() => {
+    const parts: string[] = []
+    const topicTitle = topic?.title || title || 'Discussion'
+    parts.push(`Title: ${topicTitle}`)
+    if (topic?.posted_at) {
+      parts.push(`Posted: ${formatDateTime(topic.posted_at)}`)
+    }
+    if (topic?.message) {
+      const clean = stripHtmlToText(topic.message).slice(0, 2000)
+      if (clean) parts.push(`Prompt:\n${clean}`)
+    }
+
+    if (rawEntries.length) {
+      const lines = rawEntries.slice(0, 5).map((entry: DiscussionEntry) => {
+        const author = entry.user_name || 'User'
+        const created = entry.created_at ? formatDateTime(entry.created_at) : ''
+        const snippet = stripHtmlToText(entry.message || '').slice(0, 280)
+        const meta = [author, created && created !== '—' ? created : ''].filter(Boolean).join(' · ')
+        return `- ${meta}: ${snippet}`.trim()
+      })
+      parts.push(['Replies (sample):', ...lines].join('\n'))
+    }
+
+    return parts.filter(Boolean).join('\n')
+  }, [topic, title, rawEntries])
+
+  const discussionOffer = useMemo(() => {
+    if (!discussionContext) return null
+    return {
+      id: `discussion:${String(courseId)}:${String(topicId)}`,
+      slot: 'view' as const,
+      kind: 'discussion' as const,
+      courseId,
+      courseName,
+      title: topic?.title || title || 'Discussion',
+      contentText: discussionContext.slice(0, 4000),
+    }
+  }, [discussionContext, courseId, courseName, topicId, topic, title])
+
+  useAIContextOffer(`discussion:${String(courseId)}:${String(topicId)}`, discussionOffer)
 
   // Mark unread entries as read when they're loaded
   useEffect(() => {

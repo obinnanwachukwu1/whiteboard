@@ -26,6 +26,7 @@ import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
 import { SkeletonList } from './Skeleton'
 import { canvasContentUrl } from '../utils/canvasContentUrl'
 import { openExternal } from '../utils/openExternal'
+import { useAIContextOffer } from '../hooks/useAIContextOffer'
 
 type Props = {
   courseId: string | number
@@ -270,6 +271,38 @@ export const CourseModules: React.FC<Props> = ({
   const queryClient = useQueryClient()
   const autoPrefetchedRef = React.useRef<string | null>(null)
   const initializedForCourseRef = React.useRef<string | null>(null)
+
+  const modulesContext = React.useMemo(() => {
+    if (!modules || !Array.isArray(modules) || modules.length === 0) return ''
+    const lines = (modules as CanvasModule[]).slice(0, 10).map((m) => {
+      const items = (m?.moduleItemsConnection?.nodes || []) as CanvasModuleItem[]
+      const itemTitles = items
+        .slice(0, 3)
+        .map((it) => it.title || 'Item')
+        .filter(Boolean)
+      const remaining = Math.max(items.length - itemTitles.length, 0)
+      const itemLabel = itemTitles.length
+        ? `: ${itemTitles.join(', ')}${remaining ? ` (+${remaining} more)` : ''}`
+        : ''
+      return `- ${m.name || 'Module'}${itemLabel}`
+    })
+    return [`Modules (${modules.length})`, ...lines].join('\n')
+  }, [modules])
+
+  const modulesOffer = React.useMemo(() => {
+    if (!modulesContext) return null
+    return {
+      id: `course-modules:${String(courseId)}`,
+      slot: 'view' as const,
+      kind: 'modules' as const,
+      title: 'Modules',
+      courseId,
+      courseName,
+      contentText: modulesContext.slice(0, 4000),
+    }
+  }, [modulesContext, courseId, courseName])
+
+  useAIContextOffer(`course-modules:${String(courseId)}`, modulesOffer)
 
   // Initialize: expand only the first module when modules load
   React.useEffect(() => {

@@ -7,13 +7,15 @@ import { ListItemRow } from './ui/ListItemRow'
 import { MetadataBadge } from './ui/MetadataBadge'
 import { SkeletonList } from './Skeleton'
 import { getExtraCourseLinks } from '../utils/courseTabs'
+import { useAIContextOffer } from '../hooks/useAIContextOffer'
 
 type Props = {
   courseId: string | number
+  courseName?: string
   onNavigate?: (url: string, title?: string) => void
 }
 
-export const CourseLinks: React.FC<Props> = ({ courseId, onNavigate }) => {
+export const CourseLinks: React.FC<Props> = ({ courseId, courseName, onNavigate }) => {
   const { data: tabs = [], isLoading, error } = useCourseTabs(courseId, true)
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
   const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
@@ -71,6 +73,33 @@ export const CourseLinks: React.FC<Props> = ({ courseId, onNavigate }) => {
       .slice()
       .sort((a: any, b: any) => Number(a.position || 0) - Number(b.position || 0))
   }, [tabs])
+
+  const linksContext = React.useMemo(() => {
+    if (!extraLinks.length) return ''
+    const lines = extraLinks.slice(0, 20).map((t: any) => {
+      const label = friendlyLabel(t)
+      const type = (t.type || '').toLowerCase()
+      const hidden = t.hidden ? 'hidden' : ''
+      const meta = [type, hidden].filter(Boolean).join(' · ')
+      return `- ${label}${meta ? ` (${meta})` : ''}`
+    })
+    return ['Course Links', ...lines].join('\n')
+  }, [extraLinks, friendlyLabel])
+
+  const linksOffer = React.useMemo(() => {
+    if (!linksContext) return null
+    return {
+      id: `course-links:${String(courseId)}`,
+      slot: 'view' as const,
+      kind: 'links' as const,
+      title: 'Course Links',
+      courseId,
+      courseName,
+      contentText: linksContext.slice(0, 4000),
+    }
+  }, [linksContext, courseId, courseName])
+
+  useAIContextOffer(`course-links:${String(courseId)}`, linksOffer)
 
   return (
     <div className="flex flex-col h-full">

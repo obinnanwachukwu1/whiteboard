@@ -7,12 +7,15 @@ import { useCourseGradebook } from '../hooks/useCourseGradebook'
 import { useQueryClient } from '@tanstack/react-query'
 import { calculateCourseGrades } from '../utils/gradeCalc'
 import { useAppActions } from '../context/AppContext'
+import { formatDateTime } from '../utils/dateFormat'
+import { useAIContextOffer } from '../hooks/useAIContextOffer'
 
 type Props = {
   courseId: string | number
+  courseName?: string
 }
 
-export const CourseGrades: React.FC<Props> = ({ courseId }) => {
+export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
   const actions = useAppActions()
   const queryClient = useQueryClient()
   // Keep raw percent input so users can type decimals naturally
@@ -45,6 +48,54 @@ export const CourseGrades: React.FC<Props> = ({ courseId }) => {
     if (!groups.length) return null as any
     return calculateCourseGrades(groups, assignments, { useWeights: 'auto', treatUngradedAsZero: true, whatIf })
   }, [groups, assignments, whatIf])
+
+  const gradesContext = React.useMemo(() => {
+    const parts: string[] = []
+    if (calc) {
+      const current = calc.current.totals.percent ?? '—'
+      const final = calc.final.totals.percent ?? '—'
+      parts.push(`Current: ${current}%`, `Final (What-If): ${final}%`)
+    }
+
+    if (rawAssignments.length) {
+      const lines = rawAssignments.slice(0, 20).map((a: any) => {
+        const pts = a?.points_possible ?? null
+        const score = a?.submission?.excused
+          ? 'Excused'
+          : (a?.submission?.score ?? null)
+        const scoreLabel =
+          typeof score === 'number'
+            ? `${score}${typeof pts === 'number' ? `/${pts}` : ''}`
+            : (score || '—')
+        const dueLabel = a?.due_at ? formatDateTime(a.due_at) : ''
+        const meta = [
+          scoreLabel ? `Score: ${scoreLabel}` : '',
+          dueLabel && dueLabel !== '—' ? `Due: ${dueLabel}` : '',
+        ]
+          .filter(Boolean)
+          .join(' · ')
+        return `- ${a?.name || 'Assignment'}${meta ? ` (${meta})` : ''}`
+      })
+      parts.push(['Gradebook:', ...lines].join('\n'))
+    }
+
+    return parts.join('\n')
+  }, [calc, rawAssignments])
+
+  const gradesOffer = React.useMemo(() => {
+    if (!gradesContext) return null
+    return {
+      id: `course-grades:${String(courseId)}`,
+      slot: 'view' as const,
+      kind: 'grades' as const,
+      title: 'Grades',
+      courseId,
+      courseName,
+      contentText: gradesContext.slice(0, 4000),
+    }
+  }, [gradesContext, courseId, courseName])
+
+  useAIContextOffer(`course-grades:${String(courseId)}`, gradesOffer)
 
   // Toggle: show current vs out-of-total (final) as a single percentage
   const [outOfTotal, setOutOfTotal] = React.useState(false)

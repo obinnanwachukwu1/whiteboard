@@ -10,9 +10,12 @@ import { useQueryClient } from '@tanstack/react-query'
 import { enqueuePrefetch } from '../utils/prefetchQueue'
 import { usePrefetchOnHover } from '../hooks/usePrefetchOnHover'
 import { useAppFlags } from '../context/AppContext'
+import { formatDateTime } from '../utils/dateFormat'
+import { useAIContextOffer } from '../hooks/useAIContextOffer'
 
 type Props = {
   courseId: string | number
+  courseName?: string
   onOpen: (topicId: string, title: string) => void
 }
 
@@ -117,7 +120,7 @@ const DiscussionItemRow: React.FC<{
   )
 }
 
-export const CourseDiscussions: React.FC<Props> = ({ courseId, onOpen }) => {
+export const CourseDiscussions: React.FC<Props> = ({ courseId, courseName, onOpen }) => {
   const { prefetchEnabled, privateModeEnabled } = useAppFlags()
   const [searchTerm, setSearchTerm] = useState('')
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
@@ -141,6 +144,46 @@ export const CourseDiscussions: React.FC<Props> = ({ courseId, onOpen }) => {
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null)
   const anchorEls = React.useRef<Map<string, HTMLElement | null>>(new Map())
   const queryClient = useQueryClient()
+
+  const discussionContext = React.useMemo(() => {
+    if (!list || list.length === 0) return ''
+    const filters: string[] = []
+    if (showUnreadOnly) filters.push('Unread only')
+    if (debouncedSearch?.trim()) filters.push(`Search: "${debouncedSearch.trim()}"`)
+    const header = filters.length ? `Filters: ${filters.join(' · ')}` : ''
+    const lines = list.slice(0, 20).map((d) => {
+      const lastActivity = d.last_reply_at || d.posted_at
+      const lastLabel = lastActivity ? formatDateTime(lastActivity) : ''
+      const replies = d.discussion_subentry_count || 0
+      const unread = d.unread_count || 0
+      const meta = [
+        lastLabel && lastLabel !== '—' ? `Last activity: ${lastLabel}` : '',
+        replies ? `${replies} replies` : '',
+        unread ? `${unread} unread` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')
+      return `- ${d.title || 'Discussion'}${meta ? ` (${meta})` : ''}`
+    })
+    return [header, lines.join('\n')].filter(Boolean).join('\n')
+  }, [list, showUnreadOnly, debouncedSearch])
+
+  const discussionsOffer = React.useMemo(() => {
+    if (!discussionContext) return null
+    const searchKey = debouncedSearch?.trim() ? `:search:${debouncedSearch.trim()}` : ''
+    const unreadKey = showUnreadOnly ? ':unread' : ''
+    return {
+      id: `course-discussions:${String(courseId)}${unreadKey}${searchKey}`,
+      slot: 'view' as const,
+      kind: 'discussions' as const,
+      title: 'Discussions',
+      courseId,
+      courseName,
+      contentText: discussionContext.slice(0, 4000),
+    }
+  }, [discussionContext, courseId, courseName, showUnreadOnly, debouncedSearch])
+
+  useAIContextOffer(`course-discussions:${String(courseId)}`, discussionsOffer)
 
   // Auto-prefetch top 5
   React.useEffect(() => {

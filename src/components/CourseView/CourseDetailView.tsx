@@ -29,6 +29,7 @@ export const CourseDetailView: React.FC<Props> = ({
         {content.contentType === 'discussion' ? (
           <DiscussionDetail
             courseId={courseId}
+            courseName={courseName}
             topicId={content.contentId}
             title={content.title}
             onBack={onClearDetail}

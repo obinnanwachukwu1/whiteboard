@@ -3,15 +3,17 @@ import { useNavigate } from '@tanstack/react-router'
 import { useDashboardData, type DueItem, type FeedbackItem } from '../../hooks/useDashboardData'
 import { useCourseImages } from '../../hooks/useCourseImages'
 import { usePriorityAssignments } from '../../hooks/usePriorityAssignments'
-import { useActivityFeed, type ActivityFeedItem } from '../../hooks/useActivityFeed'
+import { useActivityFeed, type ActivityFeedItem, formatActivityTime } from '../../hooks/useActivityFeed'
 import { useDashboardSettings } from '../../hooks/useDashboardSettings'
 import { extractAssignmentIdFromUrl, extractCourseIdFromUrl } from '../../utils/urlHelpers'
 import { useQueryClient } from '@tanstack/react-query'
+import { formatDateTime } from '../../utils/dateFormat'
 import { PriorityList } from '../dashboard/PriorityList'
 import { ActivityPanel } from '../dashboard/ActivityPanel'
 import { RecentFeedback } from '../dashboard/RecentFeedback'
 import { PinnedPages } from '../dashboard/PinnedPages'
 import { useDashboardPrefetch } from './useDashboardPrefetch'
+import { useAIContextOffer } from '../../hooks/useAIContextOffer'
 
 type Props = {
   due: DueItem[]
@@ -103,6 +105,60 @@ export const Dashboard: React.FC<Props> = ({
       }
     }
   }, [onOpenAnnouncement, onOpenCourse, navigate])
+
+  const dashboardContext = React.useMemo(() => {
+    const parts: string[] = []
+
+    if (priorityData.assignments.length) {
+      const lines = priorityData.assignments.slice(0, 5).map((a) => {
+        const dueLabel = a.relativeTime || (a.dueAt ? formatDateTime(a.dueAt) : '')
+        const points =
+          typeof a.pointsPossible === 'number' ? `${a.pointsPossible} pts` : ''
+        const dueText = dueLabel ? `Due: ${dueLabel}` : ''
+        const meta = [dueText, points].filter(Boolean).join(', ')
+        return `- ${a.name} — ${a.courseLabel}${meta ? ` (${meta})` : ''}`
+      })
+      parts.push(['Priority Assignments:', ...lines].join('\n'))
+    }
+
+    if (activityData.items.length) {
+      const lines = activityData.items.slice(0, 5).map((item) => {
+        const timeLabel = formatActivityTime(item.timestamp)
+        const typeLabel = item.type === 'announcement' ? 'Announcement' : 'Event'
+        const meta = [item.courseName, timeLabel].filter(Boolean).join(' · ')
+        return `- ${typeLabel}: ${item.title}${meta ? ` (${meta})` : ''}`
+      })
+      parts.push(['Activity Feed:', ...lines].join('\n'))
+    }
+
+    if (recentFeedback && recentFeedback.length) {
+      const lines = recentFeedback.slice(0, 5).map((item) => {
+        const score =
+          typeof item.score === 'number'
+            ? `${item.score}${typeof item.pointsPossible === 'number' ? `/${item.pointsPossible}` : ''}`
+            : 'Unscored'
+        const gradedAt = item.gradedAt ? formatDateTime(item.gradedAt) : ''
+        const meta = [score, gradedAt && gradedAt !== '—' ? gradedAt : ''].filter(Boolean).join(' · ')
+        return `- ${item.name} — ${item.courseName}${meta ? ` (${meta})` : ''}`
+      })
+      parts.push(['Recent Feedback:', ...lines].join('\n'))
+    }
+
+    return parts.join('\n\n')
+  }, [activityData.items, priorityData.assignments, recentFeedback])
+
+  const dashboardOffer = React.useMemo(() => {
+    if (!dashboardContext) return null
+    return {
+      id: 'dashboard',
+      slot: 'view' as const,
+      kind: 'dashboard' as const,
+      title: 'Dashboard',
+      contentText: dashboardContext.slice(0, 4000),
+    }
+  }, [dashboardContext])
+
+  useAIContextOffer('dashboard', dashboardOffer)
 
   return (
     <div className="space-y-5">

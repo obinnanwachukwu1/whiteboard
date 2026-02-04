@@ -32,6 +32,9 @@ import { Dropdown, DropdownItem } from './ui/Dropdown'
 import { openExternal } from '../utils/openExternal'
 import { canvasContentUrl } from '../utils/canvasContentUrl'
 import { AssignmentSubmitPanel } from './assignment/AssignmentSubmitPanel'
+import { stripHtmlToText } from '../utils/stripHtmlToText'
+import { formatDateTime } from '../utils/dateFormat'
+import { useAIContextOffer } from '../hooks/useAIContextOffer'
 
 type ContentType = 'page' | 'assignment' | 'file' | 'announcement'
 
@@ -119,6 +122,19 @@ export const CanvasContentView: React.FC<Props> = ({
     return discussionsQ.data.find((t) => String(t.assignment_id) === id) || null
   }, [isDiscussionAssignment, discussionsQ.data, contentId])
 
+  const formatBytes = (bytes?: number | null) => {
+    const b = typeof bytes === 'number' && isFinite(bytes) ? bytes : 0
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'] as const
+    let idx = 0
+    let val = b
+    while (val >= 1024 && idx < units.length - 1) {
+      val /= 1024
+      idx++
+    }
+    if (idx === 0) return `${val} ${units[idx]}`
+    return `${val.toFixed(1)} ${units[idx]}`
+  }
+
   const resolvedTitle = useMemo(() => {
     if (contentType === 'page' && pageQ.data?.title) return pageQ.data.title
     if (contentType === 'assignment' && assignQ.data?.name) return assignQ.data.name
@@ -128,6 +144,121 @@ export const CanvasContentView: React.FC<Props> = ({
     }
     return title
   }, [contentType, pageQ.data, assignQ.data, annQ.data, fileQ.data, title])
+
+  const contextOffer = useMemo(() => {
+    if (contentType === 'page') {
+      const body = pageQ.data?.body || ''
+      const contentText = stripHtmlToText(body).slice(0, 4000)
+      if (!contentText.trim()) return null
+      return {
+        id: `page:${String(courseId)}:${String(contentId)}`,
+        slot: 'view' as const,
+        kind: 'page' as const,
+        courseId,
+        courseName,
+        title: resolvedTitle,
+        pageUrl: String(contentId),
+        contentText,
+      }
+    }
+
+    if (contentType === 'assignment') {
+      const description = assignQ.data?.description || ''
+      const clean = stripHtmlToText(description)
+      const due = assignQ.data?.due_at
+      const points = assignQ.data?.points_possible
+      const parts = [
+        `Title: ${resolvedTitle}`,
+        due ? `Due: ${formatDateTime(due)}` : '',
+        typeof points === 'number' ? `Points: ${points}` : '',
+        clean ? `Description:\n${clean}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n')
+      if (!parts.trim()) return null
+      return {
+        id: `assignment:${String(courseId)}:${String(contentId)}`,
+        slot: 'view' as const,
+        kind: 'assignment' as const,
+        courseId,
+        courseName,
+        title: resolvedTitle,
+        contentText: parts.slice(0, 4000),
+      }
+    }
+
+    if (contentType === 'announcement') {
+      const message = annQ.data?.message || ''
+      const clean = stripHtmlToText(message)
+      const posted = annQ.data?.posted_at
+      const parts = [
+        `Title: ${resolvedTitle}`,
+        posted ? `Posted: ${formatDateTime(posted)}` : '',
+        clean ? `Message:\n${clean}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n')
+      if (!parts.trim()) return null
+      return {
+        id: `announcement:${String(courseId)}:${String(contentId)}`,
+        slot: 'view' as const,
+        kind: 'announcement' as const,
+        courseId,
+        courseName,
+        title: resolvedTitle,
+        contentText: parts.slice(0, 4000),
+      }
+    }
+
+    if (contentType === 'file') {
+      const name =
+        (fileQ.data as any)?.display_name ||
+        (fileQ.data as any)?.filename ||
+        (fileQ.data as any)?.name ||
+        resolvedTitle
+      const contentTypeLabel = (fileQ.data as any)?.content_type as string | undefined
+      const size = formatBytes((fileQ.data as any)?.size)
+      const updated = (fileQ.data as any)?.updated_at as string | undefined
+      const parts = [
+        `Title: ${name || resolvedTitle}`,
+        contentTypeLabel ? `Type: ${contentTypeLabel}` : '',
+        size ? `Size: ${size}` : '',
+        updated ? `Updated: ${formatDateTime(updated)}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n')
+      if (!parts.trim()) return null
+      return {
+        id: `file:${String(courseId)}:${String(contentId)}`,
+        slot: 'view' as const,
+        kind: 'file' as const,
+        courseId,
+        courseName,
+        title: name || resolvedTitle,
+        contentText: parts.slice(0, 4000),
+      }
+    }
+
+    return null
+  }, [
+    contentType,
+    pageQ.data?.body,
+    assignQ.data?.description,
+    assignQ.data?.due_at,
+    assignQ.data?.points_possible,
+    annQ.data?.message,
+    annQ.data?.posted_at,
+    fileQ.data,
+    courseId,
+    courseName,
+    contentId,
+    resolvedTitle,
+  ])
+
+  useAIContextOffer(
+    `content-detail:${String(courseId)}:${String(contentType)}:${String(contentId)}`,
+    contextOffer,
+  )
 
   // Context Menu State
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
