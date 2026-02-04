@@ -1,7 +1,9 @@
 
 import React, { useEffect, useMemo, useRef } from 'react'
 import DOMPurify from 'dompurify'
-import { useAppActions, useAppData, useAppFlags } from '../context/AppContext'
+import { useAppActions, useAppData, useAppFlags, useAppPreferences } from '../context/AppContext'
+import { isSafeMediaSrc } from '../utils/urlPolicy'
+import { normalizeCanvasHtmlForDarkMode } from '../utils/canvasHtmlDarkMode'
 
 let allowExternalEmbeds = false
 let allowExternalMedia = false
@@ -52,6 +54,18 @@ function isAllowedResolvedUrl(u: URL, kind: 'embed' | 'media'): boolean {
   if (allowExternalMedia) return true
   if (mediaAllowHosts.length && hostAllowed(u.hostname, mediaAllowHosts)) return true
   return false
+}
+
+function extractFileIdFromEndpoint(endpoint: string): string | null {
+  if (!endpoint) return null
+  try {
+    const u = resolveHttpUrl(endpoint)
+    if (!u) return null
+    const match = u.pathname.match(/\/files\/(\d+)/)
+    return match?.[1] ?? null
+  } catch {
+    return null
+  }
 }
 
 function stashSrc(el: Element, attr: 'src' | 'srcset') {
@@ -192,6 +206,9 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
   const data = useAppData()
   const appActions = useAppActions()
   const { externalEmbedsEnabled, externalMediaEnabled } = useAppFlags()
+  const { themeSettings } = useAppPreferences()
+  const isDarkMode = themeSettings.theme === 'dark'
+  const shouldNormalize = isDarkMode
   const [blockedCount, setBlockedCount] = React.useState(0)
   const [blockedEmbedCount, setBlockedEmbedCount] = React.useState(0)
   const [mediaAllowedForThisRender, setMediaAllowedForThisRender] = React.useState(false)
@@ -230,7 +247,7 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
       baseUrl: data.baseUrl,
       mediaAllowHosts,
     })
-    return DOMPurify.sanitize(html || '', {
+    const base = DOMPurify.sanitize(html || '', {
       USE_PROFILES: { html: true },
       ADD_ATTR: [
         'style',
@@ -264,7 +281,8 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
       ADD_TAGS: ['img', 'video', 'audio', 'source', 'picture', 'figure', 'figcaption', 'iframe'],
       // Keep links and images functional, but block unknown protocols
       ALLOW_UNKNOWN_PROTOCOLS: false,
-    } as any)
+    } as any) as unknown as string
+    return shouldNormalize ? normalizeCanvasHtmlForDarkMode(base) : base
   }, [
     html,
     externalEmbedsEnabled,
@@ -272,6 +290,7 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
     mediaAllowedForThisRender,
     data.baseUrl,
     mediaAllowHosts,
+    shouldNormalize,
   ])
 
   // Optimize image loading - set eager loading, high priority, and fade-in effect
@@ -313,8 +332,26 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
       } else {
         img.addEventListener('load', handleLoad, { once: true })
       }
+
+      const apiEndpoint = img.getAttribute('data-api-endpoint') || ''
+      if (apiEndpoint && typeof window !== 'undefined' && window.canvas?.getFile) {
+        const handleError = async () => {
+          const fileId = extractFileIdFromEndpoint(apiEndpoint)
+          if (!fileId) return
+          try {
+            const res = await window.canvas.getFile(fileId)
+            const nextUrl = res?.ok ? (res.data as any)?.url : null
+            if (!nextUrl) return
+            const allowExternal = externalMediaEnabled || mediaAllowedForThisRender
+            if (isSafeMediaSrc(nextUrl, data.baseUrl, allowExternal, mediaAllowHosts)) {
+              img.src = nextUrl
+            }
+          } catch {}
+        }
+        img.addEventListener('error', handleError, { once: true })
+      }
     })
-  }, [sanitized])
+  }, [sanitized, externalMediaEnabled, mediaAllowedForThisRender, data.baseUrl, mediaAllowHosts])
 
   const onLoadExternalMedia = () => {
     const el = containerRef.current
@@ -350,8 +387,10 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
     return () => el.removeEventListener('click', handler)
   }, [onNavigate, appActions])
 
+  const normalizedClassName = shouldNormalize ? `${className} rich-html--dark`.trim() : className
+
   return (
-    <div className={className}>
+    <div className={normalizedClassName}>
       {!externalEmbedsEnabled && blockedEmbedCount > 0 && (
         <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           <div className="flex items-center justify-between gap-3">

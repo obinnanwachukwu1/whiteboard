@@ -512,6 +512,27 @@ html {
 .dark .rich-html a:hover {
   color: #93c5fd;
 }
+.rich-html.rich-html--dark [style*="var(--color-backgroundLightest)"],
+.rich-html.rich-html--dark [style*="var(--color-backgroundlightest)"],
+.rich-html.rich-html--dark [style*="background-color: #ffffff"],
+.rich-html.rich-html--dark [style*="background-color:#ffffff"],
+.rich-html.rich-html--dark [style*="background-color: #fff"],
+.rich-html.rich-html--dark [style*="background-color:#fff"],
+.rich-html.rich-html--dark [style*="background: #ffffff"],
+.rich-html.rich-html--dark [style*="background:#ffffff"],
+.rich-html.rich-html--dark [style*="background: #fff"],
+.rich-html.rich-html--dark [style*="background:#fff"] {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+.rich-html.rich-html--dark [style*="color: var(--color-textdarkest)"],
+.rich-html.rich-html--dark [style*="color: var(--color-textDarkest)"],
+.rich-html.rich-html--dark [style*="color: #000000"],
+.rich-html.rich-html--dark [style*="color:#000000"],
+.rich-html.rich-html--dark [style*="color: #000"],
+.rich-html.rich-html--dark [style*="color:#000"] {
+  color: inherit !important;
+}
 .rich-html img,
 .rich-html video,
 .rich-html iframe {
