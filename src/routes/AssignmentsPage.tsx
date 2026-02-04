@@ -313,11 +313,11 @@ export default function AssignmentsPage() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="mt-0 mb-0 text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center min-w-0">
+        <h1 className="mt-0 mb-0 text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 min-w-0 flex-1">
           Assignments
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:flex-nowrap items-stretch sm:items-center gap-2 min-w-0 w-full sm:w-auto">
           <div className="inline-flex rounded-control ring-1 ring-black/10 dark:ring-white/10 overflow-hidden flex-shrink-0">
             <button
               title="Board view"
@@ -335,7 +335,7 @@ export default function AssignmentsPage() {
             </button>
           </div>
           <select
-            className="rounded-control border border-gray-300 dark:border-neutral-700 px-2 py-1.5 text-xs sm:text-sm bg-white/90 dark:bg-neutral-900 min-w-0 flex-1 sm:flex-none sm:w-auto truncate"
+            className="rounded-control border border-gray-300 dark:border-neutral-700 px-2 py-1.5 text-xs sm:text-sm bg-white/90 dark:bg-neutral-900 w-full sm:w-[clamp(10rem,25vw,18rem)] max-w-full min-w-0 truncate"
             value={courseFilter}
             onChange={(e) => setCourseFilter(e.target.value)}
           >

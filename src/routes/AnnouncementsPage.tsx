@@ -95,9 +95,15 @@ export default function AnnouncementsPage() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <h1 className="mt-0 mb-0 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Announcements</h1>
-        <select className="rounded-control border border-gray-300 dark:border-neutral-700 px-2 py-1 text-xs sm:text-sm bg-white/90 dark:bg-neutral-900 max-w-[160px] sm:max-w-none" value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)}>
+      <div className="flex flex-col sm:flex-row sm:flex-nowrap sm:items-center gap-2 min-w-0">
+        <h1 className="mt-0 mb-0 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 min-w-0 flex-1">
+          Announcements
+        </h1>
+        <select
+          className="rounded-control border border-gray-300 dark:border-neutral-700 px-2 py-1 text-xs sm:text-sm bg-white/90 dark:bg-neutral-900 w-full sm:w-[clamp(10rem,25vw,18rem)] max-w-full min-w-0 truncate"
+          value={courseFilter}
+          onChange={(e) => setCourseFilter(e.target.value)}
+        >
           <option value="all">All Courses</option>
           {orderedCourses.map((c: any) => (
             <option key={String(c.id)} value={String(c.id)}>{labelFor(c)}</option>

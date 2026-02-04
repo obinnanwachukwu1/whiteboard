@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { SidebarConfig } from '../../components/Sidebar'
 
 type Params = {
@@ -11,6 +11,7 @@ type Params = {
   setPdfGestureZoomEnabledState: (next: boolean) => void
   setPrivateModeEnabledState: (next: boolean) => void
   setPrivateModeAcknowledgedState: (next: boolean) => void
+  onHydrated?: () => void
 }
 
 export function useRootLayoutUserSettings({
@@ -23,7 +24,14 @@ export function useRootLayoutUserSettings({
   setPdfGestureZoomEnabledState,
   setPrivateModeEnabledState,
   setPrivateModeAcknowledgedState,
+  onHydrated,
 }: Params) {
+  const hydratedRef = useRef(false)
+
+  useEffect(() => {
+    hydratedRef.current = false
+  }, [userKey])
+
   useEffect(() => {
     ;(async () => {
       if (!userKey) return
@@ -101,6 +109,10 @@ export function useRootLayoutUserSettings({
 
         const uid = userKey.split('|')[1]
         if (uid) window.settings.set({ lastUserId: uid }).catch(() => {})
+        if (!hydratedRef.current) {
+          hydratedRef.current = true
+          onHydrated?.()
+        }
       } catch {}
     })()
   }, [userKey])

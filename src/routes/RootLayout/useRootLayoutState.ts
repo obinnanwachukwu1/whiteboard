@@ -51,6 +51,7 @@ export function useRootLayoutState() {
   const [cachedCourses, setCachedCourses] = useState<any[] | null>(null)
   const [cachedDue, setCachedDue] = useState<any[] | null>(null)
   const [activeCourseId, setActiveCourseIdState] = useState<string | number | null>(null)
+  const [userSettingsHydrated, setUserSettingsHydrated] = useState(false)
   const [sidebarCfg, setSidebarCfg] = useState<SidebarConfig>({
     hiddenCourseIds: [],
     customNames: {},
@@ -140,6 +141,10 @@ export function useRootLayoutState() {
     return hasToken && uid ? `${baseUrl}|${uid}` : null
   }, [hasToken, baseUrl, profileQ.data])
 
+  useEffect(() => {
+    setUserSettingsHydrated(false)
+  }, [userKey])
+
   useRootLayoutBootstrap({
     baseUrl,
     verbose,
@@ -176,6 +181,7 @@ export function useRootLayoutState() {
     setPdfGestureZoomEnabledState,
     setPrivateModeEnabledState,
     setPrivateModeAcknowledgedState,
+    onHydrated: () => setUserSettingsHydrated(true),
   })
 
   useEffect(() => {
@@ -395,6 +401,7 @@ export function useRootLayoutState() {
 
   const clearedForPrivateModeRef = useRef(false)
   useEffect(() => {
+    if (!userSettingsHydrated) return
     if (privateModeEnabled) {
       if (clearedForPrivateModeRef.current) return
       clearedForPrivateModeRef.current = true
@@ -402,7 +409,7 @@ export function useRootLayoutState() {
       return
     }
     clearedForPrivateModeRef.current = false
-  }, [privateModeEnabled, clearLocalCaches])
+  }, [privateModeEnabled, clearLocalCaches, userSettingsHydrated])
 
   const setPrefetchEnabledPersisted = useCallback(
     async (v: boolean) => {

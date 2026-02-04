@@ -1,6 +1,6 @@
 import React from 'react'
 import { useCourses } from '../hooks/useCanvasQueries'
-import { useQueries } from '@tanstack/react-query'
+import { keepPreviousData, useQueries } from '@tanstack/react-query'
 import { MessageCircle, Pin, Lock, Search } from 'lucide-react'
 import { useAppActions, useAppData } from '../context/AppContext'
 import { Badge } from '../components/ui/Badge'
@@ -49,13 +49,12 @@ export default function DiscussionsPage() {
   // Memoize to prevent new object reference every render (causes query key instability)
   const queryParams = React.useMemo(() => {
     const params: any = {}
-    if (debouncedSearch?.trim()) params.searchTerm = debouncedSearch.trim()
     // When showing all courses without search, limit pages to avoid flooding
-    if (courseFilter === 'all' && !params.searchTerm) {
+    if (courseFilter === 'all') {
       params.maxPages = 2 // Fetch recent items only
     }
     return params
-  }, [debouncedSearch, courseFilter])
+  }, [courseFilter])
 
   const queries = useQueries({
     queries: coursesToFetch.map((courseId) => ({
@@ -68,6 +67,7 @@ export default function DiscussionsPage() {
         if (!res?.ok) throw new Error(res?.error || 'Failed to load discussions')
         return res.data || []
       },
+      placeholderData: keepPreviousData,
       staleTime: 1000 * 60 * 5,
       gcTime: 1000 * 60 * 60 * 2,
       refetchOnMount: false,
@@ -76,10 +76,10 @@ export default function DiscussionsPage() {
 
   // Show the full-page skeleton only when we have no cached data at all.
   // Otherwise, render whatever is already cached and let the rest fill in.
-  const isHardLoading = queries.every((q) => q.isLoading && !q.data)
-  const isBackgroundFetching = !isHardLoading && queries.some((q) => q.isFetching && !q.data)
+  const isHardLoading = queries.length > 0 && queries.every((q) => q.isLoading && !q.data)
+  const isFetchingAny = !isHardLoading && queries.some((q) => q.isFetching)
 
-  const allDiscussions = React.useMemo(() => {
+  const baseDiscussions = React.useMemo(() => {
     const results: Array<DiscussionTopic & { courseId: string; courseName: string }> = []
     
     queries.forEach((q, i) => {
@@ -103,6 +103,22 @@ export default function DiscussionsPage() {
     return results
   }, [queries, coursesToFetch, orderedCourses])
 
+  const visibleDiscussions = React.useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase()
+    if (!q) return baseDiscussions
+
+    const terms = q.split(/\s+/).filter(Boolean)
+    if (!terms.length) return baseDiscussions
+
+    return baseDiscussions.filter((d) => {
+      const courseLabel = d.courseName || ''
+      const author =
+        d.author?.display_name || d.user_name || (d.user_id != null ? String(d.user_id) : '')
+      const haystack = `${d.title || ''} ${courseLabel} ${author}`.toLowerCase()
+      return terms.every((t) => haystack.includes(t))
+    })
+  }, [baseDiscussions, debouncedSearch])
+
   const timeAgo = (dateStr?: string) => {
     if (!dateStr) return ''
     const date = new Date(dateStr)
@@ -120,27 +136,29 @@ export default function DiscussionsPage() {
   }
 
   const imagesReady = useCourseAvatarPreloadGate(
-    allDiscussions.map((d) => d.courseId),
-    { enabled: !isHardLoading && allDiscussions.length > 0, once: true }
+    visibleDiscussions.map((d) => d.courseId),
+    { enabled: !isHardLoading && visibleDiscussions.length > 0, once: true }
   )
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <h1 className="mt-0 mb-0 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Discussions</h1>
-        <div className="flex gap-2">
-          <div className="relative">
+      <div className="flex flex-col sm:flex-row sm:flex-nowrap sm:items-center gap-2 min-w-0">
+        <h1 className="mt-0 mb-0 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex-none">
+          Discussions
+        </h1>
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:justify-end gap-2 min-w-0 w-full sm:flex-1">
+          <div className="relative min-w-0 w-full sm:flex-1 sm:max-w-[16rem]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
               type="text" 
               placeholder="Search all courses..." 
-              className="w-full sm:w-64 pl-9 pr-3 py-1.5 text-xs sm:text-sm border border-gray-300 dark:border-neutral-700 rounded-control bg-white/90 dark:bg-neutral-900 focus:ring-2 focus:ring-[var(--app-accent)]/30 focus:border-[var(--app-accent)] outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-500"
+              className="w-full min-w-0 pl-9 pr-3 py-1.5 text-xs sm:text-sm border border-gray-300 dark:border-neutral-700 rounded-control bg-white/90 dark:bg-neutral-900 focus:ring-2 focus:ring-[var(--app-accent)]/30 focus:border-[var(--app-accent)] outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <select
-            className="rounded-control border border-gray-300 dark:border-neutral-700 px-2 py-1 text-xs sm:text-sm bg-white/90 dark:bg-neutral-900 max-w-[160px] sm:max-w-none"
+            className="rounded-control border border-gray-300 dark:border-neutral-700 px-2 py-1 text-xs sm:text-sm bg-white/90 dark:bg-neutral-900 w-full sm:w-[clamp(10rem,25vw,18rem)] max-w-full min-w-0 truncate"
             value={courseFilter}
             onChange={(e) => setCourseFilter(e.target.value)}
           >
@@ -152,19 +170,23 @@ export default function DiscussionsPage() {
         </div>
       </div>
 
-      {isHardLoading || (!imagesReady && allDiscussions.length > 0) ? (
+      {isHardLoading || (!imagesReady && visibleDiscussions.length > 0) ? (
         <SkeletonList count={5} hasAvatar variant="row" />
-      ) : allDiscussions.length === 0 ? (
+      ) : visibleDiscussions.length === 0 ? (
         <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-4 text-center">
           <MessageCircle className="w-8 h-8 mx-auto text-slate-400 dark:text-neutral-500 mb-2" />
-          <div className="text-sm text-slate-500 dark:text-neutral-400">No discussions</div>
+          <div className="text-sm text-slate-500 dark:text-neutral-400">
+            {debouncedSearch.trim() ? 'No matching discussions' : 'No discussions'}
+          </div>
         </div>
       ) : (
         <div className="space-y-2">
-          {isBackgroundFetching && (
-            <div className="text-xs text-slate-500 dark:text-neutral-400 px-1">Loading more courses…</div>
+          {isFetchingAny && (
+            <div className="text-xs text-slate-500 dark:text-neutral-400 px-1">
+              Loading more courses…
+            </div>
           )}
-          {allDiscussions.map((d, i) => {
+          {visibleDiscussions.map((d) => {
             const open = () => {
               if (d.courseId != null) {
                 actions.onOpenDiscussion?.(d.courseId, String(d.id), d.title)
@@ -177,7 +199,7 @@ export default function DiscussionsPage() {
 
             return (
               <ListItemRow
-                key={`${d.courseId}-${d.id}-${i}`}
+                key={`${d.courseId}-${String(d.id)}`}
                 icon={
                   <CourseAvatar
                     courseId={d.courseId}

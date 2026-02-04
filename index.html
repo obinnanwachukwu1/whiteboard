@@ -12,9 +12,10 @@
       img-src 'self' data: canvas-file: https: blob:;
       media-src 'self' canvas-file: https: blob:;
       font-src 'self' data:;
-      connect-src 'self' canvas-file:;
+      connect-src 'self' ws: http: https: canvas-file:;
       frame-src 'self' https: pdf-viewer: docx-viewer:;
       object-src 'none';
+      worker-src 'self' blob:;
 	    ">
     <title>Whiteboard</title>
     <script src="./themeBootstrap.js"></script>

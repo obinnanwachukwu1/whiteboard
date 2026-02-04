@@ -36,7 +36,7 @@ export class FileMetaStore {
   async load(): Promise<void> {
     try {
       if (!fs.existsSync(this.persistPath)) {
-        console.log('[FileMetaStore] No persisted metadata found')
+        console.log('[FileMetaStore] No persisted metadata found', this.persistPath)
         return
       }
 
@@ -48,7 +48,10 @@ export class FileMetaStore {
       }
 
       this.files = data.files || {}
-      console.log(`[FileMetaStore] Loaded metadata for ${Object.keys(this.files).length} files`)
+      console.log(
+        `[FileMetaStore] Loaded metadata for ${Object.keys(this.files).length} files`,
+        this.persistPath,
+      )
     } catch (error) {
       console.error('[FileMetaStore] Failed to load:', error)
       this.files = {}

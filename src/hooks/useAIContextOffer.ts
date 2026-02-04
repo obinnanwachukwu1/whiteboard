@@ -5,6 +5,8 @@ import { useAppFlags } from '../context/AppContext'
 
 export function useAIContextOffer(key: string, offer: AIAttachment | null) {
   const aiPanel = useOptionalAIPanelActions()
+  const registerContextOffer = aiPanel?.registerContextOffer
+  const unregisterContextOffer = aiPanel?.unregisterContextOffer
   const { privateModeEnabled } = useAppFlags()
   const signature = useMemo(() => {
     if (!offer) return ''
@@ -19,21 +21,21 @@ export function useAIContextOffer(key: string, offer: AIAttachment | null) {
   }, [offer])
 
   useEffect(() => {
-    if (!aiPanel) return
+    if (!registerContextOffer || !unregisterContextOffer) return
     if (!key) return
     if (privateModeEnabled || !offer) {
-      aiPanel.unregisterContextOffer(key)
+      unregisterContextOffer(key)
       return () => {
-        aiPanel.unregisterContextOffer(key)
+        unregisterContextOffer(key)
       }
     }
     if (offer) {
-      aiPanel.registerContextOffer(key, offer)
+      registerContextOffer(key, offer)
     } else {
-      aiPanel.unregisterContextOffer(key)
+      unregisterContextOffer(key)
     }
     return () => {
-      aiPanel.unregisterContextOffer(key)
+      unregisterContextOffer(key)
     }
-  }, [aiPanel, key, signature, offer, privateModeEnabled])
+  }, [key, signature, privateModeEnabled, registerContextOffer, unregisterContextOffer])
 }
