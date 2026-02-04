@@ -25,6 +25,7 @@ export interface ExtractionOptions {
 
 const DEFAULT_MAX_PAGES = 50
 const DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
+const yieldToEventLoop = () => new Promise<void>((resolve) => setImmediate(resolve))
 
 /**
  * Extract text from a PDF file using unpdf (Node.js compatible)
@@ -34,9 +35,10 @@ async function extractPdfText(filePath: string, options: ExtractionOptions): Pro
 
   try {
     // Read file into buffer, then convert to Uint8Array (required by unpdf)
-    const nodeBuffer = fs.readFileSync(filePath)
+    const nodeBuffer = await fs.promises.readFile(filePath)
     const dataBuffer = new Uint8Array(nodeBuffer.buffer, nodeBuffer.byteOffset, nodeBuffer.byteLength)
     
+    await yieldToEventLoop()
     // Parse PDF with unpdf - returns { text, totalPages }
     const result = await extractText(dataBuffer, {
       mergePages: true, // Merge all pages into a single string
@@ -80,7 +82,8 @@ async function extractPdfText(filePath: string, options: ExtractionOptions): Pro
  */
 async function extractDocxText(filePath: string): Promise<ExtractionResult> {
   try {
-    const buffer = fs.readFileSync(filePath)
+    const buffer = await fs.promises.readFile(filePath)
+    await yieldToEventLoop()
     const result = await mammoth.extractRawText({ buffer })
     
     const text = result.value
@@ -111,9 +114,9 @@ async function extractTextFile(filePath: string): Promise<ExtractionResult> {
     // Read as UTF-8, fallback to latin1 if it fails
     let text: string
     try {
-      text = fs.readFileSync(filePath, 'utf-8')
+      text = await fs.promises.readFile(filePath, 'utf-8')
     } catch {
-      text = fs.readFileSync(filePath, 'latin1')
+      text = await fs.promises.readFile(filePath, 'latin1')
     }
     
     return {

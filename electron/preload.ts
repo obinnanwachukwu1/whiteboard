@@ -387,6 +387,7 @@ if (process.isMainFrame) {
       }>,
     ) => ipcRenderer.invoke('embedding:index', items),
     getStatus: () => ipcRenderer.invoke('embedding:status'),
+    setPaused: (paused: boolean) => ipcRenderer.invoke('embedding:setPaused', paused),
     clear: () => ipcRenderer.invoke('embedding:clear'),
     // File indexing APIs
     indexFile: (
@@ -397,6 +398,7 @@ if (process.isMainFrame) {
       fileSize: number,
       updatedAt?: string,
       url?: string,
+      opts?: { maxPages?: number },
     ) =>
       ipcRenderer.invoke(
         'embedding:indexFile',
@@ -407,6 +409,7 @@ if (process.isMainFrame) {
         fileSize,
         updatedAt,
         url,
+        opts,
       ),
     pruneCourse: (courseId: string) => ipcRenderer.invoke('embedding:pruneCourse', courseId),
     getStorageStats: () => ipcRenderer.invoke('embedding:getStorageStats'),

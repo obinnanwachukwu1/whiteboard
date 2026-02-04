@@ -13,6 +13,61 @@ interface HSL {
   l: number
 }
 
+type WorkerResponse =
+  | { id: number; ok: true; data: HSL }
+  | { id: number; ok: false; error: string }
+
+const WORKER_TIMEOUT_MS = 4000
+let colorWorker: Worker | null = null
+let workerRequestId = 0
+const workerPending = new Map<number, { resolve: (value: HSL | null) => void }>()
+
+function getColorWorker(): Worker | null {
+  if (typeof window === 'undefined' || typeof Worker === 'undefined') return null
+  if (colorWorker) return colorWorker
+  try {
+    colorWorker = new Worker(new URL('../workers/colorWorker.ts', import.meta.url), { type: 'module' })
+    colorWorker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+      const payload = event.data
+      if (!payload || typeof payload.id !== 'number') return
+      const pending = workerPending.get(payload.id)
+      if (!pending) return
+      workerPending.delete(payload.id)
+      pending.resolve(payload.ok ? payload.data : null)
+    }
+    colorWorker.onerror = () => {
+      // Fail all pending requests if the worker crashes.
+      for (const pending of workerPending.values()) {
+        pending.resolve(null)
+      }
+      workerPending.clear()
+      colorWorker = null
+    }
+  } catch {
+    colorWorker = null
+  }
+  return colorWorker
+}
+
+function computeAccentWithWorker(colors: RGB[]): Promise<HSL | null> {
+  const worker = getColorWorker()
+  if (!worker) return Promise.resolve(null)
+  return new Promise((resolve) => {
+    const id = ++workerRequestId
+    const timer = window.setTimeout(() => {
+      workerPending.delete(id)
+      resolve(null)
+    }, WORKER_TIMEOUT_MS)
+    workerPending.set(id, {
+      resolve: (value) => {
+        window.clearTimeout(timer)
+        resolve(value)
+      },
+    })
+    worker.postMessage({ id, colors })
+  })
+}
+
 // Convert RGB to HSL
 function rgbToHsl(r: number, g: number, b: number): HSL {
   r /= 255
@@ -154,7 +209,7 @@ function scoreAccentColor(hsl: HSL): number {
 }
 
 // Sample pixels from an image
-async function sampleImageColors(imageUrl: string, sampleSize = 100): Promise<RGB[]> {
+async function sampleImageColors(imageUrl: string, sampleSize = 120): Promise<RGB[]> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
@@ -168,7 +223,7 @@ async function sampleImageColors(imageUrl: string, sampleSize = 100): Promise<RG
       }
 
       // Scale down large images for performance
-      const maxDim = 200
+      const maxDim = 128
       let width = img.width
       let height = img.height
 
@@ -218,11 +273,16 @@ async function sampleImageColors(imageUrl: string, sampleSize = 100): Promise<RG
 export async function extractAccentColor(imageUrl: string): Promise<HSL> {
   try {
     // Sample colors from the image
-    const colors = await sampleImageColors(imageUrl, 200)
+    const colors = await sampleImageColors(imageUrl, 160)
 
     if (colors.length === 0) {
       // Fallback to default slate
       return { h: 215, s: 16, l: 47 }
+    }
+
+    const workerResult = await computeAccentWithWorker(colors)
+    if (workerResult) {
+      return workerResult
     }
 
     // Cluster to find dominant colors

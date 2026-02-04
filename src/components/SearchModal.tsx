@@ -20,9 +20,8 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { useGlobalSearch } from '../hooks/useGlobalSearch'
-import { useAppData, useAppFlags } from '../context/AppContext'
+import { useAppFlags } from '../context/AppContext'
 import { useAIPanelActions } from '../context/AIPanelContext'
-import { coordinateSearch } from '../utils/coordinator'
 import type { SearchResult, SearchResultType } from '../utils/searchIndex'
 
 type Props = {
@@ -93,11 +92,12 @@ function getTypeLabel(type: SearchResultType): string {
 export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const navigate = useNavigate()
   const flags = useAppFlags()
-  const data = useAppData()
   const aiPanel = useAIPanelActions()
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [showSpinner, setShowSpinner] = useState(false)
+  const spinnerTimerRef = useRef<number | null>(null)
 
   const {
     query,
@@ -107,7 +107,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
     isSearching: isStandardSearching,
     isPendingSearch,
     clearSearch,
-  } = useGlobalSearch({ enabled: isOpen && !flags.privateModeEnabled })
+  } = useGlobalSearch({ enabled: !flags.privateModeEnabled })
 
   // Deep Search State
   const [isDeepSearching, setIsDeepSearching] = useState(false)
@@ -117,6 +117,32 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
   // Unified results view
   const results = deepSearchActive ? deepResults : standardResults
   const isSearching = isStandardSearching || isDeepSearching
+
+  useEffect(() => {
+    const shouldShow = isSearching || isBuilding || isPendingSearch
+    if (!shouldShow) {
+      if (spinnerTimerRef.current) {
+        window.clearTimeout(spinnerTimerRef.current)
+        spinnerTimerRef.current = null
+      }
+      setShowSpinner(false)
+      return
+    }
+
+    if (!spinnerTimerRef.current) {
+      spinnerTimerRef.current = window.setTimeout(() => {
+        spinnerTimerRef.current = null
+        setShowSpinner(true)
+      }, 1000)
+    }
+
+    return () => {
+      if (spinnerTimerRef.current) {
+        window.clearTimeout(spinnerTimerRef.current)
+        spinnerTimerRef.current = null
+      }
+    }
+  }, [isSearching, isBuilding, isPendingSearch])
 
   // Reset deep search when query changes significantly
   useEffect(() => {
@@ -151,18 +177,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
       let searchQuery = query
       let options: any = {}
 
-      // Pass 1: Coordinate (if AI enabled)
-      if (flags.aiEnabled && window.ai) {
-        const plan = await coordinateSearch(query, data.courses)
-        searchQuery = plan.rewrittenQuery
-        options = {
-          courseIds: plan.filters?.courseIds,
-          types: plan.filters?.types,
-          minScore: 0.2,
-        }
-      }
-
-      // Pass 2: Execute Vector Search
+      // Execute Vector Search
       const res = await window.embedding.search(searchQuery, 15, options)
 
       if (res.ok && res.data) {
@@ -373,7 +388,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
             }
             className="flex-1 bg-transparent text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-neutral-500 text-base outline-none disabled:opacity-50"
           />
-          {(isSearching || isBuilding || isPendingSearch) && (
+          {showSpinner && (
             <Loader2 className="w-4 h-4 text-slate-400 animate-spin shrink-0" />
           )}
           <button

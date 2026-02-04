@@ -9,6 +9,39 @@ let allowExternalEmbeds = false
 let allowExternalMedia = false
 let canvasOrigin: string | null = null
 let mediaAllowHosts: string[] = []
+const NORMALIZED_CACHE_LIMIT = 8
+const normalizedCache = new Map<string, string>()
+
+function getNormalizedCached(html: string): string | null {
+  if (!html) return null
+  const cached = normalizedCache.get(html)
+  if (!cached) return null
+  normalizedCache.delete(html)
+  normalizedCache.set(html, cached)
+  return cached
+}
+
+function setNormalizedCached(html: string, normalized: string) {
+  if (!html) return
+  normalizedCache.set(html, normalized)
+  if (normalizedCache.size <= NORMALIZED_CACHE_LIMIT) return
+  const oldest = normalizedCache.keys().next().value
+  if (oldest) normalizedCache.delete(oldest)
+}
+
+function scheduleIdle(cb: () => void) {
+  if (typeof window === 'undefined') {
+    const id = setTimeout(cb, 0)
+    return () => clearTimeout(id)
+  }
+  const ric = (window as any).requestIdleCallback as undefined | ((fn: () => void) => number)
+  if (typeof ric === 'function') {
+    const id = ric(() => cb())
+    return () => (window as any).cancelIdleCallback?.(id)
+  }
+  const id = window.setTimeout(cb, 0)
+  return () => window.clearTimeout(id)
+}
 
 function setHtmlPolicy(next: {
   allowExternalEmbeds: boolean
@@ -213,6 +246,7 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
   const [blockedEmbedCount, setBlockedEmbedCount] = React.useState(0)
   const [mediaAllowedForThisRender, setMediaAllowedForThisRender] = React.useState(false)
   const [mediaAllowHosts, setMediaAllowHosts] = React.useState<string[]>(['inscloudgate.net'])
+  const [normalizedHtml, setNormalizedHtml] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     let active = true
@@ -282,7 +316,7 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
       // Keep links and images functional, but block unknown protocols
       ALLOW_UNKNOWN_PROTOCOLS: false,
     } as any) as unknown as string
-    return shouldNormalize ? normalizeCanvasHtmlForDarkMode(base) : base
+    return base
   }, [
     html,
     externalEmbedsEnabled,
@@ -290,8 +324,39 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
     mediaAllowedForThisRender,
     data.baseUrl,
     mediaAllowHosts,
-    shouldNormalize,
   ])
+
+  useEffect(() => {
+    if (!shouldNormalize) {
+      setNormalizedHtml(null)
+      return
+    }
+    if (!sanitized) {
+      setNormalizedHtml(null)
+      return
+    }
+
+    const cached = getNormalizedCached(sanitized)
+    if (cached) {
+      setNormalizedHtml(cached)
+      return
+    }
+
+    setNormalizedHtml(null)
+    let cancelled = false
+    const cancelIdle = scheduleIdle(() => {
+      if (cancelled) return
+      const normalized = normalizeCanvasHtmlForDarkMode(sanitized)
+      setNormalizedCached(sanitized, normalized)
+      setNormalizedHtml(normalized)
+    })
+    return () => {
+      cancelled = true
+      cancelIdle?.()
+    }
+  }, [sanitized, shouldNormalize])
+
+  const renderedHtml = shouldNormalize ? normalizedHtml ?? sanitized : sanitized
 
   // Optimize image loading - set eager loading, high priority, and fade-in effect
   useEffect(() => {
@@ -351,7 +416,7 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
         img.addEventListener('error', handleError, { once: true })
       }
     })
-  }, [sanitized, externalMediaEnabled, mediaAllowedForThisRender, data.baseUrl, mediaAllowHosts])
+  }, [renderedHtml, externalMediaEnabled, mediaAllowedForThisRender, data.baseUrl, mediaAllowHosts])
 
   const onLoadExternalMedia = () => {
     const el = containerRef.current
@@ -419,7 +484,7 @@ export const HtmlContent: React.FC<Props> = ({ html, onNavigate, className = '' 
           </div>
         </div>
       )}
-      <div ref={containerRef} dangerouslySetInnerHTML={{ __html: sanitized }} />
+      <div ref={containerRef} dangerouslySetInnerHTML={{ __html: renderedHtml }} />
     </div>
   )
 }

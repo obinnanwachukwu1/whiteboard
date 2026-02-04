@@ -60,7 +60,8 @@ export function classifyFileForIndexing(
  */
 export async function extractFileText(
   fileId: string,
-  maxPages: number = 50
+  maxPages: number = 50,
+  gate?: () => Promise<void>
 ): Promise<{
   text: string
   pageCount: number
@@ -68,12 +69,14 @@ export async function extractFileText(
   error?: string
 }> {
   try {
+    if (gate) await gate()
     // Download file to temp location
     console.log(`[FileIndexer] Downloading file ${fileId}...`)
     const filePath = await downloadFile(fileId)
     console.log(`[FileIndexer] Downloaded to ${filePath}`)
 
     // Extract text content
+    if (gate) await gate()
     console.log(`[FileIndexer] Extracting text from ${filePath}...`)
     const result = await extractFileContent(filePath, { maxPages })
 
@@ -184,7 +187,8 @@ export function prepareFileChunks(
  */
 export async function prepareFileForIndexing(
   request: FileIndexRequest,
-  maxPages: number = 50
+  maxPages: number = 50,
+  gate?: () => Promise<void>
 ): Promise<{
   chunks: FileChunkData[]
   pageCount: number
@@ -192,7 +196,7 @@ export async function prepareFileForIndexing(
   error?: string
 }> {
   // Extract text
-  const extraction = await extractFileText(request.fileId, maxPages)
+  const extraction = await extractFileText(request.fileId, maxPages, gate)
   
   if (extraction.error) {
     return {

@@ -29,6 +29,7 @@ import { canvasContentUrl } from '../utils/canvasContentUrl'
 import { openExternal } from '../utils/openExternal'
 import { formatDateTime } from '../utils/dateFormat'
 import { useAIContextOffer } from '../hooks/useAIContextOffer'
+import { requestIdle } from '../utils/prefetchQueue'
 
 type Props = {
   courseId: string | number
@@ -228,6 +229,39 @@ export const CourseFiles: React.FC<Props> = ({
     return [...folderItems, ...fileItems]
   }, [listFolders, files])
 
+  const INITIAL_RENDER_COUNT = 60
+  const RENDER_BATCH_SIZE = 40
+  const [renderLimit, setRenderLimit] = React.useState(INITIAL_RENDER_COUNT)
+
+  React.useEffect(() => {
+    let cancelled = false
+    const total = combinedItems.length
+    const initial = Math.min(INITIAL_RENDER_COUNT, total)
+    setRenderLimit(initial)
+    if (total <= initial) return () => {}
+
+    const loadMore = () => {
+      if (cancelled) return
+      setRenderLimit((prev) => {
+        const next = Math.min(prev + RENDER_BATCH_SIZE, total)
+        if (next < total) {
+          requestIdle(loadMore)
+        }
+        return next
+      })
+    }
+
+    requestIdle(loadMore)
+    return () => {
+      cancelled = true
+    }
+  }, [combinedItems])
+
+  const visibleItems = React.useMemo(
+    () => combinedItems.slice(0, renderLimit),
+    [combinedItems, renderLimit],
+  )
+
   const showListSkeleton = isLoading || (effectiveCurrent != null && filesQ.isLoading)
 
   const currentFolderName = React.useMemo(() => {
@@ -352,7 +386,7 @@ export const CourseFiles: React.FC<Props> = ({
             )}
             {!filesQ.isLoading && combinedItems.length > 0 && (
               <ul className="list-none m-0 p-0 space-y-3">
-                {combinedItems.map((item) => {
+                {visibleItems.map((item) => {
                   if (item.type === 'folder') {
                     const f = item.data
                     return (

@@ -54,6 +54,7 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicI
 
   const [replyingTo, setReplyingTo] = useState<string | number | null>(null)
   const [threadSearch, setThreadSearch] = useState('')
+  const deferredSearch = React.useDeferredValue(threadSearch)
 
   // Track which entries we've already marked as read to avoid duplicate calls
   const markedReadRef = useRef<Set<string | number>>(new Set())
@@ -120,28 +121,35 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicI
     markEntriesRead.mutate({ courseId, topicId, entryIds: toMark })
   }, [courseId, topicId, unreadEntries])
 
+  const searchTerm = deferredSearch.trim().toLowerCase()
+  const searchCache = useMemo(() => new Map<string, boolean>(), [searchTerm, rawEntries])
+
   // Helper: check if entry (or any descendant) matches search
-  const matchesSearch = (entry: DiscussionEntry, search: string): boolean => {
-    if (!search) return true
-    const term = search.toLowerCase()
-    
-    // Check entry content
-    if (entry.message?.toLowerCase().includes(term)) return true
-    if (entry.user_name?.toLowerCase().includes(term)) return true
-    
-    // Check replies
-    if (entry.replies) {
-      return entry.replies.some(r => matchesSearch(r, search))
+  const matchesSearch = React.useCallback((entry: DiscussionEntry): boolean => {
+    if (!searchTerm) return true
+    const key = String(entry.id)
+    const cached = searchCache.get(key)
+    if (cached !== undefined) return cached
+
+    const message = String(entry.message || '').toLowerCase()
+    const user = String(entry.user_name || '').toLowerCase()
+    let matches = false
+
+    if (message.includes(searchTerm) || user.includes(searchTerm)) {
+      matches = true
+    } else if (entry.replies) {
+      matches = entry.replies.some(r => matchesSearch(r))
     }
-    
-    return false
-  }
+
+    searchCache.set(key, matches)
+    return matches
+  }, [searchTerm, searchCache])
 
   const entries = useMemo(() => {
     // First, filter by search term if active
     let filtered = rawEntries
-    if (threadSearch.trim()) {
-      filtered = rawEntries.filter(e => matchesSearch(e, threadSearch.trim()))
+    if (searchTerm) {
+      filtered = rawEntries.filter(e => matchesSearch(e))
     }
     
     if (!myId || !filtered.length) return filtered
@@ -165,7 +173,7 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicI
       }
       return a.originalIndex - b.originalIndex
     }).map(item => item.entry)
-  }, [rawEntries, myId, threadSearch])
+  }, [rawEntries, myId, searchTerm, matchesSearch])
 
   const getParticipant = (userId: string | number): DiscussionParticipant | undefined => {
     return participants.find(p => String(p.id) === String(userId))

@@ -475,7 +475,7 @@ export const GpaTrends: React.FC<Props> = ({
   }, [])
 
   // SVG Chart renderer
-  const renderChart = () => {
+  const chartContent = React.useMemo(() => {
     if (chartData.length === 0) {
       return (
         <div className="h-full flex items-center justify-center text-sm text-slate-500 dark:text-neutral-400">
@@ -822,7 +822,7 @@ export const GpaTrends: React.FC<Props> = ({
         </div>
       </div>
     )
-  }
+  }, [chartData, chartSize, semesterGoal])
 
   // Stats cards
   const renderStats = () => {
@@ -1202,7 +1202,7 @@ export const GpaTrends: React.FC<Props> = ({
       {/* Tab content */}
       {activeTab === 'trend' ? (
         <div ref={chartContainerRef} className="h-48 w-full">
-          {renderChart()}
+          {chartContent}
         </div>
       ) : (
         renderHistory()

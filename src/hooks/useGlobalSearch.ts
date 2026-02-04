@@ -12,6 +12,47 @@ import { useCourses } from './useCanvasQueries'
 import { useAppData, useAppFlags } from '../context/AppContext'
 import { extractAssignmentIdFromUrl } from '../utils/urlHelpers'
 
+const scheduleIdle = (cb: () => void, timeoutMs = 2000): number => {
+  if (typeof window === 'undefined') {
+    return setTimeout(cb, timeoutMs) as unknown as number
+  }
+  const ric = (window as any).requestIdleCallback as
+    | ((fn: () => void, opts?: { timeout: number }) => number)
+    | undefined
+  if (typeof ric === 'function') {
+    return ric(cb, { timeout: timeoutMs })
+  }
+  return window.setTimeout(cb, timeoutMs)
+}
+
+const cancelIdle = (id: number | null) => {
+  if (id == null) return
+  if (typeof window === 'undefined') {
+    clearTimeout(id)
+    return
+  }
+  const cancel = (window as any).cancelIdleCallback as ((handle: number) => void) | undefined
+  if (typeof cancel === 'function') cancel(id)
+  else clearTimeout(id)
+}
+
+const SEARCH_CACHE_VERSION = 1
+const SEARCH_CACHE_TTL_MS = 1000 * 60 * 60 * 6
+const SEARCH_CACHE_MAX_ITEMS = 20000
+
+type SearchIndexCache = {
+  version: number
+  builtAt: number
+  baseUrl: string
+  courseIds: string[]
+  items: SearchResult[]
+}
+
+const normalizeCourseIds = (ids: string[]) => [...ids].sort()
+
+const sameStringArray = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((value, index) => value === b[index])
+
 /**
  * Trigger embedding indexing in the background.
  * This converts the fetched content to embeddings for semantic search.
@@ -353,6 +394,7 @@ async function triggerFileAutoIndex(data: {
           file.fileSize,
           file.updatedAt,
           file.url,
+          { maxPages: 20 },
         )
 
         if (result?.ok && result.data) {
@@ -365,7 +407,7 @@ async function triggerFileAutoIndex(data: {
         }
 
         // Small delay between files to avoid blocking
-        await new Promise((r) => setTimeout(r, 100))
+        await new Promise((r) => setTimeout(r, 300))
       } catch (e) {
         console.warn(`[Search] Error indexing ${file.fileName}:`, e)
         failed++
@@ -384,8 +426,13 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
   const { data: courses } = useCourses()
   const flags = useAppFlags()
   const data = useAppData()
+  const userKey = useMemo(() => {
+    const uid = (data.profile as any)?.id
+    return uid && data.baseUrl ? `${data.baseUrl}|${uid}` : null
+  }, [data.baseUrl, data.profile])
   const searchEnabled = enabled && !flags.privateModeEnabled
   const embeddingEnabled = searchEnabled && flags.embeddingsEnabled
+  const debug = import.meta.env.DEV
   const [isReady, setIsReady] = useState(searchManager.isReady)
   const [isBuilding, setIsBuilding] = useState(searchManager.isBuilding)
   const [query, setQuery] = useState('')
@@ -393,6 +440,13 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
   const [isSearching, setIsSearching] = useState(false)
   const [isPendingSearch, setIsPendingSearch] = useState(false)
   const wasReadyRef = useRef(searchManager.isReady)
+  const cacheLoadedRef = useRef(false)
+  const refreshNeededRef = useRef(false)
+  const cacheMetaRef = useRef<{ builtAt: number; courseIds: string[] } | null>(null)
+  const cacheHydratingRef = useRef(false)
+  const lastCourseKeyRef = useRef<string>('')
+  const emptyEmbeddingRebuildRef = useRef(false)
+  const pauseRef = useRef<boolean | null>(null)
 
   // Embedding status tracking
   const [embeddingStatus, setEmbeddingStatus] = useState<{
@@ -410,7 +464,27 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
     setIsBuilding(false)
     setQuery('')
     setResults([])
+    cacheLoadedRef.current = false
+    refreshNeededRef.current = false
+    cacheMetaRef.current = null
+    cacheHydratingRef.current = false
+    emptyEmbeddingRebuildRef.current = false
+    pauseRef.current = null
   }, [flags.privateModeEnabled])
+
+  useEffect(() => {
+    cacheLoadedRef.current = false
+    refreshNeededRef.current = false
+    cacheMetaRef.current = null
+    cacheHydratingRef.current = false
+    emptyEmbeddingRebuildRef.current = false
+    pauseRef.current = null
+    searchManager.clear()
+    setIsReady(false)
+    setIsBuilding(false)
+    setQuery('')
+    setResults([])
+  }, [userKey])
 
   // Get visible (pinned) courses - exclude hidden ones
   const visibleCourses = useMemo(() => {
@@ -418,6 +492,21 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
     const hiddenIds = new Set(data?.sidebar?.hiddenCourseIds?.map(String) || [])
     return courses.filter((c) => !hiddenIds.has(String(c.id)))
   }, [courses, data?.sidebar?.hiddenCourseIds])
+  const visibleCourseIds = useMemo(
+    () => normalizeCourseIds(visibleCourses.map((c) => String(c.id))),
+    [visibleCourses],
+  )
+  const visibleCourseKey = useMemo(() => visibleCourseIds.join('|'), [visibleCourseIds])
+
+  const shouldRefreshCache = useCallback(
+    (meta: { builtAt: number; courseIds: string[] } | null, currentIds: string[]) => {
+      if (!meta) return true
+      if (currentIds.length === 0) return false
+      if (meta.courseIds.length > 0 && !sameStringArray(meta.courseIds, currentIds)) return true
+      return Date.now() - meta.builtAt > SEARCH_CACHE_TTL_MS
+    },
+    [],
+  )
 
   // Listen for ready state
   useEffect(() => {
@@ -426,6 +515,72 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
       setIsBuilding(false)
     })
   }, [])
+
+  useEffect(() => {
+    if (!searchEnabled || cacheLoadedRef.current || !userKey) return
+    cacheLoadedRef.current = true
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        const cfg = await window.settings.get?.()
+        const dataCfg = (cfg?.ok ? (cfg.data as any) : {}) || {}
+        const per = dataCfg?.userSettings?.[userKey] || {}
+        const cache = per?.searchIndexCache as SearchIndexCache | undefined
+
+        if (!cache || cache.version !== SEARCH_CACHE_VERSION) return
+        if (!Array.isArray(cache.items) || cache.items.length === 0) return
+        if (cache.baseUrl && cache.baseUrl !== data.baseUrl) return
+
+        cacheHydratingRef.current = true
+        setIsBuilding(true)
+        const count = await searchManager.buildFromItems(cache.items)
+        if (cancelled) return
+
+        setIsReady(true)
+        cacheMetaRef.current = {
+          builtAt: Number(cache.builtAt || Date.now()),
+          courseIds: normalizeCourseIds((cache.courseIds || []).map(String)),
+        }
+
+        if (visibleCourseIds.length > 0 && shouldRefreshCache(cacheMetaRef.current, visibleCourseIds)) {
+          refreshNeededRef.current = true
+        }
+
+        if (debug) {
+          console.debug('[Search] Hydrated index from cache', {
+            items: count,
+            refresh: refreshNeededRef.current,
+          })
+        }
+      } catch (error) {
+        if (debug) console.debug('[Search] Cache hydrate failed', error)
+      } finally {
+        cacheHydratingRef.current = false
+        if (!cancelled) setIsBuilding(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [searchEnabled, userKey, data.baseUrl, visibleCourseIds, shouldRefreshCache, debug])
+
+  useEffect(() => {
+    const meta = cacheMetaRef.current
+    if (!meta || !visibleCourseIds.length) return
+    if (shouldRefreshCache(meta, visibleCourseIds)) {
+      refreshNeededRef.current = true
+    }
+  }, [visibleCourseIds, shouldRefreshCache])
+
+  useEffect(() => {
+    if (!visibleCourseKey) return
+    if (lastCourseKeyRef.current && lastCourseKeyRef.current !== visibleCourseKey) {
+      refreshNeededRef.current = true
+    }
+    lastCourseKeyRef.current = visibleCourseKey
+  }, [visibleCourseKey])
 
   // Poll embedding status periodically (only when enabled)
   useEffect(() => {
@@ -442,6 +597,22 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
             memoryUsedMB: result.data.memoryUsedMB,
             memoryLimitMB: result.data.memoryLimitMB,
           })
+
+          if (
+            searchEnabled &&
+            visibleCourseIds.length > 0 &&
+            result.data.itemCount === 0 &&
+            searchManager.isReady &&
+            !searchManager.isBuilding &&
+            !emptyEmbeddingRebuildRef.current
+          ) {
+            emptyEmbeddingRebuildRef.current = true
+            refreshNeededRef.current = true
+            setIsReady(false)
+            if (debug) {
+              console.debug('[Search] Embedding index empty; scheduling rebuild')
+            }
+          }
         }
       } catch {
         // Ignore errors
@@ -454,14 +625,130 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
     // Poll every 5 seconds to check for status changes
     const interval = setInterval(fetchStatus, 5000)
     return () => clearInterval(interval)
+  }, [embeddingEnabled, searchEnabled, visibleCourseIds, debug])
+
+  useEffect(() => {
+    if (!embeddingEnabled) {
+      emptyEmbeddingRebuildRef.current = false
+    }
   }, [embeddingEnabled])
+
+  useEffect(() => {
+    if (!window.embedding?.setPaused) return
+
+    const setPaused = (next: boolean) => {
+      if (pauseRef.current === next) return
+      pauseRef.current = next
+      window.embedding?.setPaused?.(next).catch(() => {})
+    }
+
+    if (!embeddingEnabled) {
+      setPaused(true)
+      return
+    }
+
+    const IDLE_DELAY_MS = 3500
+    let idleTimer: number | null = null
+
+    const scheduleIdle = () => {
+      if (idleTimer) window.clearTimeout(idleTimer)
+      idleTimer = window.setTimeout(() => {
+        if (document.visibilityState === 'visible') {
+          setPaused(false)
+        }
+      }, IDLE_DELAY_MS)
+    }
+
+    const markActive = () => {
+      setPaused(true)
+      scheduleIdle()
+    }
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        if (idleTimer) window.clearTimeout(idleTimer)
+        idleTimer = null
+        setPaused(false)
+      } else {
+        markActive()
+      }
+    }
+
+    markActive()
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('mousemove', markActive, { passive: true })
+    window.addEventListener('mousedown', markActive, { passive: true })
+    window.addEventListener('keydown', markActive)
+    window.addEventListener('wheel', markActive, { passive: true })
+    window.addEventListener('pointerdown', markActive, { passive: true })
+    window.addEventListener('pointermove', markActive, { passive: true })
+    window.addEventListener('touchstart', markActive, { passive: true })
+    window.addEventListener('touchmove', markActive, { passive: true })
+    document.addEventListener('scroll', markActive, { passive: true, capture: true })
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('mousemove', markActive)
+      window.removeEventListener('mousedown', markActive)
+      window.removeEventListener('keydown', markActive)
+      window.removeEventListener('wheel', markActive)
+      window.removeEventListener('pointerdown', markActive)
+      window.removeEventListener('pointermove', markActive)
+      window.removeEventListener('touchstart', markActive)
+      window.removeEventListener('touchmove', markActive)
+      document.removeEventListener('scroll', markActive, true)
+      if (idleTimer) window.clearTimeout(idleTimer)
+      setPaused(false)
+    }
+  }, [embeddingEnabled])
+
+  const persistSearchCache = useCallback(
+    async (items: SearchResult[], courseIds: string[]) => {
+      if (!userKey || flags.privateModeEnabled) return
+      if (!items.length) return
+      if (items.length > SEARCH_CACHE_MAX_ITEMS) {
+        if (debug) {
+          console.debug('[Search] Cache skipped (too many items)', { items: items.length })
+        }
+        return
+      }
+
+      try {
+        const cfg = await window.settings.get?.()
+        const dataCfg = (cfg?.ok ? (cfg.data as any) : {}) || {}
+        const map = { ...(dataCfg.userSettings || {}) }
+        const current = map[userKey] || {}
+        const nextCache: SearchIndexCache = {
+          version: SEARCH_CACHE_VERSION,
+          builtAt: Date.now(),
+          baseUrl: data.baseUrl,
+          courseIds: normalizeCourseIds(courseIds),
+          items,
+        }
+        map[userKey] = { ...current, searchIndexCache: nextCache }
+        await window.settings.set?.({ userSettings: map })
+        cacheMetaRef.current = {
+          builtAt: nextCache.builtAt,
+          courseIds: nextCache.courseIds,
+        }
+      } catch (error) {
+        if (debug) console.debug('[Search] Cache persist failed', error)
+      }
+    },
+    [userKey, flags.privateModeEnabled, data.baseUrl, debug],
+  )
 
   // Proactively fetch and build index for visible courses (only when enabled)
   useEffect(() => {
-    if (!searchEnabled || !visibleCourses?.length || searchManager.isReady || searchManager.isBuilding)
-      return
+    if (!searchEnabled || !visibleCourses?.length || searchManager.isBuilding) return
+    if (searchManager.isReady && !refreshNeededRef.current) return
+    if (cacheHydratingRef.current) return
+
+    let cancelled = false
+    let idleId: number | null = null
 
     const timer = setTimeout(async () => {
+      if (cancelled) return
       setIsBuilding(true)
 
       const courseAssignments = new Map<string, any[]>()
@@ -553,37 +840,74 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
         )
       }
 
-      await searchManager.buildIndex({
-        courses: visibleCourses,
-        courseAssignments,
-        courseAnnouncements,
-        courseFiles,
-        courseModules,
-      })
-
-      setIsReady(true)
-      setIsBuilding(false)
-
-      // Trigger embedding indexing in background (non-blocking)
-      if (embeddingEnabled) {
-        triggerEmbeddingIndex({
+      let itemCount = 0
+      let builtItems: SearchResult[] = []
+      try {
+        const buildStart = debug ? performance.now() : 0
+        const buildResult = await searchManager.buildIndex({
           courses: visibleCourses,
           courseAssignments,
           courseAnnouncements,
           courseFiles,
           courseModules,
         })
+        itemCount = buildResult.count
+        builtItems = buildResult.items
 
-        // Also trigger Tier 1 auto-indexing for small files
-        triggerFileAutoIndex({
-          courses: visibleCourses,
-          courseFiles,
-        })
+        if (debug) {
+          const duration = Math.round(performance.now() - buildStart)
+          console.debug(`[Search] Index build complete`, {
+            courses: visibleCourses.length,
+            items: itemCount,
+            ms: duration,
+          })
+        }
+
+        if (cancelled) return
+        setIsReady(true)
+        refreshNeededRef.current = false
+        void persistSearchCache(builtItems, visibleCourseIds)
+      } catch (error) {
+        console.warn('[Search] Index build failed', error)
+      } finally {
+        if (!cancelled) setIsBuilding(false)
+      }
+
+      // Trigger embedding indexing in background (non-blocking)
+      if (!cancelled && itemCount > 0 && embeddingEnabled) {
+        idleId = scheduleIdle(() => {
+          if (cancelled) return
+          triggerEmbeddingIndex({
+            courses: visibleCourses,
+            courseAssignments,
+            courseAnnouncements,
+            courseFiles,
+            courseModules,
+          })
+
+          // Also trigger Tier 1 auto-indexing for small files
+          triggerFileAutoIndex({
+            courses: visibleCourses,
+            courseFiles,
+          })
+        }, 2500)
       }
     }, 1500) // 1.5 second delay after courses load
 
-    return () => clearTimeout(timer)
-  }, [searchEnabled, visibleCourses, queryClient, embeddingEnabled])
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+      cancelIdle(idleId)
+    }
+  }, [
+    searchEnabled,
+    visibleCourses,
+    queryClient,
+    embeddingEnabled,
+    debug,
+    persistSearchCache,
+    visibleCourseIds,
+  ])
 
   // Perform search
   const search = useCallback(async (q: string) => {
@@ -594,16 +918,26 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
     }
 
     setIsSearching(true)
+    const start = debug ? performance.now() : 0
+    let searchResults: SearchResult[] = []
     try {
-      const searchResults = await searchManager.search(q, 20)
+      searchResults = await searchManager.search(q, 20)
       setResults(searchResults)
     } catch (e) {
       console.error('Search failed:', e)
       setResults([])
     } finally {
       setIsSearching(false)
+      if (debug) {
+        const duration = Math.round(performance.now() - start)
+        console.debug(`[Search] Query complete`, {
+          query: q,
+          results: searchResults.length,
+          ms: duration,
+        })
+      }
     }
-  }, [])
+  }, [debug])
 
   // Debounced search
   useEffect(() => {
@@ -693,7 +1027,7 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
       )
     }
 
-    await searchManager.buildIndex({
+    const buildResult = await searchManager.buildIndex({
       courses: visibleCourses,
       courseAssignments,
       courseAnnouncements,
@@ -703,6 +1037,8 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
 
     setIsReady(true)
     setIsBuilding(false)
+    refreshNeededRef.current = false
+    void persistSearchCache(buildResult.items, visibleCourseIds)
 
     // Trigger embedding indexing in background (non-blocking)
     if (embeddingEnabled) {
@@ -714,7 +1050,7 @@ export function useGlobalSearch(options?: { enabled?: boolean }) {
         courseModules,
       })
     }
-  }, [visibleCourses, queryClient, embeddingEnabled])
+  }, [visibleCourses, queryClient, embeddingEnabled, persistSearchCache, visibleCourseIds])
 
   return useMemo(
     () => ({

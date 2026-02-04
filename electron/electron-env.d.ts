@@ -368,6 +368,7 @@ interface Window {
       }
       error?: string
     }>
+    setPaused: (paused: boolean) => Promise<{ ok: boolean; error?: string }>
     clear: () => Promise<{ ok: boolean; error?: string }>
     // File indexing APIs
     indexFile: (
@@ -378,6 +379,7 @@ interface Window {
       fileSize: number,
       updatedAt?: string,
       url?: string,
+      opts?: { maxPages?: number },
     ) => Promise<{
       ok: boolean
       data?: { chunks: number; pageCount: number; truncated: boolean; skipped?: boolean }

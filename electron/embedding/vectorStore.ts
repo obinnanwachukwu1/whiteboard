@@ -49,6 +49,8 @@ export interface SearchResult {
 
 const STORE_VERSION = 1
 const EMBEDDING_DIM = 384 // MiniLM output dimension
+const YIELD_EVERY = 200
+const yieldToEventLoop = () => new Promise<void>((resolve) => setImmediate(resolve))
 
 export class VectorStore {
   private entries: Map<string, VectorEntry> = new Map()
@@ -199,18 +201,23 @@ export class VectorStore {
       return
     }
 
-    console.log(`[VectorStore] Saving ${this.entries.size} entries...`)
+    console.log(`[VectorStore] Saving ${this.entries.size} entries...`, this.storePath)
 
     const chunks: Buffer[] = []
+    const entries = Array.from(this.entries)
 
     // Header: version + entry count
     const header = Buffer.alloc(8)
     header.writeUInt32LE(STORE_VERSION, 0)
-    header.writeUInt32LE(this.entries.size, 4)
+    header.writeUInt32LE(entries.length, 4)
     chunks.push(header)
 
     // Entries
-    for (const [id, entry] of this.entries) {
+    for (let i = 0; i < entries.length; i++) {
+      if (i > 0 && i % YIELD_EVERY === 0) {
+        await yieldToEventLoop()
+      }
+      const [id, entry] = entries[i]
       // ID
       const idBuffer = Buffer.from(id, 'utf-8')
       const idLength = Buffer.alloc(4)
@@ -240,8 +247,8 @@ export class VectorStore {
 
     // Write atomically (write to temp, then rename)
     const tempPath = this.storePath + '.tmp'
-    fs.writeFileSync(tempPath, data)
-    fs.renameSync(tempPath, this.storePath)
+    await fs.promises.writeFile(tempPath, data)
+    await fs.promises.rename(tempPath, this.storePath)
 
     this.dirty = false
     console.log(`[VectorStore] Saved ${this.entries.size} entries (${Math.round(data.length / 1024)}KB)`)
@@ -252,14 +259,14 @@ export class VectorStore {
    */
   async load(): Promise<void> {
     if (!fs.existsSync(this.storePath)) {
-      console.log('[VectorStore] No saved store found')
+      console.log('[VectorStore] No saved store found', this.storePath)
       return
     }
 
-    console.log('[VectorStore] Loading from disk...')
+    console.log('[VectorStore] Loading from disk...', this.storePath)
 
     try {
-      const data = fs.readFileSync(this.storePath)
+      const data = await fs.promises.readFile(this.storePath)
       let offset = 0
 
       // Header
@@ -276,6 +283,9 @@ export class VectorStore {
       // Entries
       this.entries.clear()
       for (let i = 0; i < entryCount; i++) {
+        if (i > 0 && i % YIELD_EVERY === 0) {
+          await yieldToEventLoop()
+        }
         // ID
         const idLength = data.readUInt32LE(offset)
         offset += 4

@@ -32,7 +32,7 @@ export interface EmbeddingStatus {
 const EMBEDDING_DIM = 384
 const MAX_SEQ_LENGTH = 256  // MiniLM max sequence length
 const SNIPPET_LENGTH = 300
-const BATCH_DELAY_MS = 50   // Delay between batches to reduce CPU pressure
+const BATCH_DELAY_MS = 100  // Delay between batches to reduce CPU pressure
 
 export class EmbeddingManager extends EventEmitter {
   private modelManager: ModelManager
@@ -41,6 +41,9 @@ export class EmbeddingManager extends EventEmitter {
   private tokenizerData: any = null
   private isInitializing = false
   private isReady = false
+  private paused = false
+  private pausePromise: Promise<void> | null = null
+  private pauseResolve: (() => void) | null = null
 
   constructor() {
     super()
@@ -165,6 +168,34 @@ export class EmbeddingManager extends EventEmitter {
    */
   get ready(): boolean {
     return this.isReady
+  }
+
+  setPaused(paused: boolean): void {
+    if (this.paused === paused) return
+    this.paused = paused
+    if (!paused && this.pauseResolve) {
+      this.pauseResolve()
+      this.pauseResolve = null
+      this.pausePromise = null
+    }
+  }
+
+  isPaused(): boolean {
+    return this.paused
+  }
+
+  private async waitIfPaused(): Promise<void> {
+    if (!this.paused) return
+    if (!this.pausePromise) {
+      this.pausePromise = new Promise((resolve) => {
+        this.pauseResolve = resolve
+      })
+    }
+    await this.pausePromise
+  }
+
+  async waitUntilResumed(): Promise<void> {
+    await this.waitIfPaused()
   }
 
   /**
@@ -346,12 +377,20 @@ export class EmbeddingManager extends EventEmitter {
       await this.initialize()
     }
 
+    await this.waitIfPaused()
+
+    if (items.length === 0) {
+      console.log('[EmbeddingManager] No items to index (skipping prune/save)')
+      return { indexed: 0, skipped: 0 }
+    }
+
     let indexed = 0
     let skipped = 0
 
     // Process in batches with throttling to reduce CPU/energy usage
-    const batchSize = 8  // Reduced from 16 for lower peak CPU usage
+    const batchSize = 6  // Reduced from 16 for lower peak CPU usage
     for (let i = 0; i < items.length; i += batchSize) {
+      await this.waitIfPaused()
       // Add delay between batches to let CPU cool down
       if (i > 0) {
         await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS))
@@ -379,6 +418,7 @@ export class EmbeddingManager extends EventEmitter {
       if (toEmbed.length === 0) continue
 
       // Generate embeddings for batch
+      await this.waitIfPaused()
       const texts = toEmbed.map(({ text }) => text)
       const embeddings = await this.embedBatch(texts)
 
@@ -503,8 +543,9 @@ export class EmbeddingManager extends EventEmitter {
     let skipped = 0
 
     // Process in batches with throttling to reduce CPU/energy usage
-    const batchSize = 8  // Reduced from 16 for lower peak CPU usage
+    const batchSize = 6  // Reduced from 16 for lower peak CPU usage
     for (let i = 0; i < chunks.length; i += batchSize) {
+      await this.waitIfPaused()
       // Add delay between batches to let CPU cool down
       if (i > 0) {
         await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS))
@@ -526,6 +567,7 @@ export class EmbeddingManager extends EventEmitter {
       if (toEmbed.length === 0) continue
 
       // Generate embeddings for batch
+      await this.waitIfPaused()
       const texts = toEmbed.map(c => c.text)
       const embeddings = await this.embedBatch(texts)
 

@@ -121,6 +121,7 @@ export const CoursePeople: React.FC<Props> = ({ courseId, courseName }) => {
   const { data: courseGroups, isLoading: groupsLoading } = useCourseGroups(courseId)
   const { data: myAllGroups } = useMyGroups('Course')
   const [search, setSearch] = React.useState('')
+  const deferredSearch = React.useDeferredValue(search)
   const [roleFilter, setRoleFilter] = React.useState<RoleFilter>('all')
   const [expandedGroups, setExpandedGroups] = React.useState<Set<string | number>>(new Set())
   
@@ -143,23 +144,30 @@ export const CoursePeople: React.FC<Props> = ({ courseId, courseName }) => {
     })
   }
   
+  const baseUsers = React.useMemo(() => {
+    if (!data) return []
+    return data.map(u => {
+      const name = String(u.name || '')
+      const shortName = String(u.short_name || '')
+      const email = String(u.email || '')
+      return {
+        ...u,
+        role: getPrimaryRole(u.enrollments),
+        searchKey: `${name} ${shortName} ${email}`.toLowerCase(),
+      }
+    })
+  }, [data])
+
   // Process and group users
   const processedUsers = React.useMemo(() => {
-    if (!data) return { instructors: [], tas: [], students: [], others: [] }
-    
-    const users = data.map(u => ({
-      ...u,
-      role: getPrimaryRole(u.enrollments),
-    }))
-    
+    if (!baseUsers.length) return { instructors: [], tas: [], students: [], others: [] }
+
+    const searchLower = deferredSearch.trim().toLowerCase()
+
     // Filter by search
-    const filtered = users.filter(u => {
-      const searchLower = search.toLowerCase()
-      const nameMatch = (u.name || '').toLowerCase().includes(searchLower) ||
-                       (u.short_name || '').toLowerCase().includes(searchLower) ||
-                       (u.email || '').toLowerCase().includes(searchLower)
-      return nameMatch
-    })
+    const filtered = searchLower
+      ? baseUsers.filter(u => u.searchKey.includes(searchLower))
+      : baseUsers
     
     // Filter by role
     const roleFiltered = filtered.filter(u => {
@@ -180,7 +188,7 @@ export const CoursePeople: React.FC<Props> = ({ courseId, courseName }) => {
     const others = roleFiltered.filter(u => !['teacher', 'ta', 'student'].includes(u.role.toLowerCase()))
     
     // Sort each group alphabetically
-    const sortByName = (a: typeof users[0], b: typeof users[0]) => 
+    const sortByName = (a: typeof baseUsers[0], b: typeof baseUsers[0]) => 
       (a.sortable_name || a.name || '').localeCompare(b.sortable_name || b.name || '')
     
     instructors.sort(sortByName)
@@ -189,7 +197,7 @@ export const CoursePeople: React.FC<Props> = ({ courseId, courseName }) => {
     others.sort(sortByName)
     
     return { instructors, tas, students, others }
-  }, [data, search, roleFilter])
+  }, [baseUsers, deferredSearch, roleFilter])
   
   const totalCount = data?.length || 0
   const filteredCount = processedUsers.instructors.length + processedUsers.tas.length + 

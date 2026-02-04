@@ -42,23 +42,24 @@ import installExtension, { REACT_DEVELOPER_TOOLS } from 'electron-devtools-insta
 const aiManager = new AIManager()
 const embeddingManager = new EmbeddingManager()
 const fileMetaStore = new FileMetaStore()
+let fileMetaStoreReady: Promise<void> | null = null
 
-// Enable high refresh rate on macOS ProMotion displays (120Hz)
-if (process.platform === 'darwin') {
-  app.commandLine.appendSwitch('disable-frame-rate-limit')
-  app.commandLine.appendSwitch('disable-gpu-vsync')
+async function ensureFileMetaStoreLoaded(): Promise<void> {
+  await app.whenReady()
+  if (!fileMetaStoreReady) {
+    fileMetaStoreReady = fileMetaStore.load().catch((error) => {
+      console.error('[FileMetaStore] Failed to load (ensure):', error)
+    })
+  }
+  await fileMetaStoreReady
 }
-
-// Disable background throttling globally for smoother animations
-app.commandLine.appendSwitch('disable-background-timer-throttling')
-app.commandLine.appendSwitch('disable-renderer-backgrounding')
 
 // Secure file upload handling: Map<handle, absolutePath>
 const uploadFileMap = new Map<string, string>()
 
 // Load file metadata on startup
 app.whenReady().then(() => {
-  fileMetaStore.load().catch(console.error)
+  void ensureFileMetaStoreLoaded()
 
   // Clean up old temp files (fire and forget)
   cleanupTempFiles().catch(console.error)
@@ -312,7 +313,6 @@ function createContentWindow(params: {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
-      backgroundThrottling: false, // Don't throttle when window loses focus (smoother animations)
     },
   })
 
@@ -455,7 +455,6 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
-      backgroundThrottling: false, // Don't throttle when window loses focus (smoother animations)
       devTools: devToolsEnabled(),
     },
   })
@@ -2303,6 +2302,18 @@ ipcMain.handle(
 )
 
 ipcMain.handle(
+  'embedding:setPaused',
+  async (_evt, paused: boolean): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      embeddingManager.setPaused(!!paused)
+      return { ok: true }
+    } catch (e: any) {
+      return { ok: false, error: String(e?.message || e) }
+    }
+  },
+)
+
+ipcMain.handle(
   'embedding:search',
   async (
     _evt,
@@ -2348,6 +2359,8 @@ ipcMain.handle('embedding:clear', async (): Promise<{ ok: boolean; error?: strin
 })
 
 // File indexing handlers
+const FILE_INDEX_IDLE_GRACE_MS = 1500
+
 ipcMain.handle(
   'embedding:indexFile',
   async (
@@ -2359,14 +2372,42 @@ ipcMain.handle(
     fileSize: number,
     updatedAt?: string,
     url?: string,
+    opts?: { maxPages?: number },
   ): Promise<{
     ok: boolean
     data?: { chunks: number; pageCount: number; truncated: boolean; skipped?: boolean }
     error?: string
   }> => {
     try {
+      const waitForSustainedIdle = async () => {
+        while (true) {
+          await embeddingManager.waitUntilResumed()
+          if (FILE_INDEX_IDLE_GRACE_MS <= 0) return
+          await new Promise((resolve) => setTimeout(resolve, FILE_INDEX_IDLE_GRACE_MS))
+          if (!embeddingManager.isPaused()) return
+        }
+      }
+
+      await ensureFileMetaStoreLoaded()
+      console.log('[embedding:indexFile] Request', {
+        fileId,
+        fileName,
+        updatedAt: updatedAt || null,
+      })
       // Check if file needs indexing (version check)
-      if (!fileMetaStore.needsIndexing(fileId, updatedAt)) {
+      const existingMeta = fileMetaStore.get(fileId)
+      const needsIndexing = fileMetaStore.needsIndexing(fileId, updatedAt)
+      if (existingMeta || updatedAt) {
+        console.log('[embedding:indexFile] Meta check', {
+          fileId,
+          updatedAt: updatedAt || null,
+          storedUpdatedAt: existingMeta?.updatedAt || null,
+          hasError: Boolean(existingMeta?.error),
+          needsIndexing,
+        })
+      }
+
+      if (!needsIndexing) {
         console.log(`[embedding:indexFile] Skipping ${fileName} (up to date)`)
         return {
           ok: true,
@@ -2379,19 +2420,27 @@ ipcMain.handle(
         }
       }
 
+      // Pause heavy extraction/indexing until the app is idle for a sustained period.
+      await waitForSustainedIdle()
+
       // Import dynamically to avoid circular dependencies
       const { prepareFileForIndexing } = await import('./embedding/fileIndexer')
 
       // Prepare the file (download, extract, chunk)
-      const result = await prepareFileForIndexing({
-        fileId,
-        courseId,
-        courseName,
-        fileName,
-        fileSize,
-        updatedAt,
-        url,
-      })
+      const maxPages = typeof opts?.maxPages === 'number' ? opts.maxPages : undefined
+      const result = await prepareFileForIndexing(
+        {
+          fileId,
+          courseId,
+          courseName,
+          fileName,
+          fileSize,
+          updatedAt,
+          url,
+        },
+        maxPages,
+        () => waitForSustainedIdle(),
+      )
 
       if (result.error) {
         if (updatedAt) {

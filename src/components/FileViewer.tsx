@@ -67,6 +67,7 @@ export const FileViewer: React.FC<Props> = ({
         fileSize || 0,
         updatedAt,
         remoteUrl,
+        { maxPages: 50 },
       )
       .then((result) => {
         if (result?.ok && result.data) {
