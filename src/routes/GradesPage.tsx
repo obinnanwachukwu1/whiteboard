@@ -66,6 +66,9 @@ export default function GradesPage() {
     ],
     [],
   )
+  const handleActiveTabChange = React.useCallback((value: string) => {
+    setActiveTab(value as GradesTab)
+  }, [])
 
   // Modal states
   const [saveAsModalOpen, setSaveAsModalOpen] = React.useState(false)
@@ -382,7 +385,7 @@ export default function GradesPage() {
     <div id="grades-content-anchor" className="relative">
       <FloatingTabs
         current={activeTab}
-        onChange={setActiveTab}
+        onChange={handleActiveTabChange}
         anchorId="grades-content-anchor"
         tabs={gradeTabs}
       />
@@ -394,7 +397,7 @@ export default function GradesPage() {
           </h1>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <Tabs value={activeTab} onValueChange={handleActiveTabChange} className="space-y-4">
 
         <TabsPanel value="overview" className="space-y-4">
           <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 p-4 shadow-card">

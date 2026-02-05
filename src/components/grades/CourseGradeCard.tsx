@@ -104,9 +104,9 @@ export const CourseGradeCard: React.FC<Props> = ({
         {statusLabel && showPlan && (
           <span
             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] ${
-              status.onTrack
+              status?.onTrack
                 ? 'bg-green-500/15 text-green-700 dark:bg-green-500/20 dark:text-green-200'
-                : status.close
+                : status?.close
                 ? 'bg-amber-500/15 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200'
                 : 'bg-rose-500/15 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'
             }`}

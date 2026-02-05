@@ -189,13 +189,14 @@ export function useRootLayoutState() {
   useEffect(() => {
     let mounted = true
     const isMac = window.platform?.isMac ?? false
+    const getAvailability = window.ai?.getAvailability
     if (!isMac) {
       setAiAvailability({ status: 'unsupported', detail: 'non-mac' })
       return () => {
         mounted = false
       }
     }
-    if (!window.ai?.getAvailability) {
+    if (!getAvailability) {
       setAiAvailability({ status: 'unsupported', detail: 'missing_api' })
       return () => {
         mounted = false
@@ -204,7 +205,7 @@ export function useRootLayoutState() {
 
     ;(async () => {
       try {
-        const res = await window.ai.getAvailability({ force: true })
+        const res = await getAvailability({ force: true })
         if (!mounted) return
         if (res.ok && res.data) {
           setAiAvailability(res.data)

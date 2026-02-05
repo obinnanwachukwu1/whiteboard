@@ -142,7 +142,10 @@ describe('CanvasClient updateConversation', () => {
         }),
       }),
     )
-    const call = request.mock.calls[0][0]
+    const requestCalls = (request as any).mock.calls as Array<Array<{ data?: string }>>
+    const call = requestCalls[0]?.[0]
+    expect(call).toBeDefined()
+    if (!call) return
     expect(call.data).toContain('conversation%5Bworkflow_state%5D=read')
     expect(call.data).toContain('conversation%5Bstarred%5D=true')
     expect(call.data).toContain('conversation%5Bsubscribed%5D=false')

@@ -34,6 +34,10 @@ export function FloatingTabs<T extends string>({
   tabs,
   onHover,
 }: Props<T>) {
+  const handleValueChange = (value: string) => {
+    onChange(value as T)
+  }
+
   const [left, setLeft] = useState<number | null>(null)
   const [collapsed, setCollapsed] = useState(true)
   const [visible, setVisible] = useState(false)
@@ -131,7 +135,7 @@ export function FloatingTabs<T extends string>({
         opacity: visible ? 1 : 0,
       }}
     >
-      <Tabs value={current} onValueChange={onChange}>
+      <Tabs value={current} onValueChange={handleValueChange}>
         <TabsList
           className={`pointer-events-auto ${
             reduceEffectsEnabled ? 'bg-white dark:bg-neutral-900' : 'bg-white/60 dark:bg-neutral-900/70'

@@ -174,8 +174,8 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
     setDeepResults([])
 
     try {
-      let searchQuery = query
-      let options: any = {}
+      const searchQuery = query
+      const options: any = {}
 
       // Execute Vector Search
       const res = await window.embedding.search(searchQuery, 15, options)
