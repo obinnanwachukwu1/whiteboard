@@ -61,13 +61,14 @@ function useQueryPersistence(client: QueryClient) {
       'upcoming',
       'todo',
       'course-tabs',
+      'account-notifications',
       // Inbox (opt-in: stores message previews/threads on disk)
       'conversations',
-        'conversation',
-        'unread-count',
-        // Dashboard: recent feedback comment lookups
-        'submission-details'
-      ])
+      'conversation',
+      'unread-count',
+      // Dashboard: recent feedback comment lookups
+      'submission-details',
+    ])
     const isPersistableDiscussions = (queryKey: unknown) => {
       if (!Array.isArray(queryKey)) return false
       const params = queryKey[3] as Record<string, unknown> | undefined

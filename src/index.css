@@ -474,6 +474,28 @@ html {
   margin: 1rem 0;
   line-height: 1.6;
 }
+.system-notice-html p:first-child {
+  margin-top: 0;
+}
+.system-notice-html p:last-child {
+  margin-bottom: 0;
+}
+.system-notice-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.system-notice-html .ic-notification__icon,
+.system-notice-html .notification_account_content .ic-notification__icon {
+  display: none;
+}
+.system-notice-html .notification_account_content,
+.system-notice-html .ic-notification__content,
+.system-notice-html .ic-notification__message {
+  margin: 0;
+  padding: 0;
+}
 .rich-html ul,
 .rich-html ol {
   padding-left: 2rem;

@@ -12,6 +12,7 @@ export type CanvasCourse = {
   id: number | string
   name: string
   course_code?: string
+  account_id?: number | string
 }
 
 export type CanvasAssignment = {
@@ -117,6 +118,19 @@ export type UpcomingEvent = {
   html_url?: string
   context_name?: string
   assignment?: { name?: string; due_at?: string }
+}
+
+export type AccountNotification = {
+  id: number | string
+  subject?: string
+  message?: string
+  start_at?: string | null
+  end_at?: string | null
+  icon?: 'information' | 'warning' | 'error' | 'question' | 'calendar' | string
+  role_ids?: Array<number | string>
+  roles?: string[]
+  is_closed?: boolean
+  author?: any
 }
 
 export type TodoItem = {

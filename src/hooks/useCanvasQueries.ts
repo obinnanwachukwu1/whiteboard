@@ -18,6 +18,7 @@ import type {
   CanvasFolder,
   CanvasFile,
   ActivityAnnouncement,
+  AccountNotification,
   CourseDiscussion,
   CourseInfo,
   AnnouncementDetail,
@@ -232,6 +233,29 @@ export function useActivityAnnouncements(
     // Announcements are time-sensitive; refresh more often.
     staleTime: 1000 * 60 * 2, // 2 minutes
     ...rest,
+  })
+}
+
+export function useAccountNotifications(
+  accountId: string | number | null | undefined,
+  params?: { includePast?: boolean; includeAll?: boolean; showIsClosed?: boolean },
+  options?: Partial<UseQueryOptions<AccountNotification[], Error, AccountNotification[]>>,
+) {
+  return useQuery<AccountNotification[], Error, AccountNotification[]>({
+    queryKey: [
+      'account-notifications',
+      accountId != null ? String(accountId) : null,
+      params?.includePast ?? false,
+      params?.includeAll ?? false,
+      params?.showIsClosed ?? false,
+    ],
+    queryFn: async () => {
+      if (accountId == null) return []
+      return ensureOk(await window.canvas.listAccountNotifications(accountId, params))
+    },
+    enabled: accountId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
+    ...options,
   })
 }
 

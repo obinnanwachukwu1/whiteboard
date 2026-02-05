@@ -31,6 +31,8 @@ export type DashboardSettings = {
   }>
   /** Quick notes content (legacy/optional) */
   quickNotes: string
+  /** Per-account read state for system notices */
+  readSystemNotices: Record<string, string[]>
 }
 
 const DEFAULT_SETTINGS: DashboardSettings = {
@@ -40,6 +42,7 @@ const DEFAULT_SETTINGS: DashboardSettings = {
   showGrades: false,
   pinnedItems: [],
   quickNotes: '',
+  readSystemNotices: {},
 }
 
 /**
@@ -51,6 +54,16 @@ function loadSettings(): DashboardSettings {
     if (!parsed || typeof parsed !== 'object') return DEFAULT_SETTINGS
     
     // Validate and merge with defaults
+    const readSystemNotices =
+      parsed.readSystemNotices && typeof parsed.readSystemNotices === 'object'
+        ? Object.fromEntries(
+            Object.entries(parsed.readSystemNotices).map(([key, value]) => [
+              String(key),
+              Array.isArray(value) ? value.map((v) => String(v)) : [],
+            ]),
+          )
+        : DEFAULT_SETTINGS.readSystemNotices
+
     return {
       timeHorizon: validateTimeHorizon(parsed.timeHorizon) ?? DEFAULT_SETTINGS.timeHorizon,
       showSubmitted: typeof parsed.showSubmitted === 'boolean' 
@@ -68,6 +81,7 @@ function loadSettings(): DashboardSettings {
       quickNotes: typeof parsed.quickNotes === 'string'
         ? parsed.quickNotes
         : DEFAULT_SETTINGS.quickNotes,
+      readSystemNotices,
     }
   } catch {
     return DEFAULT_SETTINGS
@@ -120,6 +134,14 @@ export function useDashboardSettings() {
       return next
     })
   }, [])
+
+  const updateSettings = useCallback((updater: (prev: DashboardSettings) => DashboardSettings) => {
+    setSettingsState((prev) => {
+      const next = updater(prev)
+      saveSettings(next)
+      return next
+    })
+  }, [])
   
   const setTimeHorizon = useCallback((horizon: TimeHorizon) => {
     setSettings({ timeHorizon: horizon })
@@ -144,6 +166,22 @@ export function useDashboardSettings() {
   const setPinnedItems = useCallback((items: DashboardSettings['pinnedItems']) => {
     setSettings({ pinnedItems: items })
   }, [setSettings])
+
+  const markSystemNoticeRead = useCallback((accountKey: string, id: string, maxKeep = 200) => {
+    if (!accountKey) return
+    updateSettings((prev) => {
+      const current = prev.readSystemNotices?.[accountKey] || []
+      const nextIds = Array.from(new Set([...current, id]))
+      const trimmed = nextIds.slice(-Math.max(1, maxKeep))
+      return {
+        ...prev,
+        readSystemNotices: {
+          ...(prev.readSystemNotices || {}),
+          [accountKey]: trimmed,
+        },
+      }
+    })
+  }, [updateSettings])
   
   const resetToDefaults = useCallback(() => {
     setSettingsState(DEFAULT_SETTINGS)
@@ -153,12 +191,14 @@ export function useDashboardSettings() {
   return {
     settings,
     setSettings,
+    updateSettings,
     setTimeHorizon,
     setShowSubmitted,
     setMaxPriorityItems,
     setShowGrades,
     setQuickNotes,
     setPinnedItems,
+    markSystemNoticeRead,
     resetToDefaults,
     
     // Convenience accessors
@@ -168,6 +208,7 @@ export function useDashboardSettings() {
     showGrades: settings.showGrades,
     pinnedItems: settings.pinnedItems,
     quickNotes: settings.quickNotes,
+    readSystemNotices: settings.readSystemNotices,
   }
 }
 

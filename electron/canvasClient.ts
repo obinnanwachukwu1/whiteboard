@@ -327,6 +327,29 @@ export class CanvasClient {
     return this.paginate<any>('/users/self/activity_stream', p)
   }
 
+  // Account notifications (global announcements)
+  async listAccountNotifications(
+    accountId: string | number,
+    params: { includePast?: boolean; includeAll?: boolean; showIsClosed?: boolean } = {},
+  ) {
+    const p: Record<string, any> = {}
+    if (params.includePast) p.include_past = true
+    if (params.includeAll) p.include_all = true
+    if (params.showIsClosed) p.show_is_closed = true
+    const encoded = encodeURIComponent(String(accountId))
+    try {
+      return await this.paginate<any>(
+        `/accounts/${encoded}/users/self/account_notifications`,
+        p,
+      )
+    } catch (err) {
+      if (err instanceof CanvasError && /HTTP 404\b/.test(err.message)) {
+        return this.paginate<any>(`/accounts/${encoded}/account_notifications`, p)
+      }
+      throw err
+    }
+  }
+
   // Announcements (Discussions API)
   listCourseAnnouncements(courseId: string | number, perPage = 50) {
     const p: Record<string, any> = {
@@ -1454,6 +1477,13 @@ export async function getRateLimitSnapshot() {
 }
 export async function listActivityStream(opts?: { onlyActiveCourses?: boolean; perPage?: number }) {
   return ensureClient().listActivityStream(opts)
+}
+
+export async function listAccountNotifications(
+  accountId: string | number,
+  params?: { includePast?: boolean; includeAll?: boolean; showIsClosed?: boolean },
+) {
+  return ensureClient().listAccountNotifications(accountId, params)
 }
 
 export async function listCourseAnnouncements(courseId: string | number, perPage = 50) {

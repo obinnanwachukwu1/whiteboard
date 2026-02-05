@@ -5,6 +5,7 @@ import { useCourseImages } from '../../hooks/useCourseImages'
 import { usePriorityAssignments } from '../../hooks/usePriorityAssignments'
 import { useActivityFeed, type ActivityFeedItem, formatActivityTime } from '../../hooks/useActivityFeed'
 import { useDashboardSettings } from '../../hooks/useDashboardSettings'
+import { useAccountNotifications } from '../../hooks/useCanvasQueries'
 import { extractAssignmentIdFromUrl, extractCourseIdFromUrl, extractQuizIdFromUrl } from '../../utils/urlHelpers'
 import { useQueryClient } from '@tanstack/react-query'
 import { formatDateTime } from '../../utils/dateFormat'
@@ -12,14 +13,16 @@ import { PriorityList } from '../dashboard/PriorityList'
 import { ActivityPanel } from '../dashboard/ActivityPanel'
 import { RecentFeedback } from '../dashboard/RecentFeedback'
 import { PinnedPages } from '../dashboard/PinnedPages'
+import { SystemNotices } from '../dashboard/SystemNotices'
 import { useDashboardPrefetch } from './useDashboardPrefetch'
 import { useAIContextOffer } from '../../hooks/useAIContextOffer'
+import { useAppData } from '../../context/AppContext'
 
 type Props = {
   due: DueItem[]
   loading: boolean
   recentFeedback?: FeedbackItem[]
-  courses?: Array<{ id: string | number; name: string; course_code?: string }>
+  courses?: Array<{ id: string | number; name: string; course_code?: string; account_id?: string | number }>
   sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> }
   onOpenCourse?: (courseId: string | number) => void
   onOpenAssignment?: (courseId: string | number, assignmentRestId: string, title: string) => void
@@ -37,6 +40,7 @@ export const Dashboard: React.FC<Props> = ({
   courses,
   sidebar,
 }) => {
+  const appData = useAppData()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { courseImageUrl } = useCourseImages()
@@ -47,7 +51,74 @@ export const Dashboard: React.FC<Props> = ({
     setShowGrades,
     pinnedItems,
     setPinnedItems,
+    markSystemNoticeRead,
+    readSystemNotices,
   } = useDashboardSettings()
+
+  const accountId = React.useMemo(() => {
+    const list = Array.isArray(courses) ? courses : []
+    const counts = new Map<string, number>()
+    for (const course of list) {
+      const raw = (course as any)?.account_id
+      if (raw == null) continue
+      const key = String(raw)
+      counts.set(key, (counts.get(key) || 0) + 1)
+    }
+    if (!counts.size) return null
+    let best: string | null = null
+    let bestCount = 0
+    counts.forEach((count, key) => {
+      if (count > bestCount) {
+        best = key
+        bestCount = count
+      }
+    })
+    return best
+  }, [courses])
+
+  const accountKey = React.useMemo(() => {
+    if (!accountId) return null
+    const base = appData.baseUrl || ''
+    const uid = (appData.profile as any)?.id
+    return uid ? `${base}|${uid}|${accountId}` : `${base}|${accountId}`
+  }, [accountId, appData.baseUrl, appData.profile])
+
+  const accountNoticesQ = useAccountNotifications(
+    accountId,
+    { includePast: false },
+    { enabled: !!accountId && !loading },
+  )
+
+  const activeNotices = React.useMemo(() => {
+    const now = Date.now()
+    const list = accountNoticesQ.data || []
+    return list.filter((notice) => {
+      const start = notice.start_at ? Date.parse(String(notice.start_at)) : NaN
+      const end = notice.end_at ? Date.parse(String(notice.end_at)) : NaN
+      if (Number.isFinite(start) && now < start) return false
+      if (Number.isFinite(end) && now > end) return false
+      return true
+    })
+  }, [accountNoticesQ.data])
+
+  const unreadNotices = React.useMemo(() => {
+    if (!accountKey) return activeNotices
+    const read = new Set((readSystemNotices?.[accountKey] || []).map(String))
+    return activeNotices.filter((notice) => !read.has(String(notice.id)))
+  }, [accountKey, activeNotices, readSystemNotices])
+
+  const sortedNotices = React.useMemo(() => {
+    return [...unreadNotices].sort((a, b) => {
+      const aTime = a.start_at ? Date.parse(String(a.start_at)) : 0
+      const bTime = b.start_at ? Date.parse(String(b.start_at)) : 0
+      return bTime - aTime
+    })
+  }, [unreadNotices])
+
+  const handleMarkNoticeRead = React.useCallback((id: string | number) => {
+    if (!accountKey) return
+    markSystemNoticeRead(accountKey, String(id))
+  }, [accountKey, markSystemNoticeRead])
 
   const handleUnpin = React.useCallback((id: string) => {
     setPinnedItems(pinnedItems.filter((i) => i.id !== id))
@@ -172,6 +243,12 @@ export const Dashboard: React.FC<Props> = ({
       <h1 className="mt-0 mb-2 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
         Dashboard
       </h1>
+
+      <SystemNotices
+        items={sortedNotices}
+        onMarkRead={handleMarkNoticeRead}
+        canMarkRead={!!accountKey}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-5">
         <PriorityList

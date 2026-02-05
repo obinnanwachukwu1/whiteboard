@@ -87,6 +87,10 @@ if (process.isMainFrame) {
       ipcRenderer.invoke('canvas:getCourseQuiz', courseId, quizId),
     listActivityStream: (opts?: { onlyActiveCourses?: boolean; perPage?: number }) =>
       ipcRenderer.invoke('canvas:listActivityStream', opts),
+    listAccountNotifications: (
+      accountId: string | number,
+      params?: { includePast?: boolean; includeAll?: boolean; showIsClosed?: boolean },
+    ) => ipcRenderer.invoke('canvas:listAccountNotifications', accountId, params),
     listCourseAnnouncements: (courseId: string | number, perPage?: number) =>
       ipcRenderer.invoke('canvas:listCourseAnnouncements', courseId, perPage),
     listCourseAnnouncementsPage: (courseId: string | number, page?: number, perPage?: number) =>

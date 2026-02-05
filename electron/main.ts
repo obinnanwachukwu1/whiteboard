@@ -143,6 +143,7 @@ import {
   listCourseQuizzes as svcListCourseQuizzes,
   getCourseQuiz as svcGetCourseQuiz,
   listActivityStream as svcListActivityStream,
+  listAccountNotifications as svcListAccountNotifications,
   listCourseAnnouncements as svcListCourseAnnouncements,
   listCourseAnnouncementsPage as svcListCourseAnnouncementsPage,
   getAnnouncement as svcGetAnnouncement,
@@ -1611,6 +1612,23 @@ ipcMain.handle(
   async (_evt, opts?: { onlyActiveCourses?: boolean; perPage?: number }) => {
     try {
       const data = await svcListActivityStream(opts)
+      return { ok: true, data }
+    } catch (e: any) {
+      const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+      return { ok: false, error: msg }
+    }
+  },
+)
+
+ipcMain.handle(
+  'canvas:listAccountNotifications',
+  async (
+    _evt,
+    accountId: string | number,
+    params?: { includePast?: boolean; includeAll?: boolean; showIsClosed?: boolean },
+  ) => {
+    try {
+      const data = await svcListAccountNotifications(accountId, params)
       return { ok: true, data }
     } catch (e: any) {
       const msg = e instanceof CanvasError ? e.message : String(e?.message || e)

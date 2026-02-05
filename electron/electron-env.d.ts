@@ -117,6 +117,10 @@ interface Window {
       onlyActiveCourses?: boolean
       perPage?: number
     }) => Promise<{ ok: boolean; data?: any; error?: string }>
+    listAccountNotifications: (
+      accountId: string | number,
+      params?: { includePast?: boolean; includeAll?: boolean; showIsClosed?: boolean },
+    ) => Promise<{ ok: boolean; data?: any; error?: string }>
     listCourseAnnouncements: (
       courseId: string | number,
       perPage?: number,
