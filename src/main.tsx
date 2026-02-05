@@ -142,6 +142,25 @@ function Bootstrap({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  React.useEffect(() => {
+    const root = document.documentElement
+    let t: number | null = null
+    const show = () => {
+      root.classList.add('show-scrollbars')
+      if (t) window.clearTimeout(t)
+      t = window.setTimeout(() => {
+        root.classList.remove('show-scrollbars')
+        t = null
+      }, 800)
+    }
+    document.addEventListener('scroll', show, { passive: true, capture: true })
+    return () => {
+      document.removeEventListener('scroll', show, true)
+      if (t) window.clearTimeout(t)
+      root.classList.remove('show-scrollbars')
+    }
+  }, [])
+
   useQueryPersistence(queryClient)
   return <>{children}</>
 }

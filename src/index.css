@@ -110,21 +110,39 @@ html {
   color: #1f2a33;
 }
 
-/* Smooth, minimal scrollbars */
+/* Auto-hide scrollbars: keep width stable, fade thumb in on scroll */
+:root {
+  --scrollbar-size: 8px;
+  --scrollbar-thumb: #c7d2e0;
+}
+.dark {
+  --scrollbar-thumb: #4b5563;
+}
 * {
   scrollbar-width: thin;
-  scrollbar-color: #c7d2e0 transparent;
+  scrollbar-color: transparent transparent;
+}
+.show-scrollbars * {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 *::-webkit-scrollbar {
-  height: 8px;
-  width: 8px;
+  height: var(--scrollbar-size);
+  width: var(--scrollbar-size);
 }
 *::-webkit-scrollbar-thumb {
-  background: #c7d2e0;
+  background: transparent;
   border-radius: 9999px;
+}
+.show-scrollbars *::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
 }
 *::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* Overlay the reserved scrollbar width so content doesn't shift */
+.scrollbar-overlay {
+  margin-right: calc(-1 * var(--scrollbar-size));
 }
 
 /* Electron draggable regions */

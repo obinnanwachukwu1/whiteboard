@@ -195,7 +195,7 @@ function AppShellInner(props: Props) {
                   className={`flex-1 flex flex-col min-h-0 min-w-0 p-6 ${props.currentView === 'course' ? 'pt-24 overflow-hidden' : 'overflow-y-auto'}`}
                 >
                   <div
-                    className={`max-w-6xl w-full mx-auto ${props.currentView === 'course' ? 'flex-1 flex flex-col min-h-0' : ''}`}
+                    className={`max-w-6xl w-full mx-auto ${props.currentView === 'course' ? 'flex-1 flex flex-col min-h-0' : 'scrollbar-overlay'}`}
                   >
                     <Outlet />
                   </div>
