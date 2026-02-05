@@ -844,7 +844,7 @@ app.whenReady().then(async () => {
   appConfig = await loadConfig()
 
   // Initialize AI Manager
-  aiManager.start(!!appConfig.aiEnabled)
+  void aiManager.start(!!appConfig.aiEnabled)
 
   // Register custom protocol for secure file serving
   // SECURITY: Only allow access to files in temp or theme backgrounds dir
@@ -2315,7 +2315,7 @@ ipcMain.handle('config:set', async (_evt, partial: Partial<AppConfig>) => {
     // Handle AI toggle
     if (partial.aiEnabled !== undefined && partial.aiEnabled !== oldConfig.aiEnabled) {
       if (partial.aiEnabled) {
-        aiManager.start(true)
+        void aiManager.start(true)
       } else {
         aiManager.stop()
       }

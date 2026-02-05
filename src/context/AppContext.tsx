@@ -2,8 +2,17 @@ import React from 'react'
 import type { SidebarConfig } from '../components/Sidebar'
 import type { ThemeSettings } from '../utils/theme'
 
+export type AIAvailabilityStatus = 'available' | 'unsupported' | 'disabled' | 'error'
+
+export type AIAvailability = {
+  status: AIAvailabilityStatus
+  detail?: string
+}
+
 export type AppFlagsValue = {
   aiEnabled: boolean
+  aiAvailable: boolean
+  aiAvailability: AIAvailability | null
   embeddingsEnabled: boolean
   privateModeEnabled: boolean
   privateModeAcknowledged: boolean

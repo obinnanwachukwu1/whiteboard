@@ -80,9 +80,9 @@ const stripHtml = (html: string) => {
  */
 export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick }) => {
   const { streamSummarize } = useAI()
-  const { aiEnabled } = useAppFlags()
+  const { aiEnabled, aiAvailable } = useAppFlags()
   
-  const showAI = aiEnabled && item.type === 'announcement'
+  const showAI = aiEnabled && aiAvailable && item.type === 'announcement'
   
   const { triggerProps, popoverProps } = useAIPopover({
     enabled: showAI,

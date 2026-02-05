@@ -28,7 +28,7 @@ type PptxEvent = {
 const PptxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDownload }) => {
   const appActions = useAppActions()
   const aiPanel = useAIPanelActions()
-  const { aiEnabled, embeddingsEnabled, privateModeEnabled } = useAppFlags()
+  const { aiEnabled, aiAvailable, embeddingsEnabled, privateModeEnabled } = useAppFlags()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [viewerState, setViewerState] = useState<ViewerState>({
     currentSlide: 1,
@@ -137,6 +137,7 @@ const PptxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDo
           if (
             (data as any).action === 'ai' &&
             aiEnabled &&
+            aiAvailable &&
             embeddingsEnabled &&
             !privateModeEnabled
           ) {
@@ -155,6 +156,7 @@ const PptxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDo
     appActions,
     aiPanel,
     aiEnabled,
+    aiAvailable,
     embeddingsEnabled,
     privateModeEnabled,
   ])

@@ -123,8 +123,8 @@ PriorityRow.displayName = 'PriorityRow'
  */
 export const PriorityItem: React.FC<Props> = ({ assignment, courseImageUrl, onClick }) => {
   const { streamExplainPriority } = useAI()
-  const { aiEnabled } = useAppFlags()
-  const showAI = aiEnabled
+  const { aiEnabled, aiAvailable } = useAppFlags()
+  const showAI = aiEnabled && aiAvailable
 
   const isPastDue = assignment.hoursUntilDue !== null && assignment.hoursUntilDue < 0
 

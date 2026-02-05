@@ -34,7 +34,7 @@ export const PdfViewerIframe: React.FC<Props> = ({
 }) => {
   const appActions = useAppActions()
   const aiPanel = useAIPanelActions()
-  const { aiEnabled, embeddingsEnabled, privateModeEnabled } = useAppFlags()
+  const { aiEnabled, aiAvailable, embeddingsEnabled, privateModeEnabled } = useAppFlags()
   const fileUrlQ = useFileBytes(fileId)
   const fileMetaQ = useFileMeta(fileId)
 
@@ -198,7 +198,13 @@ export const PdfViewerIframe: React.FC<Props> = ({
 
         case 'SHORTCUT':
           if (data.action === 'search' && !privateModeEnabled) appActions.onOpenSearch()
-          if (data.action === 'ai' && aiEnabled && embeddingsEnabled && !privateModeEnabled) {
+          if (
+            data.action === 'ai' &&
+            aiEnabled &&
+            aiAvailable &&
+            embeddingsEnabled &&
+            !privateModeEnabled
+          ) {
             aiPanel.open()
           }
           break
@@ -217,6 +223,7 @@ export const PdfViewerIframe: React.FC<Props> = ({
     appActions,
     aiPanel,
     aiEnabled,
+    aiAvailable,
     embeddingsEnabled,
     privateModeEnabled,
   ])

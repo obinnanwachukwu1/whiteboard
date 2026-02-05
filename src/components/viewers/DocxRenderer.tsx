@@ -26,7 +26,7 @@ type DocxEvent = {
 const DocxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDownload }) => {
   const appActions = useAppActions()
   const aiPanel = useAIPanelActions()
-  const { aiEnabled, embeddingsEnabled, privateModeEnabled } = useAppFlags()
+  const { aiEnabled, aiAvailable, embeddingsEnabled, privateModeEnabled } = useAppFlags()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const lastLoadedUrlRef = useRef<string | null>(null)
 
@@ -137,6 +137,7 @@ const DocxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDo
           if (
             (data as any).action === 'ai' &&
             aiEnabled &&
+            aiAvailable &&
             embeddingsEnabled &&
             !privateModeEnabled
           ) {
@@ -155,6 +156,7 @@ const DocxRenderer: React.FC<Props> = ({ url, className = '', isFullscreen, onDo
     sendCommand,
     url,
     aiEnabled,
+    aiAvailable,
     embeddingsEnabled,
     privateModeEnabled,
   ])

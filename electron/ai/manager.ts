@@ -1,5 +1,5 @@
 // electron/ai/manager.ts
-import { spawn, ChildProcess, execSync } from 'child_process'
+import { spawn, ChildProcess } from 'child_process'
 import path from 'path'
 import fs from 'fs'
 import { app, ipcMain } from 'electron'
@@ -12,6 +12,11 @@ const RESTART_DELAY_MS = 2000
 const READINESS_CHECK_INTERVAL_MS = 500
 const READINESS_TIMEOUT_MS = 10000
 
+export type AIAvailability = {
+  status: 'available' | 'unsupported' | 'disabled' | 'error'
+  detail?: string
+}
+
 export class AIManager {
   private process: ChildProcess | null = null
   private socketPath: string
@@ -21,6 +26,13 @@ export class AIManager {
   private restartAttempts = 0
   private isReady = false
   private activeRequests: Map<string, http.ClientRequest> = new Map()
+  private availabilityCache:
+    | {
+        checkedAt: number
+        status: AIAvailability
+      }
+    | null = null
+  private availabilityPromise: Promise<AIAvailability> | null = null
 
   constructor() {
     // Socket path will be initialized in start() once we have app.getPath('temp')
@@ -29,52 +41,256 @@ export class AIManager {
     this.setupIPC()
   }
 
-  private isSupported(): boolean {
-    if (process.platform !== 'darwin') return false
-
-    try {
-      const productVersion = execSync('sw_vers -productVersion').toString().trim()
-      const [major, minor] = productVersion.split('.').map(Number)
-
-      if (major < 26) return false
-      if (major === 26 && minor < 1) return false
-
-      return true
-    } catch (e) {
-      console.error('[AI] Failed to check macOS version:', e)
-      return false
-    }
+  private resolveBinaryPath() {
+    const isDev = !app.isPackaged
+    const binaryName = 'afmbridge-server'
+    return isDev
+      ? path.join(process.cwd(), 'resources', 'bin', binaryName)
+      : path.join(process.resourcesPath, 'bin', binaryName)
   }
 
-  public start(enabled: boolean) {
+  public async getAvailability(force = false): Promise<AIAvailability> {
+    const now = Date.now()
+    if (!force && this.availabilityCache && now - this.availabilityCache.checkedAt < 30_000) {
+      return this.availabilityCache.status
+    }
+    if (this.availabilityPromise) return this.availabilityPromise
+
+    this.availabilityPromise = this.checkAvailability().finally(() => {
+      this.availabilityPromise = null
+    })
+
+    const status = await this.availabilityPromise
+    this.availabilityCache = { checkedAt: Date.now(), status }
+    return status
+  }
+
+  private parseAvailabilityReason(output: string): string | null {
+    const match = output.match(/unavailable:\s*([^\n\r]+)/i)
+    return match ? match[1].trim() : null
+  }
+
+  private isNotEnabledReason(reason: string): boolean {
+    const lower = reason.toLowerCase()
+    return (
+      lower.includes('notenabled') ||
+      lower.includes('not enabled') ||
+      lower.includes('disabled') ||
+      lower.includes('not_enabled')
+    )
+  }
+
+  private async checkAvailability(): Promise<AIAvailability> {
+    if (process.platform !== 'darwin') {
+      return { status: 'unsupported', detail: 'non-mac' }
+    }
+
+    const binaryPath = this.resolveBinaryPath()
+    if (!fs.existsSync(binaryPath)) {
+      return { status: 'unsupported', detail: 'missing_binary' }
+    }
+
+    try {
+      fs.chmodSync(binaryPath, 0o755)
+    } catch {}
+
+    const statusResult = await this.checkAvailabilityViaStatus(binaryPath)
+    if (statusResult) return statusResult
+
+    // Fallback for older binaries that don't support --status.
+    return this.checkAvailabilityViaSocket(binaryPath)
+  }
+
+  private async checkAvailabilityViaStatus(binaryPath: string): Promise<AIAvailability | null> {
+    return new Promise<AIAvailability | null>((resolve) => {
+      let settled = false
+      let stdout = ''
+      let stderr = ''
+
+      const child = spawn(binaryPath, ['--status'])
+
+      const finish = (result: AIAvailability | null) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeout)
+        resolve(result)
+      }
+
+      child.stdout?.on('data', (data) => {
+        stdout += String(data)
+      })
+
+      child.stderr?.on('data', (data) => {
+        stderr += String(data)
+      })
+
+      child.on('error', (err) => {
+        finish({ status: 'error', detail: err.message })
+      })
+
+      child.on('exit', (code) => {
+        const raw = stdout.trim()
+        if (raw) {
+          try {
+            const json = JSON.parse(raw)
+            const status = String(json?.status || '').toLowerCase()
+            const detail = typeof json?.detail === 'string' ? json.detail : undefined
+
+            if (status === 'available') {
+              finish({ status: 'available', detail })
+              return
+            }
+            if (status === 'unavailable') {
+              if (detail && this.isNotEnabledReason(detail)) {
+                finish({ status: 'disabled', detail })
+              } else {
+                finish({ status: 'unsupported', detail })
+              }
+              return
+            }
+            if (status === 'unknown') {
+              finish({ status: 'error', detail: detail || 'unknown' })
+              return
+            }
+          } catch {
+            // Fall through to fallback.
+          }
+        }
+
+        if (code === 0 && !raw) {
+          finish({ status: 'available' })
+          return
+        }
+        if (code === 2 && stderr) {
+          const reason = this.parseAvailabilityReason(stderr) || stderr.trim()
+          if (reason && this.isNotEnabledReason(reason)) {
+            finish({ status: 'disabled', detail: reason })
+          } else if (reason) {
+            finish({ status: 'unsupported', detail: reason })
+          } else {
+            finish({ status: 'unsupported', detail: 'unavailable' })
+          }
+          return
+        }
+
+        finish(null)
+      })
+
+      const timeout = setTimeout(() => {
+        finish({ status: 'error', detail: 'timeout' })
+      }, 2000)
+    })
+  }
+
+  private async checkAvailabilityViaSocket(binaryPath: string): Promise<AIAvailability> {
+    const shortId = randomUUID().split('-')[0]
+    const socketPath = path.join('/tmp', `wb-ai-check-${shortId}.sock`)
+
+    return new Promise<AIAvailability>((resolve) => {
+      let settled = false
+      let stderr = ''
+      let stdout = ''
+
+      const child = spawn(binaryPath, ['--socket', socketPath, '--quiet'])
+
+      const finish = (result: AIAvailability) => {
+        if (settled) return
+        settled = true
+        cleanup()
+        resolve(result)
+      }
+
+      const cleanup = () => {
+        if (!child.killed) {
+          try {
+            child.kill('SIGINT')
+          } catch {}
+        }
+        setTimeout(() => {
+          if (!child.killed) {
+            try {
+              child.kill('SIGKILL')
+            } catch {}
+          }
+        }, 200)
+
+        if (fs.existsSync(socketPath)) {
+          try {
+            fs.unlinkSync(socketPath)
+          } catch {}
+        }
+        clearTimeout(timeout)
+        clearInterval(socketCheck)
+      }
+
+      child.stderr?.on('data', (data) => {
+        stderr += String(data)
+      })
+
+      child.stdout?.on('data', (data) => {
+        stdout += String(data)
+      })
+
+      child.on('error', (err) => {
+        finish({ status: 'error', detail: err.message })
+      })
+
+      child.on('exit', (code) => {
+        if (settled) return
+        const output = `${stderr}\n${stdout}`.trim()
+        const reason = this.parseAvailabilityReason(output) || output
+        if (code === 2 || reason) {
+          if (reason && this.isNotEnabledReason(reason)) {
+            finish({ status: 'disabled', detail: reason })
+          } else if (reason) {
+            finish({ status: 'unsupported', detail: reason })
+          } else {
+            finish({ status: 'unsupported', detail: 'unavailable' })
+          }
+          return
+        }
+        if (code === 0) {
+          finish({ status: 'available' })
+          return
+        }
+        finish({ status: 'error', detail: output || `exit_${code ?? 'unknown'}` })
+      })
+
+      const socketCheck = setInterval(() => {
+        if (fs.existsSync(socketPath)) {
+          finish({ status: 'available' })
+        }
+      }, 50)
+
+      const timeout = setTimeout(() => {
+        finish({ status: 'error', detail: 'timeout' })
+      }, 2000)
+    })
+  }
+
+  public async start(enabled: boolean) {
     if (!enabled) {
       console.log('[AI] Disabled by settings.')
       return
     }
 
-    if (!this.isSupported()) {
-      console.log('[AI] Not supported on this platform/version.')
+    const availability = await this.getAvailability()
+    if (availability.status !== 'available') {
+      console.log(`[AI] Not available: ${availability.status}${availability.detail ? ` (${availability.detail})` : ''}.`)
       return
     }
 
     this.isEnabled = true
 
     // Determine path to binary
-    const isDev = !app.isPackaged
-    const binaryName = 'afmbridge-server'
-
-    if (isDev) {
-      this.binaryPath = path.join(process.cwd(), 'resources', 'bin', binaryName)
-    } else {
-      this.binaryPath = path.join(process.resourcesPath, 'bin', binaryName)
-    }
+    this.binaryPath = this.resolveBinaryPath()
 
     // Use /tmp with a short name to avoid "unixDomainSocketPathTooLong" (limit is ~104 chars)
     // app.getPath('temp') on macOS can be very long (/var/folders/...)
     const shortId = randomUUID().split('-')[0]
     this.socketPath = path.join('/tmp', `wb-${shortId}.sock`)
 
-    this.startProcess()
+    await this.startProcess()
   }
 
   private async startProcess() {
@@ -238,6 +454,15 @@ export class AIManager {
   }
 
   private setupIPC() {
+    ipcMain.handle('ai:availability', async (_evt, opts?: { force?: boolean }) => {
+      try {
+        const data = await this.getAvailability(Boolean(opts?.force))
+        return { ok: true, data }
+      } catch (e: any) {
+        return { ok: false, error: String(e?.message || e) }
+      }
+    })
+
     ipcMain.on('ai:chat-cancel', (_, { id }) => {
       this.cancelRequest(id)
     })

@@ -111,6 +111,16 @@ declare global {
       ) => Promise<{ ok: boolean; data?: any; error?: string }>
     }
     ai: {
+      getAvailability?: (opts?: {
+        force?: boolean
+      }) => Promise<{
+        ok: boolean
+        data?: {
+          status: 'available' | 'unsupported' | 'disabled' | 'error'
+          detail?: string
+        }
+        error?: string
+      }>
       chat: (
         messages: any[],
         opts?:

@@ -9,6 +9,7 @@ import {
   type AppDataValue,
   type AppDataActionsValue,
   type AppPreferencesValue,
+  type AIAvailability,
   type NotificationSettings,
   type GpaSettings,
   DEFAULT_NOTIFICATION_SETTINGS,
@@ -44,6 +45,7 @@ export function useRootLayoutState() {
   const [pdfGestureZoomEnabled, setPdfGestureZoomEnabledState] = useState(true)
   const [embeddingsEnabled, setEmbeddingsEnabledState] = useState(true)
   const [aiEnabled, setAiEnabledState] = useState(false)
+  const [aiAvailability, setAiAvailability] = useState<AIAvailability | null>(null)
   const [privateModeEnabled, setPrivateModeEnabledState] = useState(false)
   const [privateModeAcknowledged, setPrivateModeAcknowledgedState] = useState(false)
   const [encryptionEnabled, setEncryptionEnabledState] = useState(false)
@@ -183,6 +185,42 @@ export function useRootLayoutState() {
     setPrivateModeAcknowledgedState,
     onHydrated: () => setUserSettingsHydrated(true),
   })
+
+  useEffect(() => {
+    let mounted = true
+    const isMac = window.platform?.isMac ?? false
+    if (!isMac) {
+      setAiAvailability({ status: 'unsupported', detail: 'non-mac' })
+      return () => {
+        mounted = false
+      }
+    }
+    if (!window.ai?.getAvailability) {
+      setAiAvailability({ status: 'unsupported', detail: 'missing_api' })
+      return () => {
+        mounted = false
+      }
+    }
+
+    ;(async () => {
+      try {
+        const res = await window.ai.getAvailability({ force: true })
+        if (!mounted) return
+        if (res.ok && res.data) {
+          setAiAvailability(res.data)
+        } else {
+          setAiAvailability({ status: 'error', detail: String(res.error || 'unknown') })
+        }
+      } catch (e: any) {
+        if (!mounted) return
+        setAiAvailability({ status: 'error', detail: String(e?.message || e) })
+      }
+    })()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -789,9 +827,13 @@ export function useRootLayoutState() {
     else delete root.dataset.reduceEffects
   }, [reduceEffectsEnabled])
 
+  const aiAvailable = aiAvailability?.status === 'available'
+
   const flagsContext: AppFlagsValue = useMemo(
     () => ({
       aiEnabled,
+      aiAvailable,
+      aiAvailability,
       embeddingsEnabled,
       privateModeEnabled,
       privateModeAcknowledged,
@@ -805,6 +847,8 @@ export function useRootLayoutState() {
     }),
     [
       aiEnabled,
+      aiAvailable,
+      aiAvailability,
       embeddingsEnabled,
       privateModeEnabled,
       privateModeAcknowledged,

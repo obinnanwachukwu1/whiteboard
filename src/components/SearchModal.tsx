@@ -202,7 +202,13 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
   // Handle Ask AI
   const handleAskAI = () => {
-    if (flags.privateModeEnabled || !flags.aiEnabled) return
+    if (
+      flags.privateModeEnabled ||
+      !flags.aiEnabled ||
+      !flags.aiAvailable ||
+      !flags.embeddingsEnabled
+    )
+      return
     onClose()
     clearSearch()
     aiPanel.open(query.trim(), 'ask-ai', true)
@@ -291,7 +297,12 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const showDeepSearchAction =
     flags.embeddingsEnabled && !deepSearchActive && query.trim().length > 0 && !isDeepSearching
   const showAskAIAction =
-    flags.aiEnabled && query.trim().length > 0 && !deepSearchActive && !isDeepSearching
+    flags.aiEnabled &&
+    flags.aiAvailable &&
+    flags.embeddingsEnabled &&
+    query.trim().length > 0 &&
+    !deepSearchActive &&
+    !isDeepSearching
 
   // Calculate total items for navigation
   const deepSearchIndex = showDeepSearchAction ? results.length : -1

@@ -3,14 +3,27 @@ import { SettingsRow, Toggle } from './SettingsRow'
 import { useAppFlags, useAppSettings } from '../../context/AppContext'
 
 export function FeaturesSettings() {
-  const { embeddingsEnabled, aiEnabled, privateModeEnabled } = useAppFlags()
+  const { embeddingsEnabled, aiEnabled, aiAvailability, privateModeEnabled } =
+    useAppFlags()
   const { setEmbeddingsEnabled, setAiEnabled } = useAppSettings()
   const isMac = window.platform?.isMac ?? false
   const privateDisabledReason = privateModeEnabled
     ? 'Disabled because Private Mode is on.'
     : undefined
-  const aiDisabled = privateModeEnabled || !embeddingsEnabled
-  const aiDisabledReason = privateModeEnabled ? privateDisabledReason : undefined
+  const aiAvailabilityStatus = aiAvailability?.status
+  const showAppleIntelligence = isMac && aiAvailabilityStatus !== 'unsupported'
+  const aiDisabledBySystem = aiAvailabilityStatus === 'disabled'
+  const aiDisabledByError = aiAvailabilityStatus === 'error'
+  const aiDisabled = privateModeEnabled || !embeddingsEnabled || aiDisabledBySystem || aiDisabledByError
+  const aiToggleChecked = aiDisabledBySystem || aiDisabledByError ? false : aiEnabled
+  const aiDisabledReason = (() => {
+    if (privateModeEnabled) return privateDisabledReason
+    if (!embeddingsEnabled) return 'Enable Deep Search to use Apple Intelligence.'
+    if (aiDisabledBySystem)
+      return 'Enable Apple Intelligence in System Settings to use this feature.'
+    if (aiDisabledByError) return 'Apple Intelligence availability could not be verified.'
+    return undefined
+  })()
 
   return (
     <SettingsSection title="Features">
@@ -27,7 +40,7 @@ export function FeaturesSettings() {
         />
       </SettingsRow>
 
-      {isMac ? (
+      {showAppleIntelligence ? (
         <SettingsRow
           label="Apple Intelligence"
           description="Local AI features (macOS 26.1+). Runs on-device."
@@ -35,7 +48,7 @@ export function FeaturesSettings() {
           disabledReason={aiDisabledReason}
         >
           <Toggle
-            checked={aiEnabled}
+            checked={aiToggleChecked}
             onChange={(checked) => setAiEnabled(checked).catch(() => {})}
             disabled={aiDisabled}
           />

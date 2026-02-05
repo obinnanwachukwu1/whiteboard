@@ -297,7 +297,7 @@ export const CanvasContentView: React.FC<Props> = ({
     }
 
     // Only show context menu if AI is enabled and we have content
-    if (!flags.aiEnabled) return
+    if (!flags.aiEnabled || !flags.aiAvailable) return
     if (loading || error) return
 
     // Only for text content types for now (not files)

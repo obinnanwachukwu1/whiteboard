@@ -8,8 +8,8 @@ import { useAppFlags } from '../../context/AppContext'
  */
 export function AISidePanelKeyboardHandler() {
   const aiPanel = useOptionalAIPanelActions()
-  const { aiEnabled, embeddingsEnabled, privateModeEnabled } = useAppFlags()
-  const canUseAI = aiEnabled && embeddingsEnabled && !privateModeEnabled
+  const { aiEnabled, aiAvailable, embeddingsEnabled, privateModeEnabled } = useAppFlags()
+  const canUseAI = aiEnabled && aiAvailable && embeddingsEnabled && !privateModeEnabled
 
   useEffect(() => {
     if (!aiPanel || !canUseAI) return

@@ -267,7 +267,7 @@ export function useOptionalAIPanelActions(): AIPanelActions | null {
 interface AIPanelProviderProps {
   children: React.ReactNode
   embeddingsEnabled?: boolean
-  aiEnabled?: boolean // Whether AI chat is available (macOS 26.1+)
+  aiEnabled?: boolean // Whether AI is enabled in settings
   // Structured data from the app for richer context
   userName?: string
   pinnedCourses?: string[]
@@ -913,11 +913,13 @@ export function AIPanelProvider({
 }: AIPanelProviderProps) {
   const [state, setState] = useState<AIPanelState>(defaultState)
   const { streamChat } = useAI()
-  const { privateModeEnabled } = useAppFlags()
+  const { privateModeEnabled, aiAvailable, aiAvailability } = useAppFlags()
 
   // Precompute the dashboard-ranked priority list so planning answers don't "guess".
   // This is gated behind AI availability.
-  const priorityData = usePriorityAssignments({ enabled: Boolean(aiEnabled && embeddingsEnabled) })
+  const priorityData = usePriorityAssignments({
+    enabled: Boolean(aiEnabled && aiAvailable && embeddingsEnabled),
+  })
   const priorityItems: PriorityItem[] = useMemo(() => {
     const list = priorityData.assignments || []
     return list.slice(0, 10).map((a: any) => ({
@@ -1027,8 +1029,21 @@ export function AIPanelProvider({
         setState((prev) => ({ ...prev, error: 'AI features are not available' }))
         return
       }
+      if (!aiAvailable) {
+        const status = aiAvailability?.status
+        const message =
+          status === 'disabled'
+            ? 'Enable Apple Intelligence in System Settings to use this feature.'
+            : status === 'unsupported'
+              ? 'Apple Intelligence is not supported on this Mac.'
+              : status === 'error'
+                ? 'Apple Intelligence availability could not be verified.'
+                : 'AI features are not available.'
+        setState((prev) => ({ ...prev, error: message }))
+        return
+      }
       if (!aiEnabled) {
-        setState((prev) => ({ ...prev, error: 'AI requires macOS 26.1 or later' }))
+        setState((prev) => ({ ...prev, error: 'Apple Intelligence is turned off in Settings.' }))
         return
       }
 
@@ -1759,6 +1774,8 @@ export function AIPanelProvider({
     },
     [
       embeddingsEnabled,
+      aiAvailable,
+      aiAvailability,
       aiEnabled,
       dueAssignments,
       courses,

@@ -310,6 +310,7 @@ if (process.isMainFrame) {
 
   // AI Helpers
   contextBridge.exposeInMainWorld('ai', {
+    getAvailability: (opts?: { force?: boolean }) => ipcRenderer.invoke('ai:availability', opts),
     chat: (
       messages: any[],
       opts?:
