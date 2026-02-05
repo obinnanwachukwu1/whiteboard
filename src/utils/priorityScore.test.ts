@@ -58,5 +58,72 @@ describe('priorityScore', () => {
 
     expect(pastDue.priorityScore).toBeGreaterThan(dueSoon.priorityScore)
   })
-})
 
+  it('allows a high-impact 3-7d item to jump one bucket above low-impact 24-72h work', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-02-05T00:00:00.000Z'))
+
+    const ranked = rankAssignmentsByPriority(
+      [
+        {
+          id: 'soon-low',
+          name: 'Soon low impact',
+          courseId: 'c1',
+          dueAt: '2026-02-06T12:00:00.000Z', // +36h
+          effectiveWeight: 2,
+          isSubmitted: false,
+        },
+        {
+          id: 'later-high',
+          name: 'Later high impact',
+          courseId: 'c2',
+          dueAt: '2026-02-10T00:00:00.000Z', // +120h (3-7d bucket)
+          effectiveWeight: 100,
+          isSubmitted: false,
+        },
+      ],
+      {
+        withinDays: 30,
+        limit: 10,
+        includeSubmitted: true,
+        includePastDue: true,
+      },
+    )
+
+    expect(String(ranked[0]?.id)).toBe('later-high')
+  })
+
+  it('does not let 24-72h work jump into <=24h bucket', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-02-05T00:00:00.000Z'))
+
+    const ranked = rankAssignmentsByPriority(
+      [
+        {
+          id: 'due-today',
+          name: 'Due today low impact',
+          courseId: 'c1',
+          dueAt: '2026-02-05T12:00:00.000Z', // +12h
+          effectiveWeight: 1,
+          isSubmitted: false,
+        },
+        {
+          id: 'due-tomorrow-high',
+          name: 'Due tomorrow very high impact',
+          courseId: 'c2',
+          dueAt: '2026-02-06T12:00:00.000Z', // +36h
+          effectiveWeight: 100,
+          isSubmitted: false,
+        },
+      ],
+      {
+        withinDays: 30,
+        limit: 10,
+        includeSubmitted: true,
+        includePastDue: true,
+      },
+    )
+
+    expect(String(ranked[0]?.id)).toBe('due-today')
+  })
+})

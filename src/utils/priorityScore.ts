@@ -1,14 +1,10 @@
 /**
  * Priority score calculation for ranking assignments.
- * 
- * Formula: priority = dueSoonBoost + (effectiveWeight × urgencyMultiplier) + statusWeight
- * 
- * Where:
- * - effectiveWeight = assignment's % of final grade (0-100)
- * - urgencyMultiplier = 3 (≤24h), 2 (≤48h), 1.5 (≤72h), 1 (>72h)
- * - statusWeight = 0 if submitted, 100 if not submitted
- * - dueSoonBoost = 0 normally; large boost when due within 24h (or past due) so
- *   near-term deadlines outrank far-future high-stakes work.
+ *
+ * Hybrid scoring model:
+ * - Urgency buckets provide the base ranking structure.
+ * - Impact score (weight, submission status, course pressure) ranks items within a bucket.
+ * - Very high-impact items can jump at most one urgency bucket via a fixed bonus.
  */
 
 export type PriorityAssignment = {
@@ -29,6 +25,27 @@ export type RankedAssignment = PriorityAssignment & {
   hoursUntilDue: number | null
   daysUntilDue: number | null
 }
+
+type PriorityScoreOptions = {
+  /** Small boost when a course has multiple due-soon items */
+  coursePressureBoost?: number
+}
+
+const IMPACT_WEIGHT_CAP = 40
+const IMPACT_WEIGHT_MULTIPLIER = 1.5
+const IMPACT_SUBMITTED_PENALTY = -20
+const IMPACT_UNSUBMITTED_BONUS = 10
+const HIGH_IMPACT_JUMP_THRESHOLD = 70
+const HIGH_IMPACT_JUMP_BONUS = 60
+
+const BUCKET_BASE_SCORES = {
+  pastDue: 420,
+  due24h: 360,
+  due72h: 260,
+  due7d: 160,
+  later: 80,
+  none: 0,
+} as const
 
 /**
  * Calculate hours until a due date from now.
@@ -77,36 +94,60 @@ export function getUrgencyMultiplier(hours: number | null): number {
   return 1                      // More than 72 hours out
 }
 
+function getUrgencyBucket(hours: number | null): {
+  index: number
+  baseScore: number
+} {
+  if (hours === null) {
+    return { index: 4, baseScore: BUCKET_BASE_SCORES.none }
+  }
+  if (hours < 0) {
+    return { index: 0, baseScore: BUCKET_BASE_SCORES.pastDue }
+  }
+  if (hours <= 24) {
+    return { index: 0, baseScore: BUCKET_BASE_SCORES.due24h }
+  }
+  if (hours <= 72) {
+    return { index: 1, baseScore: BUCKET_BASE_SCORES.due72h }
+  }
+  if (hours <= 168) {
+    return { index: 2, baseScore: BUCKET_BASE_SCORES.due7d }
+  }
+  return { index: 3, baseScore: BUCKET_BASE_SCORES.later }
+}
+
+function calculateImpactScore(
+  assignment: PriorityAssignment,
+  coursePressureBoost: number
+): number {
+  const weight = Math.max(0, assignment.effectiveWeight ?? 0)
+  const normalizedWeight = Math.min(weight, IMPACT_WEIGHT_CAP)
+  const weightScore = normalizedWeight * IMPACT_WEIGHT_MULTIPLIER
+  const statusScore = assignment.isSubmitted ? IMPACT_SUBMITTED_PENALTY : IMPACT_UNSUBMITTED_BONUS
+  return weightScore + statusScore + coursePressureBoost
+}
+
 /**
  * Calculate priority score for a single assignment.
  * Higher score = higher priority.
  */
-export function calculatePriorityScore(assignment: PriorityAssignment): RankedAssignment {
+export function calculatePriorityScore(
+  assignment: PriorityAssignment,
+  options: PriorityScoreOptions = {}
+): RankedAssignment {
   const hours = hoursUntilDue(assignment.dueAt)
   const days = hours !== null ? Math.round(hours / 24) : null
   const urgency = getUrgencyMultiplier(hours)
-  
-  // Effective weight (0-100), default to 0 if unknown
-  const weight = assignment.effectiveWeight ?? 0
-  
-  // Status weight: 100 if not submitted, 0 if submitted
-  // This strongly biases the list toward unsubmitted assignments
-  const statusWeight = assignment.isSubmitted ? 0 : 100
 
-  // Any unsubmitted item due within 24 hours (or past due) should be the top priority,
-  // regardless of grade weight.
-  // Max of the non-boosted score is ~500 (100 * 4 + 100), so 1000 is a safe separator.
-  const dueSoonBoost =
-    !assignment.isSubmitted && hours !== null && hours <= 24
-      ? hours < 0
-        ? 2000 // Past due outranks "due soon"
-        : 1000 // Due within 24h outranks later items
-      : 0
-  
-  // Final priority score
-  // The statusWeight biases unsubmitted items upward
-  // The weight * urgency gives ranking among unsubmitted items
-  const priorityScore = dueSoonBoost + (weight * urgency) + statusWeight
+  const bucket = getUrgencyBucket(hours)
+  const impactScore = calculateImpactScore(assignment, options.coursePressureBoost ?? 0)
+
+  // High-impact items can jump one bucket only from 3-7d (or later) into the next bucket.
+  // This keeps urgency meaningful while still surfacing meaningful long-range work.
+  const canJumpOneBucket = !assignment.isSubmitted && bucket.index >= 2 && impactScore >= HIGH_IMPACT_JUMP_THRESHOLD
+  const jumpBonus = canJumpOneBucket ? HIGH_IMPACT_JUMP_BONUS : 0
+
+  const priorityScore = bucket.baseScore + impactScore + jumpBonus
   
   return {
     ...assignment,
@@ -141,8 +182,20 @@ export function rankAssignmentsByPriority(
     includePastDue = true,
   } = options
   
+  const dueSoonCounts = new Map<string, number>()
+  for (const a of assignments) {
+    const hours = hoursUntilDue(a.dueAt)
+    if (a.isSubmitted || hours === null || hours > 72) continue
+    const cid = String(a.courseId)
+    dueSoonCounts.set(cid, (dueSoonCounts.get(cid) ?? 0) + 1)
+  }
+
   // Score all assignments
-  const scored = assignments.map(calculatePriorityScore)
+  const scored = assignments.map((a) => {
+    const courseDueSoonCount = dueSoonCounts.get(String(a.courseId)) ?? 0
+    const coursePressureBoost = courseDueSoonCount >= 2 ? 5 : 0
+    return calculatePriorityScore(a, { coursePressureBoost })
+  })
   
   // Filter
   const filtered = scored.filter((a) => {
@@ -190,7 +243,7 @@ export function getAssignmentsBeyondHorizon(
 ): RankedAssignment[] {
   const horizonHours = horizonDays * 24
   
-  const scored = assignments.map(calculatePriorityScore)
+  const scored = assignments.map((a) => calculatePriorityScore(a))
   
   return scored.filter((a) => {
     // Must not be submitted

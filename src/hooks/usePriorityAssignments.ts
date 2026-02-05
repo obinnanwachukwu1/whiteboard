@@ -306,7 +306,7 @@ export function usePriorityAssignments(options?: {
         if (a.dueAt === null) return false
         return true
       })
-      .map(calculatePriorityScore)
+      .map((a) => calculatePriorityScore(a))
       .sort((a, b) => (a.hoursUntilDue ?? 0) - (b.hoursUntilDue ?? 0)) // Sort soonest first
   }, [priorityAssignments, rankedAssignments, weightsReady])
 

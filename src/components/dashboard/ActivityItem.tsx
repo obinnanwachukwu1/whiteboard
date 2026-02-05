@@ -13,6 +13,7 @@ type Props = {
   item: ActivityFeedItem
   onMarkRead?: (topicId: string) => void
   onClick?: () => void
+  compact?: boolean
 }
 
 type TriggerProps = ReturnType<typeof useAIPopover>['triggerProps']
@@ -21,7 +22,7 @@ type RowProps = Props & {
   triggerProps: TriggerProps
 }
 
-const ActivityRow = React.memo(({ item, onMarkRead, onClick, triggerProps }: RowProps) => {
+const ActivityRow = React.memo(({ item, onMarkRead, onClick, triggerProps, compact }: RowProps) => {
   const Icon = item.type === 'announcement' ? Megaphone : Calendar
   const iconColor = item.type === 'announcement' 
     ? 'text-violet-500 dark:text-violet-400' 
@@ -36,7 +37,7 @@ const ActivityRow = React.memo(({ item, onMarkRead, onClick, triggerProps }: Row
 
   return (
     <ListItemRow
-      density="compact"
+      density={compact ? 'compact' : 'default'}
       interactiveProps={triggerProps}
       onClick={onClick}
       icon={
@@ -44,13 +45,25 @@ const ActivityRow = React.memo(({ item, onMarkRead, onClick, triggerProps }: Row
       }
       title={item.title}
       subtitle={
-        <span className="flex items-center justify-between gap-2 w-full">
-          <span className="truncate">{cleanCourseName(item.courseName)}</span>
-          <span className="whitespace-nowrap flex-shrink-0">{formatActivityTime(item.timestamp)}</span>
-        </span>
+        compact
+          ? undefined
+          : (
+              <span className="flex items-center justify-between gap-2 w-full">
+                <span className="truncate">{cleanCourseName(item.courseName)}</span>
+                <span className="whitespace-nowrap flex-shrink-0">{formatActivityTime(item.timestamp)}</span>
+              </span>
+            )
       }
+      trailing={
+        compact ? (
+          <span className="text-xs text-slate-400 dark:text-neutral-500 whitespace-nowrap">
+            {formatActivityTime(item.timestamp)}
+          </span>
+        ) : undefined
+      }
+      className={compact ? 'text-sm text-slate-600 dark:text-neutral-400' : ''}
       menu={
-        item.type === 'announcement' && item.topicId && onMarkRead ? (
+        !compact && item.type === 'announcement' && item.topicId && onMarkRead ? (
           <button
             type="button"
             onClick={handleMarkRead}
@@ -78,11 +91,11 @@ const stripHtml = (html: string) => {
 /**
  * Single activity feed item (announcement or calendar event).
  */
-export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick }) => {
+export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick, compact = false }) => {
   const { streamSummarize } = useAI()
   const { aiEnabled, aiAvailable } = useAppFlags()
   
-  const showAI = aiEnabled && aiAvailable && item.type === 'announcement'
+  const showAI = !compact && aiEnabled && aiAvailable && item.type === 'announcement'
   
   const { triggerProps, popoverProps } = useAIPopover({
     enabled: showAI,
@@ -105,6 +118,7 @@ export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick }) => 
         onMarkRead={onMarkRead}
         onClick={onClick}
         triggerProps={triggerProps}
+        compact={compact}
       />
       <SummaryPopover {...popoverProps} />
     </>
