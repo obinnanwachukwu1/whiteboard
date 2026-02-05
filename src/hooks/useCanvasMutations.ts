@@ -13,6 +13,16 @@ type ConversationsPage = {
   nextPageUrl?: string | null
 }
 
+type ConversationWorkflowOverride = Record<string, Conversation['workflow_state']>
+type UnreadCountLocalDeltaMap = Record<string, number>
+
+function isWorkflowFallbackError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err || '')
+  return (
+    /HTTP 401|HTTP 403|HTTP 405|read.?only|method not allowed|forbidden|not authorized/i.test(msg)
+  )
+}
+
 // Create a new conversation
 export function useCreateConversation() {
   const queryClient = useQueryClient()
@@ -90,6 +100,33 @@ export function useUpdateConversation() {
 
       const prevConversation = queryClient.getQueryData<Conversation>(['conversation', convId])
       const prevLists = queryClient.getQueriesData<Conversation[]>({ queryKey: ['conversations'] })
+      const prevUnreadCount = queryClient.getQueryData<number>(['unread-count'])
+      const prevWorkflowOverrides = queryClient.getQueryData<ConversationWorkflowOverride>([
+        'conversation-workflow-overrides',
+      ])
+      const prevUnreadDeltaMap = queryClient.getQueryData<UnreadCountLocalDeltaMap>([
+        'unread-count-local-delta-map',
+      ])
+
+      const prevWorkflowState =
+        prevConversation?.workflow_state ??
+        (() => {
+          for (const [, list] of prevLists) {
+            if (Array.isArray(list)) {
+              const found = list.find((c) => String(c.id) === convId)
+              if (found) return found.workflow_state
+              continue
+            }
+            if (list && typeof list === 'object' && Array.isArray((list as any).pages)) {
+              const data = list as InfiniteData<ConversationsPage>
+              for (const page of data.pages) {
+                const found = page.items.find((c) => String(c.id) === convId)
+                if (found) return found.workflow_state
+              }
+            }
+          }
+          return undefined
+        })()
 
       const patch = (c: Conversation): Conversation => {
         const next: Conversation = { ...c }
@@ -121,25 +158,111 @@ export function useUpdateConversation() {
         }
       }
 
-      return { prevConversation, prevLists }
-    },
-    onError: (_err, variables, ctx) => {
-      const convId = String(variables.conversationId)
-      if (ctx?.prevConversation) {
-        queryClient.setQueryData(['conversation', convId], ctx.prevConversation)
-      }
-      if (ctx?.prevLists) {
-        for (const [key, data] of ctx.prevLists) {
-          queryClient.setQueryData(key, data)
+      if (typeof prevUnreadCount === 'number' && variables.params.workflowState) {
+        let delta = 0
+        if (
+          prevWorkflowState === 'unread' &&
+          (variables.params.workflowState === 'read' || variables.params.workflowState === 'archived')
+        ) {
+          delta = -1
+        } else if (
+          prevWorkflowState !== 'unread' &&
+          variables.params.workflowState === 'unread'
+        ) {
+          delta = 1
+        }
+        if (delta !== 0) {
+          queryClient.setQueryData<number>(['unread-count'], Math.max(0, prevUnreadCount + delta))
         }
       }
+
+      return {
+        prevConversation,
+        prevLists,
+        prevUnreadCount,
+        prevWorkflowOverrides,
+        prevUnreadDeltaMap,
+        prevWorkflowState,
+      }
     },
-    onSettled: (_data, _err, variables) => {
+    onError: (err, variables, ctx) => {
       const convId = String(variables.conversationId)
-      queryClient.invalidateQueries({ queryKey: ['conversation', convId] })
-      queryClient.invalidateQueries({ queryKey: ['conversations'] })
-      if (variables.params.workflowState) {
-        queryClient.invalidateQueries({ queryKey: ['unread-count'] })
+      const workflowTarget = variables.params.workflowState
+      const useFallback = Boolean(workflowTarget) && isWorkflowFallbackError(err)
+
+      if (!useFallback) {
+        if (ctx?.prevConversation) {
+          queryClient.setQueryData(['conversation', convId], ctx.prevConversation)
+        }
+        if (ctx?.prevLists) {
+          for (const [key, data] of ctx.prevLists) {
+            queryClient.setQueryData(key, data)
+          }
+        }
+        if (typeof ctx?.prevUnreadCount === 'number') {
+          queryClient.setQueryData(['unread-count'], ctx.prevUnreadCount)
+        }
+        return
+      }
+
+      const nextOverrides: ConversationWorkflowOverride = {
+        ...(ctx?.prevWorkflowOverrides || {}),
+        [convId]: workflowTarget!,
+      }
+      queryClient.setQueryData<ConversationWorkflowOverride>(
+        ['conversation-workflow-overrides'],
+        nextOverrides,
+      )
+
+      const prevState = ctx?.prevWorkflowState
+      let delta = 0
+      if (prevState === 'unread' && (workflowTarget === 'read' || workflowTarget === 'archived')) {
+        delta = -1
+      } else if (prevState !== 'unread' && workflowTarget === 'unread') {
+        delta = 1
+      }
+      if (delta !== 0) {
+        const nextDeltaMap: UnreadCountLocalDeltaMap = { ...(ctx?.prevUnreadDeltaMap || {}) }
+        nextDeltaMap[convId] = delta
+        queryClient.setQueryData<UnreadCountLocalDeltaMap>(
+          ['unread-count-local-delta-map'],
+          nextDeltaMap,
+        )
+      }
+    },
+    onSettled: (_data, err, variables) => {
+      const convId = String(variables.conversationId)
+      const workflowTarget = variables.params.workflowState
+      const useFallback = Boolean(workflowTarget) && Boolean(err) && isWorkflowFallbackError(err)
+
+      if (!useFallback) {
+        queryClient.invalidateQueries({ queryKey: ['conversation', convId] })
+        queryClient.invalidateQueries({ queryKey: ['conversations'] })
+        if (variables.params.workflowState) {
+          queryClient.invalidateQueries({ queryKey: ['unread-count'] })
+        }
+      }
+
+      if (!err && workflowTarget) {
+        const overrides = queryClient.getQueryData<ConversationWorkflowOverride>([
+          'conversation-workflow-overrides',
+        ])
+        if (overrides && overrides[convId]) {
+          const next = { ...overrides }
+          delete next[convId]
+          queryClient.setQueryData<ConversationWorkflowOverride>(
+            ['conversation-workflow-overrides'],
+            next,
+          )
+        }
+        const deltaMap = queryClient.getQueryData<UnreadCountLocalDeltaMap>([
+          'unread-count-local-delta-map',
+        ])
+        if (deltaMap && deltaMap[convId] !== undefined) {
+          const next = { ...deltaMap }
+          delete next[convId]
+          queryClient.setQueryData<UnreadCountLocalDeltaMap>(['unread-count-local-delta-map'], next)
+        }
       }
     },
   })

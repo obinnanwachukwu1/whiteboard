@@ -1134,11 +1134,26 @@ export class CanvasClient {
       subscribed?: boolean
     },
   ) {
-    const data: Record<string, any> = {}
-    if (params.workflowState) data['conversation[workflow_state]'] = params.workflowState
-    if (params.starred !== undefined) data['conversation[starred]'] = params.starred
-    if (params.subscribed !== undefined) data['conversation[subscribed]'] = params.subscribed
-    return this.put(`/conversations/${conversationId}`, data)
+    const formData = new URLSearchParams()
+    if (params.workflowState) {
+      formData.append('conversation[workflow_state]', params.workflowState)
+    }
+    if (params.starred !== undefined) {
+      formData.append('conversation[starred]', String(params.starred))
+    }
+    if (params.subscribed !== undefined) {
+      formData.append('conversation[subscribed]', String(params.subscribed))
+    }
+
+    const resp = await this.request({
+      method: 'PUT',
+      url: this.url(`/conversations/${conversationId}`),
+      data: formData.toString(),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
+    return resp.data
   }
 
   async deleteConversation(conversationId: string | number) {

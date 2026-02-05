@@ -5,6 +5,7 @@ import {
   type InfiniteData,
   useInfiniteQuery,
 } from '@tanstack/react-query'
+import { useMemo } from 'react'
 import type {
   CanvasProfile,
   CanvasCourse,
@@ -766,6 +767,9 @@ export type ConversationsPage = {
   nextPageUrl?: string | null
 }
 
+export type ConversationWorkflowOverride = Record<string, Conversation['workflow_state']>
+export type UnreadCountLocalDeltaMap = Record<string, number>
+
 export async function fetchConversationsPage(params: {
   scope?: ConversationScope
   perPage?: number
@@ -845,6 +849,34 @@ export function useUnreadCount(options?: Partial<UseQueryOptions<number, Error, 
     refetchInterval: 1000 * 60 * 2, // Poll every 2 minutes for new messages
     ...options,
   })
+}
+
+export function useConversationWorkflowOverrides() {
+  return useQuery<ConversationWorkflowOverride, Error, ConversationWorkflowOverride>({
+    queryKey: ['conversation-workflow-overrides'],
+    queryFn: async () => ({}),
+    initialData: {},
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+  })
+}
+
+export function useUnreadCountLocalDeltaMap() {
+  return useQuery<UnreadCountLocalDeltaMap, Error, UnreadCountLocalDeltaMap>({
+    queryKey: ['unread-count-local-delta-map'],
+    queryFn: async () => ({}),
+    initialData: {},
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+  })
+}
+
+export function useUnreadCountLocalDelta() {
+  const { data: deltaMap = {} } = useUnreadCountLocalDeltaMap()
+  return useMemo(
+    () => Object.values(deltaMap).reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0),
+    [deltaMap],
+  )
 }
 
 export function useRecipientSearch(

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Archive, Trash2, Star } from 'lucide-react'
 import { useConversation } from '../../hooks/useCanvasQueries'
 import {
@@ -30,6 +30,27 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
   const updateMutation = useUpdateConversation()
   const deleteMutation = useDeleteConversation()
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const lastMarkedReadRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const convId = String(conversationId)
+    if (lastMarkedReadRef.current !== convId) {
+      lastMarkedReadRef.current = null
+    }
+  }, [conversationId])
+
+  useEffect(() => {
+    if (!conversation) return
+    const convId = String(conversation.id)
+    if (conversation.workflow_state !== 'unread') return
+    if (updateMutation.isPending) return
+    if (lastMarkedReadRef.current === convId) return
+    lastMarkedReadRef.current = convId
+    updateMutation.mutate({
+      conversationId: conversation.id,
+      params: { workflowState: 'read' },
+    })
+  }, [conversation, updateMutation])
 
   const handleToggleStar = () => {
     if (!conversation) return

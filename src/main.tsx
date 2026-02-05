@@ -66,6 +66,8 @@ function useQueryPersistence(client: QueryClient) {
       'conversations',
       'conversation',
       'unread-count',
+      'conversation-workflow-overrides',
+      'unread-count-local-delta-map',
       // Dashboard: recent feedback comment lookups
       'submission-details',
     ])

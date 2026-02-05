@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Mail, Star } from 'lucide-react'
-import { useConversations } from '../../hooks/useCanvasQueries'
-import { useUpdateConversation } from '../../hooks/useCanvasMutations'
+import { useConversationWorkflowOverrides, useConversations } from '../../hooks/useCanvasQueries'
 import type { Conversation, ConversationScope } from '../../types/canvas'
 import { usePrefetchOnHover } from '../../hooks/usePrefetchOnHover'
 import { useAppFlags } from '../../context/AppContext'
@@ -10,16 +9,16 @@ import { formatRelativeTime, getParticipantNames } from './utils'
 
 type ConversationRowProps = {
   conv: Conversation
+  workflowState: Conversation['workflow_state']
   selectedId?: string | number
   onSelect: (id: string | number) => void
-  updateMutation: ReturnType<typeof useUpdateConversation>
 }
 
 const ConversationRow: React.FC<ConversationRowProps> = ({
   conv,
+  workflowState,
   selectedId,
   onSelect,
-  updateMutation,
 }) => {
   const { prefetchEnabled, privateModeEnabled } = useAppFlags()
   const hoverHandlers = usePrefetchOnHover({
@@ -38,9 +37,6 @@ const ConversationRow: React.FC<ConversationRowProps> = ({
       key={conv.id}
       onClick={() => {
         onSelect(conv.id)
-        if (conv.workflow_state === 'unread') {
-          updateMutation.mutate({ conversationId: conv.id, params: { workflowState: 'read' } })
-        }
       }}
       {...hoverHandlers}
       className={`w-full text-left px-4 py-3 border-b border-slate-100 dark:border-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-800/50 transition-colors ${
@@ -49,7 +45,7 @@ const ConversationRow: React.FC<ConversationRowProps> = ({
     >
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 mt-0.5">
-          {conv.workflow_state === 'unread' ? (
+          {workflowState === 'unread' ? (
             <div
               className="w-2 h-2 rounded-full"
               style={{ backgroundColor: 'var(--accent-500)' }}
@@ -62,7 +58,7 @@ const ConversationRow: React.FC<ConversationRowProps> = ({
           <div className="flex items-center justify-between gap-2">
             <span
               className={`text-sm truncate ${
-                conv.workflow_state === 'unread'
+                workflowState === 'unread'
                   ? 'font-semibold text-slate-900 dark:text-white'
                   : 'text-slate-700 dark:text-slate-200'
               }`}
@@ -75,7 +71,7 @@ const ConversationRow: React.FC<ConversationRowProps> = ({
           </div>
           <div
             className={`text-sm truncate ${
-              conv.workflow_state === 'unread'
+              workflowState === 'unread'
                 ? 'font-medium text-slate-700 dark:text-slate-300'
                 : 'text-slate-500 dark:text-neutral-400'
             }`}
@@ -111,26 +107,34 @@ export const ConversationList: React.FC<Props> = ({ scope, selectedId, onSelect,
     hasNextPage,
     error,
   } = useConversations(listScope)
-  const updateMutation = useUpdateConversation()
+  const { data: workflowOverrides = {} } = useConversationWorkflowOverrides()
   const baseConversations = useMemo(
     () => data?.pages.flatMap((page) => page.items) ?? [],
     [data?.pages],
   )
+  const withWorkflowOverrides = useMemo(
+    () =>
+      baseConversations.map((conv) => ({
+        conv,
+        workflowState: workflowOverrides[String(conv.id)] ?? conv.workflow_state,
+      })),
+    [baseConversations, workflowOverrides],
+  )
   const conversations = useMemo(() => {
     switch (scope) {
       case 'unread':
-        return baseConversations.filter((conv) => conv.workflow_state === 'unread')
+        return withWorkflowOverrides.filter((item) => item.workflowState === 'unread')
       case 'starred':
-        return baseConversations.filter((conv) => conv.starred)
+        return withWorkflowOverrides.filter((item) => item.conv.starred)
       case 'archived':
-        return baseConversations.filter((conv) => conv.workflow_state === 'archived')
+        return withWorkflowOverrides.filter((item) => item.workflowState === 'archived')
       case 'sent':
-        return baseConversations
+        return withWorkflowOverrides
       case 'all':
       default:
-        return baseConversations
+        return withWorkflowOverrides
     }
-  }, [baseConversations, scope])
+  }, [scope, withWorkflowOverrides])
 
   const handleScroll = useCallback(() => {
     if (!hasNextPage || isFetchingNextPage) return
@@ -202,13 +206,13 @@ export const ConversationList: React.FC<Props> = ({ scope, selectedId, onSelect,
 
   return (
     <div ref={handleListRef} className="flex-1 overflow-y-auto" onScroll={handleScroll}>
-      {conversations.map((conv) => (
+      {conversations.map(({ conv, workflowState }) => (
         <ConversationRow
           key={String(conv.id)}
           conv={conv}
+          workflowState={workflowState}
           selectedId={selectedId}
           onSelect={onSelect}
-          updateMutation={updateMutation}
         />
       ))}
       {hasNextPage && !isFetchingNextPage && (

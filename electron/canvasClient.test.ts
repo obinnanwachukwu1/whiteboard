@@ -106,3 +106,45 @@ describe('initCanvas baseUrl validation', () => {
     ).resolves.toBeTruthy()
   })
 })
+
+describe('CanvasClient updateConversation', () => {
+  afterEach(() => {
+    vi.resetModules()
+    vi.doUnmock('axios')
+  })
+
+  it('sends workflow updates as form-urlencoded data', async () => {
+    vi.resetModules()
+
+    const request = vi.fn(async () => ({ status: 200, data: { ok: true }, headers: {} }))
+    const create = vi.fn(() => ({
+      request,
+      defaults: { headers: { Authorization: 'Bearer t123' } },
+    }))
+
+    vi.doMock('axios', () => ({
+      __esModule: true,
+      default: { create, request: vi.fn() },
+      create,
+    }))
+
+    const { CanvasClient } = await import('./canvasClient')
+    const client = new CanvasClient({ token: 't123', baseUrl: 'https://canvas.example.edu' })
+    await client.updateConversation(42, { workflowState: 'read', starred: true, subscribed: false })
+
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'PUT',
+        url: 'https://canvas.example.edu/api/v1/conversations/42',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/x-www-form-urlencoded',
+        }),
+      }),
+    )
+    const call = request.mock.calls[0][0]
+    expect(call.data).toContain('conversation%5Bworkflow_state%5D=read')
+    expect(call.data).toContain('conversation%5Bstarred%5D=true')
+    expect(call.data).toContain('conversation%5Bsubscribed%5D=false')
+  })
+})
