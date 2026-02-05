@@ -17,6 +17,7 @@ import {
   type AssignmentGroupData,
 } from '../utils/assignmentWeight'
 import { isSubmissionSubmitted } from '../utils/submissionState'
+import { extractAssignmentIdFromUrl, extractQuizIdFromUrl } from '../utils/urlHelpers'
 
 /**
  * Extended ranked assignment with display-ready fields.
@@ -185,14 +186,7 @@ export function usePriorityAssignments(options?: {
       // Extract assignment ID from URL if available
       let assignmentId: string | null = null
       if (item.htmlUrl) {
-        try {
-          const url = new URL(item.htmlUrl)
-          const parts = url.pathname.split('/')
-          const aIdx = parts.indexOf('assignments')
-          if (aIdx >= 0 && parts[aIdx + 1]) {
-            assignmentId = parts[aIdx + 1]
-          }
-        } catch {}
+        assignmentId = extractAssignmentIdFromUrl(item.htmlUrl) || extractQuizIdFromUrl(item.htmlUrl)
       }
 
       // Try to calculate weight using O(1) lookup

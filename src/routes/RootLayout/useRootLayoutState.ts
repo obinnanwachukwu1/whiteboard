@@ -569,6 +569,9 @@ export function useRootLayoutState() {
         }
       }
 
+      try {
+        await window.settings.set?.({ privateModeEnabled: false })
+      } catch {}
       await saveUserSettings({ privateModeEnabled: false })
     },
     [
@@ -616,6 +619,18 @@ export function useRootLayoutState() {
         to: '/course/$courseId',
         params: { courseId: String(courseId) },
         search: { tab: 'assignments', type: 'assignment', contentId: String(restId), title },
+      })
+    },
+    [navigate],
+  )
+
+  const onOpenQuiz = useCallback(
+    (courseId: string | number, quizId: string | number, title?: string) => {
+      setActiveCourseIdState(courseId)
+      navigate({
+        to: '/course/$courseId',
+        params: { courseId: String(courseId) },
+        search: { tab: 'quizzes', type: 'quiz', contentId: String(quizId), title },
       })
     },
     [navigate],
@@ -700,7 +715,7 @@ export function useRootLayoutState() {
 
   type PinnedItemType = {
     id: string
-    type: 'course' | 'assignment' | 'page' | 'discussion' | 'announcement' | 'file' | 'url'
+    type: 'course' | 'assignment' | 'quiz' | 'page' | 'discussion' | 'announcement' | 'file' | 'url'
     title: string
     subtitle?: string
     url?: string
@@ -845,6 +860,7 @@ export function useRootLayoutState() {
     () => ({
       onOpenCourse,
       onOpenAssignment,
+      onOpenQuiz,
       onOpenAnnouncement,
       onOpenDiscussion,
       onOpenPage,
@@ -859,6 +875,7 @@ export function useRootLayoutState() {
     [
       onOpenCourse,
       onOpenAssignment,
+      onOpenQuiz,
       onOpenAnnouncement,
       onOpenDiscussion,
       onOpenPage,

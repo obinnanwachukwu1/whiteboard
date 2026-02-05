@@ -7,7 +7,7 @@ import { CourseAvatar } from '../CourseAvatar'
 import { SummaryPopover } from './SummaryPopover'
 import { useAIPopover } from '../../hooks/useAIPopover'
 import { useAssignmentRest } from '../../hooks/useCanvasQueries'
-import { extractAssignmentIdFromUrl } from '../../utils/urlHelpers'
+import { extractAssignmentIdFromUrl, extractQuizIdFromUrl } from '../../utils/urlHelpers'
 import { ListItemRow } from '../ui/ListItemRow'
 
 const stripHtml = (html: string) => {
@@ -129,12 +129,14 @@ export const PriorityItem: React.FC<Props> = ({ assignment, courseImageUrl, onCl
   const isPastDue = assignment.hoursUntilDue !== null && assignment.hoursUntilDue < 0
 
   const courseId = assignment.courseId
+  const quizId = assignment.htmlUrl ? extractQuizIdFromUrl(assignment.htmlUrl) : null
   const restId = assignment.htmlUrl
     ? extractAssignmentIdFromUrl(assignment.htmlUrl) || assignment.id
     : assignment.id
+  const canFetchAssignment = Boolean(restId) && !quizId
 
   const { data: assignmentRest } = useAssignmentRest(courseId, restId, [], {
-    enabled: showAI && !!courseId && !!restId,
+    enabled: showAI && !!courseId && canFetchAssignment,
     staleTime: 1000 * 60 * 10,
   })
 

@@ -15,6 +15,8 @@ const TAB_KEY_MAP: Record<string, CourseTabKey> = {
   modules: 'modules',
   files: 'files',
   assignments: 'assignments',
+  quiz: 'quizzes',
+  quizzes: 'quizzes',
   grades: 'grades',
   people: 'people',
   users: 'people',
@@ -38,6 +40,7 @@ function keyFromUrl(url?: string): TabKeySource {
     if (/\/announcements/.test(path)) return 'announcements'
     if (/\/modules/.test(path)) return 'modules'
     if (/\/assignments/.test(path)) return 'assignments'
+    if (/\/quizzes/.test(path)) return 'quizzes'
     if (/\/grades/.test(path)) return 'grades'
     if (/\/files/.test(path)) return 'files'
     if (/\/(people|users)/.test(path)) return 'people'
@@ -83,6 +86,8 @@ export function computeResolvedTabs(
   const hasPeople = Array.isArray(tabs) && tabs.some((t) => toSupportedCourseTabKey(t) === 'people')
   const hasDiscussions =
     Array.isArray(tabs) && tabs.some((t) => toSupportedCourseTabKey(t) === 'discussions')
+  const hasQuizzes =
+    Array.isArray(tabs) && tabs.some((t) => toSupportedCourseTabKey(t) === 'quizzes')
   const list: ResolvedTab[] = []
   if (hasHome) list.push({ key: 'home', label: 'Home' })
   if (hasSyllabus) list.push({ key: 'syllabus', label: 'Syllabus' })
@@ -92,6 +97,7 @@ export function computeResolvedTabs(
   list.push({ key: 'modules', label: 'Modules' })
   if (hasLinks) list.push({ key: 'links', label: 'Links' })
   list.push({ key: 'assignments', label: 'Assignments' })
+  if (hasQuizzes) list.push({ key: 'quizzes', label: 'Quizzes' })
   list.push({ key: 'grades', label: 'Grades' })
   if (hasPeople) list.push({ key: 'people', label: 'People' })
   return list

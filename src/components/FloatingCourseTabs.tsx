@@ -4,7 +4,19 @@ import { BookOpen, Megaphone, FileText, Percent, Link as LinkIcon } from 'lucide
 import { useAIPanelState } from '../context/AIPanelContext'
 import { useAppFlags } from '../context/AppContext'
 
-export type CourseTabKey = 'home' | 'wiki' | 'syllabus' | 'announcements' | 'discussions' | 'files' | 'modules' | 'links' | 'assignments' | 'grades' | 'people'
+export type CourseTabKey =
+  | 'home'
+  | 'wiki'
+  | 'syllabus'
+  | 'announcements'
+  | 'discussions'
+  | 'files'
+  | 'modules'
+  | 'links'
+  | 'assignments'
+  | 'quizzes'
+  | 'grades'
+  | 'people'
 
 type TabDesc = { key: CourseTabKey; label: string; Icon: React.ComponentType<any> }
 type Props = {
@@ -20,6 +32,7 @@ const defaultTabs: TabDesc[] = [
   { key: 'modules', label: 'Modules', Icon: BookOpen },
   { key: 'links', label: 'Links', Icon: LinkIcon },
   { key: 'assignments', label: 'Assignments', Icon: FileText },
+  { key: 'quizzes', label: 'Quizzes', Icon: FileText },
   { key: 'grades', label: 'Grades', Icon: Percent },
 ]
 

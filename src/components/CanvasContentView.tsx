@@ -18,6 +18,7 @@ import { FileViewer } from './FileViewer'
 import {
   useAssignmentRest,
   useCoursePage,
+  useCourseQuiz,
   useAnnouncement,
   useMySubmission,
   useFileMeta,
@@ -36,7 +37,7 @@ import { stripHtmlToText } from '../utils/stripHtmlToText'
 import { formatDateTime } from '../utils/dateFormat'
 import { useAIContextOffer } from '../hooks/useAIContextOffer'
 
-type ContentType = 'page' | 'assignment' | 'file' | 'announcement'
+type ContentType = 'page' | 'assignment' | 'file' | 'announcement' | 'quiz'
 
 type Props = {
   courseId: string | number
@@ -80,6 +81,11 @@ export const CanvasContentView: React.FC<Props> = ({
     contentType === 'page' ? contentId : undefined,
     { enabled: contentType === 'page' },
   )
+  const quizQ = useCourseQuiz(
+    contentType === 'quiz' ? courseId : undefined,
+    contentType === 'quiz' ? contentId : undefined,
+    { enabled: contentType === 'quiz' },
+  )
   const assignQ = useAssignmentRest(
     isAssignment ? courseId : undefined,
     isAssignment ? contentId : undefined,
@@ -108,9 +114,11 @@ export const CanvasContentView: React.FC<Props> = ({
     enabled: contentType === 'file',
   })
 
-  const loading = pageQ.isLoading || assignQ.isLoading || annQ.isLoading || fileQ.isLoading
+  const loading =
+    pageQ.isLoading || quizQ.isLoading || assignQ.isLoading || annQ.isLoading || fileQ.isLoading
   const error =
     pageQ.error?.message ||
+    quizQ.error?.message ||
     assignQ.error?.message ||
     annQ.error?.message ||
     fileQ.error?.message ||
@@ -137,13 +145,14 @@ export const CanvasContentView: React.FC<Props> = ({
 
   const resolvedTitle = useMemo(() => {
     if (contentType === 'page' && pageQ.data?.title) return pageQ.data.title
+    if (contentType === 'quiz' && quizQ.data?.title) return quizQ.data.title
     if (contentType === 'assignment' && assignQ.data?.name) return assignQ.data.name
     if (contentType === 'announcement' && annQ.data?.title) return annQ.data.title
     if (contentType === 'file' && fileQ.data) {
       return fileQ.data.display_name || fileQ.data.filename || title
     }
     return title
-  }, [contentType, pageQ.data, assignQ.data, annQ.data, fileQ.data, title])
+  }, [contentType, pageQ.data, quizQ.data, assignQ.data, annQ.data, fileQ.data, title])
 
   const contextOffer = useMemo(() => {
     if (contentType === 'page') {
@@ -301,6 +310,7 @@ export const CanvasContentView: React.FC<Props> = ({
 
   const getContentText = () => {
     if (contentType === 'page') return pageQ.data?.body || ''
+    if (contentType === 'quiz') return quizQ.data?.description || quizQ.data?.instructions || ''
     if (contentType === 'assignment') return assignQ.data?.description || ''
     if (contentType === 'announcement') return annQ.data?.message || ''
     return ''
@@ -385,6 +395,9 @@ export const CanvasContentView: React.FC<Props> = ({
     }
     if (contentType === 'page') {
       return canvasContentUrl({ baseUrl, courseId, type: 'page', contentId })
+    }
+    if (contentType === 'quiz') {
+      return canvasContentUrl({ baseUrl, courseId, type: 'quiz', contentId })
     }
     return null
   }, [data.baseUrl, courseId, contentId, contentType])
@@ -573,6 +586,38 @@ export const CanvasContentView: React.FC<Props> = ({
                       className="rich-html"
                       onNavigate={onNavigate}
                     />
+                  )}
+                  {!loading && !error && contentType === 'quiz' && (
+                    <>
+                      <div className="mb-6 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 p-5 text-center">
+                        <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">
+                          Complete in Canvas
+                        </h3>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4 max-w-sm mx-auto">
+                          Quizzes must be completed in Canvas. Open the quiz there to take it in
+                          Canvas.
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={async () => {
+                            await openInCanvas()
+                          }}
+                          disabled={!openInCanvasUrl}
+                          className="gap-2 border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          Open in Canvas
+                        </Button>
+                      </div>
+                      {(quizQ.data?.description || quizQ.data?.instructions) && (
+                        <HtmlContent
+                          html={quizQ.data.description || quizQ.data.instructions || ''}
+                          className="rich-html"
+                          onNavigate={onNavigate}
+                        />
+                      )}
+                    </>
                   )}
                   {!loading && !error && contentType === 'assignment' && assignQ.data && (
                     <AssignmentSubmitPanel

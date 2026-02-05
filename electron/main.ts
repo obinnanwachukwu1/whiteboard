@@ -140,6 +140,8 @@ import {
   listAssignmentGroups as svcListAssignmentGroups,
   listMyEnrollmentsForCourse as svcListMyEnrollmentsForCourse,
   listCourseTabs as svcListCourseTabs,
+  listCourseQuizzes as svcListCourseQuizzes,
+  getCourseQuiz as svcGetCourseQuiz,
   listActivityStream as svcListActivityStream,
   listCourseAnnouncements as svcListCourseAnnouncements,
   listCourseAnnouncementsPage as svcListCourseAnnouncementsPage,
@@ -240,13 +242,14 @@ function devToolsEnabled(): boolean {
 
 function safeContentType(
   t: any,
-): 'page' | 'assignment' | 'announcement' | 'discussion' | 'file' | null {
+): 'page' | 'assignment' | 'announcement' | 'discussion' | 'file' | 'quiz' | null {
   if (
     t === 'page' ||
     t === 'assignment' ||
     t === 'announcement' ||
     t === 'discussion' ||
-    t === 'file'
+    t === 'file' ||
+    t === 'quiz'
   )
     return t
   return null
@@ -254,7 +257,7 @@ function safeContentType(
 
 function buildContentHash(params: {
   courseId: string
-  type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file'
+  type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file' | 'quiz'
   contentId: string
   title?: string
   embed?: boolean
@@ -272,7 +275,7 @@ function buildContentHash(params: {
 
 function createContentWindow(params: {
   courseId: string
-  type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file'
+  type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file' | 'quiz'
   contentId: string
   title?: string
 }) {
@@ -1569,6 +1572,32 @@ ipcMain.handle(
   async (_evt, courseId: string | number, includeExternal = true) => {
     try {
       const data = await svcListCourseTabs(courseId, includeExternal)
+      return { ok: true, data }
+    } catch (e: any) {
+      const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+      return { ok: false, error: msg }
+    }
+  },
+)
+
+ipcMain.handle(
+  'canvas:listCourseQuizzes',
+  async (_evt, courseId: string | number, perPage = 100) => {
+    try {
+      const data = await svcListCourseQuizzes(courseId, perPage)
+      return { ok: true, data }
+    } catch (e: any) {
+      const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
+      return { ok: false, error: msg }
+    }
+  },
+)
+
+ipcMain.handle(
+  'canvas:getCourseQuiz',
+  async (_evt, courseId: string | number, quizId: string | number) => {
+    try {
+      const data = await svcGetCourseQuiz(courseId, quizId)
       return { ok: true, data }
     } catch (e: any) {
       const msg = e instanceof CanvasError ? e.message : String(e?.message || e)

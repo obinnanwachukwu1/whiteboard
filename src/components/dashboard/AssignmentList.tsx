@@ -3,7 +3,7 @@ import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
 import { CalendarClock } from 'lucide-react'
-import { extractAssignmentIdFromUrl } from '../../utils/urlHelpers'
+import { extractAssignmentIdFromUrl, extractQuizIdFromUrl } from '../../utils/urlHelpers'
 import { formatDateTime } from '../../utils/dateFormat'
 import type { DueItem } from '../../hooks/useDashboardData'
 import { SkeletonList } from '../Skeleton'
@@ -14,12 +14,21 @@ type Props = {
   due: DueItem[]
   loading: boolean
   onOpenAssignment?: (courseId: string | number, assignmentRestId: string, title: string) => void
+  onOpenQuiz?: (courseId: string | number, quizId: string, title: string) => void
   onOpenCourse?: (courseId: string | number) => void
   courseImageUrl: (courseId: string | number | undefined | null) => string | undefined
   navigate: (opts: { to: string }) => void
 }
 
-export const AssignmentList: React.FC<Props> = ({ due, loading, onOpenAssignment, onOpenCourse, courseImageUrl, navigate }) => {
+export const AssignmentList: React.FC<Props> = ({
+  due,
+  loading,
+  onOpenAssignment,
+  onOpenQuiz,
+  onOpenCourse,
+  courseImageUrl,
+  navigate,
+}) => {
   // Memoize sorted list to avoid re-sorting on unrelated renders
   const sortedDue = React.useMemo(
     () => [...due].sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime()),
@@ -47,6 +56,11 @@ export const AssignmentList: React.FC<Props> = ({ due, loading, onOpenAssignment
         <div className="space-y-2">
           {sortedDue.map((d) => {
               const open = () => {
+                const quizId = String(d.quiz_id || extractQuizIdFromUrl(d.htmlUrl) || '')
+                if (quizId && onOpenQuiz) {
+                  onOpenQuiz(d.course_id, quizId, d.name)
+                  return
+                }
                 const rid = String(d.assignment_rest_id || extractAssignmentIdFromUrl(d.htmlUrl) || '')
                 if (rid) onOpenAssignment?.(d.course_id, rid, d.name)
                 else onOpenCourse?.(d.course_id)

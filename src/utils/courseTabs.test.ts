@@ -31,7 +31,7 @@ describe('getExtraCourseLinks', () => {
     ]
 
     const extra = getExtraCourseLinks(tabs)
-    expect(extra.map((t) => t.id)).toEqual(['external_tool', 'quizzes'])
+    expect(extra.map((t) => t.id)).toEqual(['external_tool'])
   })
 })
 

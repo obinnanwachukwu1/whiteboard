@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, X, Send } from 'lucide-react'
 import { useCreateConversation } from '../../hooks/useCanvasMutations'
 import { useRecipientSearch } from '../../hooks/useCanvasQueries'
@@ -15,11 +15,23 @@ export const ComposeMessage: React.FC<Props> = ({ onBack, onSent }) => {
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const createMutation = useCreateConversation()
-  const { data: searchResults = [], isLoading: searchLoading } = useRecipientSearch(searchQuery)
+  const { data: searchResults = [], isLoading: searchLoading } = useRecipientSearch(debouncedQuery)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) {
+      setDebouncedQuery(searchQuery)
+      return
+    }
+    const t = window.setTimeout(() => {
+      setDebouncedQuery(searchQuery)
+    }, 200)
+    return () => window.clearTimeout(t)
+  }, [searchQuery])
 
   const handleSend = async () => {
     if (recipients.length === 0 || !body.trim()) return

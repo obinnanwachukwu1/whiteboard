@@ -81,6 +81,10 @@ if (process.isMainFrame) {
       ipcRenderer.invoke('canvas:listMyEnrollmentsForCourse', courseId),
     listCourseTabs: (courseId: string | number, includeExternal?: boolean) =>
       ipcRenderer.invoke('canvas:listCourseTabs', courseId, includeExternal),
+    listCourseQuizzes: (courseId: string | number, perPage?: number) =>
+      ipcRenderer.invoke('canvas:listCourseQuizzes', courseId, perPage),
+    getCourseQuiz: (courseId: string | number, quizId: string | number) =>
+      ipcRenderer.invoke('canvas:getCourseQuiz', courseId, quizId),
     listActivityStream: (opts?: { onlyActiveCourses?: boolean; perPage?: number }) =>
       ipcRenderer.invoke('canvas:listActivityStream', opts),
     listCourseAnnouncements: (courseId: string | number, perPage?: number) =>
@@ -144,6 +148,7 @@ if (process.isMainFrame) {
     listConversations: (params?: {
       scope?: 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'
       perPage?: number
+      pageUrl?: string
     }) => ipcRenderer.invoke('canvas:listConversations', params),
     getConversation: (conversationId: string | number) =>
       ipcRenderer.invoke('canvas:getConversation', conversationId),

@@ -7,14 +7,14 @@ import { openExternal } from '../utils/openExternal'
 
 type SearchParams = {
   courseId?: string
-  type?: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file'
+  type?: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file' | 'quiz'
   contentId?: string
   title?: string
   embed?: string
 }
 
 type ViewState = {
-  type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file'
+  type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file' | 'quiz'
   contentId: string
   title: string
 }
@@ -120,6 +120,13 @@ export default function ContentPage() {
           navigateTo('file', fileId, 'File')
           return
         }
+      }
+
+      // Handle Quizzes
+      const idxQuiz = parts.indexOf('quizzes')
+      if (idxQuiz >= 0 && parts[idxQuiz + 1]) {
+        navigateTo('quiz', parts[idxQuiz + 1], 'Quiz')
+        return
       }
 
       // Handle Module Item Redirects

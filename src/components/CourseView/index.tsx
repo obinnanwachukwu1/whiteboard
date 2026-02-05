@@ -17,7 +17,7 @@ import { useCourseLinkNavigator } from './useCourseLinkNavigator'
 import { useAppFlags } from '../../context/AppContext'
 
 type Detail = {
-  contentType: 'page' | 'assignment' | 'file' | 'announcement' | 'discussion'
+  contentType: 'page' | 'assignment' | 'file' | 'announcement' | 'discussion' | 'quiz'
   contentId: string
   title: string
 }
@@ -33,7 +33,11 @@ type Props = {
   baseUrl?: string
   onNavigateCourse?: (
     courseId: string | number,
-    init?: { type: 'assignment' | 'announcement' | 'page' | 'file'; id: string; title?: string },
+    init?: {
+      type: 'assignment' | 'announcement' | 'page' | 'file' | 'quiz'
+      id: string
+      title?: string
+    },
   ) => void
 }
 

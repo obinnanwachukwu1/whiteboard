@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useAppFlags } from '../../context/AppContext'
 import { enqueuePrefetch } from '../../utils/prefetchQueue'
-import { extractAssignmentIdFromUrl, extractCourseIdFromUrl } from '../../utils/urlHelpers'
+import { extractAssignmentIdFromUrl, extractCourseIdFromUrl, extractQuizIdFromUrl } from '../../utils/urlHelpers'
 import type { QueryClient } from '@tanstack/react-query'
 import type { ActivityFeedItem } from '../../hooks/useActivityFeed'
 
@@ -24,6 +24,24 @@ export function useDashboardPrefetch({ assignments, activityItems, queryClient }
     const top = assignments.slice(0, 5)
     for (const a of top) {
       if (a.htmlUrl) {
+        const quizId = extractQuizIdFromUrl(a.htmlUrl)
+        if (quizId) {
+          const key = `quiz-${a.courseId}-${quizId}`
+          if (prefetchedAssignments.current.has(key)) continue
+          prefetchedAssignments.current.add(key)
+          enqueuePrefetch(async () => {
+            await queryClient.prefetchQuery({
+              queryKey: ['course-quiz', String(a.courseId), quizId],
+              queryFn: async () => {
+                const res = await window.canvas.getCourseQuiz?.(a.courseId, quizId)
+                if (!res?.ok) throw new Error(res?.error || 'Failed')
+                return res.data
+              },
+              staleTime: 1000 * 60 * 5,
+            })
+          })
+          continue
+        }
         const extracted = extractAssignmentIdFromUrl(a.htmlUrl) || String(a.id)
         const key = `${a.courseId}-${extracted}`
         if (prefetchedAssignments.current.has(key)) continue

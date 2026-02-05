@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { ArrowLeft, Archive, Trash2, Star } from 'lucide-react'
 import { useConversation } from '../../hooks/useCanvasQueries'
 import {
@@ -7,6 +7,7 @@ import {
   useDeleteConversation,
 } from '../../hooks/useCanvasMutations'
 import { Skeleton } from '../Skeleton'
+import { ConfirmModal } from '../ui/Modal'
 import { MessageList } from './MessageList'
 import { ReplyComposer } from './ReplyComposer'
 import { getParticipantNames } from './utils'
@@ -28,6 +29,7 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
   const addMessageMutation = useAddMessage()
   const updateMutation = useUpdateConversation()
   const deleteMutation = useDeleteConversation()
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
   const handleToggleStar = () => {
     if (!conversation) return
@@ -46,9 +48,7 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
   }
 
   const handleDelete = () => {
-    if (!window.confirm('Delete this conversation? This cannot be undone.')) return
-    deleteMutation.mutate(conversationId)
-    onBack()
+    setConfirmDeleteOpen(true)
   }
 
   if (error && !conversation) {
@@ -85,6 +85,19 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
 
   return (
     <div className="flex-1 flex flex-col">
+      <ConfirmModal
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        onConfirm={() => {
+          deleteMutation.mutate(conversationId)
+          onBack()
+        }}
+        title="Delete conversation?"
+        message="This cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+      />
       <div className="flex-shrink-0 px-4 py-3 border-b border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
         <div className="flex items-center gap-2 mb-2">
           <button
@@ -107,15 +120,23 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
             <button
               onClick={handleToggleStar}
               disabled={!conversation}
-              className={`p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors ${conversation?.starred ? 'text-yellow-500' : 'text-slate-400'} ${!conversation ? 'opacity-50' : ''}`}
+              className={`p-1.5 rounded-md transition-colors ${
+                conversation?.starred
+                  ? 'text-[color:var(--accent-700)]'
+                  : 'text-[color:var(--accent-600)]'
+              } hover:bg-[color:var(--accent-100)] dark:hover:bg-[color:var(--accent-50)] ${!conversation ? 'opacity-50' : ''}`}
               title={conversation?.starred ? 'Unstar' : 'Star'}
             >
-              <Star className={`w-4 h-4 ${conversation?.starred ? 'fill-yellow-500' : ''}`} />
+              <Star
+                className={`w-4 h-4 ${
+                  conversation?.starred ? 'fill-[color:var(--accent-600)]' : ''
+                }`}
+              />
             </button>
             <button
               onClick={handleArchive}
               disabled={!conversation}
-              className={`p-1.5 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-neutral-800 hover:text-slate-600 dark:hover:text-slate-300 transition-colors ${!conversation ? 'opacity-50' : ''}`}
+              className={`p-1.5 rounded-md text-[color:var(--accent-600)] hover:bg-[color:var(--accent-100)] dark:hover:bg-[color:var(--accent-50)] hover:text-[color:var(--accent-700)] transition-colors ${!conversation ? 'opacity-50' : ''}`}
               title="Archive"
             >
               <Archive className="w-4 h-4" />
@@ -123,7 +144,7 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
             <button
               onClick={handleDelete}
               disabled={!conversation}
-              className={`p-1.5 rounded-md text-slate-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 transition-colors ${!conversation ? 'opacity-50' : ''}`}
+              className={`p-1.5 rounded-md text-[color:var(--accent-600)] hover:bg-[color:var(--accent-100)] dark:hover:bg-[color:var(--accent-50)] hover:text-[color:var(--accent-700)] transition-colors ${!conversation ? 'opacity-50' : ''}`}
               title="Delete"
             >
               <Trash2 className="w-4 h-4" />
@@ -133,6 +154,7 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
       </div>
 
       <MessageList
+        key={String(conversationId)}
         messages={messages}
         participantsMap={participantsMap}
         isLoading={isLoading}

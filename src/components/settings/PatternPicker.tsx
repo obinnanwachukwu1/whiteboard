@@ -21,7 +21,7 @@ export function PatternPicker({
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {PATTERNS.map((pattern) => {
           const isSelected = selected === pattern.id
           const previewCSS = pattern.generate(accent.h, accent.s, accent.l, dark)

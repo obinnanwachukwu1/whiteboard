@@ -12,6 +12,7 @@ export default function DashboardPage() {
       sidebar={data.sidebar}
       onOpenCourse={actions.onOpenCourse}
       onOpenAssignment={actions.onOpenAssignment}
+      onOpenQuiz={actions.onOpenQuiz}
       onOpenAnnouncement={actions.onOpenAnnouncement}
     />
   )

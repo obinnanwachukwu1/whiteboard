@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import type { Conversation, DiscussionEntry } from '../types/canvas'
 
 type IpcResult<T> = { ok: boolean; data?: T; error?: string }
@@ -6,6 +6,11 @@ type IpcResult<T> = { ok: boolean; data?: T; error?: string }
 function ensureOk<T>(res: IpcResult<T>): T {
   if (!res?.ok) throw new Error(res?.error || 'IPC call failed')
   return res.data as T
+}
+
+type ConversationsPage = {
+  items: Conversation[]
+  nextPageUrl?: string | null
 }
 
 // Create a new conversation
@@ -99,13 +104,21 @@ export function useUpdateConversation() {
       }
 
       for (const [key, list] of prevLists) {
-        if (!Array.isArray(list)) continue
-        queryClient.setQueryData<Conversation[]>(key, list.map((c) => (String(c.id) === convId ? patch(c) : c)))
-      }
-
-      if (variables.params.workflowState) {
-        // Keep badge responsive even before server roundtrip.
-        queryClient.invalidateQueries({ queryKey: ['unread-count'] })
+        if (Array.isArray(list)) {
+          queryClient.setQueryData<Conversation[]>(
+            key,
+            list.map((c) => (String(c.id) === convId ? patch(c) : c)),
+          )
+          continue
+        }
+        if (list && typeof list === 'object' && Array.isArray((list as any).pages)) {
+          const data = list as InfiniteData<ConversationsPage>
+          const nextPages = data.pages.map((page) => ({
+            ...page,
+            items: page.items.map((c) => (String(c.id) === convId ? patch(c) : c)),
+          }))
+          queryClient.setQueryData(key, { ...data, pages: nextPages })
+        }
       }
 
       return { prevConversation, prevLists }

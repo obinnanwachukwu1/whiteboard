@@ -468,6 +468,71 @@ export class CanvasClient {
     return normalized
   }
 
+  async listCourseQuizzes(courseRestId: string | number, perPage = 100) {
+    const per = Math.min(100, Math.max(1, Math.floor(Number(perPage) || 0)))
+    if (!per) return []
+
+    const classic = await this.paginate<any>(`/courses/${courseRestId}/quizzes`, { per_page: per })
+
+    let newQuizzes: any[] = []
+    try {
+      const url = `${this.baseUrl}/api/quiz/v1/courses/${courseRestId}/quizzes`
+      newQuizzes = await this.paginate<any>(url, { per_page: per })
+    } catch (e) {
+      if (this.verbose) {
+        console.warn(`[Canvas] New Quizzes API unavailable for course ${courseRestId}:`, e)
+      }
+    }
+
+    const normalizedNew = newQuizzes.map((q) => {
+      const id = q?.id ?? q?.assignment_id
+      const assignmentId = q?.assignment_id ?? q?.id
+      return {
+        ...q,
+        id,
+        assignment_id: assignmentId,
+        description: q?.description ?? q?.instructions,
+        instructions: q?.instructions,
+        html_url:
+          q?.html_url ||
+          `${this.baseUrl}/courses/${courseRestId}/quizzes/${assignmentId ?? id}`,
+        isNewQuiz: true,
+      }
+    })
+
+    const merged: any[] = []
+    const seen = new Set<string>()
+    for (const q of [...classic, ...normalizedNew]) {
+      const key = String(q?.id || q?.assignment_id || q?.html_url || '')
+      if (key && seen.has(key)) continue
+      if (key) seen.add(key)
+      merged.push(q)
+    }
+    return merged
+  }
+
+  async getCourseQuiz(courseRestId: string | number, quizId: string | number) {
+    try {
+      return await this.get(`/courses/${courseRestId}/quizzes/${quizId}`)
+    } catch (e) {
+      if (this.verbose) {
+        console.warn(`[Canvas] Classic quiz fetch failed; trying New Quizzes API:`, e)
+      }
+    }
+
+    const url = `${this.baseUrl}/api/quiz/v1/courses/${courseRestId}/quizzes/${quizId}`
+    const q = await this.get<any>(url)
+    return {
+      ...q,
+      id: q?.assignment_id ?? q?.id ?? quizId,
+      assignment_id: q?.assignment_id ?? q?.id ?? quizId,
+      description: q?.description ?? q?.instructions,
+      instructions: q?.instructions,
+      html_url: q?.html_url || `${this.baseUrl}/courses/${courseRestId}/quizzes/${quizId}`,
+      isNewQuiz: true,
+    }
+  }
+
   async listCourseModulesGql(courseRestId: string | number, _first = 20, _itemsFirst = 50) {
     // REST: include items and content_details. This avoids expensive per-module fan-out.
     const modules = await this.paginate<any>(`/courses/${courseRestId}/modules`, {
@@ -958,14 +1023,37 @@ export class CanvasClient {
 
   // Conversations (Inbox)
   async listConversations(
-    params: { scope?: 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'; perPage?: number } = {},
+    params: {
+      scope?: 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'
+      perPage?: number
+      pageUrl?: string
+    } = {},
   ) {
     const p: Record<string, any> = {
-      per_page: params.perPage ?? 25,
+      per_page: Math.min(100, Math.max(1, params.perPage ?? 20)),
       'include[]': ['participant_avatars'],
     }
     if (params.scope) p.scope = params.scope
-    return this.paginate<any>('/conversations', p)
+    const url = params.pageUrl ? this.url(params.pageUrl) : this.url('/conversations')
+    const resp = await this.request<any>({
+      method: 'GET',
+      url,
+      params: params.pageUrl ? undefined : p,
+    })
+    const data = Array.isArray(resp.data) ? resp.data : [resp.data]
+    const link = (resp.headers['link'] || resp.headers['Link']) as string | undefined
+    let nextPageUrl: string | null = null
+    if (link) {
+      const match = link
+        .split(',')
+        .map((s) => s.trim())
+        .find((s) => s.endsWith('rel="next"'))
+      if (match) {
+        const m = match.match(/<(.*)>/)
+        nextPageUrl = m ? m[1] : null
+      }
+    }
+    return { items: data, nextPageUrl }
   }
 
   async getConversation(conversationId: string | number) {
@@ -1070,6 +1158,18 @@ export class CanvasClient {
     const now = new Date()
     const end = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
     const out: any[] = []
+    const quizIdsFromAssignments = new Set<string>()
+
+    const extractQuizId = (url?: string | null) => {
+      if (!url) return null
+      try {
+        const u = new URL(url)
+        const parts = u.pathname.split('/')
+        const idx = parts.indexOf('quizzes')
+        if (idx >= 0 && parts[idx + 1]) return String(parts[idx + 1])
+      } catch {}
+      return null
+    }
 
     // Fetch per-course assignments concurrently with a small pool to reduce total time
     const concurrency = 6
@@ -1078,12 +1178,19 @@ export class CanvasClient {
       const cname = c?.name ?? ''
       if (!cid) return
       try {
+        const assignmentById = new Map<string, any>()
+        const dueAssignmentIds = new Set<string>()
         const nodes = await this.listAssignmentsWithSubmission(cid, 100)
         for (const n of nodes) {
+          const assignId = String(n?.id || '')
+          if (assignId) assignmentById.set(assignId, n)
           if (onlyPublished && (n as any).published === false) continue
           const dt = parseIso(n?.due_at)
           if (!dt) continue
           if (dt >= now && dt <= end) {
+            const quizId = extractQuizId(n?.html_url)
+            if (quizId) quizIdsFromAssignments.add(`${cid}:${quizId}`)
+            if (assignId) dueAssignmentIds.add(assignId)
             const item: any = {
               course_id: cid,
               assignment_rest_id: n?.id,
@@ -1093,6 +1200,7 @@ export class CanvasClient {
               state: n?.workflow_state, // REST uses workflow_state, GQL uses state.
               pointsPossible: n?.points_possible,
               htmlUrl: n?.html_url,
+              contentType: 'assignment',
               submission: n?.submission
                 ? {
                     submittedAt: n.submission.submitted_at,
@@ -1102,6 +1210,78 @@ export class CanvasClient {
             }
             if (includeCourseName) item.course_name = cname
             out.push(item)
+          }
+        }
+        // Add quizzes so they show up in dashboard/priority, even if not in assignments list.
+        try {
+          const quizzes = await this.listCourseQuizzes(cid, 100)
+          const pendingSubmissions: Array<{ assignmentId: string; item: any }> = []
+          for (const q of quizzes || []) {
+            if (onlyPublished && (q as any)?.published === false) continue
+            const dt = parseIso((q as any)?.due_at)
+            if (!dt) continue
+            if (dt < now || dt > end) continue
+            const isNew = Boolean((q as any)?.isNewQuiz)
+            const assignmentId = String((q as any)?.assignment_id || '')
+            const quizId = String(
+              isNew
+                ? assignmentId || (q as any)?.id || ''
+                : (q as any)?.id || '',
+            )
+            if (!quizId) continue
+            if (quizIdsFromAssignments.has(`${cid}:${quizId}`)) continue
+            if (assignmentId && dueAssignmentIds.has(assignmentId)) continue
+            const fromAssignment = assignmentId ? assignmentById.get(assignmentId) : null
+            const item: any = {
+              course_id: cid,
+              quiz_id: quizId,
+              name: (q as any)?.title || 'Quiz',
+              dueAt: dt.toISOString(),
+              pointsPossible:
+                (q as any)?.points_possible ??
+                fromAssignment?.points_possible ??
+                null,
+              htmlUrl: (q as any)?.html_url,
+              contentType: 'quiz',
+              submission: fromAssignment?.submission
+                ? {
+                    submittedAt: fromAssignment.submission.submitted_at,
+                    workflowState: fromAssignment.submission.workflow_state,
+                  }
+                : undefined,
+            }
+            if (includeCourseName) item.course_name = cname
+            out.push(item)
+            if (!item.submission && assignmentId) {
+              pendingSubmissions.push({ assignmentId, item })
+            }
+          }
+          if (pendingSubmissions.length > 0) {
+            let qi = 0
+            const subWorkers = Array.from(
+              { length: Math.min(4, pendingSubmissions.length) },
+              () =>
+                (async () => {
+                  while (qi < pendingSubmissions.length) {
+                    const cur = qi++
+                    const { assignmentId, item } = pendingSubmissions[cur]
+                    try {
+                      const sub = await this.getMySubmission(cid, assignmentId, [])
+                      if (sub) {
+                        item.submission = {
+                          submittedAt: sub.submitted_at,
+                          workflowState: sub.workflow_state,
+                        }
+                      }
+                    } catch {}
+                  }
+                })(),
+            )
+            await Promise.all(subWorkers)
+          }
+        } catch (_quizErr) {
+          if (this.verbose) {
+            console.warn(`[Canvas] Failed to fetch quizzes for course ${cid}:`, _quizErr)
           }
         }
       } catch (_e) {
@@ -1262,6 +1442,12 @@ export async function listMyEnrollmentsForCourse(courseId: string | number) {
 
 export async function listCourseTabs(courseId: string | number, includeExternal = true) {
   return ensureClient().listCourseTabs(courseId, includeExternal)
+}
+export async function listCourseQuizzes(courseId: string | number, perPage = 100) {
+  return ensureClient().listCourseQuizzes(courseId, perPage)
+}
+export async function getCourseQuiz(courseId: string | number, quizId: string | number) {
+  return ensureClient().getCourseQuiz(courseId, quizId)
 }
 export async function getRateLimitSnapshot() {
   return ensureClient().getRateLimitSnapshot()
@@ -1462,6 +1648,7 @@ export async function listGroupUsers(groupId: string | number, perPage = 100) {
 export async function listConversations(params?: {
   scope?: 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'
   perPage?: number
+  pageUrl?: string
 }) {
   return ensureClient().listConversations(params)
 }

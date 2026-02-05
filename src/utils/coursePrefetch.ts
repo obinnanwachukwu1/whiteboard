@@ -36,6 +36,18 @@ export async function prefetchCourseTab(queryClient: QueryClient, courseId: stri
         })
         break
 
+      case 'quizzes':
+        await queryClient.prefetchQuery({
+          queryKey: ['course-quizzes', id, 100],
+          queryFn: async () => {
+            const res = await window.canvas.listCourseQuizzes?.(id, 100)
+            if (!res?.ok) throw new Error(res?.error || 'Failed to load quizzes')
+            return res.data || []
+          },
+          staleTime: 1000 * 60 * 5,
+        })
+        break
+
       case 'announcements':
         await queryClient.prefetchInfiniteQuery({
           queryKey: ['course-announcements-infinite', id, 10],

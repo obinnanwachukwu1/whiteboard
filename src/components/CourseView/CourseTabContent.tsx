@@ -6,6 +6,7 @@ import { CourseFiles } from '../CourseFiles'
 import { CourseLinks } from '../CourseLinks'
 import { CourseAnnouncements } from '../CourseAnnouncements'
 import { CourseAssignments } from '../CourseAssignments'
+import { CourseQuizzes } from '../CourseQuizzes'
 import { CourseDiscussions } from '../CourseDiscussions'
 import { CoursePeople } from '../CoursePeople'
 import { HtmlContent } from '../HtmlContent'
@@ -14,7 +15,7 @@ import { useAIContextOffer } from '../../hooks/useAIContextOffer'
 import { stripHtmlToText } from '../../utils/stripHtmlToText'
 
 type Detail = {
-  contentType: 'page' | 'assignment' | 'file' | 'announcement' | 'discussion'
+  contentType: 'page' | 'assignment' | 'file' | 'announcement' | 'discussion' | 'quiz'
   contentId: string
   title: string
 }
@@ -188,6 +189,12 @@ export const CourseTabContent: React.FC<Props> = ({
             courseName={courseName}
             onOpenDetail={onOpenDetail}
           />
+        </div>
+      )}
+
+      {activeTab === 'quizzes' && (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <CourseQuizzes courseId={courseId} courseName={courseName} onOpenDetail={onOpenDetail} />
         </div>
       )}
 

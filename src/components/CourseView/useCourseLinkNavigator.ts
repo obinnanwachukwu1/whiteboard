@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import type { CourseTabKey } from '../FloatingCourseTabs'
 
 type Detail = {
-  contentType: 'page' | 'assignment' | 'file' | 'announcement' | 'discussion'
+  contentType: 'page' | 'assignment' | 'file' | 'announcement' | 'discussion' | 'quiz'
   contentId: string
   title: string
 }
@@ -14,7 +14,11 @@ type Params = {
   onOpenDetail: (detail: Detail) => void
   onNavigateCourse?: (
     courseId: string | number,
-    init?: { type: 'assignment' | 'announcement' | 'page' | 'file'; id: string; title?: string },
+    init?: {
+      type: 'assignment' | 'announcement' | 'page' | 'file' | 'quiz'
+      id: string
+      title?: string
+    },
   ) => void
 }
 
@@ -58,6 +62,7 @@ export function useCourseLinkNavigator({
             discussions: 'discussions',
             modules: 'modules',
             assignments: 'assignments',
+            quizzes: 'quizzes',
             grades: 'grades',
             files: 'files',
             pages: 'home',
@@ -86,6 +91,23 @@ export function useCourseLinkNavigator({
               })
             } else if (cid)
               onNavigateCourse?.(cid, { type: 'assignment', id: String(id), title: linkTitle })
+            return true
+          }
+          return false
+        }
+        const openQuiz = () => {
+          const idx = parts.indexOf('quizzes')
+          const id = idx >= 0 ? parts[idx + 1] : null
+          if (id) {
+            if (withinCurrent) {
+              onChangeTab('quizzes')
+              onOpenDetail({
+                contentType: 'quiz',
+                contentId: String(id),
+                title: linkTitle || 'Quiz',
+              })
+            } else if (cid)
+              onNavigateCourse?.(cid, { type: 'quiz', id: String(id), title: linkTitle })
             return true
           }
           return false
@@ -169,6 +191,7 @@ export function useCourseLinkNavigator({
 
         if (openAssignment()) return
         if (openAnnouncement()) return
+        if (openQuiz()) return
         if (openPage()) return
         if (openFile()) return
         if (withinCurrent && idxCourse >= 0) {

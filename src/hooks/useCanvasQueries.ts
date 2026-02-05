@@ -1,8 +1,15 @@
-import { useQuery, UseQueryOptions, useInfiniteQuery } from '@tanstack/react-query'
+import {
+  useQuery,
+  UseQueryOptions,
+  UseInfiniteQueryOptions,
+  type InfiniteData,
+  useInfiniteQuery,
+} from '@tanstack/react-query'
 import type {
   CanvasProfile,
   CanvasCourse,
   CanvasAssignment,
+  CanvasQuiz,
   CanvasModule,
   UpcomingEvent,
   TodoItem,
@@ -115,6 +122,48 @@ export function useCourseAssignments(
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
+    ...options,
+  })
+}
+
+export function useCourseQuizzes(
+  courseId: string | number | undefined,
+  perPage = 100,
+  options?: Partial<UseQueryOptions<CanvasQuiz[], Error, CanvasQuiz[]>>,
+) {
+  return useQuery<CanvasQuiz[], Error, CanvasQuiz[]>({
+    queryKey: ['course-quizzes', courseId != null ? String(courseId) : courseId, perPage],
+    queryFn: async () => {
+      if (courseId == null) return []
+      return ensureOk(await window.canvas.listCourseQuizzes(String(courseId), perPage))
+    },
+    enabled: courseId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 60 * 2,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    ...options,
+  })
+}
+
+export function useCourseQuiz(
+  courseId: string | number | undefined,
+  quizId: string | number | undefined,
+  options?: Partial<UseQueryOptions<CanvasQuiz | null, Error, CanvasQuiz | null>>,
+) {
+  return useQuery<CanvasQuiz | null, Error, CanvasQuiz | null>({
+    queryKey: ['course-quiz', keyId(courseId), keyId(quizId)],
+    queryFn: async () => {
+      if (courseId == null || quizId == null) return null
+      return ensureOk(await window.canvas.getCourseQuiz(String(courseId), String(quizId))) as CanvasQuiz
+    },
+    enabled: courseId != null && quizId != null && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 60 * 2,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: 'always',
     ...options,
   })
 }
@@ -688,20 +737,53 @@ export function useMyGroups(
 }
 
 // Conversations (Inbox)
+export type ConversationsPage = {
+  items: Conversation[]
+  nextPageUrl?: string | null
+}
+
+export async function fetchConversationsPage(params: {
+  scope?: ConversationScope
+  perPage?: number
+  pageUrl?: string
+}): Promise<ConversationsPage> {
+  const res = await window.canvas.listConversations?.({
+    scope: params.scope,
+    perPage: params.perPage,
+    pageUrl: params.pageUrl,
+  })
+  if (!res?.ok) throw new Error(res?.error || 'Failed to load conversations')
+  const data = res.data as ConversationsPage | Conversation[] | undefined
+  if (Array.isArray(data)) {
+    return { items: data, nextPageUrl: null }
+  }
+  return {
+    items: Array.isArray(data?.items) ? data!.items : [],
+    nextPageUrl: data?.nextPageUrl ?? null,
+  }
+}
+
 export function useConversations(
   scope?: ConversationScope,
-  perPage = 25,
-  options?: Partial<UseQueryOptions<Conversation[], Error, Conversation[]>>,
+  perPage = 20,
+  options?: Partial<UseInfiniteQueryOptions<ConversationsPage, Error, InfiniteData<ConversationsPage>>>,
 ) {
-  return useQuery<Conversation[], Error, Conversation[]>({
-    queryKey: ['conversations', scope, perPage],
-    queryFn: async () => {
-      const res = await window.canvas.listConversations?.({ scope, perPage })
-      if (!res?.ok) throw new Error(res?.error || 'Failed to load conversations')
-      return res.data || []
-    },
+  const normalizedScope = scope ?? 'inbox'
+  return useInfiniteQuery<ConversationsPage, Error, InfiniteData<ConversationsPage>>({
+    queryKey: ['conversations', normalizedScope, perPage, 'v2'],
+    queryFn: ({ pageParam }) =>
+      fetchConversationsPage({
+        scope: normalizedScope,
+        perPage,
+        pageUrl: typeof pageParam === 'string' ? pageParam : undefined,
+      }),
+    getNextPageParam: (lastPage) => lastPage.nextPageUrl ?? undefined,
+    initialPageParam: undefined,
     // Inbox: avoid refetching on every open; still refresh reasonably often.
     staleTime: 1000 * 60 * 2, // 2 minutes
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     ...options,
   })
 }
@@ -720,6 +802,9 @@ export function useConversation(
     },
     enabled: conversationId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 2, // 2 minutes
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     ...options,
   })
 }

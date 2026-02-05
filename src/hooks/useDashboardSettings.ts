@@ -22,7 +22,7 @@ export type DashboardSettings = {
   /** Pinned items on dashboard */
   pinnedItems: Array<{
     id: string
-    type: 'course' | 'assignment' | 'page' | 'discussion' | 'announcement' | 'file' | 'url'
+    type: 'course' | 'assignment' | 'quiz' | 'page' | 'discussion' | 'announcement' | 'file' | 'url'
     title: string
     subtitle?: string
     url?: string // for external links or deep links

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { QueryClient } from '@tanstack/react-query'
-import { computeResolvedTabs, getExtraCourseLinks, hasFilesFromTabs } from '../../utils/courseTabs'
+import { computeResolvedTabs, getExtraCourseLinks, hasFilesFromTabs, toSupportedCourseTabKey } from '../../utils/courseTabs'
 import type { ResolvedTab } from '../../types/ui'
 
 type Params = {
@@ -28,15 +28,17 @@ export function useCourseTabsState({
   const hasFilesViaTabs = hasFilesFromTabs(tabsData as any)
   const hasFiles = hasFilesViaTabs || (Array.isArray(filesProbeData) && filesProbeData.length > 0)
   const hasLinks = getExtraCourseLinks(tabsData as any).length > 0
+  const hasQuizzes =
+    Array.isArray(tabsData) && tabsData.some((t) => toSupportedCourseTabKey(t) === 'quizzes')
 
   useEffect(() => {
     const base = computeResolvedTabs(infoData || null, (tabsData as any[]) || [], hasFiles)
     setAvailableTabs(base)
-    const fallbackOnly = !hasHome && !hasSyllabus && !hasFiles && !hasLinks
+    const fallbackOnly = !hasHome && !hasSyllabus && !hasFiles && !hasLinks && !hasQuizzes
     if (Array.isArray(tabsData) && !fallbackOnly) {
       queryClient.setQueryData(['course-resolved-tabs', String(courseId)], base)
     }
-  }, [courseId, hasHome, hasSyllabus, hasFiles, hasLinks, tabsData, infoData, queryClient])
+  }, [courseId, hasHome, hasSyllabus, hasFiles, hasLinks, hasQuizzes, tabsData, infoData, queryClient])
 
   useEffect(() => {
     const cachedTabs = queryClient.getQueryData<ResolvedTab[]>([
@@ -87,6 +89,7 @@ export function useCourseTabsState({
     hasHome,
     hasFiles,
     hasLinks,
+    hasQuizzes,
     skeletonLeft,
   }
 }

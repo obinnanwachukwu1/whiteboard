@@ -325,6 +325,14 @@ declare global {
         courseId: string | number,
         includeExternal?: boolean,
       ) => Promise<{ ok: boolean; data?: any; error?: string }>
+      listCourseQuizzes: (
+        courseId: string | number,
+        perPage?: number,
+      ) => Promise<{ ok: boolean; data?: any; error?: string }>
+      getCourseQuiz: (
+        courseId: string | number,
+        quizId: string | number,
+      ) => Promise<{ ok: boolean; data?: any; error?: string }>
       listActivityStream: (opts?: {
         onlyActiveCourses?: boolean
         perPage?: number
@@ -412,7 +420,12 @@ declare global {
       listConversations: (params?: {
         scope?: 'inbox' | 'unread' | 'starred' | 'sent' | 'archived'
         perPage?: number
-      }) => Promise<{ ok: boolean; data?: any; error?: string }>
+        pageUrl?: string
+      }) => Promise<{
+        ok: boolean
+        data?: { items: any[]; nextPageUrl?: string | null }
+        error?: string
+      }>
       getConversation: (
         conversationId: string | number,
       ) => Promise<{ ok: boolean; data?: any; error?: string }>
@@ -459,13 +472,13 @@ declare global {
     }
     system: {
       openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>
-      openContentWindow: (params: {
-        courseId: string
-        type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file'
-        contentId: string
-        title?: string
-        courseName?: string
-      }) => Promise<{ ok: boolean; error?: string }>
+    openContentWindow: (params: {
+      courseId: string
+      type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file' | 'quiz'
+      contentId: string
+      title?: string
+      courseName?: string
+    }) => Promise<{ ok: boolean; error?: string }>
       pickFiles: (opts?: {
         multiple?: boolean
         filters?: { name: string; extensions: string[] }[]

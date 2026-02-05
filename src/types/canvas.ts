@@ -34,6 +34,23 @@ export type CanvasAssignment = {
   }
 }
 
+export type CanvasQuiz = {
+  id?: string | number
+  assignment_id?: string | number
+  title?: string
+  description?: string
+  instructions?: string
+  html_url?: string
+  due_at?: string | null
+  lock_at?: string | null
+  unlock_at?: string | null
+  points_possible?: number | null
+  quiz_type?: string
+  time_limit?: number | null
+  published?: boolean
+  isNewQuiz?: boolean
+}
+
 export type SubmissionComment = {
   comment: string
   author_name?: string
@@ -117,6 +134,8 @@ export type DueItem = {
   pointsPossible?: number
   htmlUrl?: string
   assignment_rest_id?: string | number
+  quiz_id?: string | number
+  contentType?: 'assignment' | 'quiz'
   submission?: {
     submittedAt?: string
     state?: string

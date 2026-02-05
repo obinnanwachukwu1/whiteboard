@@ -49,6 +49,7 @@ const KanbanCard = React.memo(function KanbanCard({
   onDragStart,
   onDragEnd,
   onOpenAssignment,
+  onOpenQuiz,
   onOpenCourse,
 }: {
   item: EnrichedDueItem
@@ -56,20 +57,28 @@ const KanbanCard = React.memo(function KanbanCard({
   onDragStart: (e: React.DragEvent, id: string) => void
   onDragEnd: () => void
   onOpenAssignment: (courseId: string | number, assignmentRestId: string, title: string) => void
+  onOpenQuiz: (courseId: string | number, quizId: string, title: string) => void
   onOpenCourse: (courseId: string | number) => void
 }) {
   // Compute assignment ID once
   const assignmentRestId = React.useMemo(() => {
     return String(item.assignment_rest_id || extractIdFromUrl(item.htmlUrl, 'assignments') || '')
   }, [item.assignment_rest_id, item.htmlUrl])
+  const quizId = React.useMemo(() => {
+    return String(item.quiz_id || extractIdFromUrl(item.htmlUrl, 'quizzes') || '')
+  }, [item.quiz_id, item.htmlUrl])
 
   const handleOpen = React.useCallback(() => {
+    if (quizId) {
+      onOpenQuiz(item.course_id, quizId, item.name)
+      return
+    }
     if (assignmentRestId) {
       onOpenAssignment(item.course_id, assignmentRestId, item.name)
     } else {
       onOpenCourse(item.course_id)
     }
-  }, [item.course_id, item.name, assignmentRestId, onOpenAssignment, onOpenCourse])
+  }, [item.course_id, item.name, quizId, assignmentRestId, onOpenAssignment, onOpenQuiz, onOpenCourse])
 
   return (
     <div
@@ -212,7 +221,9 @@ export default function AssignmentsPage() {
     setKanban((prev) => ({ ...prev, [id]: status }))
   const assignId = (d: DueItem) =>
     String(
-      d.assignment_rest_id ||
+      d.quiz_id ||
+        extractIdFromUrl(d.htmlUrl, 'quizzes') ||
+        d.assignment_rest_id ||
         extractIdFromUrl(d.htmlUrl, 'assignments') ||
         `${d.course_id}:${d.name}:${d.dueAt}`,
     )
@@ -396,6 +407,7 @@ export default function AssignmentsPage() {
                     onDragStart={onDragStart}
                     onDragEnd={onDragEnd}
                     onOpenAssignment={actions.onOpenAssignment}
+                    onOpenQuiz={actions.onOpenQuiz}
                     onOpenCourse={actions.onOpenCourse}
                   />
                 ))}
@@ -412,6 +424,7 @@ export default function AssignmentsPage() {
           onOpenAssignment={(courseId, rid, title) =>
             actions.onOpenAssignment(courseId, rid, title)
           }
+          onOpenQuiz={(courseId, quizId, title) => actions.onOpenQuiz(courseId, quizId, title)}
         />
       )}
     </div>
@@ -422,7 +435,8 @@ const CalendarView: React.FC<{
   items: DueItem[]
   onOpenCourse?: (courseId: string | number) => void
   onOpenAssignment?: (courseId: string | number, assignmentRestId: string, title: string) => void
-}> = ({ items, onOpenCourse, onOpenAssignment }) => {
+  onOpenQuiz?: (courseId: string | number, quizId: string, title: string) => void
+}> = ({ items, onOpenCourse, onOpenAssignment, onOpenQuiz }) => {
   const { courseImageUrl } = useCourseImages()
   const [month, setMonth] = React.useState(() => {
     const d = new Date()
@@ -512,6 +526,11 @@ const CalendarView: React.FC<{
   }
 
   const openItem = (it: DueItem) => {
+    const quizId = String(it.quiz_id || extractIdFromUrl(it.htmlUrl, 'quizzes') || '')
+    if (quizId) {
+      onOpenQuiz?.(it.course_id, quizId, it.name)
+      return
+    }
     const rid = String(it.assignment_rest_id || extractIdFromUrl(it.htmlUrl, 'assignments') || '')
     if (rid) onOpenAssignment?.(it.course_id, rid, it.name)
     else onOpenCourse?.(it.course_id)

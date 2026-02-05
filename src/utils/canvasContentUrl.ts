@@ -1,4 +1,4 @@
-type ContentType = 'page' | 'assignment' | 'announcement' | 'discussion' | 'file'
+type ContentType = 'page' | 'assignment' | 'announcement' | 'discussion' | 'file' | 'quiz'
 
 function trimSlash(s: string) {
   return s.replace(/\/+$/, '')
@@ -37,6 +37,10 @@ export function canvasContentUrl(params: {
     } catch {
       return `${base}/courses/${courseId}/pages/${encodeURIComponent(id)}`
     }
+  }
+
+  if (params.type === 'quiz') {
+    return `${base}/courses/${courseId}/quizzes/${encodeURIComponent(id)}`
   }
 
   return null

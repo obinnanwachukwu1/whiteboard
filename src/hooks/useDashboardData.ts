@@ -15,6 +15,8 @@ export type DueItem = {
   pointsPossible?: number
   htmlUrl?: string
   assignment_rest_id?: number | string
+  quiz_id?: number | string
+  contentType?: 'assignment' | 'quiz'
 }
 
 export type Comment = {

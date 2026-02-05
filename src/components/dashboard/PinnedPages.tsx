@@ -6,7 +6,7 @@ import { ListItemRow } from '../ui/ListItemRow'
 
 type PinnedItem = {
   id: string
-  type: 'course' | 'assignment' | 'page' | 'discussion' | 'announcement' | 'file' | 'url'
+  type: 'course' | 'assignment' | 'quiz' | 'page' | 'discussion' | 'announcement' | 'file' | 'url'
   title: string
   subtitle?: string
   url?: string
@@ -30,9 +30,12 @@ export const PinnedPages: React.FC<Props> = ({ items, onUnpin }) => {
     
     if (!item.courseId) return
 
-    switch (item.type) {
+      switch (item.type) {
         case 'assignment':
             actions.onOpenAssignment(item.courseId, item.contentId!, item.title)
+            break
+        case 'quiz':
+            actions.onOpenQuiz(item.courseId, item.contentId!, item.title)
             break
         case 'page':
             actions.onOpenPage(item.courseId, String(item.contentId!), item.title)
@@ -57,7 +60,7 @@ export const PinnedPages: React.FC<Props> = ({ items, onUnpin }) => {
     if (item.type === 'url' || !item.courseId || !item.contentId) return
     
     // Only certain types support pop-out
-    if (['page', 'assignment', 'announcement', 'discussion', 'file'].includes(item.type)) {
+    if (['page', 'assignment', 'quiz', 'announcement', 'discussion', 'file'].includes(item.type)) {
         await window.system.openContentWindow({
             courseId: String(item.courseId),
             type: item.type as any,
@@ -70,6 +73,7 @@ export const PinnedPages: React.FC<Props> = ({ items, onUnpin }) => {
   const getIcon = (type: string) => {
       switch (type) {
           case 'assignment': return <FileText className="w-4 h-4" />
+          case 'quiz': return <FileText className="w-4 h-4" />
           case 'page': return <BookOpen className="w-4 h-4" />
           case 'discussion': return <MessageCircle className="w-4 h-4" />
           case 'announcement': return <Megaphone className="w-4 h-4" />
@@ -109,7 +113,7 @@ export const PinnedPages: React.FC<Props> = ({ items, onUnpin }) => {
             subtitle={item.subtitle}
             menu={
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                {['page', 'assignment', 'announcement', 'discussion', 'file'].includes(item.type) && (
+                {['page', 'assignment', 'quiz', 'announcement', 'discussion', 'file'].includes(item.type) && (
                   <button
                     onClick={(e) => handlePopOut(e, item)}
                     className="p-1.5 rounded hover:bg-white dark:hover:bg-neutral-700 text-slate-400 hover:text-slate-600 dark:text-neutral-500 dark:hover:text-neutral-300"

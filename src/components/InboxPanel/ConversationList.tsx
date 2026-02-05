@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Mail, Star } from 'lucide-react'
 import { useConversations } from '../../hooks/useCanvasQueries'
 import { useUpdateConversation } from '../../hooks/useCanvasMutations'
@@ -100,12 +100,64 @@ type Props = {
 }
 
 export const ConversationList: React.FC<Props> = ({ scope, selectedId, onSelect, onCompose }) => {
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const listScope: ConversationScope = scope === 'sent' ? 'sent' : 'inbox'
   const {
-    data: conversations = [],
+    data,
     isLoading,
+    isFetching,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
     error,
-  } = useConversations(scope === 'all' ? undefined : (scope as ConversationScope))
+  } = useConversations(listScope)
   const updateMutation = useUpdateConversation()
+  const baseConversations = useMemo(
+    () => data?.pages.flatMap((page) => page.items) ?? [],
+    [data?.pages],
+  )
+  const conversations = useMemo(() => {
+    switch (scope) {
+      case 'unread':
+        return baseConversations.filter((conv) => conv.workflow_state === 'unread')
+      case 'starred':
+        return baseConversations.filter((conv) => conv.starred)
+      case 'archived':
+        return baseConversations.filter((conv) => conv.workflow_state === 'archived')
+      case 'sent':
+        return baseConversations
+      case 'all':
+      default:
+        return baseConversations
+    }
+  }, [baseConversations, scope])
+
+  const handleScroll = useCallback(() => {
+    if (!hasNextPage || isFetchingNextPage) return
+    const el = listRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    if (distanceFromBottom < 200) {
+      fetchNextPage().catch(() => {})
+    }
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage])
+
+  const handleListRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      listRef.current = node
+      if (!node) return
+    },
+    [fetchNextPage, hasNextPage, isFetchingNextPage],
+  )
+
+  useEffect(() => {
+    if (scope !== 'all' && scope !== 'sent') return
+    const node = listRef.current
+    if (!node) return
+    if (!hasNextPage || isFetchingNextPage) return
+    const fits = node.scrollHeight <= node.clientHeight + 24
+    if (fits) fetchNextPage().catch(() => {})
+  }, [baseConversations.length, fetchNextPage, hasNextPage, isFetchingNextPage, scope])
 
   if (isLoading) {
     return (
@@ -128,19 +180,28 @@ export const ConversationList: React.FC<Props> = ({ scope, selectedId, onSelect,
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
         <Mail className="w-12 h-12 text-slate-300 dark:text-neutral-600 mb-3" />
         <p className="text-sm text-slate-500 dark:text-neutral-400">No messages</p>
-        <button
-          onClick={onCompose}
-          className="mt-4 px-4 py-2 text-sm rounded-md text-white hover:opacity-90 transition-opacity"
-          style={{ backgroundColor: 'var(--accent-600)' }}
-        >
-          Compose message
-        </button>
+        {hasNextPage ? (
+          <button
+            onClick={() => fetchNextPage().catch(() => {})}
+            className="mt-4 text-sm text-slate-500 dark:text-neutral-400 hover:text-slate-700 dark:hover:text-neutral-200 transition-colors"
+          >
+            Load more
+          </button>
+        ) : (
+          <button
+            onClick={onCompose}
+            className="mt-4 px-4 py-2 text-sm rounded-md text-white hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: 'var(--accent-600)' }}
+          >
+            Compose message
+          </button>
+        )}
       </div>
     )
   }
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div ref={handleListRef} className="flex-1 overflow-y-auto" onScroll={handleScroll}>
       {conversations.map((conv) => (
         <ConversationRow
           key={String(conv.id)}
@@ -150,6 +211,21 @@ export const ConversationList: React.FC<Props> = ({ scope, selectedId, onSelect,
           updateMutation={updateMutation}
         />
       ))}
+      {hasNextPage && !isFetchingNextPage && (
+        <div className="px-4 py-3">
+          <button
+            onClick={() => fetchNextPage().catch(() => {})}
+            className="text-xs text-slate-500 dark:text-neutral-400 hover:text-slate-700 dark:hover:text-neutral-200 transition-colors"
+          >
+            Load more
+          </button>
+        </div>
+      )}
+      {(isFetchingNextPage || isFetching) && (
+        <div className="px-4 py-3 text-xs text-slate-400 dark:text-neutral-500">
+          Loading more…
+        </div>
+      )}
     </div>
   )
 }

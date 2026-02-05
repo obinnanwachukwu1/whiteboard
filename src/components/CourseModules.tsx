@@ -34,7 +34,7 @@ type Props = {
   onOpenExternal?: (url: string) => void
   onOpenContent?: (content: {
     courseId: string | number
-    contentType: 'page' | 'assignment' | 'file'
+    contentType: 'page' | 'assignment' | 'file' | 'quiz'
     contentId: string
     title: string
   }) => void
@@ -44,7 +44,8 @@ function useModuleItemPrefetch(courseId: string | number, it: CanvasModuleItem) 
   const flags = useAppFlags()
   const enabled = !!(
     (it.__typename === 'PageModuleItem' && it.pageUrl) ||
-    (it.__typename === 'AssignmentModuleItem' && it.contentId)
+    (it.__typename === 'AssignmentModuleItem' && it.contentId) ||
+    (it.__typename === 'QuizModuleItem' && it.contentId)
   )
 
   const queryKey = React.useMemo(() => {
@@ -53,6 +54,9 @@ function useModuleItemPrefetch(courseId: string | number, it: CanvasModuleItem) 
     }
     if (it.__typename === 'AssignmentModuleItem' && it.contentId) {
       return ['assignment-rest', String(courseId), String(it.contentId)]
+    }
+    if (it.__typename === 'QuizModuleItem' && it.contentId) {
+      return ['course-quiz', String(courseId), String(it.contentId)]
     }
     return ['ignore']
   }, [courseId, it])
@@ -65,6 +69,11 @@ function useModuleItemPrefetch(courseId: string | number, it: CanvasModuleItem) 
     }
     if (it.__typename === 'AssignmentModuleItem' && it.contentId) {
       const res = await window.canvas.getAssignmentRest?.(courseId, it.contentId)
+      if (!res?.ok) throw new Error(res?.error || 'Failed')
+      return res.data
+    }
+    if (it.__typename === 'QuizModuleItem' && it.contentId) {
+      const res = await window.canvas.getCourseQuiz?.(courseId, it.contentId)
       if (!res?.ok) throw new Error(res?.error || 'Failed')
       return res.data
     }
@@ -120,15 +129,19 @@ const ModuleItemRow: React.FC<{
   const canOpenInApp =
     (it.__typename === 'PageModuleItem' && it.pageUrl) ||
     (it.__typename === 'AssignmentModuleItem' && it.contentId) ||
-    (it.__typename === 'FileModuleItem' && it.contentId)
+    (it.__typename === 'FileModuleItem' && it.contentId) ||
+    (it.__typename === 'QuizModuleItem' && it.contentId)
 
   // Get the content type and ID for building Canvas URL and opening in new window
-  const getContentInfo = (): { type: 'page' | 'assignment' | 'file'; contentId: string } | null => {
+  const getContentInfo = (): { type: 'page' | 'assignment' | 'file' | 'quiz'; contentId: string } | null => {
     if (it.__typename === 'PageModuleItem' && it.pageUrl) {
       return { type: 'page', contentId: it.pageUrl }
     }
     if (it.__typename === 'AssignmentModuleItem' && it.contentId) {
       return { type: 'assignment', contentId: String(it.contentId) }
+    }
+    if (it.__typename === 'QuizModuleItem' && it.contentId) {
+      return { type: 'quiz', contentId: String(it.contentId) }
     }
     if (it.__typename === 'FileModuleItem' && it.contentId) {
       return { type: 'file', contentId: String(it.contentId) }
@@ -448,6 +461,15 @@ export const CourseModules: React.FC<Props> = ({
       return
     }
     if (it.__typename === 'QuizModuleItem' && it.contentId) {
+      if (onOpenContent) {
+        onOpenContent({
+          courseId,
+          contentType: 'quiz',
+          contentId: String(it.contentId),
+          title,
+        })
+        return
+      }
       const url = new URL(`/courses/${courseId}/quizzes/${it.contentId}`, data.baseUrl).toString()
       await openExternal(url)
       return
@@ -501,6 +523,15 @@ export const CourseModules: React.FC<Props> = ({
           return
         }
         if (type === 'quiz' && meta?.content_id != null) {
+          if (onOpenContent) {
+            onOpenContent({
+              courseId,
+              contentType: 'quiz',
+              contentId: String(meta.content_id),
+              title,
+            })
+            return
+          }
           const url = new URL(
             `/courses/${courseId}/quizzes/${meta.content_id}`,
             data.baseUrl,
@@ -617,7 +648,7 @@ export const CourseModules: React.FC<Props> = ({
 
                         // Calculate pinId based on item type
                         const getPinInfo = (): {
-                          type: 'page' | 'assignment' | 'file'
+                          type: 'page' | 'assignment' | 'file' | 'quiz'
                           contentId: string
                         } | null => {
                           if (it.__typename === 'PageModuleItem' && it.pageUrl) {
@@ -625,6 +656,9 @@ export const CourseModules: React.FC<Props> = ({
                           }
                           if (it.__typename === 'AssignmentModuleItem' && it.contentId) {
                             return { type: 'assignment', contentId: String(it.contentId) }
+                          }
+                          if (it.__typename === 'QuizModuleItem' && it.contentId) {
+                            return { type: 'quiz', contentId: String(it.contentId) }
                           }
                           if (it.__typename === 'FileModuleItem' && it.contentId) {
                             return { type: 'file', contentId: String(it.contentId) }

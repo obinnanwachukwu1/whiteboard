@@ -10,6 +10,7 @@ import {
   Percent,
   Link as LinkIcon,
   Users,
+  ClipboardCheck,
 } from 'lucide-react'
 import { FloatingCourseTabs, type CourseTabKey } from '../FloatingCourseTabs'
 import type { ResolvedTab } from '../../types/ui'
@@ -70,6 +71,7 @@ export const CourseTabsBar: React.FC<Props> = ({
                 modules: 'Modules',
                 links: 'Links',
                 assignments: 'Assignments',
+                quizzes: 'Quizzes',
                 grades: 'Grades',
                 people: 'People',
               } as const
@@ -85,6 +87,7 @@ export const CourseTabsBar: React.FC<Props> = ({
               modules: BookOpen,
               links: LinkIcon,
               assignments: ClipboardList,
+              quizzes: ClipboardCheck,
               grades: Percent,
               people: Users,
             } as const

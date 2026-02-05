@@ -35,6 +35,7 @@ export default function CoursePage() {
     if (dv === 'wiki' || dv === 'pages') return 'home'
     if (dv === 'modules') return 'modules'
     if (dv === 'assignments') return 'assignments'
+    if (dv === 'quizzes' || dv === 'quiz') return 'quizzes'
     if (dv === 'syllabus') return 'syllabus'
     if (dv === 'feed' || dv === 'announcements') return 'announcements'
 
@@ -102,7 +103,7 @@ export default function CoursePage() {
   }
 
   const onOpenDetail = (d: {
-    contentType: 'assignment' | 'announcement' | 'page' | 'file' | 'discussion'
+    contentType: 'assignment' | 'announcement' | 'page' | 'file' | 'discussion' | 'quiz'
     contentId: string
     title: string
   }) => {
@@ -123,7 +124,7 @@ export default function CoursePage() {
   const onNavigateCourse = (
     cid: string | number,
     init?: {
-      type: 'assignment' | 'announcement' | 'page' | 'file' | 'discussion'
+      type: 'assignment' | 'announcement' | 'page' | 'file' | 'discussion' | 'quiz'
       id: string
       title?: string
     },
@@ -133,6 +134,8 @@ export default function CoursePage() {
       const t =
         init.type === 'assignment'
           ? 'assignments'
+          : init.type === 'quiz'
+            ? 'quizzes'
           : init.type === 'announcement'
             ? 'announcements'
             : init.type === 'discussion'

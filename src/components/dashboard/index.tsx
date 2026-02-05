@@ -5,7 +5,7 @@ import { useCourseImages } from '../../hooks/useCourseImages'
 import { usePriorityAssignments } from '../../hooks/usePriorityAssignments'
 import { useActivityFeed, type ActivityFeedItem, formatActivityTime } from '../../hooks/useActivityFeed'
 import { useDashboardSettings } from '../../hooks/useDashboardSettings'
-import { extractAssignmentIdFromUrl, extractCourseIdFromUrl } from '../../utils/urlHelpers'
+import { extractAssignmentIdFromUrl, extractCourseIdFromUrl, extractQuizIdFromUrl } from '../../utils/urlHelpers'
 import { useQueryClient } from '@tanstack/react-query'
 import { formatDateTime } from '../../utils/dateFormat'
 import { PriorityList } from '../dashboard/PriorityList'
@@ -23,12 +23,14 @@ type Props = {
   sidebar?: { hiddenCourseIds?: Array<string | number>; customNames?: Record<string, string>; order?: Array<string | number> }
   onOpenCourse?: (courseId: string | number) => void
   onOpenAssignment?: (courseId: string | number, assignmentRestId: string, title: string) => void
+  onOpenQuiz?: (courseId: string | number, quizId: string, title: string) => void
   onOpenAnnouncement?: (courseId: string | number, topicId: string, title: string) => void
 }
 
 export const Dashboard: React.FC<Props> = ({
   onOpenCourse,
   onOpenAssignment,
+  onOpenQuiz,
   onOpenAnnouncement,
   due,
   loading,
@@ -73,6 +75,11 @@ export const Dashboard: React.FC<Props> = ({
 
     let restId = assignmentId
     if (assignment.htmlUrl) {
+      const quizId = extractQuizIdFromUrl(assignment.htmlUrl)
+      if (quizId && onOpenQuiz) {
+        onOpenQuiz(courseId, quizId, assignment.name)
+        return
+      }
       const extracted = extractAssignmentIdFromUrl(assignment.htmlUrl)
       if (extracted) restId = extracted
     }
@@ -82,7 +89,7 @@ export const Dashboard: React.FC<Props> = ({
     } else if (onOpenCourse) {
       onOpenCourse(courseId)
     }
-  }, [onOpenAssignment, onOpenCourse])
+  }, [onOpenAssignment, onOpenCourse, onOpenQuiz])
 
   const handleActivityClick = React.useCallback((item: ActivityFeedItem) => {
     if (item.type === 'announcement' && item.topicId) {

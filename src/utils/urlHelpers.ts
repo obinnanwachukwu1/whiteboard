@@ -32,3 +32,14 @@ export function extractAnnouncementIdFromUrl(url?: string): string | null {
     return null
   } catch { return null }
 }
+
+export function extractQuizIdFromUrl(url?: string): string | null {
+  if (!url) return null
+  try {
+    const u = new URL(url)
+    const parts = u.pathname.split('/')
+    const idx = parts.indexOf('quizzes')
+    if (idx >= 0 && parts[idx + 1]) return String(parts[idx + 1])
+    return null
+  } catch { return null }
+}

@@ -170,6 +170,9 @@ export default defineConfig(({ command }) => {
     optimizeDeps: {
       exclude: ['keytar'],
     },
+    worker: {
+      format: 'es',
+    },
     build: {
       chunkSizeWarningLimit: 600, // Raise limit slightly for acceptable chunks like tiptap
       rollupOptions: {

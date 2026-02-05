@@ -3,7 +3,7 @@ import { CanvasContentView } from '../CanvasContentView'
 import { DiscussionDetail } from '../DiscussionDetail'
 
 type Detail = {
-  contentType: 'page' | 'assignment' | 'file' | 'announcement' | 'discussion'
+  contentType: 'page' | 'assignment' | 'file' | 'announcement' | 'discussion' | 'quiz'
   contentId: string
   title: string
 }

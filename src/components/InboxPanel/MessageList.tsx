@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useRef } from 'react'
 import { HtmlContent } from '../HtmlContent'
 import { SkeletonList } from '../Skeleton'
 import { useAppData, useAppFlags } from '../../context/AppContext'
@@ -31,15 +31,30 @@ export const MessageList = React.memo(function MessageList({
   hasConversation,
 }: Props) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const autoScrollRef = useRef(true)
   const appData = useAppData()
   const { externalMediaEnabled } = useAppFlags()
 
+  const handleScroll = useCallback(() => {
+    const el = listRef.current
+    if (!el) return
+    const threshold = 80
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    autoScrollRef.current = distanceFromBottom < threshold
+  }, [])
+
   useEffect(() => {
+    if (!autoScrollRef.current) return
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages.length])
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div
+      ref={listRef}
+      onScroll={handleScroll}
+      className="flex-1 overflow-y-auto p-4 space-y-4"
+    >
       {isLoading && !hasConversation && (
         <div className="py-2">
           <SkeletonList count={5} hasAvatar />

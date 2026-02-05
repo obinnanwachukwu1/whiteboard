@@ -48,6 +48,7 @@ export function useAppSettings(): AppSettingsValue {
 export type AppActionsValue = {
   onOpenCourse: (id: string | number) => void
   onOpenAssignment: (courseId: string | number, restId: string | number, title?: string) => void
+  onOpenQuiz: (courseId: string | number, quizId: string | number, title?: string) => void
   onOpenAnnouncement: (courseId: string | number, topicId: string | number, title?: string) => void
   onOpenDiscussion: (courseId: string | number, topicId: string | number, title?: string) => void
   onOpenPage: (courseId: string | number, pageUrlOrSlug: string, title?: string) => void
@@ -58,7 +59,7 @@ export type AppActionsValue = {
   onOpenSettings: () => void
   pinItem: (item: {
     id: string
-    type: 'course' | 'assignment' | 'page' | 'discussion' | 'announcement' | 'file' | 'url'
+    type: 'course' | 'assignment' | 'quiz' | 'page' | 'discussion' | 'announcement' | 'file' | 'url'
     title: string
     subtitle?: string
     url?: string
@@ -86,7 +87,7 @@ export type AppDataValue = {
   courseImages: Record<string, string>
   pinnedItems: Array<{
     id: string
-    type: 'course' | 'assignment' | 'page' | 'discussion' | 'announcement' | 'file' | 'url'
+    type: 'course' | 'assignment' | 'quiz' | 'page' | 'discussion' | 'announcement' | 'file' | 'url'
     title: string
     subtitle?: string
     url?: string
