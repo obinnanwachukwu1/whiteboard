@@ -915,6 +915,32 @@ export function AIPanelProvider({
   const { streamChat } = useAI()
   const { privateModeEnabled, aiAvailable, aiAvailability } = useAppFlags()
 
+  const messagesRef = useRef<ChatMessage[]>(state.messages)
+  const attachmentsRef = useRef<AIAttachment[]>(state.attachments)
+  const contextOfferRef = useRef<AIAttachment | null>(state.contextOffer)
+  const followContextOfferRef = useRef<boolean>(state.followContextOffer)
+  const queryRef = useRef<string>(state.query)
+
+  useEffect(() => {
+    messagesRef.current = state.messages
+  }, [state.messages])
+
+  useEffect(() => {
+    attachmentsRef.current = state.attachments
+  }, [state.attachments])
+
+  useEffect(() => {
+    contextOfferRef.current = state.contextOffer
+  }, [state.contextOffer])
+
+  useEffect(() => {
+    followContextOfferRef.current = state.followContextOffer
+  }, [state.followContextOffer])
+
+  useEffect(() => {
+    queryRef.current = state.query
+  }, [state.query])
+
   // Precompute the dashboard-ranked priority list so planning answers don't "guess".
   // This is gated behind AI availability.
   const priorityData = usePriorityAssignments({
@@ -1062,9 +1088,9 @@ export function AIPanelProvider({
       const userMessageId = `u_${requestId}`
       const assistantMessageId = `a_${requestId}`
 
-      const baseAttachments = state.attachments
-      const offer = state.contextOffer
-      const shouldUseOffer = !privateModeEnabled && state.followContextOffer && !!offer
+      const baseAttachments = attachmentsRef.current
+      const offer = contextOfferRef.current
+      const shouldUseOffer = !privateModeEnabled && followContextOfferRef.current && !!offer
       const attachmentsForTurn = privateModeEnabled
         ? []
         : shouldUseOffer && offer
@@ -1620,7 +1646,7 @@ export function AIPanelProvider({
 
         const MAX_PROMPT_CHARS = 15000
 
-        let historyMessagesForPrompt = buildPromptHistory(state.messages)
+        let historyMessagesForPrompt = buildPromptHistory(messagesRef.current)
         let attachmentContextForPrompt = attachmentContext
         let structuredContextForPrompt = structuredContext
         let priorityContextForPrompt = priorityContext
@@ -1777,12 +1803,6 @@ export function AIPanelProvider({
       aiAvailable,
       aiAvailability,
       aiEnabled,
-      dueAssignments,
-      courses,
-      state.messages,
-      state.attachments,
-      state.contextOffer,
-      state.followContextOffer,
       privateModeEnabled,
       streamChat,
       buildPromptHistory,
@@ -1791,8 +1811,8 @@ export function AIPanelProvider({
   )
 
   const submit = useCallback(async () => {
-    await runSubmit(state.query)
-  }, [runSubmit, state.query])
+    await runSubmit(queryRef.current)
+  }, [runSubmit])
 
   const sendMessage = useCallback(
     async (queryText: string) => {
@@ -1969,6 +1989,7 @@ export function AIPanelProvider({
   }, [])
 
   const setQuery = useCallback((query: string) => {
+    queryRef.current = query
     setState((prev) => ({ ...prev, query }))
   }, [])
 
