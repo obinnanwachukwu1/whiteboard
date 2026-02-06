@@ -6,6 +6,14 @@ import {
   useInfiniteQuery,
 } from '@tanstack/react-query'
 import { useMemo } from 'react'
+import {
+  adaptCanvasAssignments,
+  adaptConversation,
+  adaptConversationsPage,
+  adaptDiscussionTopic,
+  adaptDiscussionTopics,
+  adaptDiscussionView,
+} from './canvasAdapters'
 import type {
   CanvasProfile,
   CanvasCourse,
@@ -116,7 +124,9 @@ export function useCourseAssignments(
     queryFn: async () => {
       if (courseId == null) return []
       // Use REST endpoint with submission data included for "Done" status
-      return ensureOk(await window.canvas.listAssignmentsWithSubmission(String(courseId), first))
+      return adaptCanvasAssignments(
+        ensureOk(await window.canvas.listAssignmentsWithSubmission(String(courseId), first)),
+      )
     },
     enabled: courseId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 10,
@@ -510,9 +520,11 @@ export function useCourseDiscussions(
     queryKey: ['course-discussions', keyId(courseId), perPage, cleanParams],
     queryFn: async () => {
       if (courseId == null) return []
-      return ensureOk(
-        await window.canvas.listCourseDiscussions?.(String(courseId), { perPage, ...cleanParams }),
-      ) as DiscussionTopic[]
+      return adaptDiscussionTopics(
+        ensureOk(
+          await window.canvas.listCourseDiscussions?.(String(courseId), { perPage, ...cleanParams }),
+        ),
+      )
     },
     enabled: courseId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 10,
@@ -533,9 +545,9 @@ export function useDiscussion(
     queryKey: ['discussion', keyId(courseId), keyId(topicId)],
     queryFn: async () => {
       if (courseId == null || topicId == null) return null
-      return ensureOk(
-        await window.canvas.getDiscussion?.(String(courseId), String(topicId)),
-      ) as DiscussionTopic
+      return adaptDiscussionTopic(
+        ensureOk(await window.canvas.getDiscussion?.(String(courseId), String(topicId))),
+      )
     },
     enabled: courseId != null && topicId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 10,
@@ -556,9 +568,9 @@ export function useDiscussionView(
     queryKey: ['discussion-view', keyId(courseId), keyId(topicId)],
     queryFn: async () => {
       if (courseId == null || topicId == null) return null
-      return ensureOk(
-        await window.canvas.getDiscussionView?.(String(courseId), String(topicId)),
-      ) as DiscussionView
+      return adaptDiscussionView(
+        ensureOk(await window.canvas.getDiscussionView?.(String(courseId), String(topicId))),
+      )
     },
     enabled: courseId != null && topicId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 5,
@@ -781,14 +793,7 @@ export async function fetchConversationsPage(params: {
     pageUrl: params.pageUrl,
   })
   if (!res?.ok) throw new Error(res?.error || 'Failed to load conversations')
-  const data = res.data as ConversationsPage | Conversation[] | undefined
-  if (Array.isArray(data)) {
-    return { items: data, nextPageUrl: null }
-  }
-  return {
-    items: Array.isArray(data?.items) ? data!.items : [],
-    nextPageUrl: data?.nextPageUrl ?? null,
-  }
+  return adaptConversationsPage(res.data)
 }
 
 export function useConversations(
@@ -826,7 +831,9 @@ export function useConversation(
       if (conversationId == null) throw new Error('conversationId is required')
       const res = await window.canvas.getConversation?.(String(conversationId))
       if (!res?.ok) throw new Error(res?.error || 'Failed to load conversation')
-      return res.data
+      const conversation = adaptConversation(res.data, conversationId)
+      if (!conversation) throw new Error('Invalid conversation payload')
+      return conversation
     },
     enabled: conversationId != null && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 2, // 2 minutes
