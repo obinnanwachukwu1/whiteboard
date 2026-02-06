@@ -1,11 +1,23 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type {
+  AIApi,
+  CanvasApi,
+  DegreeAuditApi,
+  ElectronApi,
+  EmbeddingApi,
+  PlatformApi,
+  SecureStorageApi,
+  SettingsApi,
+  SystemApi,
+  ThemeApi,
+} from '../src/types/ipc'
 
 // SECURITY: Only expose APIs to the main frame, not iframes
 if (process.isMainFrame) {
   // (No native embedded views to clean up.)
 
   // --------- Expose some API to the Renderer process ---------
-  contextBridge.exposeInMainWorld('electron', {
+  const electronApi = {
     onMainProcessMessage: (callback: (message: string) => void) => {
       return ipcRenderer.on('main-process-message', (_event, message) => callback(message))
     },
@@ -14,10 +26,12 @@ if (process.isMainFrame) {
       ipcRenderer.on('menu:action', handler)
       return () => ipcRenderer.removeListener('menu:action', handler)
     },
-  })
+  } satisfies ElectronApi
+
+  contextBridge.exposeInMainWorld('electron', electronApi)
 
   // High-level Canvas API
-  contextBridge.exposeInMainWorld('canvas', {
+  const canvasApi = {
     init: (cfg: { token?: string; baseUrl?: string; verbose?: boolean }) =>
       ipcRenderer.invoke('canvas:init', cfg),
     clearToken: (baseUrl?: string) => ipcRenderer.invoke('canvas:clearToken', baseUrl),
@@ -182,83 +196,25 @@ if (process.isMainFrame) {
       type?: 'user' | 'context'
       perPage?: number
     }) => ipcRenderer.invoke('canvas:searchRecipients', params),
+    resolveUrl: (url: string) => ipcRenderer.invoke('canvas:resolveUrl', url),
     getRateLimit: () => ipcRenderer.invoke('canvas:getRateLimit'),
-  })
+  } satisfies CanvasApi
 
-  // Theme config types (mirrored from config.ts for type safety)
-  type AccentPreset =
-    | 'slate'
-    | 'red'
-    | 'orange'
-    | 'amber'
-    | 'yellow'
-    | 'lime'
-    | 'green'
-    | 'emerald'
-    | 'teal'
-    | 'cyan'
-    | 'sky'
-    | 'blue'
-    | 'indigo'
-    | 'violet'
-    | 'purple'
-    | 'fuchsia'
-    | 'pink'
-    | 'rose'
-  type BackgroundMode = 'accent' | 'background'
-  type BackgroundType = 'solid' | 'pattern' | 'image'
-  type PatternId = 'dots' | 'grid' | 'mesh'
-  interface BackgroundSettings {
-    type: BackgroundType
-    patternId?: PatternId
-    imageUrl?: string
-    blur: number
-    opacity: number
-    overlay: number
-    extractedAccent?: { h: number; s: number; l: number }
-  }
-  interface ThemeConfig {
-    theme: 'light' | 'dark'
-    accentPreset: AccentPreset
-    backgroundMode: BackgroundMode
-    background: BackgroundSettings
-  }
+  contextBridge.exposeInMainWorld('canvas', canvasApi)
 
-  contextBridge.exposeInMainWorld('settings', {
+  const settingsApi = {
     get: () => ipcRenderer.invoke('config:get'),
-    set: (
-      partial: Partial<{
-        baseUrl: string
-        verbose?: boolean
-        theme?: 'light' | 'dark'
-        accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'
-        themeConfig?: ThemeConfig
-        prefetchEnabled?: boolean
-        cachedCourses?: any[]
-        cachedDue?: any[]
-        queryCache?: any
-        userSettings?: Record<string, any>
-        userSidebars?: Record<string, any>
-        courseImages?: Record<string, Record<string, string>>
-        sidebar?: {
-          hiddenCourseIds?: Array<string | number>
-          customNames?: Record<string, string>
-          order?: Array<string | number>
-        }
-        pdfGestureZoomEnabled?: boolean
-        pdfZoom?: Record<string, number>
-        lastUserId?: string
-        aiEnabled?: boolean
-      }>,
-    ) => ipcRenderer.invoke('config:set', partial),
-  })
+    set: (partial: Parameters<SettingsApi['set']>[0]) => ipcRenderer.invoke('config:set', partial),
+  } satisfies SettingsApi
+
+  contextBridge.exposeInMainWorld('settings', settingsApi)
 
   // System helpers
-  contextBridge.exposeInMainWorld('system', {
+  const systemApi = {
     openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
     openContentWindow: (params: {
       courseId: string
-      type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file'
+      type: 'page' | 'assignment' | 'announcement' | 'discussion' | 'file' | 'quiz'
       contentId: string
       title?: string
       courseName?: string
@@ -272,10 +228,12 @@ if (process.isMainFrame) {
     clearTempCache: () => ipcRenderer.invoke('app:clearTempCache'),
     writeClipboard: (text: string) => ipcRenderer.invoke('app:writeClipboard', text),
     copyText: (text: string) => ipcRenderer.invoke('app:copyText', text),
-  })
+  } satisfies SystemApi
+
+  contextBridge.exposeInMainWorld('system', systemApi)
 
   // Secure storage helpers (sync, backed by OS keychain via main process)
-  contextBridge.exposeInMainWorld('secureStorage', {
+  const secureStorageApi = {
     isAvailable: () => {
       try {
         return Boolean(ipcRenderer.sendSync('secureStorage:isAvailable'))
@@ -304,12 +262,14 @@ if (process.isMainFrame) {
         return null
       }
     },
-  })
+  } satisfies SecureStorageApi
+
+  contextBridge.exposeInMainWorld('secureStorage', secureStorageApi)
 
   // (PDF/PPTX viewers run in iframes; no viewer bridge exposed.)
 
   // AI Helpers
-  contextBridge.exposeInMainWorld('ai', {
+  const aiApi = {
     getAvailability: (opts?: { force?: boolean }) => ipcRenderer.invoke('ai:availability', opts),
     chat: (
       messages: any[],
@@ -372,10 +332,12 @@ if (process.isMainFrame) {
         ipcRenderer.send('ai:chat-cancel', { id })
       }
     },
-  })
+  } satisfies AIApi
+
+  contextBridge.exposeInMainWorld('ai', aiApi)
 
   // Embedding / Deep Search Helpers
-  contextBridge.exposeInMainWorld('embedding', {
+  const embeddingApi = {
     search: (
       query: string,
       k?: number,
@@ -436,32 +398,40 @@ if (process.isMainFrame) {
       // Return cleanup function
       return () => ipcRenderer.removeListener('embedding:download-progress', handler)
     },
-  })
+  } satisfies EmbeddingApi
+
+  contextBridge.exposeInMainWorld('embedding', embeddingApi)
 
   // Degree audit helpers
-  contextBridge.exposeInMainWorld('degreeAudit', {
+  const degreeAuditApi = {
     extractPdfText: (
       pdfBytes: ArrayBuffer,
       options?: { maxPages?: number; maxFileSizeBytes?: number; maxChars?: number },
     ) => ipcRenderer.invoke('degreeAudit:extractPdfText', pdfBytes, options),
-  })
+  } satisfies DegreeAuditApi
+
+  contextBridge.exposeInMainWorld('degreeAudit', degreeAuditApi)
 
   // Theme helpers for background image management
-  contextBridge.exposeInMainWorld('theme', {
+  const themeApi = {
     uploadBackgroundImage: (filePath: string) =>
       ipcRenderer.invoke('theme:uploadBackgroundImage', filePath),
     deleteBackgroundImage: (imageUrl: string) =>
       ipcRenderer.invoke('theme:deleteBackgroundImage', imageUrl),
     pickBackgroundImage: () => ipcRenderer.invoke('theme:pickBackgroundImage'),
-  })
+  } satisfies ThemeApi
+
+  contextBridge.exposeInMainWorld('theme', themeApi)
 
   // Platform helpers + body class for macOS styling hooks
-  contextBridge.exposeInMainWorld('platform', {
+  const platformApi = {
     isMac: process.platform === 'darwin',
     isWindows: process.platform === 'win32',
     setTitleBarOverlayTheme: (opts: { isDark: boolean }) =>
       ipcRenderer.invoke('window:setTitleBarOverlayTheme', opts),
-  })
+  } satisfies PlatformApi
+
+  contextBridge.exposeInMainWorld('platform', platformApi)
 
   // Tag the <html> or <body> so renderer CSS can adjust spacing for traffic lights
   try {

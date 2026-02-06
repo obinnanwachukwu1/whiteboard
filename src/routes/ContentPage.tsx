@@ -132,7 +132,7 @@ export default function ContentPage() {
       // Handle Module Item Redirects
       if (path.includes('/modules/items/')) {
         try {
-          const res = await (window.canvas as any).resolveUrl(href)
+          const res = await window.canvas.resolveUrl(href)
           if (res.ok && res.data && res.data !== href) {
             handleNavigate(res.data)
             return
