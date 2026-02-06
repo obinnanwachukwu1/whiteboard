@@ -775,7 +775,7 @@ export const GpaTrends: React.FC<Props> = ({
           {/* X-axis labels */}
           {chartData.map((d, i) => (
             <text
-              key={i}
+              key={`${d.type}:${d.term}`}
               x={xScale(i)}
               y={height - padding.bottom + 20}
               fontSize="11"
@@ -1145,8 +1145,11 @@ export const GpaTrends: React.FC<Props> = ({
 
               {expandedTerms.has(term.term) && term.courses.length > 0 && (
                 <div className="divide-y divide-gray-100 dark:divide-neutral-800">
-                  {term.courses.map((course, i) => (
-                    <div key={i} className="px-3 py-2 flex items-center justify-between text-sm">
+                  {term.courses.map((course) => (
+                    <div
+                      key={`${term.term}:${course.course}:${course.credits}:${course.effectiveGrade}`}
+                      className="px-3 py-2 flex items-center justify-between text-sm"
+                    >
                       <div className="min-w-0 flex-1">
                         <div className="font-medium truncate">{course.course}</div>
                       </div>

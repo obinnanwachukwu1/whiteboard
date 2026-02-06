@@ -33,6 +33,17 @@ function extractIdFromUrl(url?: string, key?: string): string | null {
   return null
 }
 
+function dueItemStableKey(item: DueItem): string {
+  const baseId =
+    item.assignment_rest_id ||
+    item.quiz_id ||
+    extractIdFromUrl(item.htmlUrl, 'assignments') ||
+    extractIdFromUrl(item.htmlUrl, 'quizzes') ||
+    item.htmlUrl ||
+    `${item.course_id}:${item.name}`
+  return `${String(item.course_id)}:${String(baseId)}:${String(item.dueAt)}`
+}
+
 type KanbanStatus = 'todo' | 'doing' | 'done'
 const LS_KANBAN = 'kanbanStatusByAssignment'
 
@@ -448,6 +459,7 @@ const CalendarView: React.FC<{
   const { handleMouseEnter, handleMouseLeave, popoverProps } = useAssignmentPopover()
 
   const today = new Date()
+  const todayMs = today.getTime()
   const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`
 
   const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1)
@@ -470,6 +482,22 @@ const CalendarView: React.FC<{
     }
     for (const v of map.values())
       v.sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
+    return map
+  }, [items])
+
+  const dueMetaByKey = React.useMemo(() => {
+    const map = new Map<string, { time: string; dueMs: number }>()
+    for (const item of items) {
+      const key = dueItemStableKey(item)
+      if (map.has(key)) continue
+      const dueMs = Date.parse(String(item.dueAt))
+      map.set(key, {
+        dueMs,
+        time: Number.isFinite(dueMs)
+          ? new Date(dueMs).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+          : '',
+      })
+    }
     return map
   }, [items])
 
@@ -628,12 +656,11 @@ const CalendarView: React.FC<{
 
                 {/* Assignment items */}
                 <div className="space-y-0.5">
-                  {list.slice(0, 3).map((it, i) => {
-                    const time = new Date(it.dueAt).toLocaleTimeString(undefined, {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })
-                    const isOverdue = new Date(it.dueAt) < today
+                  {list.slice(0, 3).map((it) => {
+                    const rowKey = dueItemStableKey(it)
+                    const meta = dueMetaByKey.get(rowKey)
+                    const time = meta?.time || ''
+                    const isOverdue = Number.isFinite(meta?.dueMs) && (meta?.dueMs || 0) < todayMs
                     const assignmentInfo = {
                       id:
                         it.assignment_rest_id ||
@@ -649,7 +676,7 @@ const CalendarView: React.FC<{
                     }
                     return (
                       <div
-                        key={i}
+                        key={rowKey}
                         onClick={(e) => {
                           e.stopPropagation()
                           openItem(it)
@@ -708,15 +735,14 @@ const CalendarView: React.FC<{
             </button>
           </div>
           <div className="divide-y divide-gray-100 dark:divide-neutral-800">
-            {selectedDateItems.map((it, i) => {
-              const time = new Date(it.dueAt).toLocaleTimeString(undefined, {
-                hour: 'numeric',
-                minute: '2-digit',
-              })
-              const isOverdue = new Date(it.dueAt) < today
+            {selectedDateItems.map((it) => {
+              const rowKey = dueItemStableKey(it)
+              const meta = dueMetaByKey.get(rowKey)
+              const time = meta?.time || ''
+              const isOverdue = Number.isFinite(meta?.dueMs) && (meta?.dueMs || 0) < todayMs
               return (
                 <div
-                  key={i}
+                  key={rowKey}
                   onClick={() => openItem(it)}
                   className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-neutral-800/50"
                 >
@@ -763,11 +789,12 @@ const CalendarView: React.FC<{
             </div>
           </div>
         )}
-        {groupedByDate.map(({ date, items: dayItems }, gi) => {
+        {groupedByDate.map(({ date, items: dayItems }) => {
           const isDateToday = date.toDateString() === today.toDateString()
           const isPastDate = date < today && !isDateToday
+          const dayKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
           return (
-            <div key={gi}>
+            <div key={dayKey}>
               <div
                 className={`text-xs font-semibold mb-1.5 px-1 flex items-center gap-2 ${
                   isDateToday
@@ -788,15 +815,14 @@ const CalendarView: React.FC<{
                 {isDateToday && <span className="text-[10px] uppercase tracking-wide">Today</span>}
               </div>
               <div className="space-y-2">
-                {dayItems.map((it, i) => {
-                  const time = new Date(it.dueAt).toLocaleTimeString(undefined, {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                  })
-                  const isOverdue = new Date(it.dueAt) < today
+                {dayItems.map((it) => {
+                  const rowKey = dueItemStableKey(it)
+                  const meta = dueMetaByKey.get(rowKey)
+                  const time = meta?.time || ''
+                  const isOverdue = Number.isFinite(meta?.dueMs) && (meta?.dueMs || 0) < todayMs
                   return (
                     <div
-                      key={i}
+                      key={rowKey}
                       role="button"
                       tabIndex={0}
                       onClick={() => openItem(it)}

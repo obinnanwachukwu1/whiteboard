@@ -30,6 +30,23 @@ export const Modal: React.FC<ModalProps> = ({
 }) => {
   const [isVisible, setIsVisible] = React.useState(open)
   const [isClosing, setIsClosing] = React.useState(false)
+  const modalRef = React.useRef<HTMLDivElement>(null)
+  const previousActiveRef = React.useRef<HTMLElement | null>(null)
+
+  const getFocusableElements = React.useCallback(() => {
+    if (!modalRef.current) return [] as HTMLElement[]
+    const selectors = [
+      'a[href]',
+      'button:not([disabled])',
+      'textarea:not([disabled])',
+      'input:not([disabled]):not([type="hidden"])',
+      'select:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(', ')
+    return Array.from(modalRef.current.querySelectorAll<HTMLElement>(selectors)).filter(
+      (el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true',
+    )
+  }, [])
 
   React.useEffect(() => {
     if (open) {
@@ -54,6 +71,55 @@ export const Modal: React.FC<ModalProps> = ({
     document.addEventListener('keydown', handleEsc)
     return () => document.removeEventListener('keydown', handleEsc)
   }, [open, onClose])
+
+  React.useEffect(() => {
+    if (!open) return
+    previousActiveRef.current = document.activeElement as HTMLElement | null
+    const timer = window.setTimeout(() => {
+      const focusable = getFocusableElements()
+      if (focusable.length > 0) {
+        focusable[0].focus()
+      } else {
+        modalRef.current?.focus()
+      }
+    }, 0)
+    return () => {
+      window.clearTimeout(timer)
+      const previous = previousActiveRef.current
+      if (previous && document.contains(previous)) {
+        previous.focus()
+      }
+    }
+  }, [open, getFocusableElements])
+
+  React.useEffect(() => {
+    if (!open) return
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return
+      const focusable = getFocusableElements()
+      if (focusable.length === 0) {
+        e.preventDefault()
+        modalRef.current?.focus()
+        return
+      }
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      if (e.shiftKey) {
+        if (!active || active === first || !modalRef.current?.contains(active)) {
+          e.preventDefault()
+          last.focus()
+        }
+        return
+      }
+      if (active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', handleTab)
+    return () => document.removeEventListener('keydown', handleTab)
+  }, [open, getFocusableElements])
 
   // Prevent body scroll when visible
   React.useEffect(() => {
@@ -82,7 +148,11 @@ export const Modal: React.FC<ModalProps> = ({
       />
       
       {/* Modal content */}
-      <div className={`relative ${width} w-full bg-white dark:bg-neutral-900 rounded-xl shadow-2xl ring-1 ring-black/10 dark:ring-white/10 ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}>
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className={`relative ${width} w-full bg-white dark:bg-neutral-900 rounded-xl shadow-2xl ring-1 ring-black/10 dark:ring-white/10 ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
+      >
         {/* Header */}
         {(title || showCloseButton) && (
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-neutral-800">

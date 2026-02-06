@@ -5,6 +5,16 @@ import { useTodo, useUpcoming } from '../hooks/useCanvasQueries'
 import { useToast } from './ui/Toaster'
 import { SkeletonList } from './Skeleton'
 
+function agendaItemKey(item: any, prefix: string): string {
+  const base =
+    item?.id ||
+    item?.assignment?.id ||
+    item?.html_url ||
+    item?.assignment?.html_url ||
+    `${item?.title || item?.assignment?.name || 'item'}:${item?.start_at || item?.assignment?.due_at || ''}`
+  return `${prefix}:${String(base)}`
+}
+
 export const Agenda: React.FC = () => {
   const upcomingQ = useUpcoming()
   const todoQ = useTodo()
@@ -33,8 +43,8 @@ export const Agenda: React.FC = () => {
           )}
           {!upcomingQ.isLoading && (upcomingQ.data || []).length > 0 && (
             <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-neutral-700">
-              {(upcomingQ.data || []).slice(0, 6).map((ev: any, i: number) => (
-                <li key={i} className="py-2">
+              {(upcomingQ.data || []).slice(0, 6).map((ev: any) => (
+                <li key={agendaItemKey(ev, 'upcoming')} className="py-2">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="font-medium leading-snug hover:text-slate-700 dark:hover:text-slate-100/90 transition-colors">
@@ -67,8 +77,8 @@ export const Agenda: React.FC = () => {
           )}
           {!todoQ.isLoading && (todoQ.data || []).length > 0 && (
             <ul className="list-none m-0 p-0 divide-y divide-gray-200 dark:divide-neutral-700">
-              {(todoQ.data || []).slice(0, 6).map((t: any, i: number) => (
-                <li key={i} className="py-2">
+              {(todoQ.data || []).slice(0, 6).map((t: any) => (
+                <li key={agendaItemKey(t, 'todo')} className="py-2">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="font-medium leading-snug hover:text-slate-700 dark:hover:text-slate-100/90 transition-colors">

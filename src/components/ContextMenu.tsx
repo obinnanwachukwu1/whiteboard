@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 export interface ContextMenuItem {
+  id?: string
   label: string
   icon?: React.ReactNode
   onClick: () => void
@@ -66,6 +67,19 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClo
     }
   }, [mounted, onClose])
 
+  const keyedItems = React.useMemo(() => {
+    const seen = new Map<string, number>()
+    return cachedItems.map((item) => {
+      const base =
+        item.id ||
+        `${item.label}:${item.danger ? 'danger' : 'normal'}:${item.disabled ? 'disabled' : 'enabled'}`
+      const count = seen.get(base) || 0
+      seen.set(base, count + 1)
+      const key = count === 0 ? base : `${base}:${count + 1}`
+      return { item, key }
+    })
+  }, [cachedItems])
+
   if (!mounted || !coords) return null
 
   // Adjust position to keep in viewport
@@ -93,9 +107,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClo
       style={style}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {cachedItems.map((item, i) => (
+      {keyedItems.map(({ item, key }) => (
         <button
-          key={i}
+          key={key}
           className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors ${
             item.danger ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-200'
           } ${item.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
