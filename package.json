@@ -85,7 +85,6 @@
     "@typescript-eslint/parser": "^8.54.0",
     "@vitejs/plugin-react": "^5.1.2",
     "@tanstack/router-devtools": "^1.131.28",
-    "@welldone-software/why-did-you-render": "^10.0.1",
     "autoprefixer": "^10.4.21",
     "electron": "^40.1.0",
     "electron-builder": "^26.6.0",

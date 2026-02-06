@@ -107,7 +107,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
     isSearching: isStandardSearching,
     isPendingSearch,
     clearSearch,
-  } = useGlobalSearch({ enabled: !flags.privateModeEnabled })
+  } = useGlobalSearch({ enabled: isOpen && !flags.privateModeEnabled })
 
   // Deep Search State
   const [isDeepSearching, setIsDeepSearching] = useState(false)
