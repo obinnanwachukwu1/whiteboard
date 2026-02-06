@@ -63,6 +63,36 @@ Exit criteria:
 - No `key={i}` in real user-data lists touched by this audit.
 - Shared modal traps focus and restores it on close.
 
+## Phase 5 - Oversized File Split (P2)
+
+Goals:
+- Reduce cognitive load in large renderer context files without behavior changes.
+- Improve contributor/model editability by moving pure logic out of provider components.
+
+Tasks:
+- Extract pure AI prompt/context builder helpers from `src/context/AIPanelContext.tsx` into focused helper modules under `src/context/ai/`.
+- Keep provider API and runtime behavior unchanged.
+- Update AGENTS assumptions for large-file refactors.
+
+Exit criteria:
+- `src/context/AIPanelContext.tsx` is materially smaller and focused on React state/actions.
+- Extracted helper modules are imported and typechecked.
+
+## Phase 6 - Single Typed IPC Contract (P1/P2)
+
+Goals:
+- Remove duplicated `Window`/preload API typing and make one source of truth.
+- Ensure preload exposure objects are checked against shared contract types.
+
+Tasks:
+- Add shared IPC type contract in `src/types/ipc.ts`.
+- Update `src/vite-env.d.ts` and `electron/electron-env.d.ts` to reference that contract instead of redeclaring it.
+- Type `electron/preload.ts` exposed objects against shared interfaces.
+
+Exit criteria:
+- Renderer and electron env declarations derive from one shared type module.
+- Preload APIs compile against shared interfaces.
+
 ## Validation (Per Phase)
 
 - `pnpm exec tsc -p tsconfig.json --noEmit`
@@ -77,3 +107,5 @@ Exit criteria:
   - `phase 2: gate global search work and remove wdyr`
   - `phase 3: stabilize ai panel action callbacks`
   - `phase 4: improve list keys and modal accessibility`
+  - `phase 5: split ai panel helper modules and document assumptions`
+  - `phase 6: unify typed ipc contract across renderer and electron`
