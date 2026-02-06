@@ -11,6 +11,8 @@ const MAX_RESTART_ATTEMPTS = 3
 const RESTART_DELAY_MS = 2000
 const READINESS_CHECK_INTERVAL_MS = 500
 const READINESS_TIMEOUT_MS = 10000
+const STATUS_PROBE_TIMEOUT_MS = 1200
+const SOCKET_PROBE_TIMEOUT_MS = 8000
 
 export type AIAvailability = {
   status: 'available' | 'unsupported' | 'disabled' | 'error'
@@ -177,8 +179,10 @@ export class AIManager {
       })
 
       const timeout = setTimeout(() => {
-        finish({ status: 'error', detail: 'timeout' })
-      }, 2000)
+        // Some systems can take longer to respond to --status on first probe.
+        // Return null so we still try the socket-based fallback check.
+        finish(null)
+      }, STATUS_PROBE_TIMEOUT_MS)
     })
   }
 
@@ -264,7 +268,7 @@ export class AIManager {
 
       const timeout = setTimeout(() => {
         finish({ status: 'error', detail: 'timeout' })
-      }, 2000)
+      }, SOCKET_PROBE_TIMEOUT_MS)
     })
   }
 

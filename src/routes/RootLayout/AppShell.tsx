@@ -25,6 +25,7 @@ import { NotificationManager } from '../../components/NotificationManager'
 import type { ThemeSettings } from '../../utils/theme'
 import { AISidePanelKeyboardHandler } from './AISidePanelKeyboardHandler'
 import { AISidePanel } from '../../components/AISidePanel'
+import { OnboardingWizard } from '../../components/onboarding/OnboardingWizard'
 import { useDashboardData } from '../../hooks/useDashboardData'
 
 type CurrentView =
@@ -53,9 +54,11 @@ type Props = {
   searchOpen: boolean
   settingsOpen: boolean
   inboxOpen: boolean
+  oobeOpen: boolean
   onCloseSearch: () => void
   onCloseSettings: () => void
   onCloseInbox: () => void
+  onCloseOobe: () => void
   onOpenSearch: () => void
   onOpenInbox: () => void
   visibleCourses: any[]
@@ -209,6 +212,7 @@ function AppShellInner(props: Props) {
           <SearchModal isOpen={props.searchOpen} onClose={props.onCloseSearch} />
           <SettingsModal isOpen={props.settingsOpen} onClose={props.onCloseSettings} />
           <InboxPanel isOpen={props.inboxOpen} onClose={props.onCloseInbox} />
+          <OnboardingWizard isOpen={props.oobeOpen} onClose={props.onCloseOobe} />
           <AISidePanelKeyboardHandler />
           <NotificationManager />
         </>

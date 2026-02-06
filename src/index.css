@@ -941,6 +941,120 @@ html {
   background-size: 200% 100%;
 }
 
+/* ============ OOBE Wizard Animations ============ */
+
+@keyframes oobeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.animate-oobe-in {
+  animation: oobeIn 350ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes oobeOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+.animate-oobe-out {
+  animation: oobeOut 200ms ease-in forwards;
+}
+
+@keyframes oobeSlideInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.animate-oobe-slide-in-right {
+  animation: oobeSlideInRight 300ms ease-out;
+}
+
+@keyframes oobeSlideInLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.animate-oobe-slide-in-left {
+  animation: oobeSlideInLeft 300ms ease-out;
+}
+
+@keyframes oobeFadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-oobe-fade-up {
+  animation: oobeFadeUp 400ms ease-out both;
+}
+.animate-oobe-fade-up-1 {
+  animation: oobeFadeUp 400ms ease-out 100ms both;
+}
+.animate-oobe-fade-up-2 {
+  animation: oobeFadeUp 400ms ease-out 200ms both;
+}
+.animate-oobe-fade-up-3 {
+  animation: oobeFadeUp 400ms ease-out 300ms both;
+}
+
+@keyframes oobeBounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  70% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animate-oobe-bounce-in {
+  animation: oobeBounceIn 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes oobeGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 16px 2px var(--accent-ring);
+  }
+  50% {
+    box-shadow: 0 0 24px 6px var(--accent-ring);
+  }
+}
+.animate-oobe-glow {
+  animation: oobeGlow 2s ease-in-out infinite;
+}
+
 /* ============ Reduce Effects Mode ============ */
 /* Toggle via: document.documentElement.dataset.reduceEffects = '1' */
 
@@ -987,7 +1101,17 @@ html {
 :root[data-reduce-effects='1'] .animate-float,
 :root[data-reduce-effects='1'] .animate-float-slow,
 :root[data-reduce-effects='1'] .animate-float-delayed,
-:root[data-reduce-effects='1'] .skeleton-shimmer {
+:root[data-reduce-effects='1'] .skeleton-shimmer,
+:root[data-reduce-effects='1'] .animate-oobe-in,
+:root[data-reduce-effects='1'] .animate-oobe-out,
+:root[data-reduce-effects='1'] .animate-oobe-slide-in-right,
+:root[data-reduce-effects='1'] .animate-oobe-slide-in-left,
+:root[data-reduce-effects='1'] .animate-oobe-fade-up,
+:root[data-reduce-effects='1'] .animate-oobe-fade-up-1,
+:root[data-reduce-effects='1'] .animate-oobe-fade-up-2,
+:root[data-reduce-effects='1'] .animate-oobe-fade-up-3,
+:root[data-reduce-effects='1'] .animate-oobe-bounce-in,
+:root[data-reduce-effects='1'] .animate-oobe-glow {
   animation: none !important;
 }
 

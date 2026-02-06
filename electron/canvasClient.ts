@@ -318,6 +318,38 @@ export class CanvasClient {
     return this.paginate<any>(`/courses/${courseId}/tabs`, p)
   }
 
+  private isVisibleQuizTab(tab: any): boolean {
+    if (!tab || tab.hidden) return false
+    const id = String(tab?.id || '')
+      .trim()
+      .toLowerCase()
+    const label = String(tab?.label || '')
+      .trim()
+      .toLowerCase()
+    if (!id && !label && !tab?.html_url) return false
+    if (id === 'links' || label === 'links') return false
+    if (id === 'quiz' || id === 'quizzes' || label === 'quiz' || label === 'quizzes') return true
+    try {
+      const u = new URL(String(tab?.html_url || ''), this.baseUrl)
+      return /\/quizzes(?:\/|$)/.test(u.pathname)
+    } catch {
+      return false
+    }
+  }
+
+  private async courseHasVisibleQuizTab(courseId: string | number): Promise<boolean> {
+    try {
+      const tabs = await this.listCourseTabs(courseId, true)
+      return Array.isArray(tabs) && tabs.some((t) => this.isVisibleQuizTab(t))
+    } catch (e) {
+      // If tabs cannot be resolved, fall back to current behavior and attempt quiz fetch.
+      if (this.verbose) {
+        console.warn(`[Canvas] Failed to fetch tabs for course ${courseId}:`, e)
+      }
+      return true
+    }
+  }
+
   // Activity stream (cross-course), useful for announcements aggregation
   listActivityStream(params: { onlyActiveCourses?: boolean; perPage?: number } = {}) {
     const p: Record<string, any> = {
@@ -1251,75 +1283,78 @@ export class CanvasClient {
           }
         }
         // Add quizzes so they show up in dashboard/priority, even if not in assignments list.
-        try {
-          const quizzes = await this.listCourseQuizzes(cid, 100)
-          const pendingSubmissions: Array<{ assignmentId: string; item: any }> = []
-          for (const q of quizzes || []) {
-            if (onlyPublished && (q as any)?.published === false) continue
-            const dt = parseIso((q as any)?.due_at)
-            if (!dt) continue
-            if (dt < now || dt > end) continue
-            const isNew = Boolean((q as any)?.isNewQuiz)
-            const assignmentId = String((q as any)?.assignment_id || '')
-            const quizId = String(
-              isNew
-                ? assignmentId || (q as any)?.id || ''
-                : (q as any)?.id || '',
-            )
-            if (!quizId) continue
-            if (quizIdsFromAssignments.has(`${cid}:${quizId}`)) continue
-            if (assignmentId && dueAssignmentIds.has(assignmentId)) continue
-            const fromAssignment = assignmentId ? assignmentById.get(assignmentId) : null
-            const item: any = {
-              course_id: cid,
-              quiz_id: quizId,
-              name: (q as any)?.title || 'Quiz',
-              dueAt: dt.toISOString(),
-              pointsPossible:
-                (q as any)?.points_possible ??
-                fromAssignment?.points_possible ??
-                null,
-              htmlUrl: (q as any)?.html_url,
-              contentType: 'quiz',
-              submission: fromAssignment?.submission
-                ? {
-                    submittedAt: fromAssignment.submission.submitted_at,
-                    workflowState: fromAssignment.submission.workflow_state,
-                  }
-                : undefined,
+        const hasQuizTab = await this.courseHasVisibleQuizTab(cid)
+        if (hasQuizTab) {
+          try {
+            const quizzes = await this.listCourseQuizzes(cid, 100)
+            const pendingSubmissions: Array<{ assignmentId: string; item: any }> = []
+            for (const q of quizzes || []) {
+              if (onlyPublished && (q as any)?.published === false) continue
+              const dt = parseIso((q as any)?.due_at)
+              if (!dt) continue
+              if (dt < now || dt > end) continue
+              const isNew = Boolean((q as any)?.isNewQuiz)
+              const assignmentId = String((q as any)?.assignment_id || '')
+              const quizId = String(
+                isNew
+                  ? assignmentId || (q as any)?.id || ''
+                  : (q as any)?.id || '',
+              )
+              if (!quizId) continue
+              if (quizIdsFromAssignments.has(`${cid}:${quizId}`)) continue
+              if (assignmentId && dueAssignmentIds.has(assignmentId)) continue
+              const fromAssignment = assignmentId ? assignmentById.get(assignmentId) : null
+              const item: any = {
+                course_id: cid,
+                quiz_id: quizId,
+                name: (q as any)?.title || 'Quiz',
+                dueAt: dt.toISOString(),
+                pointsPossible:
+                  (q as any)?.points_possible ??
+                  fromAssignment?.points_possible ??
+                  null,
+                htmlUrl: (q as any)?.html_url,
+                contentType: 'quiz',
+                submission: fromAssignment?.submission
+                  ? {
+                      submittedAt: fromAssignment.submission.submitted_at,
+                      workflowState: fromAssignment.submission.workflow_state,
+                    }
+                  : undefined,
+              }
+              if (includeCourseName) item.course_name = cname
+              out.push(item)
+              if (!item.submission && assignmentId) {
+                pendingSubmissions.push({ assignmentId, item })
+              }
             }
-            if (includeCourseName) item.course_name = cname
-            out.push(item)
-            if (!item.submission && assignmentId) {
-              pendingSubmissions.push({ assignmentId, item })
-            }
-          }
-          if (pendingSubmissions.length > 0) {
-            let qi = 0
-            const subWorkers = Array.from(
-              { length: Math.min(4, pendingSubmissions.length) },
-              () =>
-                (async () => {
-                  while (qi < pendingSubmissions.length) {
-                    const cur = qi++
-                    const { assignmentId, item } = pendingSubmissions[cur]
-                    try {
-                      const sub = await this.getMySubmission(cid, assignmentId, [])
-                      if (sub) {
-                        item.submission = {
-                          submittedAt: sub.submitted_at,
-                          workflowState: sub.workflow_state,
+            if (pendingSubmissions.length > 0) {
+              let qi = 0
+              const subWorkers = Array.from(
+                { length: Math.min(4, pendingSubmissions.length) },
+                () =>
+                  (async () => {
+                    while (qi < pendingSubmissions.length) {
+                      const cur = qi++
+                      const { assignmentId, item } = pendingSubmissions[cur]
+                      try {
+                        const sub = await this.getMySubmission(cid, assignmentId, [])
+                        if (sub) {
+                          item.submission = {
+                            submittedAt: sub.submitted_at,
+                            workflowState: sub.workflow_state,
+                          }
                         }
-                      }
-                    } catch {}
-                  }
-                })(),
-            )
-            await Promise.all(subWorkers)
-          }
-        } catch (_quizErr) {
-          if (this.verbose) {
-            console.warn(`[Canvas] Failed to fetch quizzes for course ${cid}:`, _quizErr)
+                      } catch {}
+                    }
+                  })(),
+              )
+              await Promise.all(subWorkers)
+            }
+          } catch (_quizErr) {
+            if (this.verbose) {
+              console.warn(`[Canvas] Failed to fetch quizzes for course ${cid}:`, _quizErr)
+            }
           }
         }
       } catch (_e) {

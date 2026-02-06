@@ -63,6 +63,7 @@ export function useRootLayoutState() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [inboxOpen, setInboxOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [oobeOpen, setOobeOpen] = useState(false)
 
   const { themeSettings, setThemeSettings } = useRootLayoutTheme()
   const [notificationSettings, setNotificationSettingsState] = useState<NotificationSettings>(() => ({
@@ -103,6 +104,18 @@ export function useRootLayoutState() {
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onToggleSearch, privateModeEnabled])
+
+  // Global Cmd+Shift+O keyboard shortcut (OOBE wizard)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'o') {
+        e.preventDefault()
+        setOobeOpen((prev) => !prev)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   useEffect(() => {
     if (privateModeEnabled && searchOpen) setSearchOpen(false)
@@ -453,6 +466,9 @@ export function useRootLayoutState() {
   const setPrefetchEnabledPersisted = useCallback(
     async (v: boolean) => {
       setPrefetchEnabledState(v)
+      try {
+        await window.settings.set?.({ prefetchEnabled: v })
+      } catch {}
       await saveUserSettings({ prefetchEnabled: v })
     },
     [saveUserSettings],
@@ -1078,9 +1094,11 @@ export function useRootLayoutState() {
       searchOpen,
       settingsOpen,
       inboxOpen,
+      oobeOpen,
       onCloseSearch: () => setSearchOpen(false),
       onCloseSettings: () => setSettingsOpen(false),
       onCloseInbox: () => setInboxOpen(false),
+      onCloseOobe: () => setOobeOpen(false),
       onOpenSearch,
       onOpenInbox: () => setInboxOpen(true),
       visibleCourses,

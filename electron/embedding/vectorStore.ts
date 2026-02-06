@@ -55,6 +55,9 @@ const yieldToEventLoop = () => new Promise<void>((resolve) => setImmediate(resol
 export class VectorStore {
   private entries: Map<string, VectorEntry> = new Map()
   private dirty = false
+  private revision = 0
+  private saveInFlight: Promise<void> | null = null
+  private saveQueued = false
   private storePath: string
   private maxMemoryBytes: number
 
@@ -74,7 +77,7 @@ export class VectorStore {
     }
 
     this.entries.set(entry.id, entry)
-    this.dirty = true
+    this.markDirty()
   }
 
   /**
@@ -83,7 +86,7 @@ export class VectorStore {
   remove(id: string): boolean {
     const existed = this.entries.delete(id)
     if (existed) {
-      this.dirty = true
+      this.markDirty()
     }
     return existed
   }
@@ -189,69 +192,94 @@ export class VectorStore {
    */
   clear(): void {
     this.entries.clear()
-    this.dirty = true
+    this.markDirty()
   }
 
   /**
    * Save the store to disk.
    */
   async save(): Promise<void> {
+    if (this.saveInFlight) {
+      if (this.dirty) this.saveQueued = true
+      await this.saveInFlight
+      return
+    }
     if (!this.dirty) {
       console.log('[VectorStore] No changes to save')
       return
     }
 
-    console.log(`[VectorStore] Saving ${this.entries.size} entries...`, this.storePath)
+    this.saveInFlight = this.flushSaves().finally(() => {
+      this.saveInFlight = null
+    })
+    await this.saveInFlight
+  }
 
-    const chunks: Buffer[] = []
-    const entries = Array.from(this.entries)
+  private async flushSaves(): Promise<void> {
+    while (this.dirty) {
+      this.saveQueued = false
+      const snapshotRevision = this.revision
 
-    // Header: version + entry count
-    const header = Buffer.alloc(8)
-    header.writeUInt32LE(STORE_VERSION, 0)
-    header.writeUInt32LE(entries.length, 4)
-    chunks.push(header)
+      console.log(`[VectorStore] Saving ${this.entries.size} entries...`, this.storePath)
 
-    // Entries
-    for (let i = 0; i < entries.length; i++) {
-      if (i > 0 && i % YIELD_EVERY === 0) {
-        await yieldToEventLoop()
+      const chunks: Buffer[] = []
+      const entries = Array.from(this.entries)
+
+      // Header: version + entry count
+      const header = Buffer.alloc(8)
+      header.writeUInt32LE(STORE_VERSION, 0)
+      header.writeUInt32LE(entries.length, 4)
+      chunks.push(header)
+
+      // Entries
+      for (let i = 0; i < entries.length; i++) {
+        if (i > 0 && i % YIELD_EVERY === 0) {
+          await yieldToEventLoop()
+        }
+        const [id, entry] = entries[i]
+        // ID
+        const idBuffer = Buffer.from(id, 'utf-8')
+        const idLength = Buffer.alloc(4)
+        idLength.writeUInt32LE(idBuffer.length, 0)
+        chunks.push(idLength, idBuffer)
+
+        // Embedding
+        const embeddingBuffer = Buffer.from(entry.embedding.buffer)
+        const embeddingLength = Buffer.alloc(4)
+        embeddingLength.writeUInt32LE(embeddingBuffer.length, 0)
+        chunks.push(embeddingLength, embeddingBuffer)
+
+        // Metadata
+        const metadataBuffer = Buffer.from(JSON.stringify(entry.metadata), 'utf-8')
+        const metadataLength = Buffer.alloc(4)
+        metadataLength.writeUInt32LE(metadataBuffer.length, 0)
+        chunks.push(metadataLength, metadataBuffer)
       }
-      const [id, entry] = entries[i]
-      // ID
-      const idBuffer = Buffer.from(id, 'utf-8')
-      const idLength = Buffer.alloc(4)
-      idLength.writeUInt32LE(idBuffer.length, 0)
-      chunks.push(idLength, idBuffer)
 
-      // Embedding
-      const embeddingBuffer = Buffer.from(entry.embedding.buffer)
-      const embeddingLength = Buffer.alloc(4)
-      embeddingLength.writeUInt32LE(embeddingBuffer.length, 0)
-      chunks.push(embeddingLength, embeddingBuffer)
+      const data = Buffer.concat(chunks)
 
-      // Metadata
-      const metadataBuffer = Buffer.from(JSON.stringify(entry.metadata), 'utf-8')
-      const metadataLength = Buffer.alloc(4)
-      metadataLength.writeUInt32LE(metadataBuffer.length, 0)
-      chunks.push(metadataLength, metadataBuffer)
+      // Ensure directory exists
+      const dir = path.dirname(this.storePath)
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true })
+      }
+
+      // Write atomically (write to temp, then rename)
+      const tempPath = `${this.storePath}.${process.pid}.${Date.now()}.${Math.random()
+        .toString(16)
+        .slice(2)}.tmp`
+      await fs.promises.writeFile(tempPath, data)
+      await fs.promises.rename(tempPath, this.storePath)
+
+      if (this.revision === snapshotRevision) {
+        this.dirty = false
+      }
+
+      console.log(`[VectorStore] Saved ${this.entries.size} entries (${Math.round(data.length / 1024)}KB)`)
+      if (!this.dirty && !this.saveQueued) {
+        return
+      }
     }
-
-    const data = Buffer.concat(chunks)
-    
-    // Ensure directory exists
-    const dir = path.dirname(this.storePath)
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true })
-    }
-
-    // Write atomically (write to temp, then rename)
-    const tempPath = this.storePath + '.tmp'
-    await fs.promises.writeFile(tempPath, data)
-    await fs.promises.rename(tempPath, this.storePath)
-
-    this.dirty = false
-    console.log(`[VectorStore] Saved ${this.entries.size} entries (${Math.round(data.length / 1024)}KB)`)
   }
 
   /**
@@ -366,7 +394,7 @@ export class VectorStore {
       }
     }
     if (removed > 0) {
-      this.dirty = true
+      this.markDirty()
       console.log(`[VectorStore] Removed ${removed} entries for course ${courseId}`)
     }
     return removed
@@ -385,7 +413,7 @@ export class VectorStore {
       }
     }
     if (removed > 0) {
-      this.dirty = true
+      this.markDirty()
       console.log(`[VectorStore] Removed ${removed} chunks for file ${fileId}`)
     }
     return removed
@@ -444,8 +472,13 @@ export class VectorStore {
       added++
     }
     if (added > 0) {
-      this.dirty = true
+      this.markDirty()
     }
     return added
+  }
+
+  private markDirty(): void {
+    this.dirty = true
+    this.revision++
   }
 }

@@ -46,6 +46,7 @@ Whiteboard includes optional AI‑powered helpers that run on your device. Use t
 ## Roadmap
 - Smarter reminders for high‑priority deadlines.
 - Deeper offline access for course content.
+- Support more local providers (Phi Silica for Copilot+ PCs)
 
 ## FAQ
 - **Where is my Canvas token stored?** Locally on your device.

@@ -7,12 +7,14 @@ type Props = {
   markdown: string
   streaming: boolean
   className?: string
+  buffered?: boolean
 }
 
 export const MarkdownMessage = memo(function MarkdownMessage({
   markdown,
   streaming,
   className = '',
+  buffered = true,
 }: Props) {
   const [html, setHtml] = useState('')
   const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -44,6 +46,13 @@ export const MarkdownMessage = memo(function MarkdownMessage({
 
     if (flushTimeoutRef.current) clearTimeout(flushTimeoutRef.current)
 
+    const shouldBuffer = streaming && buffered
+    if (!shouldBuffer) {
+      renderMarkdown(markdown)
+      lastRenderedTextLength.current = markdown.length
+      return
+    }
+
     // Streaming-smooth: render up to last newline immediately.
     const lastNewlineIndex = markdown.lastIndexOf('\n')
     if (lastNewlineIndex !== -1 && lastNewlineIndex + 1 > lastRenderedTextLength.current) {
@@ -61,7 +70,7 @@ export const MarkdownMessage = memo(function MarkdownMessage({
     return () => {
       if (flushTimeoutRef.current) clearTimeout(flushTimeoutRef.current)
     }
-  }, [markdown, streaming])
+  }, [markdown, streaming, buffered])
 
   return <HtmlContent html={html} className={className} />
 })
