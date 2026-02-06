@@ -25,6 +25,11 @@ import { useRootLayoutTheme } from './useRootLayoutTheme'
 import { useRootLayoutBootstrap } from './useRootLayoutBootstrap'
 import { useRootLayoutUserSettings } from './useRootLayoutUserSettings'
 import { setEncryptionEnabledFlag } from '../../utils/secureStorage'
+import {
+  filterVisibleCourses,
+  toHiddenCourseIdSet,
+  updateHiddenCourseIds,
+} from '../../utils/courseVisibility'
 
 export function useRootLayoutState() {
   useWindowControlsOverlayInsets()
@@ -965,8 +970,7 @@ export function useRootLayoutState() {
   )
 
   const visibleCourses = useMemo(() => {
-    const hidden = new Set(sidebarCfg.hiddenCourseIds || [])
-    const list = (courses as any[]).filter((c: any) => !hidden.has(c.id))
+    const list = filterVisibleCourses(courses as any[], sidebarCfg.hiddenCourseIds)
     const order = sidebarCfg.order || []
     const orderMap = new Map(order.map((id, i) => [String(id), i]))
     list.sort(
@@ -976,9 +980,10 @@ export function useRootLayoutState() {
   }, [courses, sidebarCfg.hiddenCourseIds, sidebarCfg.order])
 
   const hideCourse = async (courseId: string | number) => {
-    const hidden = new Set(sidebarCfg.hiddenCourseIds || [])
-    hidden.add(String(courseId))
-    const next = { ...sidebarCfg, hiddenCourseIds: Array.from(hidden) }
+    const next = {
+      ...sidebarCfg,
+      hiddenCourseIds: updateHiddenCourseIds(sidebarCfg.hiddenCourseIds, courseId, true),
+    }
     setSidebarCfg(next)
     await saveUserSidebar(next)
   }
@@ -1010,10 +1015,10 @@ export function useRootLayoutState() {
     })
 
   // Embedding cleanup when a course is unpinned
-  const prevHiddenRef = useRef<Set<string | number>>(new Set())
+  const prevHiddenRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     const prevHidden = prevHiddenRef.current
-    const currHidden = new Set(sidebarCfg.hiddenCourseIds || [])
+    const currHidden = toHiddenCourseIdSet(sidebarCfg.hiddenCourseIds)
 
     for (const courseId of currHidden) {
       if (!prevHidden.has(courseId)) {

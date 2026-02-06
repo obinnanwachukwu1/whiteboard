@@ -13,6 +13,7 @@ import { restrictToVerticalAxis, restrictToWindowEdges } from '@dnd-kit/modifier
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { SidebarNavItem } from './SidebarNavItem'
 import { SidebarCourseRow } from './SidebarCourseRow'
+import { filterVisibleCourses } from '../../utils/courseVisibility'
 
 type Course = { id: number | string; name: string; course_code?: string }
 
@@ -103,17 +104,15 @@ export const Sidebar: React.FC<Props> = ({
     if (courseHoverTimer.current) clearTimeout(courseHoverTimer.current)
   }
 
-  const hidden = useMemo(() => new Set(sidebar?.hiddenCourseIds || []), [sidebar?.hiddenCourseIds])
-
   const orderedVisibleCourses = useMemo(() => {
-    const all = courses.filter((c) => !hidden.has(c.id))
+    const all = filterVisibleCourses(courses, sidebar?.hiddenCourseIds)
     const order = sidebar?.order || []
     const index = new Map(order.map((id, i) => [String(id), i]))
     return all
       .map((c) => ({ c, i: index.get(String(c.id)) ?? Number.MAX_SAFE_INTEGER }))
       .sort((a, b) => a.i - b.i || String(a.c.name).localeCompare(String(b.c.name)))
       .map((x) => x.c)
-  }, [courses, sidebar?.order, hidden])
+  }, [courses, sidebar?.order, sidebar?.hiddenCourseIds])
 
   const labelFor = (c: Course) => sidebar?.customNames?.[String(c.id)] || c.course_code || c.name
 

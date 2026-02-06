@@ -20,6 +20,7 @@ import { AssignmentPopover, useAssignmentPopover } from '../components/Assignmen
 import type { DueItem } from '../types/canvas'
 import { formatDateTime } from '../utils/dateFormat'
 import { useAIContextOffer } from '../hooks/useAIContextOffer'
+import { filterVisibleCourses } from '../utils/courseVisibility'
 
 function extractIdFromUrl(url?: string, key?: string): string | null {
   if (!url || !key) return null
@@ -140,8 +141,7 @@ export default function AssignmentsPage() {
   const [view, setView] = React.useState<'kanban' | 'calendar'>('kanban')
 
   const orderedCourses = React.useMemo(() => {
-    const hidden = new Set(sidebar?.hiddenCourseIds || [])
-    const all = courses.filter((c: any) => !hidden.has(c.id))
+    const all = filterVisibleCourses(courses, sidebar?.hiddenCourseIds)
     const order = sidebar?.order || []
     const index = new Map(order.map((id, i) => [String(id), i]))
     return all

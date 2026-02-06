@@ -10,6 +10,7 @@ import type { DiscussionTopic } from '../types/canvas'
 import { CourseAvatar } from '../components/CourseAvatar'
 import { useCourseImages } from '../hooks/useCourseImages'
 import { useCourseAvatarPreloadGate } from '../hooks/useCourseAvatarPreloadGate'
+import { filterVisibleCourses } from '../utils/courseVisibility'
 
 export default function DiscussionsPage() {
   const data = useAppData()
@@ -28,8 +29,7 @@ export default function DiscussionsPage() {
   }, [searchTerm])
 
   const orderedCourses = React.useMemo(() => {
-    const hidden = new Set(sidebar?.hiddenCourseIds || [])
-    const all = courses.filter((c: any) => !hidden.has(c.id))
+    const all = filterVisibleCourses(courses, sidebar?.hiddenCourseIds)
     const order = sidebar?.order || []
     const index = new Map(order.map((id, i) => [String(id), i]))
     return all

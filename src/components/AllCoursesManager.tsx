@@ -4,6 +4,11 @@ import { Eye, EyeOff, Pencil, RotateCcw } from 'lucide-react'
 import { useAppActions } from '../context/AppContext'
 import { useCourseImages } from '../hooks/useCourseImages'
 import { courseHueFor } from '../utils/colorHelpers'
+import {
+  normalizeCourseId,
+  toHiddenCourseIdSet,
+  updateHiddenCourseIds,
+} from '../utils/courseVisibility'
 
 type Course = { id: number | string; name: string; course_code?: string }
 
@@ -22,11 +27,11 @@ type Props = {
 export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange }) => {
   const actions = useAppActions()
   const { courseImageUrl } = useCourseImages()
-  const hiddenSet = useMemo(() => new Set(sidebar.hiddenCourseIds || []), [sidebar.hiddenCourseIds])
+  const hiddenSet = useMemo(() => toHiddenCourseIdSet(sidebar.hiddenCourseIds), [sidebar.hiddenCourseIds])
   const sortedCourses = useMemo(() => {
     return [...courses].sort((a, b) => {
-      const aHidden = hiddenSet.has(a.id)
-      const bHidden = hiddenSet.has(b.id)
+      const aHidden = hiddenSet.has(normalizeCourseId(a.id))
+      const bHidden = hiddenSet.has(normalizeCourseId(b.id))
       if (aHidden !== bHidden) return aHidden ? 1 : -1
       return 0
     })
@@ -35,14 +40,17 @@ export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange 
   const failedImages = useRef<Set<string>>(new Set())
   const [, forceUpdate] = useState(0)
 
-  const toggleVisibility = useCallback(async (courseId: string | number, show: boolean) => {
-    const hidden = new Set(sidebar.hiddenCourseIds || [])
-    if (show) hidden.delete(courseId)
-    else hidden.add(courseId)
-    const next = { ...sidebar, hiddenCourseIds: Array.from(hidden) }
-    onChange(next)
-    await window.settings.set?.({ sidebar: next })
-  }, [sidebar, onChange])
+  const toggleVisibility = useCallback(
+    async (courseId: string | number, show: boolean) => {
+      const next = {
+        ...sidebar,
+        hiddenCourseIds: updateHiddenCourseIds(sidebar.hiddenCourseIds, courseId, !show),
+      }
+      onChange(next)
+      await window.settings.set?.({ sidebar: next })
+    },
+    [sidebar, onChange],
+  )
 
   const setCustomName = useCallback(async (courseId: string | number, name: string) => {
     const custom = { ...(sidebar.customNames || {}) }
@@ -69,7 +77,7 @@ export const AllCoursesManager: React.FC<Props> = ({ courses, sidebar, onChange 
         {sortedCourses.map((c) => {
           const idKey = String(c.id)
           const custom = sidebar.customNames?.[idKey] || ''
-          const hidden = hiddenSet.has(c.id)
+          const hidden = hiddenSet.has(idKey)
           const imageUrl = courseImageUrl(c.id)
           const imageFailed = failedImages.current.has(idKey)
           const showImage = imageUrl && !imageFailed

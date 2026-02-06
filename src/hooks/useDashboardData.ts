@@ -6,6 +6,7 @@ import { useAppFlags } from '../context/AppContext'
 import { calculateCourseGrades, toAssignmentInputsFromRest } from '../utils/gradeCalc'
 import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
 import { extractCourseIdFromUrl } from '../utils/urlHelpers'
+import { filterVisibleCourses } from '../utils/courseVisibility'
 
 export type DueItem = {
   course_id: number | string
@@ -53,16 +54,15 @@ export function useDashboardData({ courses, sidebar, due, loading }: UseDashboar
   const lastFeedbackRef = React.useRef<FeedbackItem[]>([])
 
   // 1. Order visible courses
-  const hidden = React.useMemo(() => new Set(sidebar?.hiddenCourseIds || []), [sidebar?.hiddenCourseIds])
   const orderedVisibleCourses = React.useMemo(() => {
-    const all = courses.filter((c) => !hidden.has(c.id))
+    const all = filterVisibleCourses(courses, sidebar?.hiddenCourseIds)
     const order = sidebar?.order || []
     const index = new Map(order.map((id, i) => [String(id), i]))
     return all
       .map((c) => ({ c, i: index.get(String(c.id)) ?? Number.MAX_SAFE_INTEGER }))
       .sort((a, b) => a.i - b.i || String(a.c.name).localeCompare(String(b.c.name)))
       .map((x) => x.c)
-  }, [courses, sidebar?.order, hidden])
+  }, [courses, sidebar?.order, sidebar?.hiddenCourseIds])
 
   const labelFor = React.useCallback((c: { id: string | number; name: string; course_code?: string }) => {
     return sidebar?.customNames?.[String(c.id)] || c.course_code || c.name

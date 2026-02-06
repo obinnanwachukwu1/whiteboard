@@ -5,6 +5,7 @@ import { enqueuePrefetch, requestIdle } from '../../utils/prefetchQueue'
 import { prefetchNavTab } from '../../utils/navPrefetch'
 import { toAssignmentGroupInputsFromRest, toAssignmentInputsFromRest } from '../../utils/gradeCalc'
 import type { SidebarConfig } from '../../components/Sidebar'
+import { filterVisibleCourses } from '../../utils/courseVisibility'
 
 type CurrentView =
   | 'dashboard'
@@ -82,8 +83,7 @@ export function useRootLayoutNavigation({
 
   const getPrefetchCourses = useCallback(() => {
     if (!coursesData?.length) return [] as Array<{ id: string | number }>
-    const hidden = new Set(sidebarCfg.hiddenCourseIds || [])
-    const visible = coursesData.filter((c: any) => !hidden.has(String(c.id)))
+    const visible = filterVisibleCourses(coursesData as any[], sidebarCfg.hiddenCourseIds)
     const targetId = derivedCourseId ?? activeCourseId ?? visible[0]?.id ?? null
     return targetId ? [{ id: targetId }] : []
   }, [coursesData, sidebarCfg.hiddenCourseIds, derivedCourseId, activeCourseId])

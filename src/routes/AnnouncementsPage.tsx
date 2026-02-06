@@ -10,6 +10,7 @@ import { CourseAvatar } from '../components/CourseAvatar'
 import { useCourseImages } from '../hooks/useCourseImages'
 import { useCourseAvatarPreloadGate } from '../hooks/useCourseAvatarPreloadGate'
 import { useAIContextOffer } from '../hooks/useAIContextOffer'
+import { filterVisibleCourses } from '../utils/courseVisibility'
 
 function extractIdFromUrl(url?: string, key?: string): string | null {
   if (!url || !key) return null
@@ -32,8 +33,7 @@ export default function AnnouncementsPage() {
   const [courseFilter, setCourseFilter] = React.useState<string>('all')
 
   const orderedCourses = React.useMemo(() => {
-    const hidden = new Set(sidebar?.hiddenCourseIds || [])
-    const all = courses.filter((c: any) => !hidden.has(c.id))
+    const all = filterVisibleCourses(courses, sidebar?.hiddenCourseIds)
     const order = sidebar?.order || []
     const index = new Map(order.map((id, i) => [String(id), i]))
     return all

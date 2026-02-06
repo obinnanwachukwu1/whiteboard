@@ -17,6 +17,7 @@ import { FloatingTabs, type FloatingTab } from '../components/FloatingTabs'
 import { LayoutGrid, Target, TrendingUp } from 'lucide-react'
 import { ListItemRow } from '../components/ui/ListItemRow'
 import { CourseAvatar } from '../components/CourseAvatar'
+import { filterVisibleCourses } from '../utils/courseVisibility'
 
 type GpaThreshold = { min: number; gpa: number }
 const defaultGpaMap: GpaThreshold[] = [
@@ -201,8 +202,7 @@ export default function GradesPage() {
   // GPA mapping editor can be added later (persisted per user)
 
   const orderedCourses = React.useMemo(() => {
-    const hidden = new Set(sidebar?.hiddenCourseIds || [])
-    const all = courses.filter((c: any) => !hidden.has(c.id))
+    const all = filterVisibleCourses(courses, sidebar?.hiddenCourseIds)
     const order = sidebar?.order || []
     const index = new Map(order.map((id, i) => [String(id), i]))
     return all
