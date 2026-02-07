@@ -11,10 +11,16 @@ import { coordinateSearch } from '../utils/coordinator'
 import type { ContentType } from '../utils/coordinator'
 import { extractAssignmentIdFromUrl } from '../utils/urlHelpers'
 import { stripHtmlToText } from '../utils/stripHtmlToText'
-import { useAI, type AIMessage } from '../hooks/useAI'
 import { usePriorityAssignments } from '../hooks/usePriorityAssignments'
 import { useAppFlags } from './AppContext'
+import type { AITelemetryEvent } from '../types/ipc'
 import {
+  buildDeterministicPlanningAnswer,
+  selectDeterministicPlanningItems,
+  type DeterministicPlanningItem,
+} from './ai/deterministicPlanning'
+import {
+  buildConversationSummaryContext,
   buildFewShotExamples,
   buildStructuredContext,
   buildSystemPrompt,
@@ -28,6 +34,16 @@ import {
   xmlEl,
   xmlEscapeText,
 } from './ai/promptContextUtils'
+import {
+  buildFallbackResponse,
+  buildRetrySystemPrompt,
+  detectExpectedAssignment,
+  detectGuardViolation,
+  validateBufferedPrefix,
+  validateFinalResponse,
+  type GuardAssignment,
+  type ResponseGuardConfig,
+} from './ai/responseGuard'
 
 export type AIMode = 'ask-ai'
 
@@ -170,6 +186,277 @@ const defaultState: AIPanelState = {
   messages: [],
 }
 
+function estimateTokensApprox(text: string): number {
+  const s = String(text || '')
+  if (!s) return 0
+  return Math.ceil(s.length / 4)
+}
+
+function normalizePhrase(value: unknown): string {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function computeDueDateExactMatch(
+  query: string,
+  dueAssignments: any[],
+): { exactHit: boolean; hadCandidates: boolean } {
+  const rows = (dueAssignments || []).filter((a) => Boolean(a?.due_at || a?.dueAt))
+  if (!rows.length) return { exactHit: false, hadCandidates: false }
+
+  const stopwords = new Set([
+    'when',
+    'what',
+    'whats',
+    "what's",
+    'is',
+    'due',
+    'the',
+    'a',
+    'an',
+    'for',
+    'in',
+    'on',
+    'at',
+    'to',
+    'my',
+    'i',
+  ])
+
+  const tokens = String(query || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2 && !stopwords.has(t))
+
+  if (!tokens.length) return { exactHit: false, hadCandidates: true }
+
+  const exactHit = rows.some((a) => {
+    const name = String(a?.name || '').toLowerCase()
+    return tokens.every((t) => name.includes(t))
+  })
+
+  return { exactHit, hadCandidates: true }
+}
+
+function normalizeQueryTokensForDueMatch(query: string): string[] {
+  const stopwords = new Set([
+    'when',
+    'what',
+    'whats',
+    "what's",
+    'is',
+    'due',
+    'deadline',
+    'the',
+    'a',
+    'an',
+    'for',
+    'in',
+    'on',
+    'at',
+    'to',
+    'my',
+    'i',
+    'me',
+    'soon',
+    'exactly',
+    'please',
+    'can',
+    'you',
+  ])
+
+  return String(query || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2 && !stopwords.has(t))
+}
+
+function buildDueAssignmentCandidates(dueAssignments: any[], courses: any[]): GuardAssignment[] {
+  const courseNameById = new Map<string, string>()
+  for (const c of courses || []) {
+    courseNameById.set(String(c?.id), String(c?.name || c?.course_code || 'Unknown Course'))
+  }
+
+  return (dueAssignments || [])
+    .filter((a) => Boolean(a?.name))
+    .slice(0, 80)
+    .map((a) => {
+      const courseId = String(a?.course_id || a?.courseId || '')
+      const dueISO = String(a?.due_at || a?.dueAt || '')
+      const dueDate = dueISO ? new Date(dueISO) : null
+      const dueLabel =
+        dueDate && Number.isFinite(dueDate.getTime())
+          ? dueDate.toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            })
+          : ''
+      const pointsRaw = a?.points_possible ?? a?.pointsPossible
+      return {
+        title: String(a?.name || ''),
+        course: String(a?.course_name || a?.courseName || courseNameById.get(courseId) || 'Unknown Course'),
+        dueISO: dueISO || undefined,
+        dueLabel: dueLabel || undefined,
+        points:
+          typeof pointsRaw === 'number' && Number.isFinite(pointsRaw)
+            ? pointsRaw
+            : null,
+      } satisfies GuardAssignment
+    })
+    .filter((a) => Boolean(a.title && a.course))
+}
+
+function shouldDeclineDueDateForMissingMatch(
+  query: string,
+  planIntent: string,
+  candidates: GuardAssignment[],
+  expectedAssignment: GuardAssignment | null,
+): boolean {
+  if (planIntent !== 'due_date') return false
+  if (expectedAssignment) return false
+  const q = String(query || '').toLowerCase()
+  const asksForDue = q.includes('when') || q.includes('due') || q.includes('deadline')
+  if (!asksForDue) return false
+
+  const tokens = normalizeQueryTokensForDueMatch(query)
+  if (!tokens.length) return false
+
+  const matches = candidates.some((a) => {
+    const haystack = `${String(a.title || '').toLowerCase()} ${String(a.course || '').toLowerCase()}`
+    return tokens.every((t) => haystack.includes(t))
+  })
+  return !matches
+}
+
+function buildReferenceContext(expected: GuardAssignment | null): string {
+  if (!expected) return ''
+  return xmlEl(
+    'ResolvedReference',
+    xmlEl('Title', xmlEscapeText(expected.title)) +
+      xmlEl('Course', xmlEscapeText(expected.course)) +
+      (expected.dueLabel ? xmlEl('Due', xmlEscapeText(expected.dueLabel)) : '') +
+      (expected.dueISO ? xmlEl('DueISO', xmlEscapeText(expected.dueISO)) : '') +
+      (typeof expected.points === 'number' && Number.isFinite(expected.points)
+        ? xmlEl('Points', xmlEscapeText(expected.points))
+        : ''),
+    { authoritative: 'true' },
+  )
+}
+
+function toDeterministicPlanningReferences(items: DeterministicPlanningItem[]): SearchResultItem[] {
+  return (items || []).slice(0, 8).map((item) => ({
+    id: item.id,
+    score: 1,
+    metadata: {
+      type: 'assignment',
+      courseId: item.courseId,
+      courseName: item.courseName,
+      title: item.title,
+      snippet: `Due: ${item.dueLabel}`,
+      contentHash: 'structured',
+    },
+  }))
+}
+
+function buildAllowedEntitySet(
+  dueAssignments: any[],
+  references: SearchResultItem[],
+  priority: PriorityItem[],
+  alsoDue: PriorityItem[],
+): Set<string> {
+  const out = new Set<string>()
+  for (const a of dueAssignments || []) {
+    const name = normalizePhrase(a?.name)
+    const course = normalizePhrase(a?.course_name || a?.courseName || a?.course_code || a?.courseCode)
+    if (name) out.add(name)
+    if (course) out.add(course)
+  }
+  for (const r of references || []) {
+    const t = normalizePhrase(r?.metadata?.title)
+    const c = normalizePhrase(r?.metadata?.courseName)
+    if (t) out.add(t)
+    if (c) out.add(c)
+  }
+  for (const p of [...(priority || []), ...(alsoDue || [])]) {
+    const t = normalizePhrase(p?.title)
+    const c = normalizePhrase(p?.course)
+    if (t) out.add(t)
+    if (c) out.add(c)
+  }
+  return out
+}
+
+function detectUnsupportedClaimHeuristic(answer: string, allowed: Set<string>): { flagged: boolean } {
+  const text = String(answer || '').trim()
+  if (!text) return { flagged: false }
+
+  const lower = text.toLowerCase()
+  if (
+    lower.includes("i don't have") ||
+    lower.includes('do not have enough') ||
+    lower.includes("can't determine")
+  ) {
+    return { flagged: false }
+  }
+
+  const candidates = new Set<string>()
+  for (const m of text.matchAll(/"([^"]{3,80})"/g)) {
+    const v = normalizePhrase(m[1])
+    if (v) candidates.add(v)
+  }
+  for (const line of text.split('\n')) {
+    const l = line.trim()
+    if (!l.startsWith('-') && !l.startsWith('•')) continue
+    const raw = l.replace(/^[-•]\s*/, '')
+    const title = raw.split(/\s+\(/)[0]?.split(/\s+-\s+/)[0] || ''
+    const v = normalizePhrase(title)
+    if (v && v.split(' ').length >= 2) candidates.add(v)
+  }
+
+  if (!candidates.size) return { flagged: false }
+
+  for (const c of candidates) {
+    if (c.length < 6) continue
+    const matched = Array.from(allowed).some((a) => a.includes(c) || c.includes(a))
+    if (!matched) return { flagged: true }
+  }
+  return { flagged: false }
+}
+
+function extractLastAssignmentsForCoordinator(
+  messages: ChatMessage[],
+): Array<{ title: string; course: string; due?: string }> {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const msg = messages[i]
+    if (msg.role !== 'assistant' || msg.status !== 'done' || !msg.references?.length) continue
+    const assignments = msg.references
+      .filter((r) => r.metadata.type === 'assignment')
+      .slice(0, 6)
+      .map((r) => {
+        const snippet = String(r.metadata.snippet || '')
+        const due = snippet.startsWith('Due:') ? snippet.replace(/^Due:\s*/, '') : undefined
+        return {
+          title: String(r.metadata.title || ''),
+          course: String(r.metadata.courseName || ''),
+          due: due || undefined,
+        }
+      })
+      .filter((a) => a.title && a.course)
+    if (assignments.length) return assignments
+  }
+  return []
+}
+
 function toAttachmentChip(a: AIAttachment): AIAttachmentChip {
   return { id: a.id, title: a.title, courseName: a.courseName }
 }
@@ -273,7 +560,6 @@ export function AIPanelProvider({
   recentSubmissions = [],
 }: AIPanelProviderProps) {
   const [state, setState] = useState<AIPanelState>(defaultState)
-  const { streamChat } = useAI()
   const { privateModeEnabled, aiAvailable, aiAvailability } = useAppFlags()
 
   const messagesRef = useRef<ChatMessage[]>(state.messages)
@@ -366,7 +652,7 @@ export function AIPanelProvider({
   const activeRequestIdRef = useRef(0)
 
   // We keep the full chat history in the UI to avoid jumpy deletions.
-  // For the model prompt, we pass a compact window (baseline + recent tail).
+  // For the model prompt, truncate to a short deterministic tail.
   const buildPromptHistory = useCallback((messages: ChatMessage[]) => {
     const done = messages.filter(
       (m) => (m.role === 'user' || m.role === 'assistant') && m.status === 'done',
@@ -374,22 +660,8 @@ export function AIPanelProvider({
 
     if (done.length === 0) return []
 
-    const baselineCount = 2 // first user message + first assistant reply (if present)
-    const tailTurns = 5
-    const tailCount = tailTurns * 2
-
-    const baseline = done.slice(0, baselineCount)
-    const tail = done.slice(-tailCount)
-
-    // Dedupe while preserving order (baseline should win).
-    const seen = new Set<string>()
-    const out: Array<{ role: 'user' | 'assistant'; content: string }> = []
-    for (const m of [...baseline, ...tail]) {
-      if (seen.has(m.id)) continue
-      seen.add(m.id)
-      out.push({ role: m.role, content: m.content })
-    }
-    return out
+    const maxMessages = 6
+    return done.slice(-maxMessages).map((m) => ({ role: m.role, content: m.content }))
   }, [])
 
   const updateMessage = useCallback(
@@ -403,6 +675,14 @@ export function AIPanelProvider({
     },
     [],
   )
+
+  const recordTelemetry = useCallback((event: AITelemetryEvent) => {
+    try {
+      void window.ai?.recordTelemetry?.(event)
+    } catch {
+      // ignore telemetry failures
+    }
+  }, [])
 
   const runSubmit = useCallback(
     async (queryText: string) => {
@@ -443,6 +723,30 @@ export function AIPanelProvider({
       const trimmedQuery = queryText.trim()
       const requestId = ++requestIdRef.current
       activeRequestIdRef.current = requestId
+      const requestStartedAt = Date.now()
+      let streamStartedAt = 0
+      let firstChunkAt = 0
+      let didRetry = false
+      let overflowTelemetrySent = false
+
+      const emitOverflowTelemetry = (triggered: boolean) => {
+        if (overflowTelemetrySent) return
+        overflowTelemetrySent = true
+        recordTelemetry({
+          name: 'overflow_retry',
+          data: { triggered },
+          ts: Date.now(),
+        })
+      }
+
+      const emitStageTiming = (stage: string, startedAt: number, endedAt = Date.now()) => {
+        if (!startedAt || endedAt < startedAt) return
+        recordTelemetry({
+          name: 'stage_timing',
+          data: { stage, ms: endedAt - startedAt },
+          ts: endedAt,
+        })
+      }
 
       const wantsAssignments = looksLikeAssignmentsQuery(trimmedQuery)
 
@@ -820,7 +1124,14 @@ export function AIPanelProvider({
         }
 
         // Pass 1: Coordinate
-        const plan = await coordinateSearch(trimmedQuery, coursesNow)
+        const coordinatorStartedAt = Date.now()
+        const coordinatorHistory = buildPromptHistory(messagesRef.current)
+        const coordinatorLastAssignments = extractLastAssignmentsForCoordinator(messagesRef.current)
+        const plan = await coordinateSearch(trimmedQuery, coursesNow, {
+          history: coordinatorHistory,
+          lastAssignments: coordinatorLastAssignments,
+        })
+        emitStageTiming('coordinator', coordinatorStartedAt)
 
         const mergedNeeds = mergeNeeds(plan.needs, inferNeedsFromQuery(trimmedQuery))
 
@@ -835,6 +1146,8 @@ export function AIPanelProvider({
 
         // If we still don't have due assignments, do NOT ask the model to "fill in".
         if (mergedNeeds.assignments && dueAssignmentsNow.length === 0) {
+          emitOverflowTelemetry(false)
+          emitStageTiming('end_to_end', requestStartedAt, Date.now())
           updateMessage(assistantMessageId, (msg) => ({
             ...msg,
             content:
@@ -858,6 +1171,7 @@ export function AIPanelProvider({
         }
 
         // Pass 2: Fetch Data
+        const retrievalStartedAt = Date.now()
         let references: SearchResultItem[] = []
         let candidates: SearchResultItem[] = []
 
@@ -891,13 +1205,30 @@ export function AIPanelProvider({
           const courseIdSet = plan.filters?.courseIds?.length
             ? new Set(plan.filters.courseIds)
             : null
+          const refTitle = normalizePhrase(plan.reference?.title)
+          const refCourse = normalizePhrase(plan.reference?.course)
 
           const matches = dueAssignmentsNow
             .filter((a: any) => {
               if (courseIdSet && !courseIdSet.has(String(a.course_id || a.courseId))) return false
+              if (plan.intent === 'due_date' && plan.reference?.kind === 'assignment' && refTitle && refCourse) {
+                const title = normalizePhrase(a?.name)
+                const course = normalizePhrase(a?.course_name || a?.courseName || '')
+                const titleMatch = title === refTitle
+                const courseMatch = course === refCourse || course.includes(refCourse) || refCourse.includes(course)
+                return titleMatch && courseMatch
+              }
               return true
             })
-            .slice(0, 5)
+            .sort((a: any, b: any) => {
+              const da = Date.parse(String(a?.due_at || a?.dueAt || ''))
+              const db = Date.parse(String(b?.due_at || b?.dueAt || ''))
+              if (!Number.isFinite(da) && !Number.isFinite(db)) return 0
+              if (!Number.isFinite(da)) return 1
+              if (!Number.isFinite(db)) return -1
+              return da - db
+            })
+            .slice(0, 12)
 
           const courseNameById = new Map<string, string>()
           for (const c of coursesNow)
@@ -936,6 +1267,49 @@ export function AIPanelProvider({
               } as SearchResultItem
             })
             .filter(Boolean) as SearchResultItem[]
+        }
+        emitStageTiming('retrieval', retrievalStartedAt)
+
+        if (plan.intent === 'due_date') {
+          const courseIdSet = plan.filters?.courseIds?.length
+            ? new Set(plan.filters.courseIds)
+            : null
+          const dueRowsForEval = dueAssignmentsNow.filter((a: any) => {
+            if (!courseIdSet) return true
+            return courseIdSet.has(String(a.course_id || a.courseId))
+          })
+          const dueDateEval = computeDueDateExactMatch(trimmedQuery, dueRowsForEval)
+          recordTelemetry({
+            name: 'due_date_exact_match',
+            data: dueDateEval,
+            ts: Date.now(),
+          })
+        }
+
+        const contextBuildStartedAt = Date.now()
+        const shouldUseDeterministicPlanning =
+          plan.intent === 'planning' &&
+          Boolean(mergedNeeds.assignments) &&
+          !mergedNeeds.contentSearch
+
+        if (shouldUseDeterministicPlanning) {
+          const planningItems = selectDeterministicPlanningItems(trimmedQuery, dueAssignmentsNow, coursesNow, 8)
+          const planningAnswer = buildDeterministicPlanningAnswer(planningItems)
+          const planningRefs = toDeterministicPlanningReferences(planningItems)
+          const finishedAt = Date.now()
+
+          emitStageTiming('context_build', contextBuildStartedAt, finishedAt)
+          emitStageTiming('end_to_end', requestStartedAt, finishedAt)
+          emitOverflowTelemetry(false)
+
+          updateMessage(assistantMessageId, (msg) => ({
+            ...msg,
+            content: planningAnswer,
+            status: 'done',
+            references: planningRefs.length ? planningRefs : null,
+          }))
+          setState((prev) => ({ ...prev, isLoading: false }))
+          return
         }
 
         const structuredContext = buildStructuredContext(
@@ -999,28 +1373,61 @@ export function AIPanelProvider({
           )
           .join('\n\n')
 
+        const dueAssignmentCandidates = buildDueAssignmentCandidates(dueAssignmentsNow, coursesNow)
+        const expectedAssignment = detectExpectedAssignment(plan.reference, dueAssignmentCandidates)
+        const mustDeclineMissingData = shouldDeclineDueDateForMissingMatch(
+          trimmedQuery,
+          plan.intent,
+          dueAssignmentCandidates,
+          expectedAssignment,
+        )
+
         const systemPrompt = buildSystemPrompt(plan.intent, {
           userName: userNameRef.current,
           pinnedCourses: pinnedCoursesRef.current,
         })
         const fewShotExamples = buildFewShotExamples(plan.intent)
 
-        const MAX_PROMPT_CHARS = 15000
+        const conversationSummaryContext = buildConversationSummaryContext(
+          coordinatorHistory,
+          coordinatorLastAssignments,
+        )
+        const referenceContext = buildReferenceContext(expectedAssignment)
+
+        const MAX_PROMPT_CHARS = 9000
 
         let historyMessagesForPrompt = buildPromptHistory(messagesRef.current)
         let attachmentContextForPrompt = attachmentContext
         let structuredContextForPrompt = structuredContext
         let priorityContextForPrompt = priorityContext
         let semanticContextForPrompt = semanticContext
+        let conversationSummaryForPrompt = conversationSummaryContext
+        let referenceContextForPrompt = referenceContext
 
         const buildFullContext = () => {
+          const semanticSection = semanticContextForPrompt
+            ? `## Related Content (Semantic Search)\n${semanticContextForPrompt}`
+            : ''
+
+          if (plan.intent === 'content_qa') {
+            return [
+              conversationSummaryForPrompt,
+              referenceContextForPrompt,
+              attachmentContextForPrompt,
+              semanticSection,
+              structuredContextForPrompt,
+            ]
+              .filter(Boolean)
+              .join('\n\n')
+          }
+
           return [
-            attachmentContextForPrompt,
+            conversationSummaryForPrompt,
+            referenceContextForPrompt,
             structuredContextForPrompt,
             priorityContextForPrompt,
-            semanticContextForPrompt
-              ? '## Related Content (Semantic Search)\n' + semanticContextForPrompt
-              : '',
+            attachmentContextForPrompt,
+            semanticSection,
           ]
             .filter(Boolean)
             .join('\n\n')
@@ -1052,19 +1459,51 @@ export function AIPanelProvider({
             if (semanticContextForPrompt) semanticContextForPrompt = ''
           },
           () => {
+            if (attachmentContextForPrompt) attachmentContextForPrompt = truncateForPrompt(attachmentContextForPrompt, 3500)
+          },
+          () => {
             if (priorityContextForPrompt) priorityContextForPrompt = ''
           },
           () => {
-            structuredContextForPrompt = truncateForPrompt(structuredContextForPrompt, 2600)
+            structuredContextForPrompt = truncateForPrompt(structuredContextForPrompt, 2200)
           },
           () => {
-            attachmentContextForPrompt = truncateForPrompt(attachmentContextForPrompt, 6000)
+            conversationSummaryForPrompt = ''
+          },
+          () => {
+            referenceContextForPrompt = ''
           },
         ]) {
           if (estimatePromptChars(messages) <= MAX_PROMPT_CHARS) break
           trim()
           messages = buildMessagesForPrompt()
         }
+        const fullContextForPrompt = buildFullContext()
+        const promptSectionTokens = {
+          system: estimateTokensApprox(systemPrompt),
+          few_shot: estimateTokensApprox(
+            fewShotExamples.map((m) => String(m.content || '')).join('\n'),
+          ),
+          history: estimateTokensApprox(
+            historyMessagesForPrompt.map((m) => String(m.content || '')).join('\n'),
+          ),
+          conversation_state: estimateTokensApprox(conversationSummaryForPrompt),
+          reference: estimateTokensApprox(referenceContextForPrompt),
+          attachments: estimateTokensApprox(attachmentContextForPrompt),
+          structured: estimateTokensApprox(structuredContextForPrompt),
+          priority: estimateTokensApprox(priorityContextForPrompt),
+          semantic: estimateTokensApprox(semanticContextForPrompt),
+          question: estimateTokensApprox(trimmedQuery),
+          full_context: estimateTokensApprox(fullContextForPrompt),
+          total: estimateTokensApprox(messages.map((m) => String(m.content || '')).join('\n')),
+        }
+
+        recordTelemetry({
+          name: 'prompt_section_tokens',
+          data: { sections: promptSectionTokens },
+          ts: Date.now(),
+        })
+        emitStageTiming('context_build', contextBuildStartedAt)
 
         if (import.meta.env.DEV) {
           try {
@@ -1089,10 +1528,38 @@ export function AIPanelProvider({
 
         updateMessage(assistantMessageId, (msg) => ({ ...msg, references: finalResults }))
 
+        const guardConfig: ResponseGuardConfig = {
+          intent: plan.intent,
+          query: trimmedQuery,
+          expectedAssignment,
+          candidateAssignments: dueAssignmentCandidates.slice(0, 8),
+          mustDeclineMissingData,
+          requireSummaryFormat:
+            plan.intent === 'content_qa' &&
+            /(summary|summarize|key takeaways|takeaways)/i.test(trimmedQuery),
+        }
+
+        if (mustDeclineMissingData) {
+          const fallback = buildFallbackResponse(guardConfig)
+          const finishedAt = Date.now()
+          emitStageTiming('end_to_end', requestStartedAt, finishedAt)
+          emitOverflowTelemetry(false)
+          updateMessage(assistantMessageId, (msg) => ({
+            ...msg,
+            content: fallback,
+            status: 'done',
+            references: finalResults,
+          }))
+          setState((prev) => ({ ...prev, isLoading: false }))
+          return
+        }
+
         const retryUserPrompt = (() => {
           const retryContext = [
-            truncateForPrompt(attachmentContext, 3000),
-            truncateForPrompt(structuredContext, 2000),
+            truncateForPrompt(conversationSummaryContext, 900),
+            truncateForPrompt(referenceContext, 500),
+            truncateForPrompt(attachmentContext, 2200),
+            truncateForPrompt(structuredContext, 1800),
           ]
             .filter(Boolean)
             .join('\n\n')
@@ -1101,57 +1568,207 @@ export function AIPanelProvider({
             : `Question: ${trimmedQuery}`
         })()
 
-        const retryMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-          { role: 'system', content: systemPrompt },
-          ...fewShotExamples,
-          { role: 'user', content: retryUserPrompt },
-        ]
+        const runGuardedStreamAttempt = async (
+          attemptMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+          opts: { bufferTokens: number; useGuard: boolean },
+        ): Promise<{ output: string; abortReason: string | null; errorText: string | null }> => {
+          return new Promise((resolve) => {
+            let settled = false
+            let accumulated = ''
+            let pending = ''
+            let bufferValidated = opts.bufferTokens <= 0
+            let cleanup: (() => void) | null = null
 
-        let didRetry = false
+            const settle = (result: { output: string; abortReason: string | null; errorText: string | null }) => {
+              if (settled) return
+              settled = true
+              streamCleanupRef.current = null
+              resolve(result)
+            }
 
-        const onUpdate = (text: string) => {
-          if (activeRequestIdRef.current !== requestId) return
-          updateMessage(assistantMessageId, (msg) => ({
-            ...msg,
-            content: text,
-            status: 'streaming',
-          }))
-        }
+            const abortWithReason = (reason: string) => {
+              if (settled) return
+              if (cleanup) cleanup()
+              settle({ output: accumulated || pending, abortReason: reason, errorText: null })
+            }
 
-        const onDone = () => {
-          if (activeRequestIdRef.current !== requestId) return
-          updateMessage(assistantMessageId, (msg) => ({ ...msg, status: 'done' }))
-          setState((prev) => ({ ...prev, isLoading: false }))
-          streamCleanupRef.current = null
-        }
+            streamStartedAt = Date.now()
+            cleanup = window.ai.chatStream(
+              attemptMessages,
+              (chunk: string) => {
+                if (settled || activeRequestIdRef.current !== requestId) return
+                if (!firstChunkAt && streamStartedAt > 0) {
+                  firstChunkAt = Date.now()
+                  emitStageTiming('stream_ttfb', streamStartedAt, firstChunkAt)
+                }
 
-        const onError = (err: string) => {
-          if (activeRequestIdRef.current !== requestId) return
+                if (!bufferValidated) {
+                  pending += chunk
+                  if (estimateTokensApprox(pending) < opts.bufferTokens) return
+                  const prefixCheck = validateBufferedPrefix(pending, guardConfig)
+                  if (!prefixCheck.ok) {
+                    abortWithReason(`buffer:${prefixCheck.reason}`)
+                    return
+                  }
+                  bufferValidated = true
+                  accumulated += pending
+                  pending = ''
+                } else {
+                  accumulated += chunk
+                }
 
-          if (!didRetry && isLikelyPromptTooLargeError(err)) {
-            didRetry = true
-            updateMessage(assistantMessageId, (msg) => ({ ...msg, content: '', status: 'streaming' }))
-            const retryCleanup = streamChat(retryMessages as AIMessage[], onUpdate, {
-              onDone,
-              onError: (e2) => {
-                if (activeRequestIdRef.current !== requestId) return
-                updateMessage(assistantMessageId, (msg) => ({ ...msg, status: 'error' }))
-                setState((prev) => ({ ...prev, isLoading: false, error: normalizeAIStreamError(e2) }))
-                streamCleanupRef.current = null
+                if (opts.useGuard) {
+                  const violation = detectGuardViolation(accumulated, guardConfig)
+                  if (violation) {
+                    abortWithReason(`guard:${violation}`)
+                    return
+                  }
+                }
+
+                updateMessage(assistantMessageId, (msg) => ({
+                  ...msg,
+                  content: accumulated,
+                  status: 'streaming',
+                }))
               },
-            })
-            streamCleanupRef.current = retryCleanup
-            return
+              () => {
+                if (settled) return
+                if (activeRequestIdRef.current !== requestId) {
+                  settle({ output: accumulated, abortReason: 'cancelled', errorText: null })
+                  return
+                }
+
+                if (!bufferValidated) {
+                  const finalPrefix = validateBufferedPrefix(pending, guardConfig)
+                  if (!finalPrefix.ok) {
+                    abortWithReason(`buffer:${finalPrefix.reason}`)
+                    return
+                  }
+                  bufferValidated = true
+                }
+
+                if (pending) {
+                  accumulated += pending
+                  pending = ''
+                }
+
+                if (opts.useGuard) {
+                  const violation = detectGuardViolation(accumulated, guardConfig)
+                  if (violation) {
+                    abortWithReason(`guard:${violation}`)
+                    return
+                  }
+                }
+
+                const finalContract = validateFinalResponse(accumulated, guardConfig)
+                if (!finalContract.ok) {
+                  settle({
+                    output: accumulated,
+                    abortReason: `final:${finalContract.reason}`,
+                    errorText: null,
+                  })
+                  return
+                }
+                settle({ output: accumulated, abortReason: null, errorText: null })
+              },
+              (error: string) => {
+                if (settled) return
+                if (activeRequestIdRef.current !== requestId) {
+                  settle({ output: accumulated, abortReason: 'cancelled', errorText: null })
+                  return
+                }
+                settle({ output: accumulated, abortReason: null, errorText: error })
+              },
+            )
+
+            streamCleanupRef.current = cleanup
+          })
+        }
+
+        const guardTokenBudget = 15
+        const isPlanningIntent = plan.intent === 'planning'
+        const shouldUseStrictGuard = !isPlanningIntent && plan.intent !== 'general'
+
+        const firstAttempt = await runGuardedStreamAttempt(messages, {
+          bufferTokens: shouldUseStrictGuard ? guardTokenBudget : 0,
+          useGuard: shouldUseStrictGuard,
+        })
+        if (activeRequestIdRef.current !== requestId) return
+
+        let attemptResult = firstAttempt
+        if (
+          firstAttempt.abortReason ||
+          (firstAttempt.errorText && isLikelyPromptTooLargeError(firstAttempt.errorText))
+        ) {
+          if (firstAttempt.errorText && isLikelyPromptTooLargeError(firstAttempt.errorText)) {
+            didRetry = true
           }
 
-          updateMessage(assistantMessageId, (msg) => ({ ...msg, status: 'error' }))
-          setState((prev) => ({ ...prev, isLoading: false, error: normalizeAIStreamError(err) }))
-          streamCleanupRef.current = null
+          updateMessage(assistantMessageId, (msg) => ({ ...msg, content: '', status: 'streaming' }))
+          const retrySystem = buildRetrySystemPrompt(guardConfig)
+          const retryMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+            { role: 'system', content: `${systemPrompt}\n${retrySystem}` },
+            ...fewShotExamples,
+            { role: 'user', content: retryUserPrompt },
+          ]
+
+          attemptResult = await runGuardedStreamAttempt(retryMessages, {
+            bufferTokens: shouldUseStrictGuard ? guardTokenBudget : 0,
+            useGuard: shouldUseStrictGuard,
+          })
+          if (activeRequestIdRef.current !== requestId) return
         }
 
-        const cleanup = streamChat(messages as AIMessage[], onUpdate, { onDone, onError })
-        streamCleanupRef.current = cleanup
+        if (attemptResult.errorText) {
+          const failedAt = Date.now()
+          if (streamStartedAt > 0) emitStageTiming('stream_complete', streamStartedAt, failedAt)
+          emitStageTiming('end_to_end', requestStartedAt, failedAt)
+          emitOverflowTelemetry(didRetry)
+          updateMessage(assistantMessageId, (msg) => ({ ...msg, status: 'error' }))
+          setState((prev) => ({
+            ...prev,
+            isLoading: false,
+            error: normalizeAIStreamError(attemptResult.errorText || 'Unknown AI stream error'),
+          }))
+          streamCleanupRef.current = null
+          return
+        }
+
+        let finalAnswer = attemptResult.output
+        if (!finalAnswer || attemptResult.abortReason) {
+          finalAnswer = buildFallbackResponse(guardConfig)
+        }
+        const finishedAt = Date.now()
+        if (streamStartedAt > 0) emitStageTiming('stream_complete', streamStartedAt, finishedAt)
+        emitStageTiming('end_to_end', requestStartedAt, finishedAt)
+        emitOverflowTelemetry(didRetry)
+
+        if (requestId % 10 === 0) {
+          const allowedEntities = buildAllowedEntitySet(
+            dueAssignmentsNow,
+            finalResults,
+            priorityItems,
+            alsoDueItems,
+          )
+          const unsupported = detectUnsupportedClaimHeuristic(finalAnswer, allowedEntities)
+          recordTelemetry({
+            name: 'unsupported_claim_sample',
+            data: { sampled: true, flagged: unsupported.flagged },
+            ts: finishedAt,
+          })
+        }
+
+        updateMessage(assistantMessageId, (msg) => ({
+          ...msg,
+          content: finalAnswer,
+          status: 'done',
+          references: finalResults,
+        }))
+        setState((prev) => ({ ...prev, isLoading: false }))
+        streamCleanupRef.current = null
       } catch (e) {
+        emitOverflowTelemetry(false)
+        emitStageTiming('end_to_end', requestStartedAt, Date.now())
         setState((prev) => ({
           ...prev,
           isLoading: false,
@@ -1165,9 +1782,11 @@ export function AIPanelProvider({
       aiAvailability,
       aiEnabled,
       privateModeEnabled,
-      streamChat,
       buildPromptHistory,
       updateMessage,
+      recordTelemetry,
+      priorityItems,
+      alsoDueItems,
     ],
   )
 

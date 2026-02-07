@@ -80,6 +80,52 @@ export function xmlEl(tag: string, content: string, attrs?: Record<string, unkno
   return `<${tag}${attrStr}>${content}</${tag}>`
 }
 
+export type PromptHistoryMessage = { role: 'user' | 'assistant'; content: string }
+
+export type ConversationAssignmentSummary = {
+  title: string
+  course: string
+  due?: string
+  points?: number | null
+}
+
+export function buildConversationSummaryContext(
+  history: PromptHistoryMessage[],
+  lastAssignments: ConversationAssignmentSummary[],
+): string {
+  const userGoals = (history || [])
+    .filter((m) => m.role === 'user')
+    .slice(-3)
+    .map((m) =>
+      String(m.content || '')
+        .replace(/[\r\n]+/g, ' ')
+        .trim(),
+    )
+    .filter(Boolean)
+
+  const goalXml = userGoals.map((g) => xmlEl('Goal', xmlEscapeText(g))).join('')
+
+  const assignmentXml = (lastAssignments || [])
+    .slice(0, 5)
+    .map((a, i) => {
+      const parts =
+        xmlEl('Title', xmlEscapeText(a.title)) +
+        xmlEl('Course', xmlEscapeText(a.course)) +
+        (a.due ? xmlEl('Due', xmlEscapeText(a.due)) : '') +
+        (typeof a.points === 'number' && Number.isFinite(a.points)
+          ? xmlEl('Points', xmlEscapeText(a.points))
+          : '')
+      return xmlEl('A', parts, { ord: String(i + 1) })
+    })
+    .join('')
+
+  const sections: string[] = []
+  if (goalXml) sections.push(xmlEl('RecentUserGoals', goalXml))
+  if (assignmentXml) sections.push(xmlEl('LastAssignments', assignmentXml))
+  if (!sections.length) return ''
+  return xmlEl('ConversationState', sections.join(''), { source: 'deterministic' })
+}
+
 export function looksLikeAssignmentsQuery(query: string): boolean {
   const q = String(query || '').toLowerCase()
   if (!q.trim()) return false
@@ -295,6 +341,13 @@ export function buildStructuredContext(
     htmlUrl?: string
   }> = [],
 ): string {
+  const normalizePhrase = (value: unknown): string =>
+    String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
   function startOfDay(d: Date): Date {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate())
   }
@@ -344,6 +397,11 @@ export function buildStructuredContext(
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const qLower = String(query || '').toLowerCase()
+  const matchQuery =
+    plan.intent === 'due_date' && String(plan.rewrittenQuery || '').trim()
+      ? String(plan.rewrittenQuery || '')
+      : query
+  const matchQueryLower = String(matchQuery || '').toLowerCase()
   const dueWindow = parseDueWindow(qLower)
 
   // Only include raw data if coordinator thinks it's needed (planning/due_date)
@@ -512,7 +570,7 @@ export function buildStructuredContext(
     'i',
   ])
 
-  const tokens = qLower
+  const tokens = matchQueryLower
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .map((t) => t.trim())
@@ -530,8 +588,26 @@ export function buildStructuredContext(
     return (matches.length ? matches : base).slice(0, 12)
   })()
 
-  if (plan.intent === 'due_date' && filteredDueRows.length) {
-    const assignmentNodes = filteredDueRows.map((a: any) => {
+  const orderedDueRows = (() => {
+    if (plan.reference?.kind !== 'assignment') return filteredDueRows
+    const title = normalizePhrase(plan.reference.title)
+    const course = normalizePhrase(plan.reference.course)
+    if (!title || !course) return filteredDueRows
+
+    const matched = filteredDueRows.filter((a: any) => {
+      const rowTitle = normalizePhrase(a?.name)
+      const rowCourse = normalizePhrase(courseLabelFor(String(a?.courseId || '')))
+      const titleMatch = rowTitle === title
+      const courseMatch = rowCourse === course || rowCourse.includes(course) || course.includes(rowCourse)
+      return titleMatch && courseMatch
+    })
+    if (!matched.length) return filteredDueRows
+    const remaining = filteredDueRows.filter((a: any) => !matched.includes(a))
+    return [...matched, ...remaining]
+  })()
+
+  if (plan.intent === 'due_date' && orderedDueRows.length) {
+    const assignmentNodes = orderedDueRows.map((a: any) => {
       const courseId = String(a?.courseId || '')
       const dueAt = String(a?.due_at || '')
       const parts =

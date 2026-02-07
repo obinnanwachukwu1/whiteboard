@@ -36,6 +36,31 @@ export type CoordinateSearchOptions = {
   lastAssignments?: Array<{ title: string; course: string; due?: string }>
 }
 
+function recordCoordinatorTelemetry(data: { fallback: boolean; parseError?: boolean }) {
+  try {
+    void window.ai?.recordTelemetry?.({
+      name: 'coordinator_result',
+      data,
+      ts: Date.now(),
+    })
+  } catch {
+    // ignore telemetry failures
+  }
+}
+
+function recordFollowupTelemetry(data: { attempted: boolean; resolved: boolean }) {
+  try {
+    if (!data.attempted) return
+    void window.ai?.recordTelemetry?.({
+      name: 'followup_reference',
+      data,
+      ts: Date.now(),
+    })
+  } catch {
+    // ignore telemetry failures
+  }
+}
+
 function toCoordinatorText(value: unknown): string {
   return String(value ?? '')
     .replace(/[\r\n]+/g, ' ')
@@ -140,6 +165,68 @@ function looksLikeDueListQuery(query: string): boolean {
   )
 }
 
+function looksLikeFollowupReferenceQuery(query: string): boolean {
+  const q = String(query || '')
+    .trim()
+    .toLowerCase()
+  if (!q) return false
+  return (
+    q.includes('first one') ||
+    q.includes('second one') ||
+    q.includes('third one') ||
+    q.includes('that one') ||
+    q.includes('that class') ||
+    q.includes('that assignment') ||
+    q.includes('this one') ||
+    q.includes('those assignments') ||
+    q.includes('the first') ||
+    q.includes('the second')
+  )
+}
+
+function detectOrdinalReference(query: string): number | null {
+  const q = String(query || '')
+    .trim()
+    .toLowerCase()
+  if (!q) return null
+  if (/\b(first|1st)\b/.test(q)) return 1
+  if (/\b(second|2nd)\b/.test(q)) return 2
+  if (/\b(third|3rd)\b/.test(q)) return 3
+  if (/\b(fourth|4th)\b/.test(q)) return 4
+  return null
+}
+
+function resolveReferenceFromLastAssignments(
+  query: string,
+  lastAssignments: Array<{ title: string; course: string; due?: string }> | undefined,
+): SearchPlan['reference'] | null {
+  if (!looksLikeFollowupReferenceQuery(query)) return null
+  const rows = (lastAssignments || []).filter((a) => a?.title && a?.course)
+  if (!rows.length) return null
+
+  const qNorm = toCoordinatorText(query).toLowerCase()
+  const ordinal = detectOrdinalReference(query)
+  if (ordinal != null) {
+    const row = rows[ordinal - 1]
+    if (row) {
+      return { kind: 'assignment', ordinal, title: row.title, course: row.course }
+    }
+  }
+
+  for (const row of rows) {
+    const title = toCoordinatorText(row.title).toLowerCase()
+    const course = toCoordinatorText(row.course).toLowerCase()
+    if (!title || !course) continue
+    if (qNorm.includes(title) || (qNorm.includes(title.split(' ')[0]) && qNorm.includes(course))) {
+      return { kind: 'assignment', title: row.title, course: row.course }
+    }
+  }
+
+  const first = rows[0]
+  if (!first) return null
+  return { kind: 'assignment', ordinal: 1, title: first.title, course: first.course }
+}
+
 /**
  * Coordinate search intent and parameters using a fast LLM pass.
  */
@@ -148,14 +235,30 @@ export async function coordinateSearch(
   courses: any[],
   options?: CoordinateSearchOptions,
 ): Promise<SearchPlan> {
+  const followupAttempted = looksLikeFollowupReferenceQuery(query)
+  const deterministicReference = resolveReferenceFromLastAssignments(query, options?.lastAssignments)
+
   // Fallback if AI not available
   if (!window.ai) {
+    recordCoordinatorTelemetry({ fallback: true, parseError: false })
+    recordFollowupTelemetry({ attempted: followupAttempted, resolved: Boolean(deterministicReference) })
     const needs = inferNeedsFromQuery(query)
+    if (deterministicReference?.kind === 'assignment') {
+      needs.assignments = true
+      needs.includeDate = true
+    }
     return {
-      intent: looksLikeGreeting(query) ? 'general' : 'content_qa',
-      rewrittenQuery: query,
+      intent: deterministicReference?.kind === 'assignment' ? 'due_date' : looksLikeGreeting(query) ? 'general' : 'content_qa',
+      rewrittenQuery:
+        deterministicReference?.kind === 'assignment'
+          ? `${deterministicReference.title || ''} ${deterministicReference.course || ''}`.trim()
+          : query,
       needs,
-      filters: {},
+      reference: deterministicReference || { kind: 'none' },
+      filters:
+        deterministicReference?.kind === 'assignment'
+          ? { types: ['assignment'], timeRange: 'upcoming' }
+          : {},
       searchDisabled: looksLikeGreeting(query),
     }
   }
@@ -351,6 +454,7 @@ JSON format: {"intent":"...","rewrittenQuery":"keywords","needs":{},"filters":{"
     // Hard override: greeting-like queries should never trigger planning/search.
     // The coordinator model can occasionally misclassify short greetings.
     if (looksLikeGreeting(query)) {
+      recordCoordinatorTelemetry({ fallback: false, parseError: false })
       return {
         intent: 'general',
         rewrittenQuery: '',
@@ -360,9 +464,31 @@ JSON format: {"intent":"...","rewrittenQuery":"keywords","needs":{},"filters":{"
       }
     }
 
+    // Deterministic override for follow-up references ("first one", "that assignment").
+    if (deterministicReference?.kind === 'assignment') {
+      plan.reference = deterministicReference
+      plan.rewrittenQuery = `${deterministicReference.title || ''} ${deterministicReference.course || ''}`.trim()
+      plan.intent = 'due_date'
+      plan.searchDisabled = false
+      plan.needs = { ...(plan.needs || {}), assignments: true, includeDate: true }
+      plan.filters = {
+        ...(plan.filters || {}),
+        types:
+          plan.filters?.types && plan.filters.types.length
+            ? plan.filters.types
+            : ['assignment'],
+        timeRange: plan.filters?.timeRange || 'upcoming',
+      }
+    }
+
     // Hard override: list-style "what's due ..." queries should be planning (lists),
     // not due_date (single deadline).
     if (looksLikeDueListQuery(query)) {
+      recordFollowupTelemetry({
+        attempted: followupAttempted,
+        resolved: plan.reference.kind !== 'none',
+      })
+      recordCoordinatorTelemetry({ fallback: false, parseError: false })
       return {
         intent: 'planning',
         rewrittenQuery: plan.rewrittenQuery || query,
@@ -372,14 +498,32 @@ JSON format: {"intent":"...","rewrittenQuery":"keywords","needs":{},"filters":{"
       }
     }
 
+    recordFollowupTelemetry({
+      attempted: followupAttempted,
+      resolved: plan.reference.kind !== 'none',
+    })
+    recordCoordinatorTelemetry({ fallback: false, parseError: false })
     return plan
   } catch (e) {
     console.warn('Coordinator fallback:', e)
+    const parseError =
+      e instanceof SyntaxError ||
+      String((e as any)?.message || '')
+        .toLowerCase()
+        .includes('json')
+    recordCoordinatorTelemetry({ fallback: true, parseError })
+    recordFollowupTelemetry({ attempted: followupAttempted, resolved: Boolean(deterministicReference) })
     // Fallback heuristic
     const q = query.toLowerCase()
     const needs = inferNeedsFromQuery(q)
+    if (deterministicReference?.kind === 'assignment') {
+      needs.assignments = true
+      needs.includeDate = true
+    }
     const intent = looksLikeDueListQuery(q)
       ? 'planning'
+      : deterministicReference?.kind === 'assignment'
+        ? 'due_date'
       : q.includes('when is') || q.startsWith('when ')
         ? 'due_date'
         : q.includes("what's due") ||
@@ -393,10 +537,16 @@ JSON format: {"intent":"...","rewrittenQuery":"keywords","needs":{},"filters":{"
             : 'content_qa'
     return {
       intent,
-      rewrittenQuery: query,
+      rewrittenQuery:
+        deterministicReference?.kind === 'assignment'
+          ? `${deterministicReference.title || ''} ${deterministicReference.course || ''}`.trim()
+          : query,
       needs,
-      reference: { kind: 'none' },
-      filters: {},
+      reference: deterministicReference || { kind: 'none' },
+      filters:
+        deterministicReference?.kind === 'assignment'
+          ? { types: ['assignment'], timeRange: 'upcoming' }
+          : {},
       searchDisabled: intent === 'general',
     }
   }
