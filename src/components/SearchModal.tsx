@@ -364,6 +364,15 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
     setSelectedIndex(0)
   }, [results.length, deepSearchActive])
 
+  // Keep keyboard-selected row visible within the scroll container.
+  useEffect(() => {
+    const container = listRef.current
+    if (!container) return
+    const selectedEl = container.querySelector<HTMLElement>(`[data-search-index="${selectedIndex}"]`)
+    if (!selectedEl) return
+    selectedEl.scrollIntoView({ block: 'nearest' })
+  }, [selectedIndex, results.length, showDeepSearchAction, showAskAIAction])
+
   if (!isOpen) return null
 
   return createPortal(
@@ -432,6 +441,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
           {results.map((result, index) => (
             <button
               key={`${result.type}-${result.id}`}
+              data-search-index={index}
               className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors ${
                 index === selectedIndex
                   ? 'bg-[var(--app-accent-bg)]'
@@ -480,6 +490,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
           {/* Deep Search Action Item */}
           {showDeepSearchAction && (
             <button
+              data-search-index={deepSearchIndex}
               className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors border-t border-gray-100 dark:border-neutral-800 ${
                 selectedIndex === deepSearchIndex
                   ? 'bg-[var(--app-accent-bg)]'
@@ -518,6 +529,7 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
           {/* Ask AI Action Item */}
           {showAskAIAction && (
             <button
+              data-search-index={askAIIndex}
               className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors border-t border-gray-100 dark:border-neutral-800 ${
                 selectedIndex === askAIIndex
                   ? 'bg-[var(--app-accent-bg)]'
