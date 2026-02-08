@@ -461,6 +461,7 @@ export const CourseFiles: React.FC<Props> = ({
                                   id: pinId,
                                   type: 'file',
                                   title: name,
+                                  subtitle: courseName || undefined,
                                   courseId,
                                   contentId: String(f.id),
                                 })
@@ -509,7 +510,7 @@ export const CourseFiles: React.FC<Props> = ({
                                     }}
                                     icon={<Pin className="w-4 h-4" />}
                                   >
-                                    {isPinned ? 'Unpin from Dashboard' : 'Pin to Dashboard'}
+                                    {isPinned ? 'Unpin' : 'Pin'}
                                   </DropdownItem>
                                   {openInCanvasUrl && (
                                     <DropdownItem

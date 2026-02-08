@@ -218,7 +218,7 @@ const ModuleItemRow: React.FC<{
               }}
               icon={<Pin className="w-4 h-4" />}
             >
-              {isPinned ? 'Unpin from Dashboard' : 'Pin to Dashboard'}
+              {isPinned ? 'Unpin' : 'Pin'}
             </DropdownItem>
             {openInCanvasUrl && (
               <DropdownItem
@@ -680,6 +680,7 @@ export const CourseModules: React.FC<Props> = ({
                               id: pinId,
                               type: pinInfo?.type || 'page',
                               title,
+                              subtitle: courseName || undefined,
                               courseId,
                               contentId: pinInfo?.contentId || it._id,
                             })

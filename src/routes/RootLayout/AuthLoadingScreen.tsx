@@ -73,6 +73,10 @@ export function AuthLoadingScreen() {
           <Skeleton width="w-12" height="h-4" />
           <Skeleton width="w-8" height="h-5" variant="rounded" />
         </div>
+        {/* Pinned button skeleton */}
+        <div className="w-9 h-9 rounded-md ring-1 ring-black/5 dark:ring-white/10 bg-white/50 dark:bg-neutral-800/50 flex items-center justify-center">
+          <Skeleton width="w-4" height="h-4" variant="rounded" />
+        </div>
         {/* Inbox button skeleton */}
         <div className="w-9 h-9 rounded-md ring-1 ring-black/5 dark:ring-white/10 bg-white/50 dark:bg-neutral-800/50 flex items-center justify-center">
           <Skeleton width="w-4" height="h-4" variant="rounded" />

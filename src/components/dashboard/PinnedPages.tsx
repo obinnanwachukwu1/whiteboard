@@ -1,7 +1,7 @@
 import React from 'react'
 import { Pin, ExternalLink, X, FileText, File, MessageCircle, Megaphone, Link as LinkIcon, BookOpen } from 'lucide-react'
 import { Card } from '../ui/Card'
-import { useAppActions } from '../../context/AppContext'
+import { useAppActions, useAppData } from '../../context/AppContext'
 import { ListItemRow } from '../ui/ListItemRow'
 
 type PinnedItem = {
@@ -21,6 +21,16 @@ type Props = {
 
 export const PinnedPages: React.FC<Props> = ({ items, onUnpin }) => {
   const actions = useAppActions()
+  const data = useAppData()
+  const courseNameById = React.useMemo(() => {
+    const map = new Map<string, string>()
+    for (const course of data.courses || []) {
+      const id = String(course?.id ?? '')
+      const name = String(course?.name || course?.course_code || '').trim()
+      if (id && name) map.set(id, name)
+    }
+    return map
+  }, [data.courses])
 
   const handleOpen = (item: PinnedItem) => {
     if (item.type === 'url' && item.url) {
@@ -110,7 +120,11 @@ export const PinnedPages: React.FC<Props> = ({ items, onUnpin }) => {
             onClick={() => handleOpen(item)}
             icon={getIcon(item.type)}
             title={item.title}
-            subtitle={item.subtitle}
+            subtitle={
+              item.courseId != null
+                ? (courseNameById.get(String(item.courseId)) || item.subtitle)
+                : item.subtitle
+            }
             menu={
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 {['page', 'assignment', 'quiz', 'announcement', 'discussion', 'file'].includes(item.type) && (

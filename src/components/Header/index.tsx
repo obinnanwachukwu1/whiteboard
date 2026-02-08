@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useAppActions, useAppFlags } from '../../context/AppContext'
 import { InboxButton } from '../InboxButton'
+import { PinnedButton } from '../PinnedButton'
 import { SearchButton } from './SearchButton'
 import { AccountButton } from './AccountButton'
 import { AccountMenu } from './AccountMenu'
@@ -8,10 +9,18 @@ import { AccountMenu } from './AccountMenu'
 type Props = {
   profile?: any | null
   onOpenSearch?: () => void
+  onOpenPinned?: () => void
+  pinnedCount?: number
   onOpenInbox?: () => void
 }
 
-export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) => {
+export const Header: React.FC<Props> = ({
+  profile,
+  onOpenSearch,
+  onOpenPinned,
+  pinnedCount,
+  onOpenInbox,
+}) => {
   const actions = useAppActions()
   const { privateModeEnabled } = useAppFlags()
   const name = profile?.short_name || profile?.name || 'Whiteboard'
@@ -71,6 +80,7 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
         {!privateModeEnabled && !isWin && onOpenSearch && (
           <SearchButton isWin={false} onClick={onOpenSearch} />
         )}
+        {!isWin && onOpenPinned && <PinnedButton onClick={onOpenPinned} count={pinnedCount} />}
         {!isWin && onOpenInbox && <InboxButton onClick={onOpenInbox} />}
         <AccountButton
           name={name}
@@ -80,6 +90,7 @@ export const Header: React.FC<Props> = ({ profile, onOpenSearch, onOpenInbox }) 
           onToggle={() => setMenuOpen((v) => !v)}
           nameBtnRef={nameBtnRef}
         />
+        {isWin && onOpenPinned && <PinnedButton onClick={onOpenPinned} count={pinnedCount} />}
         {isWin && onOpenInbox && <InboxButton onClick={onOpenInbox} />}
         {!privateModeEnabled && isWin && onOpenSearch && (
           <SearchButton isWin onClick={onOpenSearch} />

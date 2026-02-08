@@ -66,6 +66,7 @@ export function useRootLayoutState() {
   })
   const [courseImages, setCourseImagesState] = useState<Record<string, string>>({})
   const [searchOpen, setSearchOpen] = useState(false)
+  const [pinnedOpen, setPinnedOpen] = useState(false)
   const [inboxOpen, setInboxOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [oobeOpen, setOobeOpen] = useState(false)
@@ -1098,14 +1099,24 @@ export function useRootLayoutState() {
       profile,
       searchOpen,
       settingsOpen,
+      pinnedOpen,
       inboxOpen,
       oobeOpen,
       onCloseSearch: () => setSearchOpen(false),
       onCloseSettings: () => setSettingsOpen(false),
+      onClosePinned: () => setPinnedOpen(false),
       onCloseInbox: () => setInboxOpen(false),
       onCloseOobe: () => setOobeOpen(false),
       onOpenSearch,
-      onOpenInbox: () => setInboxOpen(true),
+      onOpenPinned: () => {
+        setInboxOpen(false)
+        setPinnedOpen(true)
+      },
+      onOpenInbox: () => {
+        setPinnedOpen(false)
+        setInboxOpen(true)
+      },
+      pinnedCount: pinnedItems.length,
       visibleCourses,
       currentView,
       derivedCourseId,

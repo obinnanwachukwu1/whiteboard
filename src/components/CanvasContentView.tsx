@@ -300,7 +300,7 @@ export const CanvasContentView: React.FC<Props> = ({
     if (!flags.aiEnabled || !flags.aiAvailable) return
     if (loading || error) return
 
-    // Only for text content types for now (not files)
+    // Only for text content types (not files)
     if (contentType === 'file') return
 
     e.preventDefault()
@@ -434,6 +434,7 @@ export const CanvasContentView: React.FC<Props> = ({
         id: pinId,
         type: contentType,
         title: resolvedTitle,
+        subtitle: courseName || undefined,
         courseId,
         contentId,
       })
@@ -527,7 +528,7 @@ export const CanvasContentView: React.FC<Props> = ({
 
         <Dropdown open={moreOpen} onOpenChange={setMoreOpen} anchorRef={moreBtnRef as any}>
           <DropdownItem onClick={togglePin} icon={<Pin className="w-4 h-4" />}>
-            {isPinned ? 'Unpin from Dashboard' : 'Pin to Dashboard'}
+            {isPinned ? 'Unpin' : 'Pin'}
           </DropdownItem>
           <DropdownItem
             onClick={async () => {

@@ -20,6 +20,7 @@ import { Header } from '../../components/Header'
 import { Sidebar, type SidebarConfig } from '../../components/Sidebar'
 import { SearchModal } from '../../components/SearchModal'
 import { InboxPanel } from '../../components/InboxPanel'
+import { PinnedPanel } from '../../components/PinnedPanel'
 import { SettingsModal } from '../../components/SettingsModal'
 import { NotificationManager } from '../../components/NotificationManager'
 import type { ThemeSettings } from '../../utils/theme'
@@ -53,14 +54,18 @@ type Props = {
   profile: any
   searchOpen: boolean
   settingsOpen: boolean
+  pinnedOpen: boolean
   inboxOpen: boolean
   oobeOpen: boolean
   onCloseSearch: () => void
   onCloseSettings: () => void
+  onClosePinned: () => void
   onCloseInbox: () => void
   onCloseOobe: () => void
   onOpenSearch: () => void
+  onOpenPinned: () => void
   onOpenInbox: () => void
+  pinnedCount: number
   visibleCourses: any[]
   currentView: CurrentView
   derivedCourseId: string | null
@@ -168,6 +173,8 @@ function AppShellInner(props: Props) {
             <Header
               profile={props.profile}
               onOpenSearch={props.onOpenSearch}
+              onOpenPinned={props.onOpenPinned}
+              pinnedCount={props.pinnedCount}
               onOpenInbox={props.onOpenInbox}
             />
             <div className="flex flex-1 overflow-hidden">
@@ -211,6 +218,7 @@ function AppShellInner(props: Props) {
           </div>
           <SearchModal isOpen={props.searchOpen} onClose={props.onCloseSearch} />
           <SettingsModal isOpen={props.settingsOpen} onClose={props.onCloseSettings} />
+          <PinnedPanel isOpen={props.pinnedOpen} onClose={props.onClosePinned} />
           <InboxPanel isOpen={props.inboxOpen} onClose={props.onCloseInbox} />
           <OnboardingWizard isOpen={props.oobeOpen} onClose={props.onCloseOobe} />
           <AISidePanelKeyboardHandler />
