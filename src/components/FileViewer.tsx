@@ -121,7 +121,7 @@ export const FileViewer: React.FC<Props> = ({
   }, [fileId, name])
 
   const LoadingSkeleton = () => (
-    <div className="flex flex-col h-full w-full bg-gray-50/50 dark:bg-neutral-950/50 items-center justify-center">
+    <div className="flex flex-col h-full w-full bg-[var(--app-accent-root)]/40 items-center justify-center">
       {/* Just text, no fake UI elements as per request */}
       <span className="text-sm font-medium text-slate-500 dark:text-neutral-400 animate-pulse">
         Loading preview...

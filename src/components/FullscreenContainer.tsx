@@ -145,7 +145,7 @@ export const FullscreenContainer: React.FC<Props> = ({ className = '', children 
               ref={portalRef}
               className={
                 isFullscreen
-                  ? `bg-gray-50 dark:bg-neutral-950 ${className}`
+                  ? `bg-[var(--app-accent-root)] ${className}`
                   : className
               }
               style={portalStyle}

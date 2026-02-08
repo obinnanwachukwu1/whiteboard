@@ -366,10 +366,14 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicI
     )
   }
 
-  const renderReplyBox = () => {
+  const renderReplyBox = (isFullscreen: boolean) => {
     if (isLoading || !topic || topic.locked || replyingTo !== null) return null
+    const immersiveSurfaceClass =
+      isEmbedded || isFullscreen ? 'bg-[var(--app-accent-bg)]' : 'bg-white dark:bg-neutral-900'
     return (
-      <div className="shrink-0 p-4 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+      <div
+        className={`shrink-0 p-4 border-t border-neutral-200 dark:border-neutral-800 ${immersiveSurfaceClass}`}
+      >
         <div className="max-w-4xl mx-auto">
           <RichTextEditor
             placeholder="Add a reply..."
@@ -383,12 +387,15 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicI
   }
 
   const header = (ctx: { isFullscreen: boolean; toggle: () => Promise<void> }) => {
+    const immersiveSurfaceClass =
+      isEmbedded || ctx.isFullscreen ? 'bg-[var(--app-accent-bg)]' : 'bg-white dark:bg-neutral-900'
+
     if (isEmbedded || ctx.isFullscreen) {
       // Single-row titlebar for embedded windows or focus mode
       return (
         <div className="flex flex-col shrink-0">
           <div
-            className={`h-14 ${canGoBack ? '' : 'border-b border-gray-200 dark:border-neutral-700'} bg-white dark:bg-neutral-900 app-drag titlebar-left-inset titlebar-right-inset px-5 grid grid-cols-[1fr_auto_1fr] items-center`}
+            className={`h-14 ${canGoBack ? '' : 'border-b border-gray-200 dark:border-neutral-700'} ${immersiveSurfaceClass} app-drag titlebar-left-inset titlebar-right-inset px-5 grid grid-cols-[1fr_auto_1fr] items-center`}
           >
             <div className="flex items-center justify-start">
               {!isEmbedded && ctx.isFullscreen && isWin && (
@@ -436,7 +443,9 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicI
 
           {/* Secondary Toolbar for Navigation */}
           {canGoBack && (
-            <div className="flex items-center px-4 py-2 border-b border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shrink-0">
+            <div
+              className={`flex items-center px-4 py-2 border-b border-gray-200 dark:border-neutral-700 ${immersiveSurfaceClass} shrink-0`}
+            >
               <Button variant="ghost" size="sm" onClick={onBack} className="w-8 h-8 p-0 justify-center rounded-full app-no-drag" title="Back">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
@@ -491,14 +500,16 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicI
           {header(ctx)}
 
           {/* Content */}
-          <div className={`flex-1 overflow-y-auto min-h-0 pb-4 ${ctx.isFullscreen ? 'px-6 md:px-10 pt-8' : 'px-4 pt-6'}`}>
+          <div
+            className={`flex-1 overflow-y-auto min-h-0 pb-4 ${isEmbedded || ctx.isFullscreen ? 'bg-[var(--app-accent-root)]' : ''} ${ctx.isFullscreen ? 'px-6 md:px-10 pt-8' : 'px-4 pt-6'}`}
+          >
             <div className={ctx.isFullscreen ? 'max-w-4xl mx-auto w-full' : ''}>
               {renderContent()}
             </div>
           </div>
 
           {/* Reply Box */}
-          {renderReplyBox()}
+          {renderReplyBox(ctx.isFullscreen)}
         </div>
       )}
     </FullscreenContainer>

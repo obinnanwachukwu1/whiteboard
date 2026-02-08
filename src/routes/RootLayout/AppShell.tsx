@@ -152,13 +152,22 @@ function AppShellInner(props: Props) {
       recentSubmissions={aiRecentSubmissions}
     >
       {props.isEmbeddedContent ? (
-        <div className="h-screen w-screen bg-gray-50 dark:bg-neutral-950">
-          <main className="h-full w-full overflow-hidden">
-            <div className="h-full w-full">
-              <Outlet />
-            </div>
-          </main>
-        </div>
+        <>
+          <BackgroundLayer settings={props.themeSettings} />
+          <div
+            data-glass-layer
+            className="fixed inset-0 z-[5] pointer-events-none"
+            style={{ backgroundColor: 'var(--app-accent-bg)' }}
+            aria-hidden="true"
+          />
+          <div className="h-screen w-screen bg-[var(--app-accent-root)] relative z-10">
+            <main className="h-full w-full overflow-hidden">
+              <div className="h-full w-full">
+                <Outlet />
+              </div>
+            </main>
+          </div>
+        </>
       ) : (
         <>
           <BackgroundLayer settings={props.themeSettings} />

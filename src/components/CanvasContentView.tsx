@@ -442,12 +442,15 @@ export const CanvasContentView: React.FC<Props> = ({
   }
 
   const header = (ctx: { isFullscreen: boolean; toggle: () => Promise<void> }) => {
+    const immersiveSurfaceClass =
+      isEmbedded || ctx.isFullscreen ? 'bg-[var(--app-accent-bg)]' : 'bg-white dark:bg-neutral-900'
+
     if (isEmbedded || ctx.isFullscreen) {
       // Single-row titlebar for embedded windows or focus mode
       return (
         <>
           <div
-            className={`h-14 ${canGoBack ? '' : 'border-b border-gray-200 dark:border-neutral-700'} bg-white dark:bg-neutral-900 app-drag titlebar-left-inset titlebar-right-inset px-5 grid grid-cols-[1fr_auto_1fr] items-center`}
+            className={`h-14 ${canGoBack ? '' : 'border-b border-gray-200 dark:border-neutral-700'} ${immersiveSurfaceClass} app-drag titlebar-left-inset titlebar-right-inset px-5 grid grid-cols-[1fr_auto_1fr] items-center`}
           >
             <div className="flex items-center justify-start">
               {!isEmbedded && ctx.isFullscreen && isWin && (
@@ -483,7 +486,7 @@ export const CanvasContentView: React.FC<Props> = ({
           </div>
           {/* Secondary Toolbar for Navigation */}
           {canGoBack && (
-            <div className="flex items-center px-4 py-2 border-b border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+            <div className={`flex items-center px-4 py-2 border-b border-gray-200 dark:border-neutral-700 ${immersiveSurfaceClass}`}>
               <Button
                 variant="ghost"
                 size="sm"
@@ -561,7 +564,9 @@ export const CanvasContentView: React.FC<Props> = ({
           {header({ isFullscreen, toggle })}
 
           {contentType === 'file' ? (
-            <div className="flex-1 min-h-0 overflow-hidden">
+            <div
+              className={`flex-1 min-h-0 overflow-hidden ${isEmbedded || isFullscreen ? 'bg-[var(--app-accent-root)]' : ''}`}
+            >
               <FileViewer
                 fileId={contentId}
                 className="h-full w-full"
@@ -571,7 +576,10 @@ export const CanvasContentView: React.FC<Props> = ({
               />
             </div>
           ) : (
-            <div className="flex-1 overflow-hidden" onContextMenu={handleContextMenu}>
+            <div
+              className={`flex-1 overflow-hidden ${isEmbedded || isFullscreen ? 'bg-[var(--app-accent-root)]' : ''}`}
+              onContextMenu={handleContextMenu}
+            >
               <div className="flex-1 overflow-y-auto p-6 h-full">
                 <div className="max-w-4xl mx-auto pb-12">
                   {loading && (
