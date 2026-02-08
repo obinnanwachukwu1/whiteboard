@@ -12,7 +12,6 @@ import { formatDateTime } from '../../utils/dateFormat'
 import { PriorityList } from '../dashboard/PriorityList'
 import { ActivityPanel } from '../dashboard/ActivityPanel'
 import { RecentFeedback } from '../dashboard/RecentFeedback'
-import { PinnedPages } from '../dashboard/PinnedPages'
 import { SystemNotices } from '../dashboard/SystemNotices'
 import { useDashboardPrefetch } from './useDashboardPrefetch'
 import { useAIContextOffer } from '../../hooks/useAIContextOffer'
@@ -49,8 +48,6 @@ export const Dashboard: React.FC<Props> = ({
     setTimeHorizon,
     showGrades,
     setShowGrades,
-    pinnedItems,
-    setPinnedItems,
     markSystemNoticeRead,
     readSystemNotices,
   } = useDashboardSettings()
@@ -119,10 +116,6 @@ export const Dashboard: React.FC<Props> = ({
     if (!accountKey) return
     markSystemNoticeRead(accountKey, String(id))
   }, [accountKey, markSystemNoticeRead])
-
-  const handleUnpin = React.useCallback((id: string) => {
-    setPinnedItems(pinnedItems.filter((i) => i.id !== id))
-  }, [pinnedItems, setPinnedItems])
 
   const { recentFeedback } = useDashboardData({
     courses: courses || [],
@@ -250,7 +243,7 @@ export const Dashboard: React.FC<Props> = ({
         canMarkRead={!!accountKey}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] lg:grid-rows-2 gap-5">
         <PriorityList
           assignments={priorityData.assignments}
           alsoDue={priorityData.alsoDue}
@@ -267,10 +260,8 @@ export const Dashboard: React.FC<Props> = ({
           isEmpty={activityData.isEmpty}
           onMarkRead={activityData.markAnnouncementRead}
           onClickItem={handleActivityClick}
+          className="lg:row-span-2"
         />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-5">
         <RecentFeedback
           items={recentFeedback}
           isLoading={false}
@@ -278,10 +269,6 @@ export const Dashboard: React.FC<Props> = ({
           onToggleGrades={setShowGrades}
           onClickItem={handleAssignmentClick}
           courseImageUrl={courseImageUrl}
-        />
-        <PinnedPages
-          items={pinnedItems}
-          onUnpin={handleUnpin}
         />
       </div>
     </div>

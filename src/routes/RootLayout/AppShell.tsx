@@ -202,10 +202,10 @@ function AppShellInner(props: Props) {
               <main className="flex-1 flex overflow-hidden bg-white/50 dark:bg-neutral-900/50 rounded-tl-xl">
                 {/* Content area - shrinks when AI panel is open */}
                 <div
-                  className={`flex-1 flex flex-col min-h-0 min-w-0 p-6 ${props.currentView === 'course' ? 'pt-24 overflow-hidden' : 'overflow-y-auto'}`}
+                  className={`flex-1 flex flex-col min-h-0 min-w-0 p-6 ${props.currentView === 'course' ? 'pt-24 overflow-hidden' : 'overflow-y-auto scrollbar-overlay'}`}
                 >
                   <div
-                    className={`max-w-6xl w-full mx-auto ${props.currentView === 'course' ? 'flex-1 flex flex-col min-h-0' : 'scrollbar-overlay'}`}
+                    className={`max-w-6xl w-full mx-auto ${props.currentView === 'course' ? 'flex-1 flex flex-col min-h-0' : ''}`}
                   >
                     <Outlet />
                   </div>

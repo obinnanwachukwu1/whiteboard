@@ -134,8 +134,8 @@ export function AuthLoadingScreen() {
               {/* Page title */}
               <Skeleton height="h-8" width="w-32" className="mb-2" />
 
-              {/* First row of cards (Priority + Activity) */}
-              <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-5">
+              {/* Dashboard card layout (left stack + full-height activity) */}
+              <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] lg:grid-rows-2 gap-5">
                 {/* Priority card skeleton */}
                 <SkeletonCard className="flex flex-col">
                   <div className="flex items-center justify-between mb-3">
@@ -154,7 +154,7 @@ export function AuthLoadingScreen() {
                 </SkeletonCard>
 
                 {/* Activity card skeleton */}
-                <SkeletonCard className="flex flex-col">
+                <SkeletonCard className="flex flex-col lg:row-span-2">
                   <div className="flex items-center gap-2 mb-3">
                     <Skeleton width="w-7" height="h-7" variant="circular" />
                     <Skeleton width="w-16" height="h-5" />
@@ -163,12 +163,11 @@ export function AuthLoadingScreen() {
                     <SkeletonListItem />
                     <SkeletonListItem />
                     <SkeletonListItem />
+                    <SkeletonListItem />
+                    <SkeletonListItem />
                   </div>
                 </SkeletonCard>
-              </div>
 
-              {/* Second row of cards (Feedback + Pinned) */}
-              <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-5">
                 {/* Recent Feedback card skeleton */}
                 <SkeletonCard className="flex flex-col">
                   <div className="flex items-center justify-between mb-3">
@@ -180,18 +179,6 @@ export function AuthLoadingScreen() {
                   </div>
                   <div className="space-y-2">
                     <SkeletonListItem />
-                    <SkeletonListItem />
-                    <SkeletonListItem />
-                  </div>
-                </SkeletonCard>
-
-                {/* Pinned Pages card skeleton */}
-                <SkeletonCard className="flex flex-col">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Skeleton width="w-7" height="h-7" variant="circular" />
-                    <Skeleton width="w-24" height="h-5" />
-                  </div>
-                  <div className="space-y-2">
                     <SkeletonListItem />
                     <SkeletonListItem />
                   </div>

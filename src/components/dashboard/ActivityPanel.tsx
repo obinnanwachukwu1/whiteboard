@@ -4,6 +4,7 @@ import { Card } from '../ui/Card'
 import { ActivityItem } from './ActivityItem'
 import { SkeletonList } from '../Skeleton'
 import type { ActivityFeedItem } from '../../hooks/useActivityFeed'
+import { useNowTick } from '../../hooks/useNowTick'
 
 type Props = {
   items: ActivityFeedItem[]
@@ -11,6 +12,7 @@ type Props = {
   isEmpty: boolean
   onMarkRead: (topicId: string) => void
   onClickItem: (item: ActivityFeedItem) => void
+  className?: string
 }
 
 /**
@@ -22,9 +24,11 @@ export const ActivityPanel: React.FC<Props> = ({
   isEmpty,
   onMarkRead,
   onClickItem,
+  className,
 }) => {
-  const MAX_VISIBLE = 5
+  const MAX_VISIBLE = 8
   const [expanded, setExpanded] = React.useState(false)
+  const nowMs = useNowTick()
 
   React.useEffect(() => {
     if (items.length <= MAX_VISIBLE && expanded) {
@@ -37,7 +41,7 @@ export const ActivityPanel: React.FC<Props> = ({
   const hasMore = items.length > MAX_VISIBLE
 
   return (
-    <Card className="h-full flex flex-col">
+    <Card className={`h-full flex flex-col ${className || ''}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-slate-100 m-0">
@@ -70,6 +74,7 @@ export const ActivityPanel: React.FC<Props> = ({
               <ActivityItem
                 key={item.id}
                 item={item}
+                nowMs={nowMs}
                 onMarkRead={item.type === 'announcement' ? onMarkRead : undefined}
                 onClick={() => onClickItem(item)}
               />
@@ -97,6 +102,7 @@ export const ActivityPanel: React.FC<Props> = ({
                       <ActivityItem
                         key={item.id}
                         item={item}
+                        nowMs={nowMs}
                         compact
                         onMarkRead={item.type === 'announcement' ? onMarkRead : undefined}
                         onClick={() => onClickItem(item)}
