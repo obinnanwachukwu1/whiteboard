@@ -103,7 +103,7 @@ export function createAppMenu(deps: {
         {
           label: 'Learn More',
           click: async () => {
-            await shell.openExternal('https://github.com/obinnanwachukwu/whiteboard')
+            await shell.openExternal('https://github.com/obinnanwachukwu1/whiteboard')
           },
         },
       ],

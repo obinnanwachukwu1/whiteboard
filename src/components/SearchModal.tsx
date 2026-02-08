@@ -62,7 +62,7 @@ function getTypeBadgeClass(type: SearchResultType): string {
     case 'file':
       return 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
     case 'module':
-      return 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+      return 'bg-[color:var(--accent-100)] dark:bg-[color:var(--accent-50)] text-[color:var(--accent-800)] dark:text-[color:var(--accent-900)]'
     case 'page':
       return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
     default:
@@ -384,9 +384,9 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
         {/* Input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-neutral-800">
           {deepSearchActive ? (
-            <Sparkles className="w-5 h-5 shrink-0" style={{ color: 'var(--accent-500)' }} />
+            <Sparkles className="w-5 h-5 shrink-0 text-[color:var(--accent-primary)]" />
           ) : (
-            <Search className="w-5 h-5 text-slate-400 shrink-0" />
+            <Search className="w-5 h-5 text-[color:var(--accent-primary)] shrink-0" />
           )}
           <input
             ref={inputRef}
@@ -400,11 +400,11 @@ export const SearchModal: React.FC<Props> = ({ isOpen, onClose }) => {
             className="flex-1 bg-transparent text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-neutral-500 text-base outline-none disabled:opacity-50"
           />
           {showSpinner && (
-            <Loader2 className="w-4 h-4 text-slate-400 animate-spin shrink-0" />
+            <Loader2 className="w-4 h-4 text-[color:var(--accent-primary)] animate-spin shrink-0" />
           )}
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-neutral-800 text-slate-500 transition-colors"
+            className="p-1 rounded hover:bg-[var(--app-accent-bg)] text-[color:var(--accent-primary)] transition-colors"
           >
             <X className="w-4 h-4" />
           </button>

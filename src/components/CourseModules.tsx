@@ -254,8 +254,8 @@ const ModuleItemRow: React.FC<{
                     title,
                   })
                 }}
-                icon={<Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />}
-                className="text-indigo-600 dark:text-indigo-400"
+                icon={<Sparkles className="w-4 h-4 text-[color:var(--accent-primary)]" />}
+                className="text-[color:var(--accent-primary)]"
               >
                 Explain
               </DropdownItem>
@@ -595,7 +595,7 @@ export const CourseModules: React.FC<Props> = ({
         {!isLoading && modules && modules.length > 1 && !allExpanded && (
           <button
             onClick={expandAll}
-            className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+            className="text-xs text-[color:var(--accent-primary)] hover:underline"
           >
             Expand All
           </button>
@@ -624,7 +624,7 @@ export const CourseModules: React.FC<Props> = ({
                   {/* Module header - clickable to toggle */}
                   <button
                     onClick={() => toggleModule(moduleId)}
-                    className="flex items-center justify-between w-full mb-1.5 p-1 -ml-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left"
+                    className="flex items-center justify-between w-full mb-1.5 p-1 -ml-1 rounded hover:bg-[var(--app-accent-bg)] transition-colors text-left"
                   >
                     <span className="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-neutral-300">
                       {isExpanded ? (

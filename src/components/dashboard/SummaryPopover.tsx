@@ -16,8 +16,8 @@ type Props = {
 
 const PopoverHeader = React.memo(({ title }: { title?: string }) => {
   return (
-    <div className="flex items-center gap-2 mb-3 text-indigo-600 dark:text-indigo-400 font-medium text-sm">
-      <div className="p-1.5 rounded-md bg-indigo-50 dark:bg-indigo-900/20">
+    <div className="flex items-center gap-2 mb-3 text-[color:var(--accent-primary)] font-medium text-sm">
+      <div className="p-1.5 rounded-md bg-[color:var(--accent-100)] dark:bg-[color:var(--accent-50)]">
         <Wand2 className="w-3.5 h-3.5" />
       </div>
       {title || 'AI Summary'}
@@ -187,7 +187,7 @@ export const SummaryPopover: React.FC<Props> = ({
               [&_p]:break-words [&_li]:break-words [&_code]:break-words
               [&_strong]:font-semibold [&_strong]:text-slate-800 dark:[&_strong]:text-slate-200
               [&_em]:italic
-              [&_a]:text-indigo-500 [&_a]:underline
+              [&_a]:text-[color:var(--accent-primary)] [&_a]:underline
             "
             dangerouslySetInnerHTML={{ __html: renderedHtml }}
           />

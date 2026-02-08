@@ -17,18 +17,18 @@ export function AboutSettings() {
           </p>
           <div className="flex gap-4 text-xs pt-2">
             <a
-              href="https://github.com/obinnanwachukwu/whiteboard"
+              href="https://github.com/obinnanwachukwu1/whiteboard"
               target="_blank"
               rel="noreferrer"
-              className="text-indigo-600 dark:text-indigo-400 hover:underline"
+              className="text-[color:var(--accent-primary)] hover:underline"
             >
               GitHub
             </a>
             <a
-              href="https://github.com/obinnanwachukwu/whiteboard/blob/main/LICENSE"
+              href="https://github.com/obinnanwachukwu1/whiteboard/blob/main/LICENSE"
               target="_blank"
               rel="noreferrer"
-              className="text-indigo-600 dark:text-indigo-400 hover:underline"
+              className="text-[color:var(--accent-primary)] hover:underline"
             >
               License (GPLv3)
             </a>

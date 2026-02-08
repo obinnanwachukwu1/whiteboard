@@ -105,12 +105,7 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, courseName, onO
   // Bound DOM: only render the most recent MAX_RENDER items (slice from end to keep newest)
   const list = React.useMemo(() => {
     if (showAll || allItems.length <= MAX_RENDER) return allItems
-    // Keep most recent items (end of array since API returns oldest first typically,
-    // but if API returns newest first, this still works - we show the first MAX_RENDER)
-    // Actually, the infinite query appends pages, so most recent are at the start
-    // So slice(0, MAX_RENDER) is correct for newest-first APIs
-    // But to be safe for oldest-first APIs, we should slice from end
-    // Let's slice from end to keep most recent regardless of API order
+    // Keep only the most recent bounded subset.
     return allItems.slice(-MAX_RENDER)
   }, [allItems, showAll])
   const hiddenCount = allItems.length - list.length
@@ -219,7 +214,7 @@ export const CourseAnnouncements: React.FC<Props> = ({ courseId, courseName, onO
           <div className="py-2 text-center">
             <button
               onClick={() => setShowAll(true)}
-              className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+              className="text-xs text-[color:var(--accent-primary)] hover:underline"
             >
               Show {hiddenCount} older announcements
             </button>

@@ -243,7 +243,7 @@ export const AssignmentPopover: React.FC<Props> = ({
         {/* AI Summary Section (optional) */}
         {(aiLoading || aiSummary) && (
           <div className="pt-2.5 mt-2.5 border-t border-slate-100 dark:border-neutral-800">
-            <div className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-medium text-[11px] mb-1.5">
+            <div className="flex items-center gap-1.5 text-[color:var(--accent-primary)] font-medium text-[11px] mb-1.5">
               <Wand2 className="w-3 h-3" />
               <span>AI Insight</span>
             </div>

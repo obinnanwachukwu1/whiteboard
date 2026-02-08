@@ -836,7 +836,7 @@ export const GpaTrends: React.FC<Props> = ({
     return (
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
         <div className="rounded-lg bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-2.5 text-center">
-          <div className="text-xl font-bold text-indigo-700 dark:text-indigo-300">
+          <div className="text-xl font-bold text-[color:var(--accent-primary)]">
             {data.overall.gpa?.toFixed(2) ?? '—'}
           </div>
           <div className="text-[10px] text-slate-600 dark:text-neutral-400">Cumulative</div>

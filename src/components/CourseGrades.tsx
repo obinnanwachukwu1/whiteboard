@@ -182,7 +182,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
                   type="checkbox"
                   checked={outOfTotal}
                   onChange={(e) => setOutOfTotal(e.target.checked)}
-                  className="align-middle accent-indigo-600 dark:accent-neutral-300"
+                  className="align-middle accent-[var(--accent-primary)]"
                 />
                 <span className="text-slate-700 dark:text-neutral-200 text-base md:text-lg font-medium">
                   Show final grade
@@ -258,7 +258,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
                                         <span className="tabular-nums">{display}</span>
                                         <button
                                           aria-label="Edit"
-                                          className="text-brand hover:text-indigo-600"
+                                          className="text-brand hover:text-[color:var(--accent-primary)]"
                                           onClick={() => {
                                             setRawWhatIfPct((prev) => {
                                               const curr = prev[id]
