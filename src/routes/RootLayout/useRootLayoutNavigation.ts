@@ -3,7 +3,7 @@ import { useRouterState } from '@tanstack/react-router'
 import type { QueryClient } from '@tanstack/react-query'
 import { enqueuePrefetch, requestIdle } from '../../utils/prefetchQueue'
 import { prefetchNavTab } from '../../utils/navPrefetch'
-import { toAssignmentGroupInputsFromRest, toAssignmentInputsFromRest } from '../../utils/gradeCalc'
+import { courseGradebookQueryKey, fetchCourseGradebook } from '../../hooks/courseGradebookQuery'
 import type { SidebarConfig } from '../../components/Sidebar'
 import { filterVisibleCourses } from '../../utils/courseVisibility'
 
@@ -209,21 +209,8 @@ export function useRootLayoutNavigation({
         requestIdle(() => {
           enqueuePrefetch(async () => {
             await queryClient.prefetchQuery({
-              queryKey: ['course-gradebook', id],
-              queryFn: async () => {
-                const [groupsRes, assignmentsRes] = await Promise.all([
-                  window.canvas.listAssignmentGroups(id, false),
-                  window.canvas.listAssignmentsWithSubmission(id, 100),
-                ])
-                if (!groupsRes?.ok)
-                  throw new Error(groupsRes?.error || 'Failed to load assignment groups')
-                if (!assignmentsRes?.ok)
-                  throw new Error(assignmentsRes?.error || 'Failed to load gradebook assignments')
-                const groups = toAssignmentGroupInputsFromRest(groupsRes.data || [])
-                const raw = (assignmentsRes.data || []) as any[]
-                const assignments = toAssignmentInputsFromRest(raw)
-                return { groups, assignments, raw }
-              },
+              queryKey: courseGradebookQueryKey(id),
+              queryFn: async () => fetchCourseGradebook(id, 100),
               staleTime: 1000 * 60 * 5,
             })
           })

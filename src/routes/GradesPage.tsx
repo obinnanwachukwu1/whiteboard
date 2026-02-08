@@ -18,6 +18,7 @@ import { LayoutGrid, Target, TrendingUp } from 'lucide-react'
 import { ListItemRow } from '../components/ui/ListItemRow'
 import { CourseAvatar } from '../components/CourseAvatar'
 import { filterVisibleCourses } from '../utils/courseVisibility'
+import { courseGradebookQueryKey, fetchCourseGradebook } from '../hooks/courseGradebookQuery'
 
 type GpaThreshold = { min: number; gpa: number }
 const defaultGpaMap: GpaThreshold[] = [
@@ -219,22 +220,8 @@ export default function GradesPage() {
       list.forEach((c: any) => {
         enqueuePrefetch(async () => {
           await qc.prefetchQuery({
-            queryKey: ['course-gradebook', String(c.id)],
-            queryFn: async () => {
-              const [groupsRes, assignmentsRes] = await Promise.all([
-                window.canvas.listAssignmentGroups(String(c.id), false),
-                window.canvas.listAssignmentsWithSubmission(String(c.id), 100),
-              ])
-              if (!groupsRes?.ok)
-                throw new Error(groupsRes?.error || 'Failed to load assignment groups')
-              if (!assignmentsRes?.ok)
-                throw new Error(assignmentsRes?.error || 'Failed to load gradebook assignments')
-              return {
-                groups: groupsRes.data || [],
-                raw: assignmentsRes.data || [],
-                assignments: [] as any[],
-              }
-            },
+            queryKey: courseGradebookQueryKey(String(c.id)),
+            queryFn: async () => fetchCourseGradebook(String(c.id), 100),
             staleTime: 1000 * 60 * 5,
           })
         })
@@ -243,11 +230,10 @@ export default function GradesPage() {
   }, [orderedCourses, qc])
 
   function currentPercent(courseId: string | number): number | null {
-    const data = qc.getQueryData<any>(['course-gradebook', String(courseId)]) as any
+    const data = qc.getQueryData<any>(courseGradebookQueryKey(String(courseId))) as any
     const groups = data?.groups || []
-    const raw = data?.raw || []
-    if (!groups?.length || !raw?.length) return null
-    const assignments = toAssignmentInputsFromRest(raw)
+    const assignments = data?.assignments || toAssignmentInputsFromRest(data?.raw || [])
+    if (!groups?.length || !assignments?.length) return null
     const calc = calculateCourseGrades(groups, assignments, {
       useWeights: 'auto',
       treatUngradedAsZero: true,

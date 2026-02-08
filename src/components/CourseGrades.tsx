@@ -4,7 +4,6 @@ import { Button } from './ui/Button'
 import { SkeletonText } from './Skeleton'
 import { Pencil, RotateCcw } from 'lucide-react'
 import { useCourseGradebook } from '../hooks/useCourseGradebook'
-import { useQueryClient } from '@tanstack/react-query'
 import { calculateCourseGrades } from '../utils/gradeCalc'
 import { useAppActions } from '../context/AppContext'
 import { formatDateTime } from '../utils/dateFormat'
@@ -17,12 +16,13 @@ type Props = {
 
 export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
   const actions = useAppActions()
-  const queryClient = useQueryClient()
   // Keep raw percent input so users can type decimals naturally
   const [rawWhatIfPct, setRawWhatIfPct] = React.useState<Record<string | number, string>>({})
   const [editingId, setEditingId] = React.useState<string | number | null>(null)
-  const inputRefs = React.useRef<Record<string, HTMLInputElement | null>>({})
-  const { data, isLoading, error, refetch, isFetching } = useCourseGradebook(courseId)
+  const inputRefs = React.useRef<
+    Record<string, { desktop: HTMLInputElement | null; mobile: HTMLInputElement | null }>
+  >({})
+  const { data, isLoading, error, isFetching } = useCourseGradebook(courseId)
   const groups = data?.groups || []
   const assignments = data?.assignments || []
   const rawAssignments = data?.raw || []
@@ -48,6 +48,10 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
     if (!groups.length) return null as any
     return calculateCourseGrades(groups, assignments, { useWeights: 'auto', treatUngradedAsZero: true, whatIf })
   }, [groups, assignments, whatIf])
+  const hasWhatIfOverrides = React.useMemo(
+    () => Object.values(rawWhatIfPct).some((v) => typeof v === 'string' && v.trim() !== ''),
+    [rawWhatIfPct],
+  )
 
   const gradesContext = React.useMemo(() => {
     const parts: string[] = []
@@ -100,11 +104,30 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
   // Toggle: show current vs out-of-total (final) as a single percentage
   const [outOfTotal, setOutOfTotal] = React.useState(false)
 
+  const setInputRef = React.useCallback(
+    (id: string | number, view: 'desktop' | 'mobile', el: HTMLInputElement | null) => {
+      const key = String(id)
+      const current = inputRefs.current[key] || { desktop: null, mobile: null }
+      current[view] = el
+      inputRefs.current[key] = current
+    },
+    [],
+  )
+
+  const getVisibleInputRef = React.useCallback((id: string | number | null) => {
+    if (id == null) return null
+    const refs = inputRefs.current[String(id)]
+    if (!refs) return null
+    if (refs.desktop && refs.desktop.offsetParent !== null) return refs.desktop
+    if (refs.mobile && refs.mobile.offsetParent !== null) return refs.mobile
+    return refs.desktop || refs.mobile || null
+  }, [])
+
   // Global click-away to exit edit mode if clicking outside the active input
   React.useEffect(() => {
     if (editingId == null) return
     const handler = (e: MouseEvent) => {
-      const ref = inputRefs.current[String(editingId)]
+      const ref = getVisibleInputRef(editingId)
       if (!ref) { setEditingId(null); return }
       if (e.target instanceof Node) {
         if (!ref.contains(e.target)) {
@@ -114,7 +137,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
     }
     document.addEventListener('mousedown', handler, true)
     return () => document.removeEventListener('mousedown', handler, true)
-  }, [editingId])
+  }, [editingId, getVisibleInputRef])
 
   function onChangeWhatIf(id: string | number, v: string) {
     // Sanitize: allow only digits and a single decimal point
@@ -137,19 +160,11 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
       <div className="flex items-center justify-between mb-3 shrink-0">
         <h3 className="m-0 text-slate-900 dark:text-slate-100 text-base font-semibold">Grades</h3>
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={async () => {
-              try {
-                await queryClient.invalidateQueries({ queryKey: ['course-gradebook', String(courseId)] })
-              } catch {}
-              await refetch()
-            }}
-          >
-            Refresh
-          </Button>
-          <Button size="sm" variant="ghost" onClick={clearOverrides}>Clear What‑If</Button>
+          {hasWhatIfOverrides && (
+            <Button size="sm" variant="ghost" onClick={clearOverrides}>
+              Reset Grades
+            </Button>
+          )}
         </div>
       </div>
 
@@ -162,17 +177,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
         {error && <div className="text-red-600">{String(error.message || error)}</div>}
 
         {calc && (
-          <div className="mb-4 flex items-end justify-between">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 px-3 py-2">
-                <div className="text-[11px] text-slate-500 dark:text-neutral-400">Current</div>
-                <div className="text-xl font-semibold tracking-tight">{calc.current.totals.percent ?? '—'}%</div>
-              </div>
-              <div className="rounded-card ring-1 ring-gray-200 dark:ring-neutral-800 bg-white/70 dark:bg-neutral-900/70 px-3 py-2">
-                <div className="text-[11px] text-slate-500 dark:text-neutral-400">Final (What‑If)</div>
-                <div className="text-xl font-semibold tracking-tight">{calc.final.totals.percent ?? '—'}%</div>
-              </div>
-            </div>
+          <div className="mb-4 flex items-end justify-end">
             <div className="text-right">
               <div className="text-2xl md:text-3xl font-semibold tracking-tight">
                 {(outOfTotal ? calc.final.totals.percent : calc.current.totals.percent) ?? '—'}%
@@ -259,7 +264,9 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
                                         <button
                                           aria-label="Edit"
                                           className="text-brand hover:text-[color:var(--accent-primary)]"
-                                          onClick={() => {
+                                          onClick={(e) => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
                                             setRawWhatIfPct((prev) => {
                                               const curr = prev[id]
                                               if ((curr == null || String(curr).trim() === '') && apiPct != null) {
@@ -269,7 +276,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
                                             })
                                             setEditingId(id)
                                             setTimeout(() => {
-                                              const ref = inputRefs.current[String(id)]
+                                              const ref = getVisibleInputRef(id)
                                               ref?.focus()
                                               try {
                                                 const val = ref?.value || ''
@@ -284,7 +291,9 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
                                           <button
                                             aria-label="Revert"
                                             className="text-slate-500 hover:text-slate-700"
-                                            onClick={() => {
+                                            onClick={(e) => {
+                                              e.preventDefault()
+                                              e.stopPropagation()
                                               const { [id]: _, ...rest } = rawWhatIfPct as any
                                               setRawWhatIfPct(rest)
                                               if (editingId === id) setEditingId(null)
@@ -303,18 +312,24 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
                                           onChange={(e) => onChangeWhatIf(id, e.target.value)}
                                           onBlur={() => {
                                             if (!raw || raw.trim() === '') {
-                                              setRawWhatIfPct((prev) => ({ ...prev, [id]: '0' }))
+                                              setRawWhatIfPct((prev) => {
+                                                const { [id]: _, ...rest } = prev as any
+                                                return rest
+                                              })
                                             }
                                             setEditingId((curr) => (curr === id ? null : curr))
                                           }}
+                                          onMouseDown={(e) => e.stopPropagation()}
+                                          onClick={(e) => e.stopPropagation()}
                                           inputMode="decimal"
-                                          ref={(el) => { inputRefs.current[String(id)] = el }}
+                                          ref={(el) => setInputRef(id, 'desktop', el)}
                                           onPaste={(e) => {
                                             e.preventDefault()
+                                            e.stopPropagation()
                                             const text = (e.clipboardData || (window as any).clipboardData).getData('text') || ''
                                             onChangeWhatIf(id, text)
                                             setTimeout(() => {
-                                              const ref = inputRefs.current[String(id)]
+                                              const ref = getVisibleInputRef(id)
                                               const val = ref?.value || ''
                                               try { ref?.setSelectionRange(val.length, val.length) } catch {}
                                             }, 0)
@@ -327,7 +342,8 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
                                             aria-label="Revert"
                                             className="text-slate-500 hover:text-slate-700"
                                             onMouseDown={(e) => e.preventDefault()}
-                                            onClick={() => {
+                                            onClick={(e) => {
+                                              e.stopPropagation()
                                               const { [id]: _, ...rest } = rawWhatIfPct as any
                                               setRawWhatIfPct(rest)
                                               setEditingId(null)
@@ -415,7 +431,9 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
                                       <button
                                         aria-label="Edit"
                                         className="p-1.5 rounded-control ring-1 ring-black/10 dark:ring-white/10 hover:bg-[var(--app-accent-bg)]"
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.preventDefault()
+                                          e.stopPropagation()
                                           setRawWhatIfPct((prev) => {
                                             const curr = prev[id]
                                             if ((curr == null || String(curr).trim() === '') && apiPct != null) {
@@ -425,7 +443,7 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
                                           })
                                           setEditingId(id)
                                           setTimeout(() => {
-                                            const ref = inputRefs.current[String(id)]
+                                            const ref = getVisibleInputRef(id)
                                             ref?.focus()
                                           }, 0)
                                         }}
@@ -436,7 +454,9 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
                                         <button
                                           aria-label="Revert"
                                           className="p-1.5 rounded-control ring-1 ring-black/10 dark:ring-white/10 hover:bg-[var(--app-accent-bg)]"
-                                          onClick={() => {
+                                          onClick={(e) => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
                                             const { [id]: _, ...rest } = rawWhatIfPct as any
                                             setRawWhatIfPct(rest)
                                           }}
@@ -456,12 +476,17 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
                                         onChange={(e) => onChangeWhatIf(id, e.target.value)}
                                         onBlur={() => {
                                           if (!raw || raw.trim() === '') {
-                                            setRawWhatIfPct((prev) => ({ ...prev, [id]: '0' }))
+                                            setRawWhatIfPct((prev) => {
+                                              const { [id]: _, ...rest } = prev as any
+                                              return rest
+                                            })
                                           }
                                           setEditingId((curr) => (curr === id ? null : curr))
                                         }}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => e.stopPropagation()}
                                         inputMode="decimal"
-                                        ref={(el) => { inputRefs.current[String(id)] = el }}
+                                        ref={(el) => setInputRef(id, 'mobile', el)}
                                         className="w-full px-2 py-1.5 border border-gray-300 rounded-control text-sm text-slate-900 placeholder-slate-400 bg-white focus:ring-2 focus:ring-brand/30 focus:border-brand outline-none dark:bg-neutral-900 dark:text-slate-100 dark:border-neutral-600"
                                       />
                                       <span className="text-slate-500 text-sm">%</span>
@@ -471,7 +496,8 @@ export const CourseGrades: React.FC<Props> = ({ courseId, courseName }) => {
                                         aria-label="Revert"
                                         className="p-1.5 rounded-control ring-1 ring-black/10 dark:ring-white/10 hover:bg-[var(--app-accent-bg)]"
                                         onMouseDown={(e) => e.preventDefault()}
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation()
                                           const { [id]: _, ...rest } = rawWhatIfPct as any
                                           setRawWhatIfPct(rest)
                                           setEditingId(null)

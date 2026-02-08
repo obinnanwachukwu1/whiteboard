@@ -137,6 +137,7 @@ export const CourseDiscussions: React.FC<Props> = ({ courseId, courseName, onOpe
     error,
   } = useCourseDiscussions(courseId, {
     perPage: 50,
+    maxPages: 2,
     searchTerm: debouncedSearch?.trim() || undefined,
     filterBy: showUnreadOnly ? 'unread' : undefined,
   })

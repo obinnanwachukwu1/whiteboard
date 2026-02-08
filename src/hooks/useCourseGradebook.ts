@@ -1,32 +1,21 @@
 import { useQuery, UseQueryOptions } from '@tanstack/react-query'
-import { toAssignmentInputsFromRest, toAssignmentGroupInputsFromRest, type AssignmentInput, type AssignmentGroupInput } from '../utils/gradeCalc'
-
-type IpcResult<T> = { ok: boolean; data?: T; error?: string }
-
-function ensureOk<T>(res: IpcResult<T>): T {
-  if (!res?.ok) throw new Error(res?.error || 'IPC call failed')
-  return res.data as T
-}
+import {
+  courseGradebookQueryKey,
+  fetchCourseGradebook,
+  type CourseGradebookData,
+} from './courseGradebookQuery'
 
 export function useCourseGradebook(
   courseId: string | number | undefined,
   opts: { perPage?: number } = {},
-  options?: Partial<UseQueryOptions<{ groups: AssignmentGroupInput[]; assignments: AssignmentInput[]; raw: any[] }, Error, { groups: AssignmentGroupInput[]; assignments: AssignmentInput[]; raw: any[] }>>,
+  options?: Partial<UseQueryOptions<CourseGradebookData, Error, CourseGradebookData>>,
 ) {
   const { perPage = 100 } = opts || {}
-  const cid = courseId == null ? courseId : String(courseId)
-  return useQuery<{ groups: AssignmentGroupInput[]; assignments: AssignmentInput[]; raw: any[] }, Error, { groups: AssignmentGroupInput[]; assignments: AssignmentInput[]; raw: any[] }>({
-    queryKey: ['course-gradebook', cid],
+  return useQuery<CourseGradebookData, Error, CourseGradebookData>({
+    queryKey: courseGradebookQueryKey(courseId),
     queryFn: async () => {
       if (courseId == null) throw new Error('courseId is required')
-      const [groupsRes, assignmentsRes] = await Promise.all([
-        window.canvas.listAssignmentGroups(String(courseId), false),
-        window.canvas.listAssignmentsWithSubmission(String(courseId), perPage),
-      ])
-      const groups = toAssignmentGroupInputsFromRest(ensureOk(groupsRes as any))
-      const raw = ensureOk(assignmentsRes as any) as any[]
-      const assignments = toAssignmentInputsFromRest(raw)
-      return { groups, assignments, raw }
+      return fetchCourseGradebook(courseId, perPage)
     },
     enabled: courseId != null && (options?.enabled ?? true),
     staleTime: 1000 * 30,

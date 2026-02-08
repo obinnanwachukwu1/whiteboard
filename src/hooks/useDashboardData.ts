@@ -7,6 +7,11 @@ import { calculateCourseGrades, toAssignmentInputsFromRest } from '../utils/grad
 import { enqueuePrefetch, requestIdle } from '../utils/prefetchQueue'
 import { extractCourseIdFromUrl } from '../utils/urlHelpers'
 import { filterVisibleCourses } from '../utils/courseVisibility'
+import {
+  courseGradebookQueryKey,
+  fetchCourseGradebook,
+  type CourseGradebookData,
+} from './courseGradebookQuery'
 
 export type DueItem = {
   course_id: number | string
@@ -71,26 +76,18 @@ export function useDashboardData({ courses, sidebar, due, loading }: UseDashboar
   // 2. Optimized Gradebook Calculation - using select to run calcs only when data changes
   const gradeQueries = useQueries({
     queries: orderedVisibleCourses.map((c) => ({
-      queryKey: ['course-gradebook', String(c.id)],
-      queryFn: async () => {
-        const [groupsRes, assignmentsRes] = await Promise.all([
-          window.canvas.listAssignmentGroups(String(c.id), false),
-          window.canvas.listAssignmentsWithSubmission(String(c.id), 100),
-        ])
-        if (!groupsRes?.ok) throw new Error(groupsRes?.error || 'Failed to load assignment groups')
-        if (!assignmentsRes?.ok) throw new Error(assignmentsRes?.error || 'Failed to load gradebook assignments')
-        return { groups: groupsRes.data || [], raw: assignmentsRes.data || [] }
-      },
+      queryKey: courseGradebookQueryKey(String(c.id)),
+      queryFn: async () => fetchCourseGradebook(String(c.id), 100),
       // Move grade calculation into select - runs only when raw data changes
-      select: (data: { groups: any[]; raw: any[] }) => {
+      select: (data: CourseGradebookData) => {
         try {
-          const assignments = toAssignmentInputsFromRest(data.raw)
+          const assignments = data.assignments || toAssignmentInputsFromRest(data.raw)
           const calc = calculateCourseGrades(data.groups, assignments, { useWeights: 'auto', treatUngradedAsZero: true, whatIf: {} })
           const pct = calc?.current?.totals?.percent
           const grade = typeof pct === 'number' && Number.isFinite(pct) ? Math.round(pct * 10) / 10 : null
-          return { grade, raw: data.raw, groups: data.groups }
+          return { grade, raw: data.raw, groups: data.groups, assignments }
         } catch {
-          return { grade: null, raw: data.raw, groups: data.groups }
+          return { grade: null, raw: data.raw, groups: data.groups, assignments: data.assignments }
         }
       },
       staleTime: 1000 * 60 * 15, // 15 minutes

@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
+import { courseGradebookQueryKey, fetchCourseGradebook } from '../hooks/courseGradebookQuery'
 
 const tabCooldownMs = 10 * 60 * 1000
 const lastTabPrefetch = new Map<string, number>()
@@ -75,16 +76,8 @@ export async function prefetchCourseTab(queryClient: QueryClient, courseId: stri
 
       case 'grades':
         await queryClient.prefetchQuery({
-          queryKey: ['course-gradebook', id],
-          queryFn: async () => {
-            const [groupsRes, assignmentsRes] = await Promise.all([
-              window.canvas.listAssignmentGroups(id, false),
-              window.canvas.listAssignmentsWithSubmission(id, 100),
-            ])
-            if (!groupsRes?.ok) throw new Error(groupsRes?.error || 'Failed to load assignment groups')
-            if (!assignmentsRes?.ok) throw new Error(assignmentsRes?.error || 'Failed to load gradebook assignments')
-            return { groups: groupsRes.data || [], raw: assignmentsRes.data || [], assignments: [] as any[] }
-          },
+          queryKey: courseGradebookQueryKey(id),
+          queryFn: async () => fetchCourseGradebook(id, 100),
           staleTime: 1000 * 60 * 5,
         })
         break
