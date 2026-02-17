@@ -5,6 +5,7 @@ import fs from 'fs'
 import { app, ipcMain } from 'electron'
 import http from 'http'
 import { randomUUID } from 'crypto'
+import { AITelemetryStore, type AITelemetryEvent } from './telemetryStore'
 
 const REQUEST_TIMEOUT_MS = 30000 // 30 second timeout
 const MAX_RESTART_ATTEMPTS = 3
@@ -35,6 +36,7 @@ export class AIManager {
       }
     | null = null
   private availabilityPromise: Promise<AIAvailability> | null = null
+  private telemetryStore = new AITelemetryStore()
 
   constructor() {
     // Socket path will be initialized in start() once we have app.getPath('temp')
@@ -471,6 +473,42 @@ export class AIManager {
       this.cancelRequest(id)
     })
 
+    ipcMain.handle('ai:telemetry:record', async (_evt, event: AITelemetryEvent) => {
+      try {
+        this.telemetryStore.record(event)
+        return { ok: true }
+      } catch (e: any) {
+        return { ok: false, error: String(e?.message || e) }
+      }
+    })
+
+    ipcMain.handle('ai:telemetry:getSummary', async () => {
+      try {
+        const data = this.telemetryStore.getSummary()
+        return { ok: true, data }
+      } catch (e: any) {
+        return { ok: false, error: String(e?.message || e) }
+      }
+    })
+
+    ipcMain.handle('ai:telemetry:export', async () => {
+      try {
+        const data = this.telemetryStore.exportSummary()
+        return { ok: true, data }
+      } catch (e: any) {
+        return { ok: false, error: String(e?.message || e) }
+      }
+    })
+
+    ipcMain.handle('ai:telemetry:reset', async () => {
+      try {
+        this.telemetryStore.reset()
+        return { ok: true }
+      } catch (e: any) {
+        return { ok: false, error: String(e?.message || e) }
+      }
+    })
+
     ipcMain.handle('ai:chat', async (_event, req) => {
       // Check if process is running and ready
       if (!this.process || !this.isReady) {
@@ -600,6 +638,7 @@ export class AIManager {
             } catch (e) {
               // Ignore parse errors for partial chunks that might have slipped through
               console.warn('[AI Stream] Parse error:', e)
+              this.telemetryStore.record({ name: 'stream_parse_error' })
             }
           }
         })
@@ -623,11 +662,13 @@ export class AIManager {
       req.on('timeout', () => {
         this.activeRequests.delete(requestId)
         req.destroy()
+        this.telemetryStore.record({ name: 'request_timeout' })
         reject(new Error('Request timeout'))
       })
 
       req.on('error', (e) => {
         this.activeRequests.delete(requestId)
+        this.telemetryStore.record({ name: 'request_error' })
         reject(e)
       })
 
@@ -683,6 +724,7 @@ export class AIManager {
         resolved = true
         req.destroy()
         console.error('[AI] Request timeout')
+        this.telemetryStore.record({ name: 'request_timeout' })
         resolve({ ok: false, error: 'Request timeout - the AI server took too long to respond.' })
       })
 
@@ -690,6 +732,7 @@ export class AIManager {
         if (resolved) return
         resolved = true
         console.error(`[AI Request Error]: ${e.message}`)
+        this.telemetryStore.record({ name: 'request_error' })
         resolve({ ok: false, error: e.message })
       })
 

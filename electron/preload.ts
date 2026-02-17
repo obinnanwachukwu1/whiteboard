@@ -9,6 +9,7 @@ import type {
   SecureStorageApi,
   SettingsApi,
   SystemApi,
+  ThemeConfigChangedPayload,
   ThemeApi,
 } from '../src/types/ipc'
 
@@ -25,6 +26,11 @@ if (process.isMainFrame) {
       const handler = (_event: any, action: string) => callback(action)
       ipcRenderer.on('menu:action', handler)
       return () => ipcRenderer.removeListener('menu:action', handler)
+    },
+    onThemeConfigChanged: (callback: (payload: ThemeConfigChangedPayload) => void) => {
+      const handler = (_event: any, payload: ThemeConfigChangedPayload) => callback(payload)
+      ipcRenderer.on('config:themeChanged', handler)
+      return () => ipcRenderer.removeListener('config:themeChanged', handler)
     },
   } satisfies ElectronApi
 
@@ -332,6 +338,11 @@ if (process.isMainFrame) {
         ipcRenderer.send('ai:chat-cancel', { id })
       }
     },
+    recordTelemetry: (event: Parameters<AIApi['recordTelemetry']>[0]) =>
+      ipcRenderer.invoke('ai:telemetry:record', event),
+    getTelemetrySummary: () => ipcRenderer.invoke('ai:telemetry:getSummary'),
+    exportTelemetry: () => ipcRenderer.invoke('ai:telemetry:export'),
+    resetTelemetry: () => ipcRenderer.invoke('ai:telemetry:reset'),
   } satisfies AIApi
 
   contextBridge.exposeInMainWorld('ai', aiApi)

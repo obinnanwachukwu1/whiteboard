@@ -1,9 +1,12 @@
 import { useEffect, useRef } from 'react'
 import type { SidebarConfig } from '../../components/Sidebar'
+import { applyThemeTokens, normalizeThemeSettings, type ThemeSettings } from '../../utils/theme'
+import { isSameThemeSettings } from './theme'
 
 type Params = {
   userKey: string | null
   setSidebarCfg: (next: SidebarConfig) => void
+  setThemeSettings: (updater: (prev: ThemeSettings) => ThemeSettings) => void
   setPrefetchEnabledState: (next: boolean) => void
   setReduceEffectsEnabledState: (next: boolean) => void
   setExternalEmbedsEnabledState: (next: boolean) => void
@@ -17,6 +20,7 @@ type Params = {
 export function useRootLayoutUserSettings({
   userKey,
   setSidebarCfg,
+  setThemeSettings,
   setPrefetchEnabledState,
   setReduceEffectsEnabledState,
   setExternalEmbedsEnabledState,
@@ -49,6 +53,15 @@ export function useRootLayoutUserSettings({
 
         const perSettings = data?.userSettings?.[userKey]
         if (perSettings) {
+          const perUserTheme = perSettings.themeConfig
+            ? normalizeThemeSettings(perSettings.themeConfig)
+            : null
+          if (perUserTheme) {
+            applyThemeTokens(perUserTheme)
+            setThemeSettings((prev) =>
+              isSameThemeSettings(prev, perUserTheme) ? prev : perUserTheme,
+            )
+          }
           if (typeof perSettings.prefetchEnabled === 'boolean')
             setPrefetchEnabledState(!!perSettings.prefetchEnabled)
           if (typeof perSettings.reduceEffectsEnabled === 'boolean')

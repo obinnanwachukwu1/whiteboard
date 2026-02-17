@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import type { AppConfig } from '../config'
+import type { AccentPreset, AppConfig } from '../config'
 
 export type ContentWindowType =
   | 'page'
@@ -18,6 +18,64 @@ export type ContentWindowParams = {
   type: ContentWindowType
   contentId: string
   title?: string
+}
+
+type AccentHsl = {
+  h: number
+  s: number
+  l: number
+}
+
+const ACCENT_PRESET_HSL: Record<AccentPreset, AccentHsl> = {
+  slate: { h: 215, s: 16, l: 47 },
+  red: { h: 0, s: 72, l: 51 },
+  orange: { h: 25, s: 95, l: 53 },
+  amber: { h: 38, s: 92, l: 50 },
+  yellow: { h: 48, s: 96, l: 53 },
+  lime: { h: 84, s: 81, l: 44 },
+  green: { h: 142, s: 71, l: 45 },
+  emerald: { h: 160, s: 84, l: 39 },
+  teal: { h: 173, s: 80, l: 40 },
+  cyan: { h: 189, s: 94, l: 43 },
+  sky: { h: 199, s: 89, l: 48 },
+  blue: { h: 217, s: 91, l: 60 },
+  indigo: { h: 239, s: 84, l: 67 },
+  violet: { h: 258, s: 90, l: 66 },
+  purple: { h: 271, s: 81, l: 56 },
+  fuchsia: { h: 292, s: 84, l: 61 },
+  pink: { h: 330, s: 81, l: 60 },
+  rose: { h: 350, s: 89, l: 60 },
+}
+
+const LEGACY_ACCENT_MAP: Record<NonNullable<AppConfig['accent']>, AccentPreset> = {
+  default: 'slate',
+  red: 'red',
+  orange: 'orange',
+  yellow: 'yellow',
+  green: 'green',
+  blue: 'blue',
+  indigo: 'indigo',
+  violet: 'violet',
+}
+
+function getInitialWindowBackgroundColor(appConfig: AppConfig, isDark: boolean): string {
+  const fallback = isDark ? '#020617' : '#ffffff'
+  const themeConfig = appConfig?.themeConfig
+  const legacyAccent = appConfig?.accent
+
+  if (!themeConfig && !legacyAccent) return fallback
+
+  const extractedAccent =
+    themeConfig?.backgroundMode === 'background' ? themeConfig.background?.extractedAccent : undefined
+  const preset =
+    themeConfig?.accentPreset || (legacyAccent ? LEGACY_ACCENT_MAP[legacyAccent] : 'slate')
+  const presetHsl = ACCENT_PRESET_HSL[preset] || ACCENT_PRESET_HSL.slate
+  const accent = extractedAccent || presetHsl
+
+  const saturation = isDark ? Math.max(accent.s - 50, 5) : Math.max(accent.s, 35)
+  const lightness = isDark ? 8 : 98
+
+  return `hsl(${accent.h}, ${saturation}%, ${lightness}%)`
 }
 
 export function safeContentType(value: unknown): ContentWindowType | null {
@@ -110,9 +168,9 @@ export function createContentWindow(
   },
 ): BrowserWindow {
   const icon = getIconPath(deps.rendererDist)
-  const savedTheme = deps.appConfig?.theme
+  const savedTheme = deps.appConfig?.themeConfig?.theme ?? deps.appConfig?.theme
   const isDark = savedTheme === 'dark' || (!savedTheme && process.platform === 'darwin')
-  const bgColor = isDark ? '#020617' : '#ffffff'
+  const bgColor = getInitialWindowBackgroundColor(deps.appConfig, isDark)
 
   const child = new BrowserWindow({
     ...(icon ? { icon } : {}),
@@ -202,7 +260,7 @@ export function createMainWindow(deps: {
   const icon = getIconPath(deps.rendererDist)
   const savedTheme = deps.appConfig?.themeConfig?.theme ?? deps.appConfig?.theme
   const isDark = savedTheme === 'dark' || (!savedTheme && process.platform === 'darwin')
-  const bgColor = isDark ? '#020617' : '#ffffff'
+  const bgColor = getInitialWindowBackgroundColor(deps.appConfig, isDark)
 
   const win = new BrowserWindow({
     ...(icon ? { icon } : {}),

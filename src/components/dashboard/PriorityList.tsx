@@ -8,6 +8,7 @@ import { SkeletonList } from '../Skeleton'
 import type { DashboardAssignment } from '../../hooks/usePriorityAssignments'
 import type { TimeHorizon } from '../../hooks/useDashboardSettings'
 import { useCourseAvatarPreloadGate } from '../../hooks/useCourseAvatarPreloadGate'
+import { useNowTick } from '../../hooks/useNowTick'
 
 type Props = {
   assignments: DashboardAssignment[]
@@ -33,6 +34,7 @@ export const PriorityList: React.FC<Props> = ({
   onClickAssignment,
   courseImageUrl,
 }) => {
+  const nowMs = useNowTick()
   const imagesReady = useCourseAvatarPreloadGate(
     assignments.map((a) => a.courseId),
     { enabled: !isLoading && assignments.length > 0, once: true }
@@ -73,6 +75,7 @@ export const PriorityList: React.FC<Props> = ({
               <PriorityItem
                 key={String(assignment.id)}
                 assignment={assignment}
+                nowMs={nowMs}
                 courseImageUrl={courseImageUrl(assignment.courseId)}
                 onClick={() => onClickAssignment(assignment)}
               />
@@ -85,6 +88,7 @@ export const PriorityList: React.FC<Props> = ({
           <AlsoDue
             assignments={alsoDue}
             count={alsoDueCount}
+            nowMs={nowMs}
             onClickAssignment={onClickAssignment}
           />
         )}

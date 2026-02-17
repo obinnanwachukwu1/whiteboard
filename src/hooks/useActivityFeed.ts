@@ -70,11 +70,7 @@ export function useActivityFeed(options?: {
       })
     }
     
-    // Sort: announcements by recency (most recent first), events by soonest
-    // We'll interleave them in a way that makes sense:
-    // - Recent announcements (within last 24h) first
-    // - Then upcoming events
-    // - Then older announcements
+    // Prioritize recent announcements, then upcoming events, then older announcements.
     
     const now = new Date()
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
@@ -159,11 +155,10 @@ export function useActivityFeed(options?: {
 /**
  * Format relative time for activity items.
  */
-export function formatActivityTime(timestamp: Date | null): string {
+export function formatActivityTime(timestamp: Date | null, nowMs: number = Date.now()): string {
   if (!timestamp) return ''
   
-  const now = new Date()
-  const diffMs = now.getTime() - timestamp.getTime()
+  const diffMs = nowMs - timestamp.getTime()
   const diffHours = diffMs / (1000 * 60 * 60)
   const isFuture = diffMs < 0
   const absDiffHours = Math.abs(diffHours)

@@ -11,6 +11,7 @@ import { ListItemRow } from '../ui/ListItemRow'
 
 type Props = {
   item: ActivityFeedItem
+  nowMs: number
   onMarkRead?: (topicId: string) => void
   onClick?: () => void
   compact?: boolean
@@ -22,11 +23,12 @@ type RowProps = Props & {
   triggerProps: TriggerProps
 }
 
-const ActivityRow = React.memo(({ item, onMarkRead, onClick, triggerProps, compact }: RowProps) => {
+const ActivityRow = React.memo(({ item, nowMs, onMarkRead, onClick, triggerProps, compact }: RowProps) => {
   const Icon = item.type === 'announcement' ? Megaphone : Calendar
   const iconColor = item.type === 'announcement' 
     ? 'text-violet-500 dark:text-violet-400' 
     : 'text-emerald-500 dark:text-emerald-400'
+  const timeLabel = formatActivityTime(item.timestamp, nowMs)
 
   const handleMarkRead = React.useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
@@ -50,14 +52,14 @@ const ActivityRow = React.memo(({ item, onMarkRead, onClick, triggerProps, compa
           : (
               <span className="flex items-center justify-between gap-2 w-full">
                 <span className="truncate">{cleanCourseName(item.courseName)}</span>
-                <span className="whitespace-nowrap flex-shrink-0">{formatActivityTime(item.timestamp)}</span>
+                <span className="whitespace-nowrap flex-shrink-0">{timeLabel}</span>
               </span>
             )
       }
       trailing={
         compact ? (
           <span className="text-xs text-slate-400 dark:text-neutral-500 whitespace-nowrap">
-            {formatActivityTime(item.timestamp)}
+            {timeLabel}
           </span>
         ) : undefined
       }
@@ -91,7 +93,7 @@ const stripHtml = (html: string) => {
 /**
  * Single activity feed item (announcement or calendar event).
  */
-export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick, compact = false }) => {
+export const ActivityItem: React.FC<Props> = ({ item, nowMs, onMarkRead, onClick, compact = false }) => {
   const { streamSummarize } = useAI()
   const { aiEnabled, aiAvailable } = useAppFlags()
   
@@ -115,6 +117,7 @@ export const ActivityItem: React.FC<Props> = ({ item, onMarkRead, onClick, compa
     <>
       <ActivityRow
         item={item}
+        nowMs={nowMs}
         onMarkRead={onMarkRead}
         onClick={onClick}
         triggerProps={triggerProps}

@@ -234,6 +234,12 @@ export interface SettingsApi {
   set: (partial: Partial<SettingsData>) => Promise<ApiResult>
 }
 
+export type ThemeConfigChangedPayload = {
+  themeConfig?: ThemeConfig
+  theme?: SettingsData['theme']
+  accent?: SettingsData['accent']
+}
+
 export type AIAvailabilityData = {
   status: 'available' | 'unsupported' | 'disabled' | 'error'
   detail?: string
@@ -250,6 +256,48 @@ export type AIChatOptions =
       top_p?: number
     }
 
+export type AITelemetryEvent =
+  | {
+      name: 'coordinator_result'
+      data?: { fallback?: boolean; parseError?: boolean }
+      ts?: number
+    }
+  | {
+      name: 'overflow_retry'
+      data?: { triggered?: boolean }
+      ts?: number
+    }
+  | {
+      name: 'prompt_section_tokens'
+      data?: { sections?: Record<string, number> }
+      ts?: number
+    }
+  | {
+      name: 'due_date_exact_match'
+      data?: { exactHit?: boolean; hadCandidates?: boolean }
+      ts?: number
+    }
+  | {
+      name: 'unsupported_claim_sample'
+      data?: { sampled?: boolean; flagged?: boolean }
+      ts?: number
+    }
+  | {
+      name: 'followup_reference'
+      data?: { attempted?: boolean; resolved?: boolean }
+      ts?: number
+    }
+  | {
+      name: 'stage_timing'
+      data?: { stage?: string; ms?: number }
+      ts?: number
+    }
+  | {
+      name: 'stream_parse_error' | 'request_timeout' | 'request_error'
+      data?: Record<string, unknown>
+      ts?: number
+    }
+
 export interface AIApi {
   getAvailability: (opts?: { force?: boolean }) => Promise<ApiResult<AIAvailabilityData>>
   chat: (messages: any[], opts?: AIChatOptions) => Promise<{ ok: boolean; choices?: any[]; error?: any }>
@@ -259,6 +307,10 @@ export interface AIApi {
     onDone?: () => void,
     onError?: (error: string) => void,
   ) => () => void
+  recordTelemetry: (event: AITelemetryEvent) => Promise<ApiResult>
+  getTelemetrySummary: () => Promise<ApiResult<any>>
+  exportTelemetry: () => Promise<ApiResult<{ path: string; summary: any }>>
+  resetTelemetry: () => Promise<ApiResult>
 }
 
 export type EmbeddingMetadata = {
@@ -364,6 +416,7 @@ export interface SecureStorageApi {
 export interface ElectronApi {
   onMainProcessMessage: (callback: (message: string) => void) => void
   onMenuAction: (callback: (action: string) => void) => () => void
+  onThemeConfigChanged: (callback: (payload: ThemeConfigChangedPayload) => void) => () => void
 }
 
 export interface ThemeApi {

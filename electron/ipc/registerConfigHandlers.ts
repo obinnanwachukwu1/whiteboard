@@ -1,7 +1,8 @@
-import { ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 
 import { loadConfig, saveConfig, type AppConfig } from '../config'
 import type { AIManager } from '../ai/manager'
+import type { ThemeConfigChangedPayload } from '../../src/types/ipc'
 
 export type ConfigIpcDeps = {
   getAppConfig: () => AppConfig
@@ -20,6 +21,19 @@ export function registerConfigHandlers(deps: ConfigIpcDeps) {
   }
 
   const { aiManager } = deps
+
+  const broadcastThemeConfig = (config: AppConfig) => {
+    const payload: ThemeConfigChangedPayload = {
+      themeConfig: config.themeConfig,
+      theme: config.theme,
+      accent: config.accent,
+    }
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win.isDestroyed()) continue
+      win.webContents.send('config:themeChanged', payload)
+    }
+  }
+
   ipcMain.handle('config:get', async () => {
     try {
       appConfigRef.current = await loadConfig()
@@ -41,6 +55,14 @@ export function registerConfigHandlers(deps: ConfigIpcDeps) {
         } else {
           aiManager.stop()
         }
+      }
+
+      if (
+        partial.themeConfig !== undefined ||
+        partial.theme !== undefined ||
+        partial.accent !== undefined
+      ) {
+        broadcastThemeConfig(appConfigRef.current)
       }
   
       return { ok: true, data: appConfigRef.current }

@@ -86,7 +86,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   accent: 'default',
   themeConfig: DEFAULT_THEME_CONFIG,
   prefetchEnabled: true,
-  aiEnabled: false, // Default to disabled to be safe, user must opt-in
+  aiEnabled: false, // Disabled by default; requires explicit opt-in
   cachedCourses: [],
   cachedDue: [],
   queryCache: undefined,

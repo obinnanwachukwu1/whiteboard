@@ -9,9 +9,7 @@ export function cleanCourseName(name: string | undefined | null): string {
   // This handles the common Canvas convention of "Course Name - Course Code"
   const parts = name.split(' - ')
   if (parts.length > 1) {
-    // If we have multiple parts, return the first one (the name)
-    // We could potentially add more validation here to ensure the second part looks like a code,
-    // but for now, this simple heuristic covers the requested case.
+    // Return the display name before the Canvas-style suffix.
     return parts[0]
   }
   

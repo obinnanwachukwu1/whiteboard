@@ -8,6 +8,7 @@ import { SummaryPopover } from './SummaryPopover'
 import { useAIPopover } from '../../hooks/useAIPopover'
 import { useAssignmentRest } from '../../hooks/useCanvasQueries'
 import { extractAssignmentIdFromUrl, extractQuizIdFromUrl } from '../../utils/urlHelpers'
+import { formatRelativeDue, hoursUntilDue } from '../../utils/priorityScore'
 import { ListItemRow } from '../ui/ListItemRow'
 
 const stripHtml = (html: string) => {
@@ -56,6 +57,7 @@ const buildCoachHints = (description: string | undefined) => {
 
 type Props = {
   assignment: DashboardAssignment
+  nowMs: number
   courseImageUrl?: string
   onClick?: () => void
 }
@@ -65,10 +67,11 @@ type TriggerProps = ReturnType<typeof useAIPopover>['triggerProps']
 type RowProps = Props & {
   triggerProps: TriggerProps
   isPastDue: boolean
+  relativeTime: string
 }
 
 const PriorityRow = React.memo(
-  ({ assignment, courseImageUrl, onClick, triggerProps, isPastDue }: RowProps) => {
+  ({ assignment, courseImageUrl, onClick, triggerProps, isPastDue, relativeTime }: RowProps) => {
     return (
       <ListItemRow
         interactiveProps={triggerProps}
@@ -106,7 +109,7 @@ const PriorityRow = React.memo(
             <span
               className={`whitespace-nowrap flex-shrink-0 ${isPastDue ? 'text-red-500 dark:text-red-400 font-medium' : ''}`}
             >
-              {assignment.relativeTime}
+              {relativeTime}
             </span>
           </span>
         }
@@ -121,12 +124,20 @@ PriorityRow.displayName = 'PriorityRow'
  * Single priority assignment row for the dashboard.
  * Shows: course avatar, title, course label, relative time, weight indicator
  */
-export const PriorityItem: React.FC<Props> = ({ assignment, courseImageUrl, onClick }) => {
+export const PriorityItem: React.FC<Props> = ({ assignment, nowMs, courseImageUrl, onClick }) => {
   const { streamExplainPriority } = useAI()
   const { aiEnabled, aiAvailable } = useAppFlags()
   const showAI = aiEnabled && aiAvailable
 
-  const isPastDue = assignment.hoursUntilDue !== null && assignment.hoursUntilDue < 0
+  const liveHoursUntilDue = React.useMemo(
+    () => hoursUntilDue(assignment.dueAt, nowMs),
+    [assignment.dueAt, nowMs],
+  )
+  const liveRelativeTime = React.useMemo(
+    () => formatRelativeDue(liveHoursUntilDue),
+    [liveHoursUntilDue],
+  )
+  const isPastDue = liveHoursUntilDue !== null && liveHoursUntilDue < 0
 
   const courseId = assignment.courseId
   const quizId = assignment.htmlUrl ? extractQuizIdFromUrl(assignment.htmlUrl) : null
@@ -147,8 +158,8 @@ export const PriorityItem: React.FC<Props> = ({ assignment, courseImageUrl, onCl
   const hints = buildCoachHints(descriptionText)
 
   const coachRelativeDue = (() => {
-    const h = assignment.hoursUntilDue
-    if (h == null) return assignment.relativeTime
+    const h = liveHoursUntilDue
+    if (h == null) return liveRelativeTime
     const absH = Math.abs(h)
     if (h < 0) {
       if (absH < 24) return `${Math.max(1, Math.round(absH))} hours overdue`
@@ -158,7 +169,7 @@ export const PriorityItem: React.FC<Props> = ({ assignment, courseImageUrl, onCl
     return `in ${Math.max(1, Math.round(h / 24))} days`
   })()
 
-  const hours = assignment.hoursUntilDue ?? null
+  const hours = liveHoursUntilDue ?? null
 
   const { triggerProps, popoverProps } = useAIPopover({
     enabled: showAI,
@@ -168,7 +179,7 @@ export const PriorityItem: React.FC<Props> = ({ assignment, courseImageUrl, onCl
           assignmentName: assignment.name,
           courseName: cleanCourseName(assignment.courseLabel),
           relativeDue: coachRelativeDue,
-          hoursUntilDue: assignment.hoursUntilDue ?? null,
+          hoursUntilDue: liveHoursUntilDue ?? null,
           urgencyMultiplier: assignment.urgencyMultiplier ?? null,
           weightText: assignment.weightDisplay.text,
           weightPercent: assignment.effectiveWeight ?? null,
@@ -181,7 +192,7 @@ export const PriorityItem: React.FC<Props> = ({ assignment, courseImageUrl, onCl
           draftWhy: [
             isPastDue
               ? `Past due (~${Math.abs(Math.round(hours ?? 0))}h)`
-              : `Due ${assignment.relativeTime}`,
+              : `Due ${liveRelativeTime}`,
             assignment.weightDisplay.text ||
               (assignment.pointsPossible ? `${assignment.pointsPossible} pts` : ''),
             hints.deliverablesText ? `Deliverables: ${hints.deliverablesText}` : '',
@@ -211,10 +222,12 @@ export const PriorityItem: React.FC<Props> = ({ assignment, courseImageUrl, onCl
     <>
       <PriorityRow
         assignment={assignment}
+        nowMs={nowMs}
         courseImageUrl={courseImageUrl}
         onClick={onClick}
         triggerProps={triggerProps}
         isPastDue={isPastDue}
+        relativeTime={liveRelativeTime}
       />
       <SummaryPopover {...popoverProps} title="AI Coach" />
     </>

@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
 import { ChevronRight, CalendarClock } from 'lucide-react'
 import type { DashboardAssignment } from '../../hooks/usePriorityAssignments'
+import { formatRelativeDue, hoursUntilDue } from '../../utils/priorityScore'
 import { ListItemRow } from '../ui/ListItemRow'
 
 type Props = {
   assignments: DashboardAssignment[]
   count: number
+  nowMs: number
   onClickAssignment?: (assignment: DashboardAssignment) => void
 }
 
@@ -13,7 +15,7 @@ type Props = {
  * Collapsible "Also Due" section showing items beyond the time horizon.
  * Displays as a single line when collapsed, expands to show list.
  */
-export const AlsoDue: React.FC<Props> = ({ assignments, count, onClickAssignment }) => {
+export const AlsoDue: React.FC<Props> = ({ assignments, count, nowMs, onClickAssignment }) => {
   const [expanded, setExpanded] = useState(false)
   
   if (count === 0) return null
@@ -38,17 +40,20 @@ export const AlsoDue: React.FC<Props> = ({ assignments, count, onClickAssignment
       
       {expanded && (
         <div className="mt-2 pl-6 space-y-2">
-          {assignments.map((a) => (
-            <ListItemRow
-              key={String(a.id)}
-              density="compact"
-              onClick={() => onClickAssignment?.(a)}
-              icon={<CalendarClock className="w-4 h-4" />}
-              title={a.name}
-              trailing={<span className="text-xs text-slate-400 dark:text-neutral-500">{a.relativeTime}</span>}
-              className="text-sm text-slate-600 dark:text-neutral-400"
-            />
-          ))}
+          {assignments.map((a) => {
+            const relativeTime = formatRelativeDue(hoursUntilDue(a.dueAt, nowMs))
+            return (
+              <ListItemRow
+                key={String(a.id)}
+                density="compact"
+                onClick={() => onClickAssignment?.(a)}
+                icon={<CalendarClock className="w-4 h-4" />}
+                title={a.name}
+                trailing={<span className="text-xs text-slate-400 dark:text-neutral-500">{relativeTime}</span>}
+                className="text-sm text-slate-600 dark:text-neutral-400"
+              />
+            )
+          })}
         </div>
       )}
     </div>

@@ -195,6 +195,7 @@ export function useRootLayoutState() {
   useRootLayoutUserSettings({
     userKey,
     setSidebarCfg,
+    setThemeSettings,
     setPrefetchEnabledState,
     setReduceEffectsEnabledState,
     setExternalEmbedsEnabledState,

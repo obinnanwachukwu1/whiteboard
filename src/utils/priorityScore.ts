@@ -52,15 +52,17 @@ const BUCKET_BASE_SCORES = {
  * Returns null if no due date or invalid date.
  * Negative values mean past due.
  */
-export function hoursUntilDue(dueAt: string | Date | null | undefined): number | null {
+export function hoursUntilDue(
+  dueAt: string | Date | null | undefined,
+  nowMs: number = Date.now(),
+): number | null {
   if (!dueAt) return null
   
   try {
     const due = typeof dueAt === 'string' ? new Date(dueAt) : dueAt
     if (isNaN(due.getTime())) return null
     
-    const now = new Date()
-    const diffMs = due.getTime() - now.getTime()
+    const diffMs = due.getTime() - nowMs
     return diffMs / (1000 * 60 * 60)
   } catch {
     return null

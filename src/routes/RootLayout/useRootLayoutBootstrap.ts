@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { normalizeThemeSettings, type ThemeSettings } from '../../utils/theme'
+import { applyThemeTokens, normalizeThemeSettings, type ThemeSettings } from '../../utils/theme'
 import { setEncryptionEnabledFlag } from '../../utils/secureStorage'
 import { isSameThemeSettings } from './theme'
 
@@ -66,9 +66,20 @@ export function useRootLayoutBootstrap({
       } catch {}
 
       try {
+        const effectiveBaseUrl = String(data?.baseUrl || baseUrl || '')
+        const lastUserId = data?.lastUserId ? String(data.lastUserId) : ''
+        const fallbackUserKey =
+          effectiveBaseUrl && lastUserId ? `${effectiveBaseUrl}|${lastUserId}` : null
+        const perUserThemeRaw = fallbackUserKey ? data?.userSettings?.[fallbackUserKey]?.themeConfig : null
+        const perUserTheme = perUserThemeRaw ? normalizeThemeSettings(perUserThemeRaw) : null
         const fileTheme = data?.themeConfig ? normalizeThemeSettings(data.themeConfig) : null
-        if (fileTheme) {
-          setThemeSettings((prev) => (isSameThemeSettings(prev, fileTheme) ? prev : fileTheme))
+        const effectiveTheme = perUserTheme || fileTheme
+
+        if (effectiveTheme) {
+          applyThemeTokens(effectiveTheme)
+          setThemeSettings((prev) =>
+            isSameThemeSettings(prev, effectiveTheme) ? prev : effectiveTheme,
+          )
         }
       } catch {}
       if (data?.sidebar) setSidebarCfg(data.sidebar)

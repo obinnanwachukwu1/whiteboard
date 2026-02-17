@@ -68,8 +68,7 @@ export default function ContentPage() {
       const idxCourse = parts.indexOf('courses')
       const cid = idxCourse >= 0 && parts[idxCourse + 1] ? parts[idxCourse + 1] : null
       
-      // Only handle navigation within the same course for now
-      // (Cross-course navigation in embedded window is complex UX)
+      // Keep embedded navigation scoped to the current course.
       const isSameCourse = cid && String(cid) === String(courseId)
 
       if (!isSameCourse) {
@@ -91,15 +90,10 @@ export default function ContentPage() {
         return
       }
 
-      // Handle Announcements/Discussions
+      // Handle announcement/discussion topics.
       const idxDisc = parts.indexOf('discussion_topics')
       if (idxDisc >= 0 && parts[idxDisc + 1]) {
-        // We need to guess if it's announcement or discussion, defaulting to discussion for generic topics
-        // But commonly announcements are just a type of discussion topic. 
-        // For embedded view, 'discussion' generic type handles both mostly OK, 
-        // but let's try to infer if we can. 
-        // Actually, the routing logic in CourseView separates them.
-        // For now, let's treat generic discussion_topics as 'discussion' unless we know better.
+        // Route generic discussion_topics links as discussions.
         navigateTo('discussion', parts[idxDisc + 1], 'Discussion')
         return
       }
