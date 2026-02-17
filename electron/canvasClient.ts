@@ -13,7 +13,7 @@ import { assertNormalizedAssignmentDev, normalizeAssignmentFromRest } from './as
 // (Types provided via a local d.ts in electron/form-data.d.ts)
 import type FormDataType from 'form-data'
 
-const DEFAULT_BASE_URL = 'https://gatech.instructure.com'
+const DEFAULT_BASE_URL = ''
 const API_PREFIX = '/api/v1'
 
 export class CanvasError extends Error {}
@@ -106,7 +106,11 @@ export class CanvasClient {
   private lastRateLimit?: { remaining?: number; cost?: number; at: number }
 
   constructor(opts: CanvasClientOptions) {
-    this.baseUrl = (opts.baseUrl || DEFAULT_BASE_URL).replace(/\/$/, '')
+    const rawBaseUrl = (opts.baseUrl || DEFAULT_BASE_URL).trim()
+    if (!rawBaseUrl) {
+      throw new CanvasError('Canvas base URL is required.')
+    }
+    this.baseUrl = rawBaseUrl.replace(/\/$/, '')
     this.apiRoot = `${this.baseUrl}${API_PREFIX}`
     this.timeoutMs = opts.timeoutMs ?? 30_000
     this.retry = opts.retry ?? DefaultRetry
@@ -1442,6 +1446,9 @@ export async function initCanvas(config: {
   verbose?: boolean
 }): Promise<{ insecure: boolean }> {
   const rawBase = (config.baseUrl || DEFAULT_BASE_URL).trim()
+  if (!rawBase) {
+    throw new CanvasError('Canvas base URL is required.')
+  }
   let parsed: URL
   try {
     parsed = new URL(rawBase)
@@ -1472,6 +1479,10 @@ export async function initCanvas(config: {
 
 export async function clearToken(baseUrl?: string) {
   const url = (baseUrl || currentBaseUrl || DEFAULT_BASE_URL).replace(/\/$/, '')
+  if (!url) {
+    client = null
+    return
+  }
   await deleteToken(url)
   client = null
 }

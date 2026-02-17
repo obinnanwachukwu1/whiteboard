@@ -1049,7 +1049,11 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     try {
       if (!url.startsWith('http')) return { ok: false, error: 'Invalid URL' }
       const target = new URL(url)
-      const base = new URL((appConfigRef.current?.baseUrl || DEFAULT_CONFIG.baseUrl).replace(/\/$/, ''))
+      const configuredBase = String(appConfigRef.current?.baseUrl || DEFAULT_CONFIG.baseUrl || '').trim()
+      if (!configuredBase) {
+        return { ok: true, data: url }
+      }
+      const base = new URL(configuredBase.replace(/\/$/, ''))
       if (target.origin !== base.origin) {
         // Never resolve non-Canvas origins in main; avoid leaking auth on redirects.
         return { ok: true, data: url }

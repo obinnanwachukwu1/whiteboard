@@ -44,7 +44,7 @@ export function useRootLayoutState() {
   const { add: addToast } = useToast()
 
   const [token, setToken] = useState('')
-  const [baseUrl, setBaseUrl] = useState('https://gatech.instructure.com')
+  const [baseUrl, setBaseUrl] = useState('')
   const [canvasWriteEnabledByHost, setCanvasWriteEnabledByHostState] = useState<
     Record<string, boolean>
   >({})

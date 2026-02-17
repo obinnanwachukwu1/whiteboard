@@ -82,7 +82,7 @@ export const DEFAULT_THEME_CONFIG: ThemeConfig = {
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
-  baseUrl: 'https://gatech.instructure.com',
+  baseUrl: '',
   canvasWriteEnabledByHost: {},
   showcaseModeEnabled: false,
   verbose: false,
