@@ -147,15 +147,9 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
 export type GpaRow = { min: number; gpa: number }
 
 export const DEFAULT_GPA_MAPPING: GpaRow[] = [
-  { min: 93, gpa: 4.0 },
-  { min: 90, gpa: 3.7 },
-  { min: 87, gpa: 3.3 },
-  { min: 83, gpa: 3.0 },
-  { min: 80, gpa: 2.7 },
-  { min: 77, gpa: 2.3 },
-  { min: 73, gpa: 2.0 },
-  { min: 70, gpa: 1.7 },
-  { min: 67, gpa: 1.3 },
+  { min: 90, gpa: 4.0 },
+  { min: 80, gpa: 3.0 },
+  { min: 70, gpa: 2.0 },
   { min: 60, gpa: 1.0 },
   { min: 0, gpa: 0.0 },
 ]

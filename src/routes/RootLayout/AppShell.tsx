@@ -231,7 +231,7 @@ function AppShellInner(props: Props) {
           <InboxPanel isOpen={props.inboxOpen} onClose={props.onCloseInbox} />
           <OnboardingWizard isOpen={props.oobeOpen} onClose={props.onCloseOobe} />
           <AISidePanelKeyboardHandler />
-          <NotificationManager />
+          <NotificationManager paused={props.oobeOpen} />
         </>
       )}
     </AIPanelProvider>

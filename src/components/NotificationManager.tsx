@@ -22,11 +22,20 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   notifiedAssignmentIds: [],
 }
 
-export function NotificationManager() {
+type Props = {
+  paused?: boolean
+}
+
+export function NotificationManager({ paused = false }: Props) {
   // We use a ref to track if we've already requested permission to avoid loop
   const permissionRequested = useRef(false)
+  const pausedRef = useRef(paused)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    pausedRef.current = paused
+  }, [paused])
 
   // Load settings (or defaults)
   const { data: appConfig } = useQuery({
@@ -49,7 +58,7 @@ export function NotificationManager() {
   // Get courses for name lookup (cached from RootLayout)
   const { data: courses } = useCourses(
     { enrollment_state: 'active' },
-    { enabled: settings.enabled },
+    { enabled: settings.enabled && !paused },
   )
 
   const courseMap = useMemo(() => {
@@ -82,6 +91,7 @@ export function NotificationManager() {
 
   // Request permission on mount if enabled
   useEffect(() => {
+    if (paused) return
     if (settings.enabled && !permissionRequested.current && Notification.permission === 'default') {
       permissionRequested.current = true
       Notification.requestPermission().then((result) => {
@@ -92,12 +102,13 @@ export function NotificationManager() {
         }
       })
     }
-  }, [settings.enabled])
+  }, [paused, settings.enabled])
 
   // --- Polling: Activity Stream (Grades, Announcements) ---
   useQuery({
     queryKey: ['notifications', 'activity-stream', courses?.length], // Re-run if courses load
     queryFn: async () => {
+      if (pausedRef.current) return null
       if (!settings.enabled) return null
       if (Notification.permission !== 'granted') return null
 
@@ -113,6 +124,7 @@ export function NotificationManager() {
 
       // Iterate newest first
       for (const item of items) {
+        if (pausedRef.current) return null
         if (!item.created_at) continue
         const itemDate = new Date(item.created_at)
 
@@ -230,13 +242,15 @@ export function NotificationManager() {
       return items
     },
     refetchInterval: 15 * 60 * 1000, // 15 minutes
-    enabled: settings.enabled && (settings.notifyNewGrades || settings.notifyNewAnnouncements),
+    enabled:
+      !paused && settings.enabled && (settings.notifyNewGrades || settings.notifyNewAnnouncements),
   })
 
   // --- Polling: Due Assignments ---
   useQuery({
     queryKey: ['notifications', 'due-assignments'],
     queryFn: async () => {
+      if (pausedRef.current) return null
       if (!settings.enabled || !settings.notifyDueAssignments) return null
       if (Notification.permission !== 'granted') return null
 
@@ -251,6 +265,7 @@ export function NotificationManager() {
       const newNotifiedIds: number[] = []
 
       for (const assign of assignments) {
+        if (pausedRef.current) return null
         if (!assign.dueAt) continue
         const due = new Date(assign.dueAt)
         const id = Number(assign.assignment_rest_id || assign.assignment_graphql_id)
@@ -320,7 +335,7 @@ export function NotificationManager() {
       return assignments
     },
     refetchInterval: 60 * 60 * 1000, // Check every hour
-    enabled: settings.enabled && settings.notifyDueAssignments,
+    enabled: !paused && settings.enabled && settings.notifyDueAssignments,
   })
 
   return null // Headless component

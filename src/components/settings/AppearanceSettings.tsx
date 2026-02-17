@@ -18,9 +18,9 @@ import { useAppData, useAppPreferences } from '../../context/AppContext'
 const PRESET_GROUPS: { label: string; presets: AccentPreset[] }[] = [
   { label: 'Neutral', presets: ['neutral'] },
   { label: 'Warm', presets: ['red', 'orange', 'amber', 'yellow'] },
-  { label: 'Nature', presets: ['lime', 'green', 'emerald', 'teal'] },
-  { label: 'Cool', presets: ['cyan', 'sky', 'blue', 'indigo'] },
-  { label: 'Vibrant', presets: ['violet', 'purple', 'fuchsia', 'pink', 'rose'] },
+  { label: 'Nature', presets: ['green', 'teal'] },
+  { label: 'Cool', presets: ['cyan', 'blue', 'indigo'] },
+  { label: 'Vibrant', presets: ['violet', 'pink'] },
 ]
 
 export function AppearanceSettings() {

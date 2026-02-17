@@ -10,33 +10,20 @@ import {
 
 const DEFAULT_ACCENTS: AccentPreset[] = [
   'neutral',
-  'blue',
-  'emerald',
-  'teal',
-  'violet',
-  'rose',
-  'amber',
-  'orange',
-]
-const ALL_ACCENTS: AccentPreset[] = [
-  'neutral',
   'red',
   'orange',
-  'amber',
   'yellow',
-  'lime',
   'green',
-  'emerald',
-  'teal',
   'cyan',
-  'sky',
   'blue',
-  'indigo',
   'violet',
-  'purple',
-  'fuchsia',
+]
+const ALL_ACCENTS: AccentPreset[] = [
+  ...DEFAULT_ACCENTS,
+  'amber',
+  'teal',
+  'indigo',
   'pink',
-  'rose',
 ]
 
 const THEME_OPTIONS: Array<{
@@ -167,9 +154,10 @@ export function AppearanceStep(_props: StepProps) {
               Accent
             </p>
 
-            <div className="mt-4 grid grid-cols-4 sm:grid-cols-8 gap-2.5">
+            <div className="mt-4 grid w-full grid-cols-4 sm:grid-cols-8 place-items-center gap-x-2.5 gap-y-3">
               {accentChoices.map((preset) => {
                 const active = selectedAccentPreset === preset
+                const activeCheckClass = dark ? 'text-white' : 'text-slate-900'
                 return (
                   <button
                     key={preset}
@@ -188,7 +176,7 @@ export function AppearanceStep(_props: StepProps) {
                     }}
                   >
                     {active && (
-                      <span className="absolute inset-0 grid place-items-center text-white text-[10px] font-semibold">
+                      <span className={`absolute inset-0 grid place-items-center text-[10px] font-semibold ${activeCheckClass}`}>
                         ✓
                       </span>
                     )}

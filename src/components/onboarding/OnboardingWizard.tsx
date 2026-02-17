@@ -133,19 +133,6 @@ export function OnboardingWizard({ isOpen, onClose }: Props) {
     }, 200)
   }, [onClose])
 
-  useEffect(() => {
-    if (!isVisible) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation()
-        handleClose()
-      }
-    }
-    document.addEventListener('keydown', handler, true)
-    return () => document.removeEventListener('keydown', handler, true)
-  }, [isVisible, handleClose])
-
   const onNext = useCallback(() => {
     if (step < steps.length - 1) {
       setDirection('forward')
@@ -209,9 +196,6 @@ export function OnboardingWizard({ isOpen, onClose }: Props) {
           <header className="border-b border-gray-200/60 dark:border-neutral-800/80 px-5 md:px-8 py-4 md:py-5">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 dark:text-neutral-400">
-                  Onboarding
-                </p>
                 <h1 className="text-lg md:text-xl font-semibold text-slate-900 dark:text-slate-100">
                   {currentStep.title}
                 </h1>

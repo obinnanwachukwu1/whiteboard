@@ -79,6 +79,7 @@ export function useRootLayoutState() {
   const [inboxOpen, setInboxOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [oobeOpen, setOobeOpen] = useState(false)
+  const [onboardingCheckUserKey, setOnboardingCheckUserKey] = useState<string | null>(null)
 
   const { themeSettings, setThemeSettings } = useRootLayoutTheme()
   const [notificationSettings, setNotificationSettingsState] = useState<NotificationSettings>(() => ({
@@ -120,12 +121,13 @@ export function useRootLayoutState() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onToggleSearch, privateModeEnabled])
 
-  // Global Cmd+Shift+O keyboard shortcut (OOBE wizard)
+  // Dev-only Cmd+Shift+O keyboard shortcut (open OOBE wizard)
   useEffect(() => {
+    if (!import.meta.env.DEV) return
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'o') {
         e.preventDefault()
-        setOobeOpen((prev) => !prev)
+        setOobeOpen((prev) => (prev ? prev : true))
       }
     }
     document.addEventListener('keydown', handleKeyDown)
@@ -383,6 +385,43 @@ export function useRootLayoutState() {
     },
     [userKey],
   )
+
+  useEffect(() => {
+    if (embedBoot) return
+    if (hasToken !== true) return
+    if (!userKey || !userSettingsHydrated) return
+    if (onboardingCheckUserKey === userKey) return
+
+    setOnboardingCheckUserKey(userKey)
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        const cfg = await window.settings.get?.()
+        const data = (cfg?.ok ? (cfg.data as any) : {}) || {}
+        const perSettings = data?.userSettings?.[userKey] || {}
+        const hasCompletedOnboarding = Boolean(
+          perSettings.onboardingCompletedAt || perSettings.onboardingCompleted,
+        )
+        if (!hasCompletedOnboarding && !cancelled) setOobeOpen(true)
+      } catch {}
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [embedBoot, hasToken, onboardingCheckUserKey, userKey, userSettingsHydrated])
+
+  useEffect(() => {
+    if (userKey) return
+    setOnboardingCheckUserKey(null)
+  }, [userKey])
+
+  const closeOobe = useCallback(() => {
+    setOobeOpen(false)
+    if (!userKey) return
+    void saveUserSettings({ onboardingCompletedAt: new Date().toISOString() })
+  }, [saveUserSettings, userKey])
 
   const setNotificationSettings = useCallback(
     async (partial: Partial<NotificationSettings>) => {
@@ -848,6 +887,8 @@ export function useRootLayoutState() {
     } catch {}
     setCachedCourses([])
     setCachedDue([])
+    setOobeOpen(false)
+    setOnboardingCheckUserKey(null)
     setHasToken(false)
     setPdfGestureZoomEnabledState(true)
     navigate({ to: '/dashboard' })
@@ -1201,7 +1242,7 @@ export function useRootLayoutState() {
       onCloseSettings: () => setSettingsOpen(false),
       onClosePinned: () => setPinnedOpen(false),
       onCloseInbox: () => setInboxOpen(false),
-      onCloseOobe: () => setOobeOpen(false),
+      onCloseOobe: closeOobe,
       onOpenSearch,
       onOpenPinned: () => {
         setInboxOpen(false)
