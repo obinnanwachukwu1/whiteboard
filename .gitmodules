@@ -1,0 +1,4 @@
+[submodule "native/afmbridge"]
+	path = native/afmbridge
+	url = https://github.com/obinnanwachukwu1/afmbridge.git
+	branch = main

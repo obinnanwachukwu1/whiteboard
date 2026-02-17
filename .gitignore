@@ -11,7 +11,6 @@ node_modules
 dist
 dist-ssr
 *.local
-.github/
 .env
 
 # Electron build outputs and installers
@@ -39,7 +38,18 @@ dist-electron/
 *.sln
 *.sw?
 
+# Generated evaluation artifacts (can contain sensitive prompt/context data)
+docs/ai-evals/
+
+# Downloaded afmbridge binary (fetched on demand for packaging)
+resources/afmbridge-server
+resources/bin/afmbridge-server
+
 # Agent Documentation
 AGENTS.md
 PLAN.md
 .claude/
+
+# Local app metadata (not part of OSS repo)
+.github/chatmodes/
+.github/appmod/

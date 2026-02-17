@@ -58,7 +58,15 @@ Your Canvas token, cache, and search index are stored locally on your device. AI
 
 ## For contributors
 - Install dependencies: `pnpm install`
-- Run checks: `pnpm lint` and `pnpm test`
+- Run checks: `pnpm exec tsc -p tsconfig.json --noEmit`, `pnpm lint`, and `pnpm test`
+- Packaging on macOS arm64 fetches `afmbridge-server` automatically via `pnpm run prepare:afmbridge` (already wired into build scripts)
+
+## Project docs
+- [CONTRIBUTING](CONTRIBUTING.md)
+- [SECURITY](SECURITY.md)
+- [CODE_OF_CONDUCT](CODE_OF_CONDUCT.md)
+- [SUPPORT](SUPPORT.md)
+- [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES.md)
 
 ## License
 GPLv3. See [LICENSE](LICENSE).
