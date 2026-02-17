@@ -16,7 +16,7 @@ import { useAppData, useAppPreferences } from '../../context/AppContext'
 
 // Group presets by color family for better organization
 const PRESET_GROUPS: { label: string; presets: AccentPreset[] }[] = [
-  { label: 'Neutral', presets: ['slate'] },
+  { label: 'Neutral', presets: ['neutral'] },
   { label: 'Warm', presets: ['red', 'orange', 'amber', 'yellow'] },
   { label: 'Nature', presets: ['lime', 'green', 'emerald', 'teal'] },
   { label: 'Cool', presets: ['cyan', 'sky', 'blue', 'indigo'] },
@@ -272,7 +272,12 @@ export function AppearanceSettings() {
                         : ''
                     }
                   `}
-                  style={{ backgroundColor: getPresetSwatchColor(preset, dark) }}
+                  style={{
+                    backgroundColor: getPresetSwatchColor(preset, dark),
+                    ...(preset === 'neutral' && !dark
+                      ? { boxShadow: 'inset 0 0 0 1px rgb(148 163 184 / 0.55)' }
+                      : undefined),
+                  }}
                 />
               )),
             )}

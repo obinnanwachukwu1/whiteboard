@@ -10,13 +10,14 @@ interface BackgroundLayerProps {
 export function BackgroundLayer({ settings }: BackgroundLayerProps) {
   const { theme, accentPreset, backgroundMode, background } = settings
   const dark = theme === 'dark'
+  const isNeutralAccent = backgroundMode !== 'background' && accentPreset === 'neutral'
 
   // Get accent HSL values
   const accentHSL = useMemo(() => {
     if (backgroundMode === 'background' && background.extractedAccent) {
       return background.extractedAccent
     }
-    return ACCENT_PRESETS[accentPreset] || ACCENT_PRESETS.slate
+    return ACCENT_PRESETS[accentPreset] || ACCENT_PRESETS.neutral
   }, [backgroundMode, background.extractedAccent, accentPreset])
 
   // Generate background styles based on type
@@ -61,14 +62,18 @@ export function BackgroundLayer({ settings }: BackgroundLayerProps) {
     }
 
     // Solid color background (default/fallback)
-    const baseColor = dark
-      ? `hsl(${accentHSL.h}, ${Math.max(accentHSL.s - 50, 5)}%, 8%)`
-      : `hsl(${accentHSL.h}, ${Math.max(accentHSL.s - 40, 10)}%, 98%)`
+    const baseColor = isNeutralAccent
+      ? dark
+        ? 'rgb(0 0 0)'
+        : 'rgb(255 255 255)'
+      : dark
+        ? `hsl(${accentHSL.h}, ${Math.max(accentHSL.s - 50, 5)}%, 8%)`
+        : `hsl(${accentHSL.h}, ${Math.max(accentHSL.s - 40, 10)}%, 98%)`
 
     return {
       backgroundColor: baseColor,
     }
-  }, [background, accentHSL, dark])
+  }, [background, accentHSL, dark, isNeutralAccent])
 
   // Image-specific overlay and blur
   const showImageEffects = background.type === 'image' && background.imageUrl
@@ -135,7 +140,7 @@ export function useBackgroundSettings(): ThemeSettings | null {
 
           // Map legacy accent to preset
           const legacyMap: Record<string, string> = {
-            default: 'slate',
+            default: 'neutral',
             red: 'red',
             orange: 'orange',
             yellow: 'yellow',
@@ -147,7 +152,7 @@ export function useBackgroundSettings(): ThemeSettings | null {
 
           setSettings({
             theme,
-            accentPreset: (legacyMap[accent] || 'slate') as any,
+            accentPreset: (legacyMap[accent] || 'neutral') as any,
             backgroundMode: 'accent',
             background: {
               type: 'solid',

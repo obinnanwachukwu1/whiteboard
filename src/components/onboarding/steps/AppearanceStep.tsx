@@ -8,9 +8,18 @@ import {
   type AccentPreset,
 } from '../../../utils/theme'
 
-const DEFAULT_ACCENTS: AccentPreset[] = ['slate', 'blue', 'emerald', 'teal', 'violet', 'rose', 'amber', 'orange']
+const DEFAULT_ACCENTS: AccentPreset[] = [
+  'neutral',
+  'blue',
+  'emerald',
+  'teal',
+  'violet',
+  'rose',
+  'amber',
+  'orange',
+]
 const ALL_ACCENTS: AccentPreset[] = [
-  'slate',
+  'neutral',
   'red',
   'orange',
   'amber',
@@ -81,7 +90,7 @@ export function AppearanceStep(_props: StepProps) {
   )
 
   const dark = settings.theme === 'dark'
-  const selectedAccentPreset = (settings.accentPreset ?? 'blue') as AccentPreset
+  const selectedAccentPreset = (settings.accentPreset ?? 'neutral') as AccentPreset
   const accentChoices = showAllAccents ? ALL_ACCENTS : DEFAULT_ACCENTS
 
   return (
@@ -171,7 +180,12 @@ export function AppearanceStep(_props: StepProps) {
                         ? 'ring-2 ring-offset-2 ring-offset-[var(--glass-bg)] ring-slate-900 dark:ring-white scale-105'
                         : ''
                     }`}
-                    style={{ backgroundColor: getPresetSwatchColor(preset, dark) }}
+                    style={{
+                      backgroundColor: getPresetSwatchColor(preset, dark),
+                      ...(preset === 'neutral' && !dark
+                        ? { boxShadow: 'inset 0 0 0 1px rgb(148 163 184 / 0.55)' }
+                        : undefined),
+                    }}
                   >
                     {active && (
                       <span className="absolute inset-0 grid place-items-center text-white text-[10px] font-semibold">

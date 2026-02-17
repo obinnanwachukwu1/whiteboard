@@ -15,6 +15,7 @@ export type AppFlagsValue = {
   aiAvailability: AIAvailability | null
   canvasWriteEnabled: boolean
   canvasWriteForcedBySchool: boolean
+  showcaseModeEnabled: boolean
   embeddingsEnabled: boolean
   privateModeEnabled: boolean
   privateModeAcknowledged: boolean

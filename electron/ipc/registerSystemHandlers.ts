@@ -4,16 +4,24 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { CanvasError, downloadFile as svcDownloadFile } from '../canvasClient'
+import type { AppConfig } from '../config'
 import { normalizeWin32Path } from '../pathUtils'
+import { SHOWCASE_UNAVAILABLE_ERROR } from '../showcaseMode/canvasShowcaseService'
+import { isShowcaseModeActive } from '../showcaseMode/runtime'
 import type { CreateContentWindowFn, SafeContentTypeFn } from './types'
 
 export type SystemIpcDeps = {
+  getAppConfig: () => AppConfig
+  isShowcaseModeAllowed: () => boolean
   uploadFileMap: Map<string, string>
   safeContentType: SafeContentTypeFn
   createContentWindow: CreateContentWindowFn
 }
 
 export function registerSystemHandlers(deps: SystemIpcDeps) {
+  const showcaseModeActive = () =>
+    isShowcaseModeActive(deps.getAppConfig(), deps.isShowcaseModeAllowed())
+
   const { uploadFileMap, safeContentType, createContentWindow } = deps
   ipcMain.handle('app:openExternal', async (_evt, url: string) => {
     try {
@@ -81,6 +89,9 @@ export function registerSystemHandlers(deps: SystemIpcDeps) {
       opts?: { multiple?: boolean; filters?: { name: string; extensions: string[] }[] },
     ) => {
       try {
+        if (showcaseModeActive()) {
+          return { ok: false, error: SHOWCASE_UNAVAILABLE_ERROR }
+        }
         const result = await dialog.showOpenDialog({
           properties: ['openFile', ...(opts?.multiple === false ? [] : ['multiSelections' as const])],
           filters: opts?.filters,
@@ -110,6 +121,9 @@ export function registerSystemHandlers(deps: SystemIpcDeps) {
     'app:downloadFile',
     async (_evt, fileId: string | number, suggestedName?: string) => {
       try {
+        if (showcaseModeActive()) {
+          return { ok: false, error: SHOWCASE_UNAVAILABLE_ERROR }
+        }
         const downloadedPath = await svcDownloadFile(fileId)
         const defaultName = suggestedName || path.basename(downloadedPath)
   

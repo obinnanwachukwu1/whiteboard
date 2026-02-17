@@ -1,4 +1,5 @@
 export type AccentPreset =
+  | 'neutral'
   | 'slate'
   | 'red'
   | 'orange'
@@ -202,6 +203,7 @@ export interface CanvasApi {
 export interface SettingsData {
   baseUrl: string
   canvasWriteEnabledByHost?: Record<string, boolean>
+  showcaseModeEnabled?: boolean
   verbose?: boolean
   theme?: 'light' | 'dark'
   accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'

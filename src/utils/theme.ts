@@ -4,6 +4,7 @@
 import { THEME_CACHE_KEY } from './themeCache'
 
 export type AccentPreset =
+  | 'neutral'
   | 'slate'
   | 'red'
   | 'orange'
@@ -142,6 +143,7 @@ export const ACCENT_PRESETS: Record<
   AccentPreset,
   { h: number; s: number; l: number; name: string }
 > = {
+  neutral: { h: 215, s: 0, l: 50, name: 'Default' },
   slate: { h: 215, s: 16, l: 47, name: 'Slate' },
   red: { h: 0, s: 72, l: 51, name: 'Red' },
   orange: { h: 25, s: 95, l: 53, name: 'Orange' },
@@ -164,7 +166,7 @@ export const ACCENT_PRESETS: Record<
 
 // Map legacy accent names to new presets
 const LEGACY_ACCENT_MAP: Record<Accent, AccentPreset> = {
-  default: 'slate',
+  default: 'neutral',
   red: 'red',
   orange: 'orange',
   yellow: 'yellow',
@@ -175,7 +177,7 @@ const LEGACY_ACCENT_MAP: Record<Accent, AccentPreset> = {
 }
 
 export function legacyAccentToPreset(accent: Accent): AccentPreset {
-  return LEGACY_ACCENT_MAP[accent] || 'slate'
+  return LEGACY_ACCENT_MAP[accent] || 'neutral'
 }
 
 // Generate a full shade scale from HSL values
@@ -215,8 +217,10 @@ export function generateAccentTokens(
   s: number,
   l: number,
   dark: boolean,
+  preset?: AccentPreset,
 ): Record<string, string> {
   const shades = generateShadeScale(h, s, l, dark)
+  const isNeutral = preset === 'neutral'
 
   // Semantic tokens mapped to shade scale
   const tokens: Record<string, string> = {
@@ -247,30 +251,64 @@ export function generateAccentTokens(
     '--accent-shadow': `hsla(${h}, ${s}%, ${dark ? 20 : 40}%, ${dark ? 0.3 : 0.15})`,
 
     // Glass surface tokens (with alpha) - semi-transparent to show background
-    '--glass-bg': dark
-      ? `hsla(${h}, ${Math.max(s - 40, 10)}%, 12%, 0.7)`
-      : `hsla(${h}, ${Math.max(s, 40)}%, 96%, 0.65)`,
-    '--glass-hover': dark
-      ? `hsla(${h}, ${Math.max(s - 35, 15)}%, 18%, 0.75)`
-      : `hsla(${h}, ${Math.max(s, 45)}%, 94%, 0.75)`,
-    '--glass-active': dark
-      ? `hsla(${h}, ${Math.max(s - 30, 20)}%, 22%, 0.8)`
-      : `hsla(${h}, ${Math.max(s, 50)}%, 92%, 0.85)`,
-    '--glass-border': dark
-      ? `hsla(${h}, ${Math.max(s - 40, 10)}%, 35%, 0.4)`
-      : `hsla(${h}, ${Math.max(s, 40)}%, 70%, 0.5)`,
+    '--glass-bg': isNeutral
+      ? dark
+        ? 'hsla(0, 0%, 4%, 0.85)'
+        : 'hsla(215, 24%, 95%, 0.9)'
+      : dark
+        ? `hsla(${h}, ${Math.max(s - 40, 10)}%, 12%, 0.7)`
+        : `hsla(${h}, ${Math.max(s, 40)}%, 96%, 0.65)`,
+    '--glass-hover': isNeutral
+      ? dark
+        ? 'hsla(0, 0%, 8%, 0.9)'
+        : 'hsla(215, 24%, 94%, 0.92)'
+      : dark
+        ? `hsla(${h}, ${Math.max(s - 35, 15)}%, 18%, 0.75)`
+        : `hsla(${h}, ${Math.max(s, 45)}%, 94%, 0.75)`,
+    '--glass-active': isNeutral
+      ? dark
+        ? 'hsla(0, 0%, 13%, 0.95)'
+        : 'hsla(215, 24%, 90%, 0.95)'
+      : dark
+        ? `hsla(${h}, ${Math.max(s - 30, 20)}%, 22%, 0.8)`
+        : `hsla(${h}, ${Math.max(s, 50)}%, 92%, 0.85)`,
+    '--glass-border': isNeutral
+      ? dark
+        ? 'hsla(0, 0%, 30%, 0.32)'
+        : 'hsla(215, 20%, 70%, 0.45)'
+      : dark
+        ? `hsla(${h}, ${Math.max(s - 40, 10)}%, 35%, 0.4)`
+        : `hsla(${h}, ${Math.max(s, 40)}%, 70%, 0.5)`,
 
     // Legacy compatibility tokens - semi-transparent for background visibility
-    '--app-accent-bg': dark
-      ? `hsla(${h}, ${Math.max(s - 40, 10)}%, 12%, 0.7)`
-      : `hsla(${h}, ${Math.max(s, 40)}%, 96%, 0.65)`,
-    '--app-accent-root': dark
-      ? `hsl(${h}, ${Math.max(s - 50, 5)}%, 8%)`
-      : `hsl(${h}, ${Math.max(s, 35)}%, 98%)`,
-    '--app-accent-hover': dark
-      ? `hsla(${h}, ${Math.max(s - 35, 15)}%, 18%, 0.75)`
-      : `hsla(${h}, ${Math.max(s, 45)}%, 94%, 0.75)`,
-    '--app-accent-active': dark ? `hsla(${h}, ${s}%, 50%, 0.2)` : `hsla(${h}, ${s}%, 55%, 0.25)`,
+    '--app-accent-bg': isNeutral
+      ? dark
+        ? 'rgb(0 0 0 / 0.88)'
+        : 'rgb(241 245 249 / 0.94)'
+      : dark
+        ? `hsla(${h}, ${Math.max(s - 40, 10)}%, 12%, 0.7)`
+        : `hsla(${h}, ${Math.max(s, 40)}%, 96%, 0.65)`,
+    '--app-accent-root': isNeutral
+      ? dark
+        ? 'rgb(0 0 0)'
+        : 'rgb(255 255 255)'
+      : dark
+        ? `hsl(${h}, ${Math.max(s - 50, 5)}%, 8%)`
+        : `hsl(${h}, ${Math.max(s, 35)}%, 98%)`,
+    '--app-accent-hover': isNeutral
+      ? dark
+        ? 'rgb(20 20 20 / 0.9)'
+        : 'rgb(226 232 240 / 0.96)'
+      : dark
+        ? `hsla(${h}, ${Math.max(s - 35, 15)}%, 18%, 0.75)`
+        : `hsla(${h}, ${Math.max(s, 45)}%, 94%, 0.75)`,
+    '--app-accent-active': isNeutral
+      ? dark
+        ? 'rgb(34 34 34 / 0.95)'
+        : 'rgb(203 213 225 / 0.98)'
+      : dark
+        ? `hsla(${h}, ${s}%, 50%, 0.2)`
+        : `hsla(${h}, ${s}%, 55%, 0.25)`,
   }
 
   return tokens
@@ -308,12 +346,12 @@ export function applyThemeTokens(settings: ThemeSettings) {
   if (backgroundMode === 'background' && background.extractedAccent) {
     ;({ h, s, l } = background.extractedAccent)
   } else {
-    const preset = ACCENT_PRESETS[accentPreset] || ACCENT_PRESETS.slate
+    const preset = ACCENT_PRESETS[accentPreset] || ACCENT_PRESETS.neutral
     ;({ h, s, l } = preset)
   }
 
   // Generate and apply accent tokens
-  const accentTokens = generateAccentTokens(h, s, l, dark)
+  const accentTokens = generateAccentTokens(h, s, l, dark, accentPreset)
   for (const [prop, value] of Object.entries(accentTokens)) {
     root.style.setProperty(prop, value)
   }
@@ -365,7 +403,7 @@ export function computeAccentBg(accent: Accent, dark: boolean): string {
   const { h, s } = preset
 
   if (accent === 'default') {
-    return dark ? 'rgb(18 18 18 / 0.85)' : 'rgb(255 255 255 / 0.8)'
+    return dark ? 'rgb(0 0 0 / 0.88)' : 'rgb(255 255 255 / 0.8)'
   }
 
   // More visible tinting in light mode
@@ -379,7 +417,7 @@ export function computeAccentBase(accent: Accent, dark: boolean): string {
   const { h, s } = preset
 
   if (accent === 'default') {
-    return dark ? 'rgb(18 18 18)' : 'rgb(255 255 255)'
+    return dark ? 'rgb(0 0 0)' : 'rgb(255 255 255)'
   }
 
   // More visible base color in light mode
@@ -391,7 +429,7 @@ export function computeAccentHover(accent: Accent, dark: boolean): string {
   const { h, s } = preset
 
   if (accent === 'default') {
-    return dark ? 'rgb(38 38 38 / 0.9)' : 'rgb(241 245 249 / 0.95)'
+    return dark ? 'rgb(20 20 20 / 0.9)' : 'rgb(241 245 249 / 0.95)'
   }
 
   // More visible hover in light mode
@@ -405,7 +443,7 @@ export function computeAccentActive(accent: Accent, dark: boolean): string {
   const { h, s } = preset
 
   if (accent === 'default') {
-    return dark ? 'rgb(255 255 255 / 0.1)' : 'rgb(0 0 0 / 0.06)'
+    return dark ? 'rgb(34 34 34 / 0.95)' : 'rgb(0 0 0 / 0.06)'
   }
 
   // More visible active state in light mode
@@ -431,15 +469,21 @@ export function applyThemeAndAccent(theme: 'light' | 'dark', accent: Accent) {
 
 // Get swatch color for UI display
 export function getPresetSwatchColor(preset: AccentPreset, dark: boolean): string {
+  if (preset === 'neutral') {
+    return dark ? 'rgb(0 0 0)' : 'rgb(255 255 255)'
+  }
   const { h, s } = ACCENT_PRESETS[preset]
-  // Return a visible color for the swatch
-  return `hsl(${h}, ${s}%, ${dark ? 60 : 50}%)`
+  const isYellowBand = h >= 35 && h <= 75
+  const minSat = dark ? 45 : 55
+  const swatchSat = Math.max(s, minSat)
+  const swatchLight = dark ? (isYellowBand ? 68 : 62) : isYellowBand ? 42 : 50
+  return `hsl(${h}, ${swatchSat}%, ${swatchLight}%)`
 }
 
 // Default theme settings
 export const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   theme: 'light',
-  accentPreset: 'slate',
+  accentPreset: 'neutral',
   backgroundMode: 'accent',
   background: {
     type: 'solid',

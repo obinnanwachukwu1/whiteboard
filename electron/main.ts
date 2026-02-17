@@ -9,6 +9,7 @@ import { FileMetaStore } from './embedding/fileMetaStore'
 import { cleanupTempFiles } from './embedding/tempCleaner'
 import { registerIndexingIPC } from './embedding/indexingService'
 import { registerIpcHandlers } from './ipc'
+import { sanitizeShowcaseModeConfig } from './showcaseMode/runtime'
 import { createAppMenu } from './bootstrap/menu'
 import {
   getThemeBackgroundsDir,
@@ -170,6 +171,7 @@ let win: BrowserWindow | null
 let tray: Tray | null = null
 let isQuitting = false
 let appConfig: AppConfig = { ...DEFAULT_CONFIG }
+const isShowcaseModeAllowed = () => Boolean(VITE_DEV_SERVER_URL)
 
 function devToolsEnabled(): boolean {
   // Allow devtools in packaged builds only when explicitly requested.
@@ -329,7 +331,7 @@ app.whenReady().then(async () => {
   })
 
   // load config and create window
-  appConfig = await loadConfig()
+  appConfig = sanitizeShowcaseModeConfig(await loadConfig(), isShowcaseModeAllowed())
 
   // Initialize AI Manager
   void aiManager.start(!!appConfig.aiEnabled)
@@ -360,6 +362,7 @@ registerIpcHandlers({
   setAppConfig: (next) => {
     appConfig = next
   },
+  isShowcaseModeAllowed,
   getMainWindow: () => win,
   aiManager,
   embeddingManager,

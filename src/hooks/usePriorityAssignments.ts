@@ -3,6 +3,7 @@ import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { useDueAssignments } from './useCanvasQueries'
 import { useDashboardSettings } from './useDashboardSettings'
+import { useAppFlags } from '../context/AppContext'
 import {
   rankAssignmentsByPriority,
   calculatePriorityScore,
@@ -43,6 +44,7 @@ export function usePriorityAssignments(options?: {
   /** Override max items from settings */
   limit?: number
 }) {
+  const { showcaseModeEnabled } = useAppFlags()
   const queryClient = useQueryClient()
   const { timeHorizon, showSubmitted, maxPriorityItems } = useDashboardSettings()
   const lastStableRef = useRef<{
@@ -53,7 +55,7 @@ export function usePriorityAssignments(options?: {
 
   const enabled = options?.enabled ?? true
   const horizonDays = options?.horizonDays ?? timeHorizon
-  const limit = options?.limit ?? maxPriorityItems
+  const limit = options?.limit ?? (showcaseModeEnabled ? Math.max(8, maxPriorityItems) : maxPriorityItems)
 
   // Fetch due assignments (this uses a longer horizon to get "also due" items)
   const dueQuery = useDueAssignments(

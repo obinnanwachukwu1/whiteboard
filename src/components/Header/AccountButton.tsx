@@ -20,7 +20,9 @@ export const AccountButton: React.FC<Props> = ({
   return (
     <button
       ref={nameBtnRef}
-      className="group inline-flex items-center gap-2 rounded-md px-2 py-1 hover:[background-color:var(--app-accent-hover)] ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10 transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+      className={`group inline-flex items-center rounded-md hover:[background-color:var(--app-accent-hover)] ring-1 ring-transparent hover:ring-black/10 dark:hover:ring-white/10 transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
+        isWin ? 'gap-1.5 px-1.5 py-1' : 'gap-1.5 px-1 py-1'
+      }`}
       onClick={onToggle}
       aria-haspopup="menu"
       aria-expanded={menuOpen}

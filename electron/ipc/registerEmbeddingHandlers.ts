@@ -3,10 +3,15 @@ import { ipcMain } from 'electron'
 import type { IndexableItem, EmbeddingStatus } from '../embedding/manager'
 import type { SearchResult } from '../embedding/vectorStore'
 import type { MainWindowAccess } from './types'
+import type { AppConfig } from '../config'
 import type { EmbeddingManager } from '../embedding/manager'
 import type { FileMetaStore } from '../embedding/fileMetaStore'
+import { SHOWCASE_UNAVAILABLE_ERROR } from '../showcaseMode/canvasShowcaseService'
+import { isShowcaseModeActive } from '../showcaseMode/runtime'
 
 export type EmbeddingIpcDeps = MainWindowAccess & {
+  getAppConfig: () => AppConfig
+  isShowcaseModeAllowed: () => boolean
   embeddingManager: EmbeddingManager
   fileMetaStore: FileMetaStore
   ensureFileMetaStoreLoaded: () => Promise<void>
@@ -14,6 +19,10 @@ export type EmbeddingIpcDeps = MainWindowAccess & {
 
 export function registerEmbeddingHandlers(deps: EmbeddingIpcDeps) {
   const { embeddingManager, fileMetaStore, ensureFileMetaStoreLoaded } = deps
+  const rejectIfShowcaseActive = () => {
+    if (!isShowcaseModeActive(deps.getAppConfig(), deps.isShowcaseModeAllowed())) return null
+    return { ok: false, error: SHOWCASE_UNAVAILABLE_ERROR }
+  }
   
   // Forward download progress events to renderer
   embeddingManager.on('download-progress', (progress) => {
@@ -56,6 +65,8 @@ export function registerEmbeddingHandlers(deps: EmbeddingIpcDeps) {
       opts?: any,
     ): Promise<{ ok: boolean; data?: SearchResult[]; error?: string }> => {
       try {
+        const blocked = rejectIfShowcaseActive()
+        if (blocked) return blocked
         const results = await embeddingManager.search(query, k, opts || {})
         return { ok: true, data: results }
       } catch (e: any) {
@@ -72,6 +83,8 @@ export function registerEmbeddingHandlers(deps: EmbeddingIpcDeps) {
       items: IndexableItem[],
     ): Promise<{ ok: boolean; data?: { indexed: number; skipped: number }; error?: string }> => {
       try {
+        const blocked = rejectIfShowcaseActive()
+        if (blocked) return blocked
         const result = await embeddingManager.index(items)
         return { ok: true, data: result }
       } catch (e: any) {
@@ -83,6 +96,8 @@ export function registerEmbeddingHandlers(deps: EmbeddingIpcDeps) {
   
   ipcMain.handle('embedding:clear', async (): Promise<{ ok: boolean; error?: string }> => {
     try {
+      const blocked = rejectIfShowcaseActive()
+      if (blocked) return blocked
       await embeddingManager.clear()
       // Also clear file indexing metadata so "rebuild" truly reindexes files.
       fileMetaStore.clear()
@@ -113,6 +128,8 @@ export function registerEmbeddingHandlers(deps: EmbeddingIpcDeps) {
       error?: string
     }> => {
       try {
+        const blocked = rejectIfShowcaseActive()
+        if (blocked) return blocked
         const waitForSustainedIdle = async () => {
           while (true) {
             await embeddingManager.waitUntilResumed()
@@ -234,6 +251,8 @@ export function registerEmbeddingHandlers(deps: EmbeddingIpcDeps) {
     'embedding:pruneCourse',
     async (_evt, courseId: string): Promise<{ ok: boolean; data?: number; error?: string }> => {
       try {
+        const blocked = rejectIfShowcaseActive()
+        if (blocked) return blocked
         const removed = await embeddingManager.removeByCourseId(courseId)
         return { ok: true, data: removed }
       } catch (e: any) {

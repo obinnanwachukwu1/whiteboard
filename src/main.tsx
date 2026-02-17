@@ -15,11 +15,6 @@ import ReactDOM from 'react-dom/client'
 import './index.css'
 import { QueryClient, QueryClientProvider, dehydrate, hydrate } from '@tanstack/react-query'
 import { ToastProvider } from './components/ui/Toaster'
-
-// Lazy load devtools only in development
-const ReactQueryDevtools = React.lazy(() =>
-  import('@tanstack/react-query-devtools').then((m) => ({ default: m.ReactQueryDevtools }))
-)
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { RouterProvider } from '@tanstack/react-router'
 import { router } from './router'
@@ -78,15 +73,18 @@ function useQueryPersistence(client: QueryClient) {
       if (params.searchTerm || params.filterBy || params.scope || params.orderBy) return false
       return params.maxPages === 2 && keys.every((k) => k === 'maxPages')
     }
-    const isPrivateMode = () => {
+    const isPersistenceDisabled = () => {
       try {
-        return localStorage.getItem('wb-private-mode') === '1'
+        return (
+          localStorage.getItem('wb-private-mode') === '1' ||
+          localStorage.getItem('wb-showcase-mode') === '1'
+        )
       } catch {
         return false
       }
     }
     const flush = () => {
-      if (isPrivateMode()) return
+      if (isPersistenceDisabled()) return
       try {
         const snap = dehydrate(client, {
           shouldDehydrateQuery: (q) => {
@@ -103,7 +101,7 @@ function useQueryPersistence(client: QueryClient) {
           else setTimeout(cb, 500)
         }
         schedule(() => {
-          if (isPrivateMode()) return
+          if (isPersistenceDisabled()) return
           window.settings.set({ queryCache: snap as any }).catch(() => {})
         })
       } catch {}
@@ -178,7 +176,17 @@ async function main() {
   // immediately (no initial skeleton/popping).
   try {
     const cfg = await window.settings.get()
-    const snap = (cfg.ok ? (cfg.data as any)?.queryCache : undefined)
+    const data = (cfg.ok ? (cfg.data as any) : {}) || {}
+    const privateMode = Boolean(data?.privateModeEnabled)
+    const showcaseMode = Boolean(data?.showcaseModeEnabled)
+    try {
+      if (privateMode) localStorage.setItem('wb-private-mode', '1')
+      else localStorage.removeItem('wb-private-mode')
+      if (showcaseMode) localStorage.setItem('wb-showcase-mode', '1')
+      else localStorage.removeItem('wb-showcase-mode')
+    } catch {}
+    const persistenceDisabled = privateMode || showcaseMode
+    const snap = persistenceDisabled ? undefined : data?.queryCache
     if (snap) {
       try {
         hydrate(queryClient, snap as any)
@@ -197,11 +205,6 @@ async function main() {
               <RouterProvider router={router} />
             </Bootstrap>
           </ErrorBoundary>
-          {import.meta.env.DEV && (
-            <React.Suspense fallback={null}>
-              <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
-            </React.Suspense>
-          )}
         </ToastProvider>
       </QueryClientProvider>
     </React.StrictMode>,

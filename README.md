@@ -2,7 +2,7 @@
   <img src="public/icon.png" alt="Whiteboard logo" width="96" />
 </p>
 <p align="center">
-  <img src="docs/screenshot-placeholder.svg" alt="Whiteboard app screenshot" width="80%" />
+  <img src="public/screenshot.png" alt="Whiteboard app screenshot" width="80%" />
 </p>
 <p align="center"><em>Whiteboard is a fast, focused desktop companion for Canvas.</em></p>
 

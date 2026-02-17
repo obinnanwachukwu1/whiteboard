@@ -10,6 +10,7 @@ type Params = {
   queryClient: { invalidateQueries: (opts?: any) => void; setQueryData: (key: any, data: any) => void }
   setBaseUrl: (next: string) => void
   setCanvasWriteEnabledByHostState: (next: Record<string, boolean>) => void
+  setShowcaseModeEnabledState: (next: boolean) => void
   setThemeSettings: (updater: (prev: ThemeSettings) => ThemeSettings) => void
   setSidebarCfg: (next: any) => void
   setCourseImagesState: (next: Record<string, string>) => void
@@ -37,6 +38,7 @@ export function useRootLayoutBootstrap({
   queryClient,
   setBaseUrl,
   setCanvasWriteEnabledByHostState,
+  setShowcaseModeEnabledState,
   setThemeSettings,
   setSidebarCfg,
   setCourseImagesState,
@@ -64,10 +66,14 @@ export function useRootLayoutBootstrap({
       if (data?.canvasWriteEnabledByHost && typeof data.canvasWriteEnabledByHost === 'object') {
         setCanvasWriteEnabledByHostState(data.canvasWriteEnabledByHost)
       }
+      const showcaseMode = Boolean(data?.showcaseModeEnabled)
+      setShowcaseModeEnabledState(showcaseMode)
       const privateMode = Boolean(data?.privateModeEnabled)
       try {
         if (privateMode) localStorage.setItem('wb-private-mode', '1')
         else localStorage.removeItem('wb-private-mode')
+        if (showcaseMode) localStorage.setItem('wb-showcase-mode', '1')
+        else localStorage.removeItem('wb-showcase-mode')
       } catch {}
 
       try {
@@ -93,7 +99,7 @@ export function useRootLayoutBootstrap({
         const key = `${url}|${data.lastUserId}`
         if (data?.userSidebars?.[key]) setSidebarCfg(data.userSidebars[key])
       }
-      if (!privateMode && data?.courseImages) {
+      if (!privateMode && !showcaseMode && data?.courseImages) {
         const url = data.baseUrl || baseUrl
         setCourseImagesState(data.courseImages[url] || {})
       }
@@ -119,14 +125,14 @@ export function useRootLayoutBootstrap({
       setEncryptionEnabledState(encEnabled)
       setEncryptionEnabledFlag(encEnabled)
       if (typeof data?.verbose === 'boolean') setVerboseState(!!data.verbose)
-      if (!privateMode && Array.isArray(data?.cachedCourses)) {
+      if (!privateMode && !showcaseMode && Array.isArray(data?.cachedCourses)) {
         setCachedCourses(data.cachedCourses || [])
         queryClient.setQueryData(
           ['courses', { enrollment_state: 'active' }],
           data.cachedCourses || [],
         )
       }
-      if (!privateMode && Array.isArray(data?.cachedDue)) {
+      if (!privateMode && !showcaseMode && Array.isArray(data?.cachedDue)) {
         setCachedDue(data.cachedDue || [])
         queryClient.setQueryData(['due-assignments'], data.cachedDue || [])
       }

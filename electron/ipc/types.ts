@@ -31,6 +31,7 @@ export type MainWindowAccess = {
 }
 
 export type SharedIpcDeps = AppConfigAccess & MainWindowAccess & {
+  isShowcaseModeAllowed: () => boolean
   aiManager: AIManager
   embeddingManager: EmbeddingManager
   fileMetaStore: FileMetaStore

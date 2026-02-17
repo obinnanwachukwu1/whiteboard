@@ -27,6 +27,7 @@ type AccentHsl = {
 }
 
 const ACCENT_PRESET_HSL: Record<AccentPreset, AccentHsl> = {
+  neutral: { h: 215, s: 0, l: 50 },
   slate: { h: 215, s: 16, l: 47 },
   red: { h: 0, s: 72, l: 51 },
   orange: { h: 25, s: 95, l: 53 },
@@ -48,7 +49,7 @@ const ACCENT_PRESET_HSL: Record<AccentPreset, AccentHsl> = {
 }
 
 const LEGACY_ACCENT_MAP: Record<NonNullable<AppConfig['accent']>, AccentPreset> = {
-  default: 'slate',
+  default: 'neutral',
   red: 'red',
   orange: 'orange',
   yellow: 'yellow',
@@ -59,7 +60,7 @@ const LEGACY_ACCENT_MAP: Record<NonNullable<AppConfig['accent']>, AccentPreset> 
 }
 
 function getInitialWindowBackgroundColor(appConfig: AppConfig, isDark: boolean): string {
-  const fallback = isDark ? '#020617' : '#ffffff'
+  const fallback = isDark ? '#000000' : '#ffffff'
   const themeConfig = appConfig?.themeConfig
   const legacyAccent = appConfig?.accent
 
@@ -68,9 +69,14 @@ function getInitialWindowBackgroundColor(appConfig: AppConfig, isDark: boolean):
   const extractedAccent =
     themeConfig?.backgroundMode === 'background' ? themeConfig.background?.extractedAccent : undefined
   const preset =
-    themeConfig?.accentPreset || (legacyAccent ? LEGACY_ACCENT_MAP[legacyAccent] : 'slate')
-  const presetHsl = ACCENT_PRESET_HSL[preset] || ACCENT_PRESET_HSL.slate
+    themeConfig?.accentPreset || (legacyAccent ? LEGACY_ACCENT_MAP[legacyAccent] : 'neutral')
+  const presetHsl = ACCENT_PRESET_HSL[preset] || ACCENT_PRESET_HSL.neutral
   const accent = extractedAccent || presetHsl
+
+  const isNeutralAccent = themeConfig?.backgroundMode !== 'background' && preset === 'neutral'
+  if (isNeutralAccent) {
+    return isDark ? '#000000' : '#ffffff'
+  }
 
   const saturation = isDark ? Math.max(accent.s - 50, 5) : Math.max(accent.s, 35)
   const lightness = isDark ? 8 : 98

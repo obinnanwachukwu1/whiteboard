@@ -7,7 +7,7 @@ import path from 'node:path'
 
 // Theme system types
 export type AccentPreset =
-  | 'slate' | 'red' | 'orange' | 'amber' | 'yellow' | 'lime'
+  | 'neutral' | 'slate' | 'red' | 'orange' | 'amber' | 'yellow' | 'lime'
   | 'green' | 'emerald' | 'teal' | 'cyan' | 'sky' | 'blue'
   | 'indigo' | 'violet' | 'purple' | 'fuchsia' | 'pink' | 'rose'
 
@@ -35,6 +35,7 @@ export interface ThemeConfig {
 export type AppConfig = {
   baseUrl: string
   canvasWriteEnabledByHost?: Record<string, boolean>
+  showcaseModeEnabled?: boolean
   verbose?: boolean
   // Legacy theme fields (for backward compatibility)
   theme?: 'light' | 'dark'
@@ -75,7 +76,7 @@ export const DEFAULT_BACKGROUND_SETTINGS: BackgroundSettings = {
 
 export const DEFAULT_THEME_CONFIG: ThemeConfig = {
   theme: 'light',
-  accentPreset: 'slate',
+  accentPreset: 'neutral',
   backgroundMode: 'accent',
   background: DEFAULT_BACKGROUND_SETTINGS,
 }
@@ -83,6 +84,7 @@ export const DEFAULT_THEME_CONFIG: ThemeConfig = {
 export const DEFAULT_CONFIG: AppConfig = {
   baseUrl: 'https://gatech.instructure.com',
   canvasWriteEnabledByHost: {},
+  showcaseModeEnabled: false,
   verbose: false,
   theme: 'light',
   accent: 'default',

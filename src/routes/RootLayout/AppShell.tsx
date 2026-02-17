@@ -94,7 +94,7 @@ function AppShellInner(props: Props) {
     loading: props.dataContext.loading,
   })
 
-  const aiUserName = props.profile?.short_name || props.profile?.name || ''
+  const aiUserName = props.profile?.name || props.profile?.short_name || ''
 
   const aiPinnedCourses = useMemo(() => {
     const list = props.visibleCourses || []

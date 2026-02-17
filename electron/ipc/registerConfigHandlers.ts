@@ -3,10 +3,15 @@ import { BrowserWindow, ipcMain } from 'electron'
 import { loadConfig, saveConfig, type AppConfig } from '../config'
 import type { AIManager } from '../ai/manager'
 import type { ThemeConfigChangedPayload } from '../../src/types/ipc'
+import {
+  sanitizeShowcaseModeConfig,
+  SHOWCASE_MODE_DISABLED_ERROR,
+} from '../showcaseMode/runtime'
 
 export type ConfigIpcDeps = {
   getAppConfig: () => AppConfig
   setAppConfig: (next: AppConfig) => void
+  isShowcaseModeAllowed: () => boolean
   aiManager: AIManager
 }
 
@@ -36,7 +41,8 @@ export function registerConfigHandlers(deps: ConfigIpcDeps) {
 
   ipcMain.handle('config:get', async () => {
     try {
-      appConfigRef.current = await loadConfig()
+      const loaded = await loadConfig()
+      appConfigRef.current = sanitizeShowcaseModeConfig(loaded, deps.isShowcaseModeAllowed())
       return { ok: true, data: appConfigRef.current }
     } catch (e: any) {
       return { ok: false, error: String(e?.message || e) }
@@ -45,8 +51,15 @@ export function registerConfigHandlers(deps: ConfigIpcDeps) {
   
   ipcMain.handle('config:set', async (_evt, partial: Partial<AppConfig>) => {
     try {
+      if (partial?.showcaseModeEnabled === true && !deps.isShowcaseModeAllowed()) {
+        return { ok: false, error: SHOWCASE_MODE_DISABLED_ERROR }
+      }
       const oldConfig = appConfigRef.current
-      appConfigRef.current = await saveConfig(partial)
+      const normalizedPartial = deps.isShowcaseModeAllowed()
+        ? partial
+        : { ...partial, showcaseModeEnabled: false }
+      const saved = await saveConfig(normalizedPartial)
+      appConfigRef.current = sanitizeShowcaseModeConfig(saved, deps.isShowcaseModeAllowed())
   
       // Handle AI toggle
       if (partial.aiEnabled !== undefined && partial.aiEnabled !== oldConfig.aiEnabled) {

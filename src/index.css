@@ -92,10 +92,10 @@ body {
   --glass-active: hsla(215, 20%, 25%, 0.95);
   --glass-border: hsla(215, 10%, 30%, 0.5);
 
-  --app-accent-root: rgb(18 18 18);
-  --app-accent-bg: rgb(18 18 18 / 0.85);
-  --app-accent-hover: rgb(38 38 38 / 0.9);
-  --app-accent-active: rgb(255 255 255 / 0.1);
+  --app-accent-root: rgb(0 0 0);
+  --app-accent-bg: rgb(0 0 0 / 0.88);
+  --app-accent-hover: rgb(20 20 20 / 0.9);
+  --app-accent-active: rgb(34 34 34 / 0.95);
 
   --color-brand: 180 180 180; /* neutral-500-ish */
 }

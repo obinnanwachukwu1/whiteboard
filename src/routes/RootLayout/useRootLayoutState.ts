@@ -48,6 +48,7 @@ export function useRootLayoutState() {
   const [canvasWriteEnabledByHost, setCanvasWriteEnabledByHostState] = useState<
     Record<string, boolean>
   >({})
+  const [showcaseModeEnabled, setShowcaseModeEnabledState] = useState(false)
   const [hasToken, setHasToken] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(false)
   const [showToken, setShowToken] = useState(false)
@@ -142,6 +143,13 @@ export function useRootLayoutState() {
     } catch {}
   }, [privateModeEnabled])
 
+  useEffect(() => {
+    try {
+      if (showcaseModeEnabled) localStorage.setItem('wb-showcase-mode', '1')
+      else localStorage.removeItem('wb-showcase-mode')
+    } catch {}
+  }, [showcaseModeEnabled])
+
   // Listen for native menu actions (Settings...)
   useEffect(() => {
     if (!window.electron?.onMenuAction) return
@@ -181,6 +189,7 @@ export function useRootLayoutState() {
     queryClient,
     setBaseUrl,
     setCanvasWriteEnabledByHostState,
+    setShowcaseModeEnabledState,
     setThemeSettings,
     setSidebarCfg,
     setCourseImagesState,
@@ -331,20 +340,20 @@ export function useRootLayoutState() {
 
   // Local memory snapshots for initial paint + persistence
   useEffect(() => {
-    if (privateModeEnabled) return
+    if (privateModeEnabled || showcaseModeEnabled) return
     if (Array.isArray(coursesQ.data) && coursesQ.data.length) {
       setCachedCourses(coursesQ.data)
       window.settings.set({ cachedCourses: coursesQ.data }).catch(() => {})
     }
-  }, [coursesQ.data, privateModeEnabled])
+  }, [coursesQ.data, privateModeEnabled, showcaseModeEnabled])
 
   useEffect(() => {
-    if (privateModeEnabled) return
+    if (privateModeEnabled || showcaseModeEnabled) return
     if (Array.isArray(dueQ.data)) {
       setCachedDue(dueQ.data)
       window.settings.set({ cachedDue: dueQ.data }).catch(() => {})
     }
-  }, [dueQ.data, privateModeEnabled])
+  }, [dueQ.data, privateModeEnabled, showcaseModeEnabled])
 
   const saveUserSidebar = useCallback(
     async (next: SidebarConfig) => {
@@ -496,6 +505,48 @@ export function useRootLayoutState() {
     },
     [baseUrl, canvasWriteEnabledByHost],
   )
+
+  const setShowcaseModeEnabledPersisted = useCallback(
+    async (v: boolean) => {
+      if (!import.meta.env.DEV) return
+      const previous = showcaseModeEnabled
+      setShowcaseModeEnabledState(v)
+      try {
+        const res = await window.settings.set?.({ showcaseModeEnabled: v })
+        if (!res?.ok) {
+          setShowcaseModeEnabledState(previous)
+          addToast({
+            title: 'Showcase Mode toggle failed',
+            description: String(res?.error || 'Unknown error'),
+            variant: 'destructive',
+          })
+          return
+        }
+      } catch (e: any) {
+        setShowcaseModeEnabledState(previous)
+        addToast({
+          title: 'Showcase Mode toggle failed',
+          description: String(e?.message || e),
+          variant: 'destructive',
+        })
+        return
+      }
+      await clearLocalCaches()
+      window.location.reload()
+    },
+    [addToast, clearLocalCaches, showcaseModeEnabled],
+  )
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.key.toLowerCase() !== 'f') return
+      e.preventDefault()
+      void setShowcaseModeEnabledPersisted(!showcaseModeEnabled)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [showcaseModeEnabled, setShowcaseModeEnabledPersisted])
 
   const setPrefetchEnabledPersisted = useCallback(
     async (v: boolean) => {
@@ -681,7 +732,7 @@ export function useRootLayoutState() {
   const setCourseImages = useCallback(
     async (map: Record<string, string>) => {
       setCourseImagesState(map)
-      if (privateModeEnabled) return
+      if (privateModeEnabled || showcaseModeEnabled) return
       try {
         const cfg = await window.settings.get?.()
         const data = (cfg?.ok ? (cfg.data as any) : {}) as any
@@ -690,7 +741,7 @@ export function useRootLayoutState() {
         await window.settings.set?.({ courseImages: next })
       } catch {}
     },
-    [baseUrl, privateModeEnabled],
+    [baseUrl, privateModeEnabled, showcaseModeEnabled],
   )
 
   const onOpenCourse = useCallback(
@@ -895,6 +946,7 @@ export function useRootLayoutState() {
       aiAvailability,
       canvasWriteEnabled,
       canvasWriteForcedBySchool,
+      showcaseModeEnabled,
       embeddingsEnabled,
       privateModeEnabled,
       privateModeAcknowledged,
@@ -912,6 +964,7 @@ export function useRootLayoutState() {
       aiAvailability,
       canvasWriteEnabled,
       canvasWriteForcedBySchool,
+      showcaseModeEnabled,
       embeddingsEnabled,
       privateModeEnabled,
       privateModeAcknowledged,

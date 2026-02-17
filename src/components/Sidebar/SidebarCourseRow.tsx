@@ -58,7 +58,7 @@ export const SidebarCourseRow: React.FC<SidebarCourseRowProps> = ({
       <button
         className={`w-full text-left py-2 pl-7 pr-8 rounded-lg text-sm outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 ${
           active
-            ? 'bg-[var(--accent-200)] dark:bg-[var(--accent-50)] text-slate-900 dark:text-slate-100 font-medium shadow-sm ring-1 ring-[var(--accent-300)] dark:ring-[var(--accent-300)]'
+            ? 'bg-[var(--accent-200)] dark:bg-[var(--accent-50)] text-slate-900 dark:text-slate-100 font-medium ring-1 ring-[var(--accent-300)] dark:ring-[var(--accent-300)]'
             : 'hover:bg-[var(--glass-hover)] text-slate-600 dark:text-slate-300'
         }`}
         onClick={onSelect}

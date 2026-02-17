@@ -65,10 +65,13 @@ import {
   CANVAS_WRITE_BLOCKED_ERROR,
   isCanvasWriteEnabledForBaseUrl,
 } from '../../src/shared/canvasWritePolicy'
+import { handleShowcaseCanvasCall } from '../showcaseMode/canvasShowcaseService'
+import { isShowcaseModeActive } from '../showcaseMode/runtime'
 
 export type CanvasIpcDeps = {
   getAppConfig: () => AppConfig
   setAppConfig: (next: AppConfig) => void
+  isShowcaseModeAllowed: () => boolean
   uploadFileMap: Map<string, string>
 }
 
@@ -93,16 +96,47 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     return { ok: false, error: CANVAS_WRITE_BLOCKED_ERROR }
   }
 
+  const showcaseModeActive = () =>
+    isShowcaseModeActive(appConfigRef.current, deps.isShowcaseModeAllowed())
+
+  const maybeShowcaseResult = (channel: string, args: unknown[]) => {
+    if (!showcaseModeActive()) return undefined
+    return handleShowcaseCanvasCall(channel, args, {
+      baseUrl: appConfigRef.current?.baseUrl || DEFAULT_CONFIG.baseUrl,
+    })
+  }
+
+  const registerCanvasHandle = (
+    channel: string,
+    handler: (
+      evt: Electron.IpcMainInvokeEvent,
+      ...args: any[]
+    ) => Promise<{ ok: boolean; [key: string]: unknown }>,
+  ) => {
+    ipcMain.handle(channel, async (evt, ...args) => {
+      const showcase = maybeShowcaseResult(channel, args)
+      if (showcase !== undefined) return showcase
+      return handler(evt, ...args)
+    })
+  }
+
   const { uploadFileMap } = deps
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:init',
     async (_evt, cfg: { token?: string; baseUrl?: string; verbose?: boolean }) => {
       try {
         const baseUrl = cfg?.baseUrl || appConfigRef.current.baseUrl
         const verbose = cfg?.verbose ?? appConfigRef.current.verbose
+        const persistencePatch = deps.isShowcaseModeAllowed()
+          ? { baseUrl, verbose }
+          : { baseUrl, verbose, showcaseModeEnabled: false }
+        if (showcaseModeActive()) {
+          appConfigRef.current = await saveConfig(persistencePatch)
+          return { ok: true }
+        }
         const res = await initCanvas({ token: cfg?.token, baseUrl, verbose })
         // persist baseUrl / verbose if provided
-        appConfigRef.current = await saveConfig({ baseUrl, verbose })
+        appConfigRef.current = await saveConfig(persistencePatch)
         return { ok: true, insecure: !!res?.insecure }
       } catch (e: any) {
         const msg = e instanceof CanvasError ? e.message : String(e?.message || e)
@@ -111,8 +145,11 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle('canvas:clearToken', async (_evt, baseUrl?: string) => {
+  registerCanvasHandle('canvas:clearToken', async (_evt, baseUrl?: string) => {
     try {
+      if (showcaseModeActive()) {
+        return { ok: true }
+      }
       await clearToken(baseUrl)
       return { ok: true }
     } catch (e: any) {
@@ -121,7 +158,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle('canvas:getProfile', async () => {
+  registerCanvasHandle('canvas:getProfile', async () => {
     try {
       const data = await canvasGetProfile()
       return { ok: true, data }
@@ -131,7 +168,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle('canvas:getRateLimit', async () => {
+  registerCanvasHandle('canvas:getRateLimit', async () => {
     try {
       const data = await canvasGetRateLimitSnapshot()
       return { ok: true, data }
@@ -141,7 +178,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle('canvas:listCourses', async (_evt, opts?: { enrollment_state?: string }) => {
+  registerCanvasHandle('canvas:listCourses', async (_evt, opts?: { enrollment_state?: string }) => {
     try {
       const data = await canvasListCourses(opts)
       return { ok: true, data }
@@ -151,7 +188,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listDueAssignments',
     async (_evt, opts?: { days?: number; onlyPublished?: boolean; includeCourseName?: boolean }) => {
       try {
@@ -164,7 +201,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listCourseAssignments',
     async (_evt, courseId: string | number, first = 200) => {
       try {
@@ -177,7 +214,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listCourseModulesGql',
     async (_evt, courseId: string | number, first = 20, itemsFirst = 50) => {
       try {
@@ -190,7 +227,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:getCourseModuleItem',
     async (_evt, courseId: string | number, itemId: string | number) => {
       try {
@@ -203,7 +240,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle('canvas:listUpcoming', async (_evt, opts?: { onlyActiveCourses?: boolean }) => {
+  registerCanvasHandle('canvas:listUpcoming', async (_evt, opts?: { onlyActiveCourses?: boolean }) => {
     try {
       const data = await svcListUpcoming(opts)
       return { ok: true, data }
@@ -213,7 +250,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle('canvas:listTodo', async () => {
+  registerCanvasHandle('canvas:listTodo', async () => {
     try {
       const data = await svcListTodo()
       return { ok: true, data }
@@ -223,7 +260,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:getMySubmission',
     async (
       _evt,
@@ -241,7 +278,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:submitAssignment',
     async (
       _evt,
@@ -266,7 +303,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:submitAssignmentUpload',
     async (
       _evt,
@@ -340,7 +377,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle('canvas:listCoursePages', async (_evt, courseId: string | number, perPage = 100) => {
+  registerCanvasHandle('canvas:listCoursePages', async (_evt, courseId: string | number, perPage = 100) => {
     try {
       const data = await svcListCoursePages(courseId, perPage)
       return { ok: true, data }
@@ -350,7 +387,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:getCoursePage',
     async (_evt, courseId: string | number, slugOrUrl: string) => {
       try {
@@ -363,7 +400,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:getAssignmentRest',
     async (
       _evt,
@@ -381,7 +418,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle('canvas:getFile', async (_evt, fileId: string | number) => {
+  registerCanvasHandle('canvas:getFile', async (_evt, fileId: string | number) => {
     try {
       const data = await svcGetFile(fileId)
       return { ok: true, data }
@@ -391,7 +428,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listAssignmentsWithSubmission',
     async (_evt, courseId: string | number, perPage = 100) => {
       try {
@@ -404,7 +441,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listAssignmentGroups',
     async (_evt, courseId: string | number, includeAssignments = false) => {
       try {
@@ -417,7 +454,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle('canvas:listMyEnrollmentsForCourse', async (_evt, courseId: string | number) => {
+  registerCanvasHandle('canvas:listMyEnrollmentsForCourse', async (_evt, courseId: string | number) => {
     try {
       const data = await svcListMyEnrollmentsForCourse(courseId)
       return { ok: true, data }
@@ -427,7 +464,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listCourseTabs',
     async (_evt, courseId: string | number, includeExternal = true) => {
       try {
@@ -440,7 +477,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listCourseQuizzes',
     async (_evt, courseId: string | number, perPage = 100) => {
       try {
@@ -453,7 +490,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:getCourseQuiz',
     async (_evt, courseId: string | number, quizId: string | number) => {
       try {
@@ -466,7 +503,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listActivityStream',
     async (_evt, opts?: { onlyActiveCourses?: boolean; perPage?: number }) => {
       try {
@@ -479,7 +516,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listAccountNotifications',
     async (
       _evt,
@@ -496,7 +533,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listCourseAnnouncements',
     async (_evt, courseId: string | number, perPage = 50) => {
       try {
@@ -509,7 +546,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listCourseAnnouncementsPage',
     async (_evt, courseId: string | number, page = 1, perPage = 10) => {
       try {
@@ -522,7 +559,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle('canvas:getCourseInfo', async (_evt, courseId: string | number) => {
+  registerCanvasHandle('canvas:getCourseInfo', async (_evt, courseId: string | number) => {
     try {
       const data = await svcGetCourseInfo(courseId)
       return { ok: true, data }
@@ -532,7 +569,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle('canvas:getCourseFrontPage', async (_evt, courseId: string | number) => {
+  registerCanvasHandle('canvas:getCourseFrontPage', async (_evt, courseId: string | number) => {
     try {
       const data = await svcGetCourseFrontPage(courseId)
       return { ok: true, data }
@@ -542,7 +579,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listCourseFiles',
     async (
       _evt,
@@ -561,7 +598,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listCourseFolders',
     async (_evt, courseId: string | number, perPage = 100) => {
       try {
@@ -574,7 +611,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle('canvas:listFolderFiles', async (_evt, folderId: string | number, perPage = 100) => {
+  registerCanvasHandle('canvas:listFolderFiles', async (_evt, folderId: string | number, perPage = 100) => {
     try {
       const data = await svcListFolderFiles(folderId, perPage)
       return { ok: true, data }
@@ -584,7 +621,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle('canvas:listCourseUsers', async (_evt, courseId: string | number, perPage = 100) => {
+  registerCanvasHandle('canvas:listCourseUsers', async (_evt, courseId: string | number, perPage = 100) => {
     try {
       const data = await svcListCourseUsers(courseId, perPage)
       return { ok: true, data }
@@ -594,7 +631,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listCourseGroups',
     async (_evt, courseId: string | number, perPage = 100) => {
       try {
@@ -607,7 +644,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle('canvas:listMyGroups', async (_evt, contextType?: 'Account' | 'Course') => {
+  registerCanvasHandle('canvas:listMyGroups', async (_evt, contextType?: 'Account' | 'Course') => {
     try {
       const data = await svcListMyGroups(contextType)
       return { ok: true, data }
@@ -617,7 +654,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle('canvas:listGroupUsers', async (_evt, groupId: string | number, perPage = 100) => {
+  registerCanvasHandle('canvas:listGroupUsers', async (_evt, groupId: string | number, perPage = 100) => {
     try {
       const data = await svcListGroupUsers(groupId, perPage)
       return { ok: true, data }
@@ -627,7 +664,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:getAnnouncement',
     async (_evt, courseId: string | number, topicId: string | number) => {
       try {
@@ -641,7 +678,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
   )
   
   // Discussions
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listCourseDiscussions',
     async (
       _evt,
@@ -716,7 +753,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:getDiscussion',
     async (_evt, courseId: string | number, topicId: string | number) => {
       try {
@@ -729,7 +766,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:getDiscussionView',
     async (_evt, courseId: string | number, topicId: string | number) => {
       try {
@@ -742,7 +779,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:postDiscussionEntry',
     async (_evt, courseId: string | number, topicId: string | number, message: string) => {
       try {
@@ -757,7 +794,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:postDiscussionReply',
     async (
       _evt,
@@ -778,7 +815,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:markDiscussionEntriesRead',
     async (
       _evt,
@@ -798,7 +835,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle('canvas:getFileBytes', async (_evt, fileId: string | number) => {
+  registerCanvasHandle('canvas:getFileBytes', async (_evt, fileId: string | number) => {
     try {
       // Return path instead of bytes, prefixed with custom protocol
       const path = await svcDownloadFile(fileId)
@@ -813,7 +850,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle('canvas:cacheCourseImage', async (_evt, courseId: string | number, url: string) => {
+  registerCanvasHandle('canvas:cacheCourseImage', async (_evt, courseId: string | number, url: string) => {
     try {
       if (appConfigRef.current?.privateModeEnabled) {
         return { ok: false, error: 'Private Mode is enabled' }
@@ -877,7 +914,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
   })
   
   // Conversations (Inbox)
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:listConversations',
     async (
       _evt,
@@ -893,7 +930,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle('canvas:getConversation', async (_evt, conversationId: string | number) => {
+  registerCanvasHandle('canvas:getConversation', async (_evt, conversationId: string | number) => {
     try {
       const data = await svcGetConversation(conversationId)
       return { ok: true, data }
@@ -903,7 +940,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle('canvas:getUnreadCount', async () => {
+  registerCanvasHandle('canvas:getUnreadCount', async () => {
     try {
       const data = await svcGetUnreadCount()
       return { ok: true, data }
@@ -913,7 +950,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:createConversation',
     async (
       _evt,
@@ -937,7 +974,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:addMessage',
     async (_evt, conversationId: string | number, body: string, includedMessages?: string[]) => {
       try {
@@ -952,7 +989,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:updateConversation',
     async (
       _evt,
@@ -975,7 +1012,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle('canvas:deleteConversation', async (_evt, conversationId: string | number) => {
+  registerCanvasHandle('canvas:deleteConversation', async (_evt, conversationId: string | number) => {
     try {
       const blocked = rejectIfCanvasWritesDisabled()
       if (blocked) return blocked
@@ -987,7 +1024,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     }
   })
   
-  ipcMain.handle(
+  registerCanvasHandle(
     'canvas:searchRecipients',
     async (
       _evt,
@@ -1008,7 +1045,7 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     },
   )
   
-  ipcMain.handle('canvas:resolveUrl', async (_evt, url: string) => {
+  registerCanvasHandle('canvas:resolveUrl', async (_evt, url: string) => {
     try {
       if (!url.startsWith('http')) return { ok: false, error: 'Invalid URL' }
       const target = new URL(url)

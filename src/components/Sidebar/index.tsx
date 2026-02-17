@@ -122,7 +122,7 @@ export const Sidebar: React.FC<Props> = ({
         <div className="font-semibold mb-2 text-[11px] uppercase tracking-wide text-brand/70">
           At A Glance
         </div>
-        <nav className="flex flex-col">
+        <nav className="flex flex-col gap-1">
           <SidebarNavItem
             to="/dashboard"
             label="Dashboard"

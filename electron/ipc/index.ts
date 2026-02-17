@@ -14,10 +14,13 @@ export function registerIpcHandlers(deps: SharedIpcDeps) {
   registerCanvasHandlers({
     getAppConfig: deps.getAppConfig,
     setAppConfig: deps.setAppConfig,
+    isShowcaseModeAllowed: deps.isShowcaseModeAllowed,
     uploadFileMap: deps.uploadFileMap,
   })
 
   registerSystemHandlers({
+    getAppConfig: deps.getAppConfig,
+    isShowcaseModeAllowed: deps.isShowcaseModeAllowed,
     uploadFileMap: deps.uploadFileMap,
     safeContentType: deps.safeContentType,
     createContentWindow: deps.createContentWindow,
@@ -26,10 +29,13 @@ export function registerIpcHandlers(deps: SharedIpcDeps) {
   registerConfigHandlers({
     getAppConfig: deps.getAppConfig,
     setAppConfig: deps.setAppConfig,
+    isShowcaseModeAllowed: deps.isShowcaseModeAllowed,
     aiManager: deps.aiManager,
   })
 
   registerEmbeddingHandlers({
+    getAppConfig: deps.getAppConfig,
+    isShowcaseModeAllowed: deps.isShowcaseModeAllowed,
     getMainWindow: deps.getMainWindow,
     embeddingManager: deps.embeddingManager,
     fileMetaStore: deps.fileMetaStore,

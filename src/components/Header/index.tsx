@@ -5,6 +5,7 @@ import { PinnedButton } from '../PinnedButton'
 import { SearchButton } from './SearchButton'
 import { AccountButton } from './AccountButton'
 import { AccountMenu } from './AccountMenu'
+import showcaseDefaultAvatar from '../../assets/canvas-default-avatar-50.png'
 
 type Props = {
   profile?: any | null
@@ -22,9 +23,9 @@ export const Header: React.FC<Props> = ({
   onOpenInbox,
 }) => {
   const actions = useAppActions()
-  const { privateModeEnabled } = useAppFlags()
-  const name = profile?.short_name || profile?.name || 'Whiteboard'
-  const avatar = profile?.avatar_url
+  const { privateModeEnabled, showcaseModeEnabled } = useAppFlags()
+  const name = profile?.name || profile?.short_name || 'Whiteboard'
+  const avatar = showcaseModeEnabled ? showcaseDefaultAvatar : profile?.avatar_url
   const isWin =
     (typeof navigator !== 'undefined' && /windows/i.test(navigator.userAgent)) ||
     (typeof navigator !== 'undefined' &&

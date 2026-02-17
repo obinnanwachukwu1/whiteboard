@@ -10,7 +10,7 @@
         var root = document.documentElement;
         if (cache.theme === 'dark') {
           root.classList.add('dark');
-          root.style.backgroundColor = '#020617'; // slate-950 fallback
+          root.style.backgroundColor = '#000000';
           root.style.colorScheme = 'dark';
         } else {
           root.style.backgroundColor = '#ffffff';
@@ -45,7 +45,7 @@
 
     if (isDark) {
       document.documentElement.classList.add('dark');
-      document.documentElement.style.backgroundColor = '#020617';
+      document.documentElement.style.backgroundColor = '#000000';
       document.documentElement.style.colorScheme = 'dark';
     } else {
       document.documentElement.style.backgroundColor = '#ffffff';

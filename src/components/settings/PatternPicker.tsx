@@ -17,7 +17,7 @@ export function PatternPicker({
   dark,
   disabled = false,
 }: PatternPickerProps) {
-  const accent = ACCENT_PRESETS[accentPreset] || ACCENT_PRESETS.slate
+  const accent = ACCENT_PRESETS[accentPreset] || ACCENT_PRESETS.neutral
 
   return (
     <div className="space-y-2">
