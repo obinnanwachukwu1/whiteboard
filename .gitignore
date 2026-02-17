@@ -53,3 +53,4 @@ PLAN.md
 # Local app metadata (not part of OSS repo)
 .github/chatmodes/
 .github/appmod/
+.opencode/
