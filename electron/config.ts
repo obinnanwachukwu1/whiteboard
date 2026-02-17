@@ -34,6 +34,7 @@ export interface ThemeConfig {
 
 export type AppConfig = {
   baseUrl: string
+  canvasWriteEnabledByHost?: Record<string, boolean>
   verbose?: boolean
   // Legacy theme fields (for backward compatibility)
   theme?: 'light' | 'dark'
@@ -81,6 +82,7 @@ export const DEFAULT_THEME_CONFIG: ThemeConfig = {
 
 export const DEFAULT_CONFIG: AppConfig = {
   baseUrl: 'https://gatech.instructure.com',
+  canvasWriteEnabledByHost: {},
   verbose: false,
   theme: 'light',
   accent: 'default',

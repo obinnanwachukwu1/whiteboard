@@ -9,6 +9,7 @@ type Params = {
   embedBoot: boolean
   queryClient: { invalidateQueries: (opts?: any) => void; setQueryData: (key: any, data: any) => void }
   setBaseUrl: (next: string) => void
+  setCanvasWriteEnabledByHostState: (next: Record<string, boolean>) => void
   setThemeSettings: (updater: (prev: ThemeSettings) => ThemeSettings) => void
   setSidebarCfg: (next: any) => void
   setCourseImagesState: (next: Record<string, string>) => void
@@ -35,6 +36,7 @@ export function useRootLayoutBootstrap({
   embedBoot,
   queryClient,
   setBaseUrl,
+  setCanvasWriteEnabledByHostState,
   setThemeSettings,
   setSidebarCfg,
   setCourseImagesState,
@@ -59,6 +61,9 @@ export function useRootLayoutBootstrap({
       const cfg = await window.settings.get()
       const data = (cfg.ok ? (cfg.data as any) : {}) as any
       if (data?.baseUrl) setBaseUrl(data.baseUrl)
+      if (data?.canvasWriteEnabledByHost && typeof data.canvasWriteEnabledByHost === 'object') {
+        setCanvasWriteEnabledByHostState(data.canvasWriteEnabledByHost)
+      }
       const privateMode = Boolean(data?.privateModeEnabled)
       try {
         if (privateMode) localStorage.setItem('wb-private-mode', '1')

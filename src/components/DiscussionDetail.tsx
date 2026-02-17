@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { Button } from './ui/Button'
-import { ArrowLeft, MessageCircle, User, Maximize2, Minimize2, Search } from 'lucide-react'
+import { ArrowLeft, MessageCircle, User, Maximize2, Minimize2, Search, ExternalLink } from 'lucide-react'
 import { useDiscussion, useDiscussionView, useProfile } from '../hooks/useCanvasQueries'
 import { usePostDiscussionEntry, usePostDiscussionReply, useMarkDiscussionEntriesRead } from '../hooks/useCanvasMutations'
 import { HtmlContent } from './HtmlContent'
@@ -13,6 +13,8 @@ import { isSafeMediaSrc } from '../utils/urlPolicy'
 import { stripHtmlToText } from '../utils/stripHtmlToText'
 import { useAIContextOffer } from '../hooks/useAIContextOffer'
 import { formatDateTime } from '../utils/dateFormat'
+import { openExternal } from '../utils/openExternal'
+import { canvasContentUrl } from '../utils/canvasContentUrl'
 
 // Helper to check if the current user has replied in a thread
 function containsUserReply(entry: DiscussionEntry, myId: string): boolean {
@@ -41,7 +43,7 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicI
     (typeof navigator !== 'undefined' && typeof (navigator as any).platform === 'string' && /^win/i.test((navigator as any).platform))
 
   const appData = useAppData()
-  const { externalMediaEnabled } = useAppFlags()
+  const { externalMediaEnabled, canvasWriteEnabled } = useAppFlags()
   const safeAvatarUrl = (raw?: string | null) =>
     raw && isSafeMediaSrc(raw, appData.baseUrl, externalMediaEnabled) ? raw : undefined
 
@@ -64,6 +66,16 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicI
   const rawEntries = view?.view || []
   const myId = profile?.id ? String(profile.id) : null
   const unreadEntries = view?.unread_entries || []
+  const openInCanvasUrl = useMemo(
+    () =>
+      canvasContentUrl({
+        baseUrl: appData.baseUrl,
+        courseId,
+        type: 'discussion',
+        contentId: String(topicId),
+      }),
+    [appData.baseUrl, courseId, topicId],
+  )
 
   const discussionContext = useMemo(() => {
     const parts: string[] = []
@@ -106,8 +118,13 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicI
 
   useAIContextOffer(`discussion:${String(courseId)}:${String(topicId)}`, discussionOffer)
 
+  const openInCanvas = async () => {
+    await openExternal(openInCanvasUrl)
+  }
+
   // Mark unread entries as read when they're loaded
   useEffect(() => {
+    if (!canvasWriteEnabled) return
     if (!unreadEntries.length) return
 
     // Filter out entries we've already marked
@@ -119,7 +136,7 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicI
 
     // Mark as read (fire and forget - don't block UI)
     markEntriesRead.mutate({ courseId, topicId, entryIds: toMark })
-  }, [courseId, topicId, unreadEntries])
+  }, [canvasWriteEnabled, courseId, topicId, unreadEntries])
 
   const searchTerm = deferredSearch.trim().toLowerCase()
   const searchCache = useMemo(() => new Map<string, boolean>(), [searchTerm, rawEntries])
@@ -196,6 +213,7 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicI
   }
 
   const handleSubmitReply = async (html: string) => {
+    if (!canvasWriteEnabled) return
     if (!html || html === '<p></p>') return
 
     try {
@@ -264,17 +282,29 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicI
 
           {/* Reply button */}
           <div className="mt-3 flex items-center gap-2">
-            <button
-              onClick={() => setReplyingTo(replyingTo === entry.id ? null : entry.id)}
-              className="text-xs font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200 flex items-center gap-1.5 px-2 py-1 -ml-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-            >
-              <MessageCircle className="w-3.5 h-3.5" />
-              Reply
-            </button>
+            {canvasWriteEnabled ? (
+              <button
+                onClick={() => setReplyingTo(replyingTo === entry.id ? null : entry.id)}
+                className="text-xs font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200 flex items-center gap-1.5 px-2 py-1 -ml-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                Reply
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  void openInCanvas()
+                }}
+                className="text-xs font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200 flex items-center gap-1.5 px-2 py-1 -ml-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Open in Canvas
+              </button>
+            )}
           </div>
 
           {/* Inline reply form */}
-          {replyingTo === entry.id && (
+          {canvasWriteEnabled && replyingTo === entry.id && (
             <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-200">
               <RichTextEditor
                 placeholder="Write a reply..."
@@ -338,6 +368,27 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicI
           </div>
         )}
 
+        {!canvasWriteEnabled && (
+          <div className="mb-6 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 p-5 text-center">
+            <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">
+              Read-Only Mode
+            </h3>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4 max-w-sm mx-auto">
+              Posting and read-state updates are disabled in Whiteboard for this school.
+            </p>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={openInCanvas}
+              disabled={!openInCanvasUrl}
+              className="gap-2 border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open in Canvas
+            </Button>
+          </div>
+        )}
+
         {/* Replies */}
         <div className="space-y-4">
           <div className="flex items-center justify-between mb-4 px-2">
@@ -367,6 +418,7 @@ export const DiscussionDetail: React.FC<Props> = ({ courseId, courseName, topicI
   }
 
   const renderReplyBox = (isFullscreen: boolean) => {
+    if (!canvasWriteEnabled) return null
     if (isLoading || !topic || topic.locked || replyingTo !== null) return null
     const immersiveSurfaceClass =
       isEmbedded || isFullscreen ? 'bg-[var(--app-accent-bg)]' : 'bg-white dark:bg-neutral-900'

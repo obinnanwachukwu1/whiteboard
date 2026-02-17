@@ -634,6 +634,7 @@ export const CanvasContentView: React.FC<Props> = ({
                       assignmentRestId={contentId}
                       assignment={assignQ.data}
                       submission={submissionQ.data || assignQ.data.submission || null}
+                      openInCanvasUrl={openInCanvasUrl}
                       discussion={
                         isDiscussionAssignment && discussionTopic
                           ? {

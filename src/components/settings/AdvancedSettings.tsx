@@ -8,6 +8,8 @@ import { Loader2, Database, HardDrive } from 'lucide-react'
 export function AdvancedSettings() {
   const queryClient = useQueryClient()
   const {
+    canvasWriteEnabled,
+    canvasWriteForcedBySchool,
     embeddingsEnabled,
     prefetchEnabled,
     reduceEffectsEnabled,
@@ -17,6 +19,7 @@ export function AdvancedSettings() {
     verbose,
   } = useAppFlags()
   const {
+    setCanvasWriteEnabled,
     setPrefetchEnabled,
     setReduceEffectsEnabled,
     setExternalEmbedsEnabled,
@@ -126,6 +129,15 @@ export function AdvancedSettings() {
 
   return (
     <SettingsSection title="Advanced">
+      {!canvasWriteForcedBySchool && (
+        <SettingsRow
+          label="Canvas Write Actions"
+          description="Allow assignment submissions, discussion posts, and inbox actions in Whiteboard"
+        >
+          <Toggle checked={canvasWriteEnabled} onChange={setCanvasWriteEnabled} />
+        </SettingsRow>
+      )}
+
       <SettingsRow
         label="Prefetch Data"
         description="Speed up navigation by preloading courses"

@@ -13,6 +13,8 @@ export type AppFlagsValue = {
   aiEnabled: boolean
   aiAvailable: boolean
   aiAvailability: AIAvailability | null
+  canvasWriteEnabled: boolean
+  canvasWriteForcedBySchool: boolean
   embeddingsEnabled: boolean
   privateModeEnabled: boolean
   privateModeAcknowledged: boolean
@@ -34,6 +36,7 @@ export function useAppFlags(): AppFlagsValue {
 }
 
 export type AppSettingsValue = {
+  setCanvasWriteEnabled: (v: boolean) => Promise<void>
   setPrefetchEnabled: (v: boolean) => Promise<void>
   setReduceEffectsEnabled: (v: boolean) => Promise<void>
   setExternalEmbedsEnabled: (v: boolean) => Promise<void>

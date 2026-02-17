@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { X, Plus } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { ConversationScope } from '../../types/canvas'
@@ -7,6 +7,8 @@ import { SlideInPanel } from '../SlideInPanel'
 import { ConversationList } from './ConversationList'
 import { ConversationThread } from './ConversationThread'
 import { ComposeMessage } from './ComposeMessage'
+import { useAppData, useAppFlags } from '../../context/AppContext'
+import { openExternal } from '../../utils/openExternal'
 
 type Props = {
   isOpen: boolean
@@ -23,10 +25,16 @@ const SCOPES: { value: ConversationScope | 'all'; label: string }[] = [
 
 export const InboxPanel: React.FC<Props> = ({ isOpen, onClose }) => {
   const queryClient = useQueryClient()
+  const { baseUrl } = useAppData()
+  const { canvasWriteEnabled } = useAppFlags()
   const [scope, setScope] = useState<ConversationScope | 'all'>('all')
   const [selectedConversation, setSelectedConversation] = useState<string | number | null>(null)
   const [isComposing, setIsComposing] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
+  const openInCanvasUrl = useMemo(() => {
+    const base = String(baseUrl || '').replace(/\/+$/, '')
+    return base ? `${base}/conversations` : null
+  }, [baseUrl])
 
   useEffect(() => {
     if (!isOpen) return
@@ -50,6 +58,15 @@ export const InboxPanel: React.FC<Props> = ({ isOpen, onClose }) => {
       setIsComposing(false)
     }
   }, [isOpen])
+
+  const openInboxInCanvas = async (conversationId?: string | number | null) => {
+    if (conversationId != null) {
+      const base = String(baseUrl || '').replace(/\/+$/, '')
+      await openExternal(base ? `${base}/conversations/${conversationId}` : null)
+      return
+    }
+    await openExternal(openInCanvasUrl)
+  }
 
   useEffect(() => {
     if (!isOpen) return
@@ -82,14 +99,28 @@ export const InboxPanel: React.FC<Props> = ({ isOpen, onClose }) => {
         </h2>
         <div className="flex items-center gap-1.5 app-no-drag">
           {!selectedConversation && !isComposing && (
-            <button
-              onClick={() => setIsComposing(true)}
-              className="inline-flex items-center gap-1.5 h-7 px-2.5 text-xs rounded-lg text-white hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: 'var(--accent-600)' }}
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Compose
-            </button>
+            <>
+              {canvasWriteEnabled ? (
+                <button
+                  onClick={() => setIsComposing(true)}
+                  className="inline-flex items-center gap-1.5 h-7 px-2.5 text-xs rounded-lg text-white hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: 'var(--accent-600)' }}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Compose
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    void openInboxInCanvas()
+                  }}
+                  className="inline-flex items-center h-7 px-2.5 text-xs rounded-lg text-white hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: 'var(--accent-600)' }}
+                >
+                  Open in Canvas
+                </button>
+              )}
+            </>
           )}
           <button
             onClick={onClose}
@@ -109,11 +140,31 @@ export const InboxPanel: React.FC<Props> = ({ isOpen, onClose }) => {
             setIsComposing(false)
             setScope('sent')
           }}
+          readOnly={!canvasWriteEnabled}
+          onOpenInCanvas={openInboxInCanvas}
         />
       ) : selectedConversation ? (
-        <ConversationThread conversationId={selectedConversation} onBack={() => setSelectedConversation(null)} />
+        <ConversationThread
+          conversationId={selectedConversation}
+          onBack={() => setSelectedConversation(null)}
+          readOnly={!canvasWriteEnabled}
+          onOpenInCanvas={() => openInboxInCanvas(selectedConversation)}
+        />
       ) : (
         <>
+          {!canvasWriteEnabled && (
+            <div className="px-4 py-2 border-b border-gray-200/50 dark:border-neutral-700/50 bg-amber-50/70 dark:bg-amber-900/20 text-xs text-amber-800 dark:text-amber-200 flex items-center justify-between gap-3">
+              <span>Inbox is read-only in Whiteboard for this school.</span>
+              <button
+                onClick={() => {
+                  void openInboxInCanvas()
+                }}
+                className="shrink-0 font-medium underline underline-offset-2"
+              >
+                Open in Canvas
+              </button>
+            </div>
+          )}
           <div className="flex-shrink-0 px-4 py-2 border-b border-gray-200/50 dark:border-neutral-700/50 overflow-x-auto">
             <div className="flex gap-1">
               {SCOPES.map((s) => (
@@ -137,7 +188,13 @@ export const InboxPanel: React.FC<Props> = ({ isOpen, onClose }) => {
             scope={scope}
             selectedId={selectedConversation ?? undefined}
             onSelect={setSelectedConversation}
-            onCompose={() => setIsComposing(true)}
+            onCompose={() => {
+              if (!canvasWriteEnabled) {
+                void openInboxInCanvas()
+                return
+              }
+              setIsComposing(true)
+            }}
           />
         </>
       )}

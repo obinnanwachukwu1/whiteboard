@@ -26,6 +26,11 @@ import { useRootLayoutBootstrap } from './useRootLayoutBootstrap'
 import { useRootLayoutUserSettings } from './useRootLayoutUserSettings'
 import { setEncryptionEnabledFlag } from '../../utils/secureStorage'
 import {
+  isCanvasWriteEnabledForBaseUrl,
+  isCanvasWriteForcedOffForBaseUrl,
+  withCanvasWriteEnabledForBaseUrl,
+} from '../../shared/canvasWritePolicy'
+import {
   filterVisibleCourses,
   toHiddenCourseIdSet,
   updateHiddenCourseIds,
@@ -40,6 +45,9 @@ export function useRootLayoutState() {
 
   const [token, setToken] = useState('')
   const [baseUrl, setBaseUrl] = useState('https://gatech.instructure.com')
+  const [canvasWriteEnabledByHost, setCanvasWriteEnabledByHostState] = useState<
+    Record<string, boolean>
+  >({})
   const [hasToken, setHasToken] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(false)
   const [showToken, setShowToken] = useState(false)
@@ -172,6 +180,7 @@ export function useRootLayoutState() {
     embedBoot,
     queryClient,
     setBaseUrl,
+    setCanvasWriteEnabledByHostState,
     setThemeSettings,
     setSidebarCfg,
     setCourseImagesState,
@@ -469,6 +478,24 @@ export function useRootLayoutState() {
     }
     clearedForPrivateModeRef.current = false
   }, [privateModeEnabled, clearLocalCaches, userSettingsHydrated])
+
+  const setCanvasWriteEnabledPersisted = useCallback(
+    async (v: boolean) => {
+      if (isCanvasWriteForcedOffForBaseUrl(baseUrl)) return
+      try {
+        const cfg = await window.settings.get?.()
+        const data = (cfg?.ok ? (cfg.data as any) : {}) || {}
+        const next = withCanvasWriteEnabledForBaseUrl(
+          baseUrl,
+          (data.canvasWriteEnabledByHost || canvasWriteEnabledByHost) as Record<string, boolean>,
+          v,
+        )
+        setCanvasWriteEnabledByHostState(next)
+        await window.settings.set?.({ canvasWriteEnabledByHost: next })
+      } catch {}
+    },
+    [baseUrl, canvasWriteEnabledByHost],
+  )
 
   const setPrefetchEnabledPersisted = useCallback(
     async (v: boolean) => {
@@ -851,6 +878,14 @@ export function useRootLayoutState() {
     else delete root.dataset.reduceEffects
   }, [reduceEffectsEnabled])
 
+  const canvasWriteForcedBySchool = useMemo(
+    () => isCanvasWriteForcedOffForBaseUrl(baseUrl),
+    [baseUrl],
+  )
+  const canvasWriteEnabled = useMemo(
+    () => isCanvasWriteEnabledForBaseUrl(baseUrl, canvasWriteEnabledByHost),
+    [baseUrl, canvasWriteEnabledByHost],
+  )
   const aiAvailable = aiAvailability?.status === 'available'
 
   const flagsContext: AppFlagsValue = useMemo(
@@ -858,6 +893,8 @@ export function useRootLayoutState() {
       aiEnabled,
       aiAvailable,
       aiAvailability,
+      canvasWriteEnabled,
+      canvasWriteForcedBySchool,
       embeddingsEnabled,
       privateModeEnabled,
       privateModeAcknowledged,
@@ -873,6 +910,8 @@ export function useRootLayoutState() {
       aiEnabled,
       aiAvailable,
       aiAvailability,
+      canvasWriteEnabled,
+      canvasWriteForcedBySchool,
       embeddingsEnabled,
       privateModeEnabled,
       privateModeAcknowledged,
@@ -888,6 +927,7 @@ export function useRootLayoutState() {
 
   const settingsContext: AppSettingsValue = useMemo(
     () => ({
+      setCanvasWriteEnabled: setCanvasWriteEnabledPersisted,
       setPrefetchEnabled: setPrefetchEnabledPersisted,
       setReduceEffectsEnabled: setReduceEffectsEnabledPersisted,
       setExternalEmbedsEnabled: setExternalEmbedsEnabledPersisted,
@@ -900,6 +940,7 @@ export function useRootLayoutState() {
       setVerbose: setVerbosePersisted,
     }),
     [
+      setCanvasWriteEnabledPersisted,
       setPrefetchEnabledPersisted,
       setReduceEffectsEnabledPersisted,
       setExternalEmbedsEnabledPersisted,

@@ -61,6 +61,10 @@ import {
   getMySubmission as svcGetMySubmission,
 } from '../canvasClient'
 import { DEFAULT_CONFIG, type AppConfig, saveConfig } from '../config'
+import {
+  CANVAS_WRITE_BLOCKED_ERROR,
+  isCanvasWriteEnabledForBaseUrl,
+} from '../../src/shared/canvasWritePolicy'
 
 export type CanvasIpcDeps = {
   getAppConfig: () => AppConfig
@@ -76,6 +80,17 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     set current(next: AppConfig) {
       deps.setAppConfig(next)
     },
+  }
+
+  const canvasWritesEnabled = () =>
+    isCanvasWriteEnabledForBaseUrl(
+      appConfigRef.current?.baseUrl || DEFAULT_CONFIG.baseUrl,
+      appConfigRef.current?.canvasWriteEnabledByHost,
+    )
+
+  const rejectIfCanvasWritesDisabled = () => {
+    if (canvasWritesEnabled()) return null
+    return { ok: false, error: CANVAS_WRITE_BLOCKED_ERROR }
   }
 
   const { uploadFileMap } = deps
@@ -240,6 +255,8 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
       },
     ) => {
       try {
+        const blocked = rejectIfCanvasWritesDisabled()
+        if (blocked) return blocked
         const data = await svcSubmitAssignment(courseId, assignmentRestId, params)
         return { ok: true, data }
       } catch (e: any) {
@@ -258,6 +275,8 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
       fileHandles: string[],
     ) => {
       try {
+        const blocked = rejectIfCanvasWritesDisabled()
+        if (blocked) return blocked
         // Security: Fetch assignment details from Canvas to get authoritative allowed_extensions
         // Do NOT trust the renderer to provide the allowlist.
         const assignment = await svcGetAssignmentRest(courseId, assignmentRestId)
@@ -727,6 +746,8 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     'canvas:postDiscussionEntry',
     async (_evt, courseId: string | number, topicId: string | number, message: string) => {
       try {
+        const blocked = rejectIfCanvasWritesDisabled()
+        if (blocked) return blocked
         const data = await svcPostDiscussionEntry(courseId, topicId, message)
         return { ok: true, data }
       } catch (e: any) {
@@ -746,6 +767,8 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
       message: string,
     ) => {
       try {
+        const blocked = rejectIfCanvasWritesDisabled()
+        if (blocked) return blocked
         const data = await svcPostDiscussionReply(courseId, topicId, entryId, message)
         return { ok: true, data }
       } catch (e: any) {
@@ -764,6 +787,8 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
       entryIds: (string | number)[],
     ) => {
       try {
+        const blocked = rejectIfCanvasWritesDisabled()
+        if (blocked) return blocked
         const data = await svcMarkDiscussionEntriesRead(courseId, topicId, entryIds)
         return { ok: true, data }
       } catch (e: any) {
@@ -901,6 +926,8 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
       },
     ) => {
       try {
+        const blocked = rejectIfCanvasWritesDisabled()
+        if (blocked) return blocked
         const data = await svcCreateConversation(params)
         return { ok: true, data }
       } catch (e: any) {
@@ -914,6 +941,8 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
     'canvas:addMessage',
     async (_evt, conversationId: string | number, body: string, includedMessages?: string[]) => {
       try {
+        const blocked = rejectIfCanvasWritesDisabled()
+        if (blocked) return blocked
         const data = await svcAddMessage(conversationId, body, includedMessages)
         return { ok: true, data }
       } catch (e: any) {
@@ -935,6 +964,8 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
       },
     ) => {
       try {
+        const blocked = rejectIfCanvasWritesDisabled()
+        if (blocked) return blocked
         const data = await svcUpdateConversation(conversationId, params)
         return { ok: true, data }
       } catch (e: any) {
@@ -946,6 +977,8 @@ export function registerCanvasHandlers(deps: CanvasIpcDeps) {
   
   ipcMain.handle('canvas:deleteConversation', async (_evt, conversationId: string | number) => {
     try {
+      const blocked = rejectIfCanvasWritesDisabled()
+      if (blocked) return blocked
       const data = await svcDeleteConversation(conversationId)
       return { ok: true, data }
     } catch (e: any) {

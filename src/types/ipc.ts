@@ -201,6 +201,7 @@ export interface CanvasApi {
 
 export interface SettingsData {
   baseUrl: string
+  canvasWriteEnabledByHost?: Record<string, boolean>
   verbose?: boolean
   theme?: 'light' | 'dark'
   accent?: 'default' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet'

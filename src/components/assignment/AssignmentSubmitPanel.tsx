@@ -12,6 +12,7 @@ import {
 import type { AssignmentRestDetail, SubmissionDetail } from '../../types/canvas'
 import { Button } from '../ui/Button'
 import { useSubmitAssignment, useSubmitAssignmentUpload } from '../../hooks/useCanvasMutations'
+import { useAppFlags } from '../../context/AppContext'
 
 type PickedFile = { path: string; name: string; size: number }
 
@@ -24,6 +25,7 @@ type Props = {
     title: string
     onOpen: () => void
   }
+  openInCanvasUrl?: string | null
 }
 
 export const AssignmentSubmitPanel: React.FC<Props> = ({
@@ -32,7 +34,9 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({
   assignment,
   submission,
   discussion,
+  openInCanvasUrl,
 }) => {
+  const { canvasWriteEnabled } = useAppFlags()
   const submissionTypes = Array.isArray(assignment.submission_types)
     ? assignment.submission_types
     : []
@@ -103,8 +107,11 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({
     return false
   }, [submission])
 
+  const externalPortalTarget =
+    openInCanvasUrl || assignment.html_url || assignment.external_tool_tag_attributes?.url
+
   const openExternalPortal = async () => {
-    const target = assignment.html_url || assignment.external_tool_tag_attributes?.url
+    const target = externalPortalTarget
     if (!target) return
     try {
       await window.system.openExternal(target)
@@ -258,7 +265,7 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({
                 </div>
               )}
 
-              {!locked && !attempting && (
+              {!locked && canvasWriteEnabled && !attempting && (
                 <div className="flex items-center gap-2">
                   {discussion?.onOpen && (
                     <Button
@@ -321,6 +328,7 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({
             size="sm"
             variant="ghost"
             onClick={openExternalPortal}
+            disabled={!externalPortalTarget}
             className="gap-2 border border-neutral-200 dark:border-neutral-700"
           >
             <ExternalLink className="w-4 h-4" />
@@ -358,6 +366,32 @@ export const AssignmentSubmitPanel: React.FC<Props> = ({
   }
 
   if (!canSubmitInApp) return null
+
+  if (!canvasWriteEnabled) {
+    return (
+      <div className="mb-8">
+        {renderSubmissionStatus()}
+        <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 p-6 text-center">
+          <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">
+            Submit Assignment
+          </h3>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4 max-w-sm mx-auto">
+            Assignment submissions are disabled in Whiteboard for this school. Submit in Canvas.
+          </p>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={openExternalPortal}
+              disabled={!externalPortalTarget}
+              className="gap-2 border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800"
+            >
+            <ExternalLink className="w-4 h-4" />
+            Open in Canvas
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   // If already submitted and not attempting a new one, just show status
   if (hasSubmission && !attempting) {

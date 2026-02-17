@@ -15,9 +15,16 @@ import { getParticipantNames } from './utils'
 type Props = {
   conversationId: string | number
   onBack: () => void
+  readOnly?: boolean
+  onOpenInCanvas?: () => void
 }
 
-export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) => {
+export const ConversationThread: React.FC<Props> = ({
+  conversationId,
+  onBack,
+  readOnly = false,
+  onOpenInCanvas,
+}) => {
   const {
     data: conversation,
     isLoading,
@@ -40,6 +47,7 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
   }, [conversationId])
 
   useEffect(() => {
+    if (readOnly) return
     if (!conversation) return
     const convId = String(conversation.id)
     if (conversation.workflow_state !== 'unread') return
@@ -50,9 +58,10 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
       conversationId: conversation.id,
       params: { workflowState: 'read' },
     })
-  }, [conversation, updateMutation])
+  }, [conversation, readOnly, updateMutation])
 
   const handleToggleStar = () => {
+    if (readOnly) return
     if (!conversation) return
     updateMutation.mutate({
       conversationId,
@@ -61,6 +70,7 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
   }
 
   const handleArchive = () => {
+    if (readOnly) return
     updateMutation.mutate({
       conversationId,
       params: { workflowState: 'archived' },
@@ -69,6 +79,7 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
   }
 
   const handleDelete = () => {
+    if (readOnly) return
     setConfirmDeleteOpen(true)
   }
 
@@ -140,7 +151,7 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
           <div className="flex items-center gap-1">
             <button
               onClick={handleToggleStar}
-              disabled={!conversation}
+              disabled={!conversation || readOnly}
               className={`p-1.5 rounded-md transition-colors ${
                 conversation?.starred
                   ? 'text-[color:var(--accent-700)]'
@@ -156,7 +167,7 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
             </button>
             <button
               onClick={handleArchive}
-              disabled={!conversation}
+              disabled={!conversation || readOnly}
               className={`p-1.5 rounded-md text-[color:var(--accent-600)] hover:bg-[color:var(--accent-100)] dark:hover:bg-[color:var(--accent-50)] hover:text-[color:var(--accent-700)] transition-colors ${!conversation ? 'opacity-50' : ''}`}
               title="Archive"
             >
@@ -164,7 +175,7 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
             </button>
             <button
               onClick={handleDelete}
-              disabled={!conversation}
+              disabled={!conversation || readOnly}
               className={`p-1.5 rounded-md text-[color:var(--accent-600)] hover:bg-[color:var(--accent-100)] dark:hover:bg-[color:var(--accent-50)] hover:text-[color:var(--accent-700)] transition-colors ${!conversation ? 'opacity-50' : ''}`}
               title="Delete"
             >
@@ -173,6 +184,17 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
           </div>
         </div>
       </div>
+      {readOnly && (
+        <div className="px-4 py-2 border-b border-gray-200/50 dark:border-neutral-700/50 bg-amber-50/70 dark:bg-amber-900/20 text-xs text-amber-800 dark:text-amber-200 flex items-center justify-between gap-3">
+          <span>Inbox is read-only in Whiteboard for this school.</span>
+          <button
+            onClick={() => onOpenInCanvas?.()}
+            className="shrink-0 font-medium underline underline-offset-2"
+          >
+            Open in Canvas
+          </button>
+        </div>
+      )}
 
       <MessageList
         key={String(conversationId)}
@@ -182,11 +204,13 @@ export const ConversationThread: React.FC<Props> = ({ conversationId, onBack }) 
         hasConversation={!!conversation}
       />
 
-      <ReplyComposer
-        conversationId={conversationId}
-        disabled={!conversation || isLoading}
-        addMessageMutation={addMessageMutation}
-      />
+      {!readOnly && (
+        <ReplyComposer
+          conversationId={conversationId}
+          disabled={!conversation || isLoading}
+          addMessageMutation={addMessageMutation}
+        />
+      )}
     </div>
   )
 }
