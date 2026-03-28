@@ -60,7 +60,7 @@
     "adm-zip": "^0.5.16",
     "axios": "^1.13.5",
     "docx-preview": "^0.3.1",
-    "dompurify": "^3.2.6",
+    "dompurify": "^3.3.2",
     "flexsearch": "^0.8.212",
     "form-data": "^4.0.5",
     "global-agent": "^3.0.0",
