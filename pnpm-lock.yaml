@@ -18,6 +18,7 @@ overrides:
   picomatch@4.0.3: 4.0.4
   protobufjs: 7.6.4
   '@protobufjs/utf8': 1.1.1
+  adm-zip: 0.6.0
   seroval: ^1.4.1
   tar: 7.5.16
   '@xmldom/xmldom': 0.8.13
@@ -85,8 +86,8 @@ importers:
         specifier: ^10.3.1
         version: 10.3.1(react@18.3.1)
       adm-zip:
-        specifier: ^0.5.16
-        version: 0.5.16
+        specifier: 0.6.0
+        version: 0.6.0
       axios:
         specifier: 1.16.0
         version: 1.16.0
@@ -1621,9 +1622,9 @@ packages:
     engines: {node: '>=0.4.0'}
     hasBin: true
 
-  adm-zip@0.5.16:
-    resolution: {integrity: sha512-TGw5yVi4saajsSEgz25grObGHEUaDrniwvA2qwSC060KfqGPdglhvPMA2lPIoxs3PQIItj2iag35fONcQqgUaQ==}
-    engines: {node: '>=12.0'}
+  adm-zip@0.6.0:
+    resolution: {integrity: sha512-XleryMhbuksdKtofnWZ9Sk+4CUTbms4Mb/EU32SZwToAyZ5RgVos/ki8n+yr0LWHOGKuakbXTuuYNHLQjhddgg==}
+    engines: {node: '>=14.0'}
 
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
@@ -5149,7 +5150,7 @@ snapshots:
 
   acorn@8.15.0: {}
 
-  adm-zip@0.5.16: {}
+  adm-zip@0.6.0: {}
 
   agent-base@7.1.4: {}
 
@@ -6512,7 +6513,7 @@ snapshots:
 
   onnxruntime-node@1.23.2:
     dependencies:
-      adm-zip: 0.5.16
+      adm-zip: 0.6.0
       global-agent: 3.0.0
       onnxruntime-common: 1.23.2
 
