@@ -43,10 +43,10 @@
       "tmp": "0.2.7",
       "esbuild": "0.28.1",
       "fast-uri": "3.1.6",
-      "js-yaml": "4.3.1",
+      "js-yaml": "4.3.2",
       "nanoid": "3.3.18",
       "linkify-it": "5.0.2",
-      "sharp": "0.35.0",
+      "sharp": "0.35.4",
       "postcss": "8.5.23"
     },
     "onlyBuiltDependencies": [
@@ -126,7 +126,7 @@
     "vite": "^7.3.5",
     "vite-plugin-electron": "^0.29.0",
     "vite-plugin-electron-renderer": "^0.14.6",
-    "vitest": "^3.2.6"
+    "vitest": "^4.1.11"
   },
   "main": "dist-electron/main.js"
 }
