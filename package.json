@@ -35,7 +35,7 @@
       "protobufjs": "7.6.5",
       "@protobufjs/utf8": "1.1.1",
       "adm-zip": "0.6.1",
-      "seroval": "1.5.3",
+      "seroval": "1.6.3",
       "tar": "7.5.21",
       "@xmldom/xmldom": "0.8.15",
       "browserslist": "4.28.7",
@@ -48,8 +48,9 @@
       "js-yaml": "4.3.2",
       "nanoid": "3.3.18",
       "linkify-it": "5.0.2",
-      "sharp": "0.35.4",
-      "postcss": "8.5.23"
+      "sharp": "0.35.5",
+      "postcss": "8.5.23",
+      "source-map-js": "1.2.2"
     },
     "onlyBuiltDependencies": [
       "electron",
