@@ -26,9 +26,9 @@
       "ajv@6.12.6": "6.14.0",
       "brace-expansion@1.1.12": "1.1.13",
       "flatted@3.3.3": "3.4.2",
-      "follow-redirects": "1.16.0",
+      "follow-redirects": "1.16.1",
       "ip-address": "10.7.3",
-      "markdown-it": "14.2.0",
+      "markdown-it": "14.3.3",
       "minimatch@3.1.2": "3.1.5",
       "minimatch@10.1.1": "10.2.5",
       "picomatch@4.0.3": "4.0.4",
@@ -50,7 +50,18 @@
       "linkify-it": "5.0.2",
       "sharp": "0.35.5",
       "postcss": "8.5.23",
-      "source-map-js": "1.2.2"
+      "source-map-js": "1.2.2",
+      "vitest@>=4 <4.1.12": "4.1.12",
+      "@vitest/mocker@>=4 <4.1.12": "4.1.12",
+      "@vitest/browser@>=4 <4.1.12": "4.1.12",
+      "@vitest/browser-preview@>=4 <4.1.12": "4.1.12",
+      "@vitest/runner@>=4 <4.1.12": "4.1.12",
+      "@vitest/expect@>=4 <4.1.12": "4.1.12",
+      "@vitest/snapshot@>=4 <4.1.12": "4.1.12",
+      "@vitest/utils@>=4 <4.1.12": "4.1.12",
+      "@vitest/coverage-v8@>=4 <4.1.12": "4.1.12",
+      "@vitest/spy@>=4 <4.1.12": "4.1.12",
+      "@vitest/pretty-format@>=4 <4.1.12": "4.1.12"
     },
     "onlyBuiltDependencies": [
       "electron",
@@ -126,10 +137,10 @@
     "prettier": "^3.8.1",
     "tailwindcss": "^4.1.12",
     "typescript": "^5.2.2",
-    "vite": "^7.3.5",
+    "vite": "^7.3.7",
     "vite-plugin-electron": "^0.29.0",
     "vite-plugin-electron-renderer": "^0.14.6",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "main": "dist-electron/main.js"
 }
