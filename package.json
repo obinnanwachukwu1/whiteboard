@@ -26,7 +26,7 @@
       "ajv@6.12.6": "6.14.0",
       "brace-expansion@1.1.12": "1.1.13",
       "flatted@3.3.3": "3.4.2",
-      "follow-redirects": "1.16.0",
+      "follow-redirects": "1.16.2",
       "ip-address": "10.7.3",
       "markdown-it": "14.2.0",
       "minimatch@3.1.2": "3.1.5",
@@ -35,16 +35,16 @@
       "protobufjs": "7.6.5",
       "@protobufjs/utf8": "1.1.1",
       "adm-zip": "0.6.1",
-      "seroval": "1.6.3",
+      "seroval": "1.6.11",
       "tar": "7.5.21",
       "@xmldom/xmldom": "0.8.15",
       "browserslist": "4.28.7",
       "brace-expansion": "5.0.12",
       "tmp": "0.2.7",
       "esbuild": "0.28.1",
-      "fast-uri": "3.1.8",
-      "undici@>=6 <7": "6.28.1",
-      "undici@>=7 <8": "7.29.1",
+      "fast-uri": "3.1.9",
+      "undici@>=6 <7": "6.29.1",
+      "undici@>=7 <8": "7.30.2",
       "js-yaml": "4.3.2",
       "nanoid": "3.3.18",
       "linkify-it": "5.0.2",
@@ -85,7 +85,7 @@
     "adm-zip": "^0.6.1",
     "axios": "1.20.0",
     "docx-preview": "^0.3.1",
-    "dompurify": "3.4.16",
+    "dompurify": "3.4.17",
     "flexsearch": "^0.8.212",
     "form-data": "^4.0.6",
     "global-agent": "^3.0.0",
@@ -102,7 +102,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "unpdf": "^1.4.0",
-    "zod": "^4.0.17"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@babel/core": "7.29.7",
@@ -126,10 +126,10 @@
     "prettier": "^3.8.1",
     "tailwindcss": "^4.1.12",
     "typescript": "^5.2.2",
-    "vite": "^7.3.5",
+    "vite": "^7.3.7",
     "vite-plugin-electron": "^0.29.0",
     "vite-plugin-electron-renderer": "^0.14.6",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "main": "dist-electron/main.js"
 }
